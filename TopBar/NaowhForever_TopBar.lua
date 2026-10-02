@@ -712,6 +712,8 @@ local function Apply()
     clockText.last = nil
     PaintClock()
     bar.sys.text:SetFont(ns.UIFontPath(), S.Get("sysSize"), "OUTLINE")
+    -- The "FPS:" and "MS:" labels; the numbers keep their own status colors.
+    bar.sys.text:SetTextColor(Tone("fg", 1))
     bar.sys:SetHeight(S.Get("sysSize") + 3)
 
     local left, right = GroupKeys()

@@ -255,4 +255,35 @@ do
     Check(not source:find("SetTextColor(1, 1, 1)", 1, true), "topbar: no fixed white clock text is left")
 end
 
+-- The launcher tooltips: the game's gold title and white lines, or the theme's Accent and Text.
+do
+    local source = Read("Core/NaowhForever_Window.lua")
+    local TIP_TITLE, TIP_TEXT = Const(source, "TIP_TITLE"), Const(source, "TIP_TEXT")
+    Check(IsRGB(TIP_TITLE, 1, 0.82, 0) and IsRGB(TIP_TEXT, 1, 1, 1), "launcher tooltip literals are the originals")
+    local code = assert(source:match("(local function TipTitle%(tooltip, text%).-\nend\nlocal function TipLine%(tooltip, text%).-\nend)"))
+    local function Tips(account)
+        local lines = {}
+        local tooltip = { AddLine = function(_, text, r, g, b) lines[#lines + 1] = { text, r, g, b } end }
+        local chunk = assert(loadstring(code .. "\nTipTitle(tooltip, 'T') TipLine(tooltip, 'L')"))
+        local core = LoadCore(account)
+        setfenv(chunk, setmetatable({ ns = core, tooltip = tooltip, TIP_TITLE = TIP_TITLE, TIP_TEXT = TIP_TEXT }, { __index = _G }))
+        chunk()
+        return lines, core.THEME
+    end
+    local lines = Tips({})
+    Check(Same(lines[1], { "T", 1, 0.82, 0 }) and Same(lines[2], { "L", 1, 1, 1 }), "launcher tooltip: the default theme keeps the gold title and white lines")
+    local t
+    lines, t = Tips(ACCENT_PRESET)
+    Check(Same(lines[1], { "T", t.accent.r, t.accent.g, t.accent.b }), "launcher tooltip: the title follows Accent")
+    Check(Same(lines[2], { "L", t.fg.r, t.fg.g, t.fg.b }), "launcher tooltip: the lines follow Text")
+    Check(not source:find('tooltip:AddLine(mod.name)', 1, true) and not source:find('tooltip:AddLine("Naowh Forever")', 1, true),
+        "launcher tooltip: no untinted title is left")
+end
+
+-- The FPS / MS readout's labels follow Text; its numbers keep their status colors.
+do
+    local source = Read("TopBar/NaowhForever_TopBar.lua")
+    Check(source:find('bar.sys.text:SetTextColor(Tone("fg", 1))', 1, true), "topbar: the FPS / MS labels are set from Text")
+end
+
 print("PASS theme HUD: " .. cases .. " checks")

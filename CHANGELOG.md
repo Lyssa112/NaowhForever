@@ -98,7 +98,7 @@
 - Dungeon Journal: its data is updated to WoW Forever build 1.60.1.70170: 4 faction rewards changed (item levels, required levels).
 
 ### Fixed
-- Themes: the Top Bar's clock and its tooltips follow your Text and Secondary Text colors instead of staying white and grey. Looks the same with the default theme.
+- Themes: the Top Bar's clock, its FPS / MS labels and its tooltips follow your Text and Secondary Text colors instead of staying white and grey, and the tooltips of the Naowh buttons (minimap, top bar) use your Accent for the title and Text for the lines. Looks the same with the default theme.
 - The Naowh font is only on this addon's own windows and HUD again; the rest of the game keeps
   its own fonts. Settings > Font has Addon Font (Naowh), plus Game Font and Combat Text Font,
   both off unless you pick a font.
