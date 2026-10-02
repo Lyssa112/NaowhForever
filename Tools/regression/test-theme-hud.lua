@@ -217,4 +217,23 @@ do
         "xpbar: a theme's accent, darkened at the low end")
 end
 
+-- Colour strings built when a file loads see the default theme only: these two are looked up
+-- when first used.
+do
+    local panel = Read("DungeonJournal/View/BossPanel.lua")
+    local items = Read("DungeonJournal/View/ItemRows.lua")
+    Check(not panel:find('\nlocal YOU = ns.Color', 1, true) and not items:find('\nlocal PERCENT = ns.Color', 1, true),
+        "no theme colour string is built at file load in the Journal")
+    local function Lookup(source, first, last, call, account)
+        local code = source:sub(source:find(first, 1, true), select(2, source:find(last, 1, true)))
+        local chunk = assert(loadstring(code .. "\nreturn " .. call .. "()"))
+        setfenv(chunk, setmetatable({ ns = LoadCore(account) }, { __index = _G }))
+        return chunk()
+    end
+    local you = Lookup(panel, "local you\n", "return you\nend", "You", {})
+    Check(you == "|cff9a9ea6 (you)|r", "(you) is the old string with the default theme")
+    local percent = Lookup(items, "local percent\n", "return percent\nend", "Percent", ACCENT_PRESET)
+    Check(percent == "|cff9ba7c8%|r", "the percent sign follows the theme's Secondary Text")
+end
+
 print("PASS theme HUD: " .. cases .. " checks")

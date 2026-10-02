@@ -55,7 +55,7 @@ function ns.OpenForgetAltMenu(owner)
         for realm, chars in pairs(all) do
             for name, c in pairs(chars) do
                 any = true
-                root:CreateButton(ns.ClassColoredName(name, c.class) .. "  |cff808080" .. realm .. "|r", function()
+                root:CreateButton(ns.ClassColoredName(name, c.class) .. "  " .. ns.ThemeCode("muted", "|cff808080") .. realm .. "|r", function()
                     ns.Confirm("Forget " .. name .. " on " .. realm .. "? It comes back the next "
                         .. "time you log in on it with a Mail & Alts option on.", function()
                         chars[name] = nil

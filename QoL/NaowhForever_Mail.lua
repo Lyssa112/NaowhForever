@@ -33,8 +33,8 @@ local function OpenAltsMenu(owner)
             return
         end
         for _, alt in ipairs(list) do
-            local text = ("%s  |cff808080%d|r  %s"):format(ns.ClassColoredName(alt.name, alt.class),
-                alt.level, Coins(alt.money))
+            local text = ("%s  %s%d|r  %s"):format(ns.ClassColoredName(alt.name, alt.class),
+                ns.ThemeCode("muted", "|cff808080"), alt.level, Coins(alt.money))
             root:CreateButton(text, function()
                 SendMailNameEditBox:SetText(alt.name)
                 SendMailSubjectEditBox:SetFocus()

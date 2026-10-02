@@ -161,5 +161,5 @@ TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tool
     local price, when = ns.AuctionPrice(id)
     if not price then return end
     tooltip:AddDoubleLine(Tag(), C_CurrencyInfo.GetCoinTextureString(price, 12)
-        .. " |cff808080each, " .. Age(time() - when) .. " ago|r", 1, 1, 1, 1, 1, 1)
+        .. " " .. ns.ThemeCode("muted", "|cff808080") .. "each, " .. Age(time() - when) .. " ago|r", 1, 1, 1, 1, 1, 1)
 end)

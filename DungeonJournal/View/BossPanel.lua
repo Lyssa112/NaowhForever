@@ -55,7 +55,11 @@ local LOOT_WINDOW = 15 * 60   -- seconds after a kill its loot is counted as its
 -- Need (main or off spec), Transmog, Greed and Pass; none for no roll.
 local ROLL_ATLAS = { [0] = "lootroll-icon-need", [1] = "lootroll-icon-need", [2] = "lootroll-icon-transmog",
     [3] = "lootroll-icon-greed", [5] = "lootroll-icon-pass" }
-local YOU = ns.Color("muted", " (you)")
+local you
+local function You()   -- built on first use, once the theme is applied
+    you = you or ns.Color("muted", " (you)")
+    return you
+end
 
 local panel, view
 local shown = {}   -- the boss shown, and its dungeon when the card knew it
@@ -148,7 +152,7 @@ Kinds.team = {
             placed.role:SetShown(atlas ~= nil)
             if atlas then placed.role:SetAtlas(atlas) end
             local color = ClassColor(member.class)
-            placed.name:SetText(member.me and member.name .. YOU or member.name)
+            placed.name:SetText(member.me and member.name .. You() or member.name)
             placed.name:SetTextColor(color.r, color.g, color.b)
             placed.name:Show()
             local icon = atlas and ROLE_ICON + ROLE_GAP or 0
@@ -251,7 +255,7 @@ Kinds.rollGrid = {
             cell.name:SetPoint("LEFT", band, "LEFT", x, 0)
             cell.name:SetPoint("RIGHT", cell.check, "LEFT", -CELL_GAP, 0)
             local color = ClassColor(roll.class)
-            cell.name:SetText(isMe(roll.name) and roll.name .. YOU or roll.name)
+            cell.name:SetText(isMe(roll.name) and roll.name .. You() or roll.name)
             cell.name:SetTextColor(color.r, color.g, color.b)
             cell.name:Show()
         end

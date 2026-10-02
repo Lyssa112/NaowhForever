@@ -238,6 +238,14 @@ function ns.ThemeTint(key, literal)
     return literal
 end
 
+-- The same for a color written into a string: the token's |cffRRGGBB prefix while the theme
+-- has changed `key`, else the shipped prefix `literal` untouched ("|cff808080"). Read when
+-- the string is built, never at file load.
+function ns.ThemeCode(key, literal)
+    if themeShipped[key] then return ns.Color(key) end
+    return literal
+end
+
 -- A secret-tainted message is silently dropped by the display, so a combat diagnostic can
 -- vanish as if the code never ran. tostring() on a secret returns a secret string that taints
 -- whatever it is joined to, so issecretvalue() must be asked before the value is coerced.

@@ -276,4 +276,22 @@ do
     Check(ns.Color("fg") == "|cfff6eff0" and ns.Color("muted") == "|cffac9a9e", "fg and muted follow too")
 end
 
+-- ns.ThemeCode: the shipped prefix until the theme changes that color, then the token's.
+do
+    local GREY = "|cff808080"
+    local ns, handler = Load({})
+    Fire(handler, "ADDON_LOADED", "NaowhForever")
+    Check(ns.ThemeCode("muted", GREY) == GREY, "ThemeCode: the shipped prefix with the default theme")
+    ns, handler = Load({ themePreset = "midnight" })
+    Fire(handler, "ADDON_LOADED", "NaowhForever")
+    Check(ns.ThemeCode("muted", GREY) == ns.Color("muted") and ns.ThemeCode("muted", GREY) ~= GREY,
+        "ThemeCode: a preset's Secondary Text")
+    ns, handler = Load({ themePreset = "custom", themeColors = { bg = { r = 1, g = 0, b = 0 } } })
+    Fire(handler, "ADDON_LOADED", "NaowhForever")
+    Check(ns.ThemeCode("muted", GREY) == GREY, "ThemeCode: a theme that left Secondary Text alone keeps the prefix")
+    ns, handler = Load({ themePreset = "custom", themeColors = { muted = { r = 1, g = 0, b = 0 } } })
+    Fire(handler, "ADDON_LOADED", "NaowhForever")
+    Check(ns.ThemeCode("muted", GREY) == "|cffff0000", "ThemeCode: a picked Secondary Text")
+end
+
 print("PASS custom colors: " .. cases .. " checks")

@@ -905,7 +905,7 @@ function UI.KeyField(rgn, action, label)
     local capturing
     local function Show()
         local key = GetBindingKey(action)
-        btn.label:SetText(capturing and "Press a key..." or key and GetBindingText(key) or "|cff808080Not bound|r")
+        btn.label:SetText(capturing and "Press a key..." or key and GetBindingText(key) or ns.ThemeCode("muted", "|cff808080") .. "Not bound|r")
         btn:SetAlpha(InCombatLockdown() and 0.4 or 1)
     end
     local function Stop()

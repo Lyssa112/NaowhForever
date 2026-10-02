@@ -283,7 +283,11 @@ end
 --  shade to its tier's colour (the accent from CHANCE_HIGH, the soft accent from CHANCE_FAIR,
 --  muted below). The bar grows with the square root of the chance, so a rare drop still shows.
 -------------------------------------------------------------------------------
-local PERCENT = ns.Color("muted", "%")
+local percent
+local function Percent()   -- built on first use, once the theme is applied, then reused
+    percent = percent or ns.Color("muted", "%")
+    return percent
+end
 
 local function Round(row, layer, color)
     local dot = row:CreateTexture(nil, layer)
@@ -318,7 +322,7 @@ local function SetChance(row, chance, shown)
     if known then
         row.chanceText:SetPoint("TOPRIGHT", 0, -CHANCE_TOP)
         row.chanceText:SetTextColor(T.fg.r, T.fg.g, T.fg.b)
-        row.chanceText:SetText(shown and (chance < 1 and "<1" or chance) .. PERCENT or "")
+        row.chanceText:SetText(shown and (chance < 1 and "<1" or chance) .. Percent() or "")
         local tier = Tier(chance)
         row.chanceBar:SetGradient("HORIZONTAL", tier.deep, tier.bright)
         local deep, color = tier.deep, tier.color

@@ -152,6 +152,7 @@
 - Dungeon Journal: its data is updated to WoW Forever build 1.60.1.70170: 4 faction rewards changed (item levels, required levels).
 
 ### Fixed
+- Themes: the grey hints (BiS "not picked" and rank tags, "Not bound" on key bindings, the realm and level in the alts menus, the auction price age in item tooltips) and the Dungeon Journal's "(you)" and drop chance "%" follow your Secondary Text. Looks the same with the default theme.
 - Recipe Finder and rank alerts: Stormwind and Eastern Plaguelands trainers and vendors
   (Lucan Cordell, the Stormwind enchanting trainer, among them) were placed at their Classic
   positions, so their waypoints pointed at the wrong spot on Forever's redrawn maps.

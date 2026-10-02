@@ -1413,7 +1413,7 @@ local function SourcePanel(parent, x, y, width)
             b:SetPoint("RIGHT", f, "RIGHT")
             local rank = ShownRank(slot, picks)
             b.slot, b.id = slot, picks[rank]
-            b.tag = picks[1] and ("  |cff%s%s|r"):format(Wearing(slot, b.id) and "1ad933" or "808080",
+            b.tag = picks[1] and ("  %s%s|r"):format(Wearing(slot, b.id) and "|cff1ad933" or ns.ThemeCode("muted", "|cff808080"),
                 RankLabel(rank)) or ""
             f.lines[slot] = b
             b.label:SetText(ns.L(SLOT_NAME[slot]) .. ":")
@@ -1421,7 +1421,7 @@ local function SourcePanel(parent, x, y, width)
             b.toggle:SetShown(picks[1] ~= nil)
             top = top - SLOT_ROW
             if not picks[1] then
-                b.item:SetText("|cff808080not picked|r")
+                b.item:SetText(ns.ThemeCode("muted", "|cff808080") .. "not picked|r")
                 b.place:SetText("")
             else
                 b.toggle:SetNormalTexture(openSlots[slot] and MINUS or PLUS)
