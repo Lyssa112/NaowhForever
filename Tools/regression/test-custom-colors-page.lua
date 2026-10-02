@@ -84,7 +84,7 @@ do
     for _, word in ipairs({ "Theme presets", "windows and HUD frames", "Custom", "Naowh (default)", "/reload" }) do
         Check(t.tooltip:find(word, 1, true), "tooltip mentions " .. word)
     end
-    Check(e.rows[1][2].type == "label" and e.rows[1][2].text == "", "nothing beside the Theme dropdown")
+    Check(e.rows[1][2].type == "palette" and #e.rows[1][2].colors() == 6, "a six-chip preview beside the Theme dropdown")
     Check(not t.tooltip:find("Reset", 1, true), "no reset any more")
 end
 
@@ -177,6 +177,59 @@ do
     start.setValue("default")
     e.confirms[2].yes()
     Check(a.themeColors.bg.r == 0x0e / 255 and a.themeColors.accent.b == 0xed / 255, "the default theme's colors")
+end
+
+-- The preview follows the selection.
+do
+    local function Chips(account) return Page(account).rows[1][2].colors() end
+    local function Hex(c)
+        return ("%02x%02x%02x"):format(math.floor(c.r * 255 + 0.5), math.floor(c.g * 255 + 0.5), math.floor(c.b * 255 + 0.5))
+    end
+    local default, midnight = Chips({}), Chips({ themePreset = "midnight" })
+    Check(Hex(default[1]) == "0e0f11" and Hex(default[6]) == "0091ed", "default: the shipped background and accent")
+    Check(Hex(midnight[1]) == "0b1020" and Hex(midnight[4]) == "eef2ff" and Hex(midnight[6]) == "5b8cff",
+        "a preset: its own background, text and accent")
+    local custom = Chips({ themePreset = "custom", themeColors = { bg = { r = 1, g = 0, b = 0 } } })
+    Check(Hex(custom[1]) == "ff0000" and Hex(custom[2]) == "1a1c1f", "custom: the saved pick, the shipped color for the rest")
+    local invalid = Chips({ themePreset = "bogus" })
+    Check(Hex(invalid[1]) == "0e0f11", "an invalid preset previews the default")
+end
+
+-- The chips themselves: the control is cut out of Widgets.lua and run with stub frames.
+do
+    local widgets = Read("Core/NaowhForever_Widgets.lua")
+    local from = assert(widgets:find('    elseif cfg.type == "palette" then', 1, true))
+    local upTo = assert(widgets:find('    elseif cfg.type == "colorpicker" then', from, true))
+    local branch = widgets:sub(from, upTo - 1):gsub('^    elseif cfg%.type == "palette" then', "")
+    local code = "local cfg, rgn = ...\n" .. branch
+    local paletteChunk = assert(loadstring(code))
+    local frames, painted = 0, {}
+    local function Frame()
+        frames = frames + 1
+        return setmetatable({}, { __index = function() return function() end end })
+    end
+    local function Build(colors)
+        painted = {}
+        local count = 0
+        local env = { CreateFrame = Frame, T = { bg = {}, muted = {} },
+            ns = { Solid = function()
+                count = count + 1
+                local index = count
+                return { SetAllPoints = function() end,
+                    SetColorTexture = function(_, r, g, b, a) painted[index] = { r, g, b, a } end }
+            end, Border = function() end } }
+        setfenv(paletteChunk, setmetatable(env, { __index = _G }))
+        local cfg = { colors = colors }
+        local control = paletteChunk(cfg, Frame())
+        return control, cfg
+    end
+    local red = { r = 1, g = 0, b = 0 }
+    local control, cfg = Build(function() return { red, red, red, red, red, red } end)
+    Check(frames == 8 and control._refreshValue, "one frame for the row of chips and one for each chip")
+    Check(#painted == 6 and painted[1][1] == 1 and painted[6][4] == 1, "every chip is painted from cfg.colors()")
+    cfg.colors = function() return { { r = 0, g = 1, b = 0 } } end
+    control._refreshValue()
+    Check(painted[1][2] == 1 and painted[2][1] == 1, "a refresh repaints from the current colors, and leaves chips it has no color for")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

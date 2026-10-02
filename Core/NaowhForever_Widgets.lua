@@ -578,6 +578,31 @@ local function BuildRegionControl(rgn, cfg)
         valBox:SetPoint("RIGHT", rgn, "RIGHT", -20, 0)
         track:SetPoint("RIGHT", valBox, "LEFT", -8, 0)
         return track
+    elseif cfg.type == "palette" then
+        -- A row of small chips showing colors; nothing to click. cfg.colors() lists them.
+        local N, SIZE, GAP = 6, 22, 4
+        local chips = CreateFrame("Frame", nil, rgn)
+        chips:SetSize(N * SIZE + (N - 1) * GAP, SIZE)
+        chips:SetPoint("RIGHT", rgn, "RIGHT", -20, 0)
+        local fills = {}
+        for i = 1, N do
+            local chip = CreateFrame("Frame", nil, chips)
+            chip:SetSize(SIZE, SIZE)
+            chip:SetPoint("LEFT", chips, "LEFT", (i - 1) * (SIZE + GAP), 0)
+            fills[i] = ns.Solid(chip, "BACKGROUND", T.bg, 1)
+            fills[i]:SetAllPoints()
+            ns.Border(chip, T.muted, 0.6)
+        end
+        local function Paint()
+            local colors = cfg.colors()
+            for i = 1, N do
+                local c = colors[i]
+                if c then fills[i]:SetColorTexture(c.r, c.g, c.b, 1) end
+            end
+        end
+        chips._refreshValue = Paint
+        Paint()
+        return chips
     elseif cfg.type == "colorpicker" then
         -- Text Color in the custom and Ability Reminder editors.
         local swatch = UI.BuildColorSwatchControl(rgn, Get, Set, cfg.hasAlpha)
