@@ -144,6 +144,7 @@
 - Threat Meter: Status Line (Layout) moves the line with your distance to pulling aggro and
   the entry count from under the bars to the top, between the title bar and the bars.
   Bottom by default.
+- Threat Meter: Apply Theme to Your Bar (Colours, off by default) colors your bar in a darker shade of your theme's Accent instead of the color picked there. The tank and pull aggro colors are unchanged.
 
 ### Changed
 - The options window's sidebar header shows the NaowhUI Forever logo, and the search box beside it is narrower.
