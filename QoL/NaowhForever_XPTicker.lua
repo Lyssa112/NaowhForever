@@ -6,7 +6,8 @@ local ns = _G.NaowhForever
 local S = ns.QoLSettings
 
 -- Naowh's scheme: his blue for the labels, the theme's near-white for the values.
-local DIM = "|cff9ca3af"
+-- The "(paused)" grey: the shade it always was, or the theme's Secondary Text once changed.
+local function Dim() return ns.ThemeTint("muted", nil) and ns.Color("muted") or "|cff9ca3af" end
 
 local ticker, clock, clockRate, unlocked
 local sessionStart, sessionXP = 0, 0
@@ -129,7 +130,7 @@ local function Update()
     local elapsed = now - sessionStart - pausedTotal - (paused and now - pausedAt or 0)
     -- At least a minute, so the first kill after login does not read as millions an hour.
     local rate = sessionXP / (math.max(elapsed, 60) / 3600)
-    local lines = { Line("XP/hr", Short(rate)) .. (paused and "  " .. DIM .. "(paused)|r" or "") }
+    local lines = { Line("XP/hr", Short(rate)) .. (paused and "  " .. Dim() .. "(paused)|r" or "") }
     if S.Get("xpTickerLevel") then
         local left = UnitXPMax("player") - UnitXP("player")
         lines[#lines + 1] = Line("Ding", rate > 0 and Duration(left / rate * 3600) or "--")

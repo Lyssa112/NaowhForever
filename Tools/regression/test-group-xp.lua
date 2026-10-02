@@ -27,6 +27,7 @@ local function boot(settings)
         return f
     end
     local ns = { THEME = { bg = {}, accent = { r = 0, g = 0.5, b = 1 } },
+        ThemeTint = function(_, literal) return literal end,
         Font = function(parent)
             local fs = frame("FontString", nil, parent)
             parent.fonts[#parent.fonts + 1] = fs

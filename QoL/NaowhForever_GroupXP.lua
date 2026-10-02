@@ -6,6 +6,13 @@
 local ns = _G.NaowhForever
 local S = ns.QoLSettings
 local T = ns.THEME
+-- White text: the color it always was, or the theme's Text once the theme has changed it.
+-- Returns r, g, b.
+local WHITE = { r = 1, g = 1, b = 1 }
+local function TextRGB()
+    local c = ns.ThemeTint("fg", WHITE)
+    return c.r, c.g, c.b
+end
 
 local PREFIX = "NaowhGroupXP"
 local GROUP_CHANNELS = { PARTY = true, RAID = true, INSTANCE_CHAT = true }
@@ -127,11 +134,11 @@ end
 local function Paint(row, name, class, level, data)
     local color = class and RAID_CLASS_COLORS[class]
     row.name:SetText(name)
-    if color then row.name:SetTextColor(color.r, color.g, color.b) else row.name:SetTextColor(1, 1, 1) end
+    if color then row.name:SetTextColor(color.r, color.g, color.b) else row.name:SetTextColor(TextRGB()) end
     local lv = level and level > 0 and ("Lv " .. level) or "Lv ?"
     if not data then
         row.bar:SetValue(0)
-        row.text:SetText(lv .. "  |cff9ca3afno addon|r")
+        row.text:SetText(lv .. "  " .. (ns.ThemeTint("muted", nil) and ns.Color("muted") or "|cff9ca3af") .. "no addon|r")
     elseif data.level >= GetMaxLevelForPlayerExpansion() or data.max <= 0 then
         row.bar:SetValue(1)
         row.text:SetText("Lv " .. data.level .. "  Max")

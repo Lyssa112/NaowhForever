@@ -6,6 +6,13 @@
 local ns = _G.NaowhForever
 local UI = ns.UI
 local T = ns.THEME
+-- White text: the color it always was, or the theme's Text once the theme has changed it.
+-- Returns r, g, b.
+local WHITE = { r = 1, g = 1, b = 1 }
+local function TextRGB()
+    local c = ns.ThemeTint("fg", WHITE)
+    return c.r, c.g, c.b
+end
 
 local S = UI.ModuleSettings("threatMeter", {
     enabled = false,
@@ -399,7 +406,7 @@ function Render(title, me)
         row:SetValue(top > 0 and e.raw / top or 0)
         row.rank:SetText(e.pull and "-" or tostring(e.rank))
         row.name:SetText(e.name)
-        row.name:SetTextColor(1, 1, 1)
+        row.name:SetTextColor(TextRGB())
         if own then
             local mark = ns.ThemeTint("accent", nil)   -- the accent, darkened, once it was changed
             if mark then row.bg:SetColorTexture(mark.r * 0.27, mark.g * 0.27, mark.b * 0.27, 1)
@@ -413,7 +420,7 @@ function Render(title, me)
         if S.Get("percentMode") == "tank" then percent = e.rawPct end
         row.percent:SetText(S.Get("showPercent") and percent and ("%.0f%%"):format(percent) or "")
         local danger = not e.pull and not e.tanking and e.scaled >= S.Get("warnAt")
-        row.percent:SetTextColor(1, danger and 0.35 or 1, danger and 0.25 or 1)
+        if danger then row.percent:SetTextColor(1, 0.35, 0.25) else row.percent:SetTextColor(TextRGB()) end
     end
     if preview or unlocked then frame.footer.state:SetText("PREVIEW")
     elseif me and me.tanking then frame.footer.state:SetText("HOLDING AGGRO")

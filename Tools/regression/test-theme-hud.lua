@@ -57,7 +57,8 @@ local PICKS = { themePreset = "custom", themeColors = {
 -- Every ThemeTint call is inside a function, so it is read when a frame is built or
 -- refreshed and never at file load.
 local files = { "ThreatMeter/NaowhForever_ThreatMeter.lua", "TopBar/NaowhForever_TopBar.lua",
-    "AuraBuffs/NaowhForever_Campfire.lua", "QoL/NaowhForever_LootFeed.lua" }
+    "AuraBuffs/NaowhForever_Campfire.lua", "QoL/NaowhForever_LootFeed.lua", "SwingTimer/NaowhForever_SwingTimer.lua",
+    "QoL/NaowhForever_GroupXP.lua", "SmartReminders/NaowhForever_RaidReminders.lua" }
 for _, path in ipairs(files) do
     local source = Read(path)
     local count = 0
@@ -381,6 +382,57 @@ do
     end
     Check(QuestText({}) == "|cfff2a900", "xpbar: the quest text keeps its gold by default")
     Check(QuestText(ACCENT_PRESET) == "|cff91b2ff", "xpbar: the quest text follows the lighter accent")
+end
+
+-- White HUD text: white by default, the theme's Text once the theme changed it. Danger red,
+-- class colors and a reminder's own color are not touched.
+do
+    local FILES = { "ThreatMeter/NaowhForever_ThreatMeter.lua", "SwingTimer/NaowhForever_SwingTimer.lua",
+        "QoL/NaowhForever_GroupXP.lua", "SmartReminders/NaowhForever_RaidReminders.lua" }
+    for _, path in ipairs(FILES) do
+        local source = Read(path)
+        local helper = assert(source:match("(local WHITE = { r = 1, g = 1, b = 1 }\nlocal function TextRGB%(%).-\nend)"), path .. ": TextRGB")
+        local function Text(account)
+            local chunk = assert(loadstring(helper .. "\nreturn TextRGB()"))
+            local core = LoadCore(account)
+            setfenv(chunk, setmetatable({ ns = core }, { __index = _G }))
+            return { chunk() }, core.THEME.fg
+        end
+        Check(Same(Text({}), { 1, 1, 1 }), path .. ": white by default")
+        local got, fg = Text(ACCENT_PRESET)
+        Check(Same(got, { fg.r, fg.g, fg.b }), path .. ": a theme's Text replaces the white")
+        got = Text({ themePreset = "custom", themeColors = { bg = { r = 1, g = 0, b = 0 } } })
+        Check(Same(got, { 1, 1, 1 }), path .. ": a theme that left Text alone keeps the white")
+        Check(not source:find("SetTextColor(1, 1, 1", 1, true) and not source:find("local r, g, b = 1, 1, 1", 1, true),
+            path .. ": no fixed white text color is left")
+    end
+    local threat = Read("ThreatMeter/NaowhForever_ThreatMeter.lua")
+    Check(threat:find("if danger then row.percent:SetTextColor(1, 0.35, 0.25) else row.percent:SetTextColor(TextRGB()) end", 1, true),
+        "threat meter: the danger red is untouched")
+    local swing = Read("SwingTimer/NaowhForever_SwingTimer.lua")
+    Check(swing:find("if oor then r, g, b = 1, 0.1, 0.1 end", 1, true), "swing timer: the out-of-range red is untouched")
+
+    -- The two greys that were 9ca3af: that shade by default, Secondary Text once changed.
+    local ticker = Read("QoL/NaowhForever_XPTicker.lua")
+    local dim = assert(ticker:match("(local function Dim%(%)[^\n]*)"))
+    local group = Read("QoL/NaowhForever_GroupXP.lua")
+    local expr = assert(group:match('(%(ns%.ThemeTint%("muted", nil%) and ns%.Color%("muted"%) or "|cff9ca3af"%))'))
+    local function Grey(account)
+        local core = LoadCore(account)
+        local env = setmetatable({ ns = core }, { __index = _G })
+        local chunk = assert(loadstring(dim .. "\nreturn Dim(), " .. expr))
+        setfenv(chunk, env)
+        local a, b = chunk()
+        return a, b, core
+    end
+    local a, b = Grey({})
+    Check(a == "|cff9ca3af" and b == "|cff9ca3af", "xp ticker and group xp: the default theme keeps its grey")
+    local core
+    a, b, core = Grey(ACCENT_PRESET)
+    Check(a == core.Color("muted") and b == core.Color("muted"), "xp ticker and group xp: Secondary Text in a theme")
+    a, b = Grey({ themePreset = "custom", themeColors = { bg = { r = 1, g = 0, b = 0 } } })
+    Check(a == "|cff9ca3af" and b == "|cff9ca3af", "xp ticker and group xp: a theme that left Secondary Text alone keeps the grey")
+    Check(not ticker:find("DIM", 1, true) and not group:find('|cff9ca3afno addon', 1, true), "no fixed 9ca3af string is left")
 end
 
 print("PASS theme HUD: " .. cases .. " checks")

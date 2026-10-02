@@ -7,6 +7,13 @@
 -------------------------------------------------------------------------------
 local ns = _G.NaowhForever
 if not ns then return end
+-- White text: the color it always was, or the theme's Text once the theme has changed it.
+-- Returns r, g, b.
+local WHITE = { r = 1, g = 1, b = 1 }
+local function TextRGB()
+    local c = ns.ThemeTint("fg", WHITE)
+    return c.r, c.g, c.b
+end
 
 -------------------------------------------------------------------------------
 --  Data
@@ -705,7 +712,7 @@ function ns.DisplayRaidReminder(entry, preview)
             r.text:SetTextColor(display.color.r or 1, display.color.g or 1,
                 display.color.b or 1, display.color.a or 1)
         else
-            r.text:SetTextColor(1, 1, 1, 1)
+            r.text:SetTextColor(TextRGB())
         end
     elseif display.type == "icon" then
         r.icon:SetTexture(ResolveDisplayIconID(display) or 134400)
@@ -751,7 +758,7 @@ function ns.DisplayRaidReminder(entry, preview)
             local T = ns.THEME
             r.fillL:SetVertexColor(T.accent.r, T.accent.g, T.accent.b)
             r.fillR:SetVertexColor(T.accent.r, T.accent.g, T.accent.b)
-            r.label:SetTextColor(1, 1, 1)
+            r.label:SetTextColor(TextRGB())
         end
         r.caption = caption
         r.expirationTime = GetTime() + dur
@@ -847,7 +854,7 @@ local reopenWindowOnExit = false
 local function PopulateSample(displayType, r)
     if displayType == "text" then
         r.text:SetText("Sample Reminder")
-        r.text:SetTextColor(1, 1, 1, 1)
+        r.text:SetTextColor(TextRGB())
     elseif displayType == "icon" then
         r.icon:SetTexture(134400)
         r.label:SetText("Sample")
@@ -863,7 +870,7 @@ local function PopulateSample(displayType, r)
     elseif displayType == "circle" then
         r:SetScript("OnUpdate", nil)
         r.label:SetText("|T134400:0|t Sample (3.4)")
-        r.label:SetTextColor(1, 1, 1)
+        r.label:SetTextColor(TextRGB())
         local T = ns.THEME
         r.fillL:SetVertexColor(T.accent.r, T.accent.g, T.accent.b)
         r.fillR:SetVertexColor(T.accent.r, T.accent.g, T.accent.b)

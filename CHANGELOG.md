@@ -181,6 +181,7 @@
 - Themes: the Top Bar's clock, its FPS / MS labels and its tooltips follow your Text and Secondary Text colors instead of staying white and grey, and the tooltips of the Naowh buttons (minimap, top bar) use your Accent for the title and Text for the lines. Looks the same with the default theme.
 - Themes: the Loot Feed follows your theme: the Dark style uses your Background, the Light style uses your Panels and Borders & Lines, and the glow uses your Accent. Looks the same with the default theme.
 - Themes: the XP Bar's quest and rested segments and text follow your theme's Accent instead of staying gold and blue. Looks the same with the default theme.
+- Themes: white text on the Threat Meter, Swing Timer, Group XP names and reminders follows your Text color, and the grey "(paused)" and "no addon" tags follow your Secondary Text. Danger and out-of-range reds, class colors and colors you set on a reminder are unchanged, and nothing changes with the default theme.
 - A copy downloaded with GitHub's green Code button has none of the addon's libraries, and
   parts of it then failed with Lua errors (Low Health's glow on a level up, among others). It
   now says at login which libraries are missing and where to download the full addon.

@@ -11,6 +11,13 @@
 local ns = _G.NaowhForever
 local UI = ns.UI
 local T = ns.THEME
+-- White text: the color it always was, or the theme's Text once the theme has changed it.
+-- Returns r, g, b.
+local WHITE = { r = 1, g = 1, b = 1 }
+local function TextRGB()
+    local c = ns.ThemeTint("fg", WHITE)
+    return c.r, c.g, c.b
+end
 
 local S = UI.ModuleSettings("swingTimer", {
     enabled = false,
@@ -233,7 +240,7 @@ end
 local function PaintRange(row)
     local oor = row.outOfRange and not unlocked
     row:SetAlpha(oor and S.Get("outOfRangeAlpha") or 1)
-    local r, g, b = 1, 1, 1
+    local r, g, b = TextRGB()
     if oor then r, g, b = 1, 0.1, 0.1 end
     row.tag:SetTextColor(r, g, b)
     row.time:SetTextColor(r, g, b)

@@ -52,7 +52,8 @@ local function Session(settings, opts)
         AttachMover = function() return Widget("Mover", log) end,
         STATUS = {},
     }
-    local ns = { UI = UI, THEME = { bg = { r = 0, g = 0, b = 0 } } }
+    local ns = { UI = UI, THEME = { bg = { r = 0, g = 0, b = 0 } },
+        ThemeTint = function(_, literal) return literal end }
     function ns.Apply() end
     function ns.ShowRaidReminderAnchorConfig() end
     log.unlock = function() ns.ShowRaidReminderAnchorConfig() end
