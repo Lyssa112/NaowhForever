@@ -59,7 +59,8 @@ local PICKS = { themePreset = "custom", themeColors = {
 local files = { "ThreatMeter/NaowhForever_ThreatMeter.lua", "TopBar/NaowhForever_TopBar.lua",
     "AuraBuffs/NaowhForever_Campfire.lua", "QoL/NaowhForever_LootFeed.lua",
     "Discovery/NaowhForever_DiscoveryTracker.lua", "Discovery/NaowhForever_DiscoveryMap.lua",
-    "QoL/NaowhForever_TownMap.lua" }
+    "QoL/NaowhForever_TownMap.lua", "QoL/NaowhForever_CombatTimer.lua",
+    "SmartReminders/NaowhForever_RaidReminders.lua" }
 for _, path in ipairs(files) do
     local source = Read(path)
     local count = 0
@@ -475,6 +476,36 @@ do
     got = Bar(ACCENT_PRESET, "queueColor", true)
     Check(Same(got, { 1, 0.7, 0.2, 1 }), "swing timer: the queued attack color is not themed")
     Check(source:find('{ key = "themeColors", label = "Apply Theme to Bar Colours"', 1, true), "swing timer: the switch with the bar colours")
+end
+
+-- Surfaces that used to be a fixed black fill: the Background of the theme now, the same
+-- fill and opacity with the default theme.
+local BG_PRESET = { themePreset = "midnight" }
+local MIDNIGHT_BG = { r = 0x0b / 255, g = 0x10 / 255, b = 0x20 / 255 }
+
+-- Runs a statement that calls ns.Solid and returns the colour and alpha it was given.
+local function SolidOf(stmt, account, env)
+    local got
+    local ns = LoadCore(account)
+    ns.Solid = function(_, _, c, a) got = { c.r, c.g, c.b, a } end
+    env.ns = ns
+    Run(stmt, env)
+    return got
+end
+
+do
+    local source = Read("QoL/NaowhForever_CombatTimer.lua")
+    local TIMER_BG = Const(source, "TIMER_BG")
+    local stmt = assert(source:match('(frame%.bg = ns%.Solid%(frame, "BACKGROUND", ns%.ThemeTint%("bg", TIMER_BG%), 0%.8%))'))
+    Check(Same(SolidOf(stmt, {}, { frame = {}, TIMER_BG = TIMER_BG }), { 0, 0, 0, 0.8 }), "combat timer: black at 80% by default")
+    Check(Same(SolidOf(stmt, BG_PRESET, { frame = {}, TIMER_BG = TIMER_BG }), { MIDNIGHT_BG.r, MIDNIGHT_BG.g, MIDNIGHT_BG.b, 0.8 }),
+        "combat timer: the Background")
+    source = Read("SmartReminders/NaowhForever_RaidReminders.lua")
+    local CONFIG_BG = Const(source, "CONFIG_BG")
+    stmt = assert(source:match('(ns%.Solid%(f, "BACKGROUND", ns%.ThemeTint%("bg", CONFIG_BG%), 1%))'))
+    Check(Same(SolidOf(stmt, {}, { f = {}, CONFIG_BG = CONFIG_BG }), { 0, 0, 0, 1 }), "anchor config bar: black by default")
+    Check(Same(SolidOf(stmt, BG_PRESET, { f = {}, CONFIG_BG = CONFIG_BG }), { MIDNIGHT_BG.r, MIDNIGHT_BG.g, MIDNIGHT_BG.b, 1 }),
+        "anchor config bar: the Background")
 end
 
 print("PASS theme HUD: " .. cases .. " checks")

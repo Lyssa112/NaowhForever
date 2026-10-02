@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Themes: the Combat Timer and the Reminder Anchors bar follow your theme's Background instead of staying black. Looks the same with the default theme.
+
 ## 0.5.21-beta
 
 ### Added

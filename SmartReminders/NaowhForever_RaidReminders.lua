@@ -1089,6 +1089,7 @@ local configToolbar
 -- Exit Config takes the slot after the last checkbox. Column width fits the longest
 -- label, "Show Defensive Anchor".
 local CONFIG_COL_W, CONFIG_ROW_H = 162, 24
+local CONFIG_BG = { r = 0, g = 0, b = 0 }
 
 local function BuildConfigToolbar()
     if configToolbar then return configToolbar end
@@ -1100,7 +1101,7 @@ local function BuildConfigToolbar()
     f:SetToplevel(true)
     f:SetClampedToScreen(true)
     ns.AllowOffscreen(f)
-    ns.Solid(f, "BACKGROUND", { r = 0, g = 0, b = 0 }, 1):SetAllPoints()
+    ns.Solid(f, "BACKGROUND", ns.ThemeTint("bg", CONFIG_BG), 1):SetAllPoints()
     ns.Border(f)
     f:SetMovable(true)
     f:EnableMouse(true)
