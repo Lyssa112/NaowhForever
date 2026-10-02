@@ -217,4 +217,42 @@ do
         "xpbar: a theme's accent, darkened at the low end")
 end
 
+-- The TopBar's clock and tooltips: the greys and whites they always were, or the player's
+-- Secondary Text and Text when the theme changed those.
+do
+    local source = Read("TopBar/NaowhForever_TopBar.lua")
+    local toneSource = assert(source:match("(local shades = {}\nlocal function Tone%(key, v%).-\nend)"))
+    local function ToneFor(account)
+        local chunk = assert(loadstring(toneSource .. "\nreturn Tone"))
+        setfenv(chunk, setmetatable({ ns = LoadCore(account) }, { __index = _G }))
+        return chunk()
+    end
+    local function Rgb(...) return { ... } end
+    local ns = LoadCore(ACCENT_PRESET)
+    local Tone = ToneFor({})
+    Check(Same(Rgb(Tone("fg", 1)), { 1, 1, 1 }), "topbar: white is white with the default theme")
+    Check(Same(Rgb(Tone("muted", 0.7)), { 0.7, 0.7, 0.7 }) and Same(Rgb(Tone("muted", 0.5)), { 0.5, 0.5, 0.5 })
+        and Same(Rgb(Tone("muted", 0.6)), { 0.6, 0.6, 0.6 }), "topbar: the three greys are unchanged with the default theme")
+    Tone = ToneFor(ACCENT_PRESET)
+    Check(Same(Rgb(Tone("fg", 1)), { ns.THEME.fg.r, ns.THEME.fg.g, ns.THEME.fg.b }), "topbar: a theme's Text replaces the white")
+    Check(Same(Rgb(Tone("muted", 0.7)), { ns.THEME.muted.r, ns.THEME.muted.g, ns.THEME.muted.b })
+        and Same(Rgb(Tone("muted", 0.5)), { ns.THEME.muted.r, ns.THEME.muted.g, ns.THEME.muted.b }),
+        "topbar: a theme's Secondary Text replaces every grey")
+    Tone = ToneFor({ themePreset = "custom", themeColors = { bg = { r = 1, g = 0, b = 0 } } })
+    Check(Same(Rgb(Tone("fg", 1)), { 1, 1, 1 }) and Same(Rgb(Tone("muted", 0.7)), { 0.7, 0.7, 0.7 }),
+        "topbar: a theme that left Text and Secondary Text alone keeps white and grey")
+
+    local greyLine = assert(source:match('(local grey = ns%.ThemeTint%("muted", nil%) and [^\n]*)'))
+    local function Grey(account)
+        local chunk = assert(loadstring(greyLine .. "\nreturn grey"))
+        local core = LoadCore(account)
+        setfenv(chunk, setmetatable({ ns = core }, { __index = _G }))
+        return chunk(), core
+    end
+    Check(Grey({}) == "|cff808080", "topbar: the AFK and DND tags keep their grey with the default theme")
+    local tag, core = Grey(ACCENT_PRESET)
+    Check(tag == core.Color("muted"), "topbar: the AFK and DND tags follow Secondary Text")
+    Check(not source:find("SetTextColor(1, 1, 1)", 1, true), "topbar: no fixed white clock text is left")
+end
+
 print("PASS theme HUD: " .. cases .. " checks")
