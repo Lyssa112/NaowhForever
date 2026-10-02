@@ -579,26 +579,34 @@ local function BuildRegionControl(rgn, cfg)
         track:SetPoint("RIGHT", valBox, "LEFT", -8, 0)
         return track
     elseif cfg.type == "palette" then
-        -- A row of small chips showing colors; nothing to click. cfg.colors() lists them.
-        local N, SIZE, GAP = 6, 22, 4
+        -- A row of small chips showing colors; nothing to click. One chip per color that
+        -- cfg.colors() returns, built as they are first needed and hidden when a later call
+        -- returns fewer.
+        local SIZE, GAP = 22, 4
         local chips = CreateFrame("Frame", nil, rgn)
-        chips:SetSize(N * SIZE + (N - 1) * GAP, SIZE)
+        chips:SetHeight(SIZE)
         chips:SetPoint("RIGHT", rgn, "RIGHT", -20, 0)
-        local fills = {}
-        for i = 1, N do
-            local chip = CreateFrame("Frame", nil, chips)
-            chip:SetSize(SIZE, SIZE)
-            chip:SetPoint("LEFT", chips, "LEFT", (i - 1) * (SIZE + GAP), 0)
-            fills[i] = ns.Solid(chip, "BACKGROUND", T.bg, 1)
-            fills[i]:SetAllPoints()
-            ns.Border(chip, T.muted, 0.6)
-        end
+        local made = {}
         local function Paint()
             local colors = cfg.colors()
-            for i = 1, N do
+            local n = #colors
+            chips:SetWidth(math.max(1, n * (SIZE + GAP) - GAP))
+            for i = 1, n do
+                local chip = made[i]
+                if not chip then
+                    chip = CreateFrame("Frame", nil, chips)
+                    chip:SetSize(SIZE, SIZE)
+                    chip:SetPoint("LEFT", chips, "LEFT", (i - 1) * (SIZE + GAP), 0)
+                    chip.fill = ns.Solid(chip, "BACKGROUND", T.bg, 1)
+                    chip.fill:SetAllPoints()
+                    ns.Border(chip, T.muted, 0.6)
+                    made[i] = chip
+                end
                 local c = colors[i]
-                if c then fills[i]:SetColorTexture(c.r, c.g, c.b, 1) end
+                chip.fill:SetColorTexture(c.r, c.g, c.b, 1)
+                chip:Show()
             end
+            for i = n + 1, #made do made[i]:Hide() end
         end
         chips._refreshValue = Paint
         Paint()

@@ -203,13 +203,16 @@ do
     local branch = widgets:sub(from, upTo - 1):gsub('^    elseif cfg%.type == "palette" then', "")
     local code = "local cfg, rgn = ...\n" .. branch
     local paletteChunk = assert(loadstring(code))
-    local frames, painted = 0, {}
+    local frames, painted = {}, {}
     local function Frame()
-        frames = frames + 1
-        return setmetatable({}, { __index = function() return function() end end })
+        local f = { shown = true }
+        function f.Show() f.shown = true end
+        function f.Hide() f.shown = false end
+        frames[#frames + 1] = f
+        return setmetatable(f, { __index = function() return function() end end })
     end
     local function Build(colors)
-        painted = {}
+        frames, painted = {}, {}
         local count = 0
         local env = { CreateFrame = Frame, T = { bg = {}, muted = {} },
             ns = { Solid = function()
@@ -223,13 +226,28 @@ do
         local control = paletteChunk(cfg, Frame())
         return control, cfg
     end
-    local red = { r = 1, g = 0, b = 0 }
-    local control, cfg = Build(function() return { red, red, red, red, red, red } end)
-    Check(frames == 8 and control._refreshValue, "one frame for the row of chips and one for each chip")
+    local function Shown()
+        local n = 0
+        for i = 3, #frames do if frames[i].shown then n = n + 1 end end
+        return n
+    end
+    local function List(count, r)
+        local out = {}
+        for i = 1, count do out[i] = { r = r, g = 0, b = 0 } end
+        return out
+    end
+    local control, cfg = Build(function() return List(6, 1) end)
+    Check(#frames == 8 and control._refreshValue, "the rgn, one frame for the row of chips and one for each chip")
     Check(#painted == 6 and painted[1][1] == 1 and painted[6][4] == 1, "every chip is painted from cfg.colors()")
-    cfg.colors = function() return { { r = 0, g = 1, b = 0 } } end
+    cfg.colors = function() return List(2, 0.5) end
     control._refreshValue()
-    Check(painted[1][2] == 1 and painted[2][1] == 1, "a refresh repaints from the current colors, and leaves chips it has no color for")
+    Check(painted[1][1] == 0.5 and painted[2][1] == 0.5 and painted[3][1] == 1, "a refresh repaints from the current colors")
+    Check(#frames == 8 and Shown() == 2, "fewer colors hide the extra chips and build nothing")
+    cfg.colors = function() return List(8, 0.25) end
+    control._refreshValue()
+    Check(#frames == 10 and Shown() == 8 and #painted == 8 and painted[8][1] == 0.25, "more colors build only the missing chips and show them all")
+    Check(Build(function() return List(3, 1) end) and #frames == 5 and Shown() == 3, "one chip per color from the start")
+    Check(Build(function() return {} end) and #frames == 2 and Shown() == 0, "no colors, no chips")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")
