@@ -98,6 +98,7 @@
 - Dungeon Journal: its data is updated to WoW Forever build 1.60.1.70170: 4 faction rewards changed (item levels, required levels).
 
 ### Fixed
+- Themes: the XP Bar's quest and rested segments and text follow your theme's Accent instead of staying gold and blue. Looks the same with the default theme.
 - The Naowh font is only on this addon's own windows and HUD again; the rest of the game keeps
   its own fonts. Settings > Font has Addon Font (Naowh), plus Game Font and Combat Text Font,
   both off unless you pick a font.
