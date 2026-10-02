@@ -65,6 +65,7 @@
 - Professions: Shift-Click Searches AH (off by default). While the auction house is open,
   Shift-click a recipe or a reagent and the search for the item runs straight away; while
   you type in chat, it still links it.
+- Settings: a Class Color Accent switch under Custom colors uses your character's class color as the accent, when it reads against your Background and Panels (otherwise your picked Accent stays). Off by default.
 
 ### Changed
 - The Naowh logo now has the closed infinity loop at the bottom, on the addon list, the main window and the small popups.

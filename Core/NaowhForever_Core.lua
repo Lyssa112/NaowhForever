@@ -156,12 +156,48 @@ local function Lightened(t, amount)
     return t.r + (1 - t.r) * amount, t.g + (1 - t.g) * amount, t.b + (1 - t.b) * amount
 end
 
+-- WCAG contrast ratio of two colors.
+local function Luminance(c)
+    local function Linear(v) return v <= 0.03928 and v / 12.92 or ((v + 0.055) / 1.055) ^ 2.4 end
+    return 0.2126 * Linear(c.r) + 0.7152 * Linear(c.g) + 0.0722 * Linear(c.b)
+end
+
+local function Contrast(a, b)
+    local la, lb = Luminance(a), Luminance(b)
+    if la < lb then la, lb = lb, la end
+    return (la + 0.05) / (lb + 0.05)
+end
+
+-- The logged-in character's class color, or nil where the client does not know it yet
+-- (Forever can answer "Unknown" this early in loading).
+local function ClassColor()
+    local class = UnitClass and select(2, UnitClass("player"))
+    local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+    if c and Channel(c.r) and Channel(c.g) and Channel(c.b) then return c end
+end
+
+-- True while Class Color Accent is on and the class was not known at ADDON_LOADED, so the
+-- accent is applied again at PLAYER_LOGIN.
+local classAccentPending = false
+function ns.ThemeClassAccentPending() return classAccentPending end
+
 function ns.ApplyThemeColors()
     local source = ThemeSource()
+    classAccentPending = false
     if not source then return end
     for _, key in ipairs(ns.THEME_EDITABLE) do
         local r, g, b = Pick(source, key)
         if r then Paint(key, r, g, b) end
+    end
+    -- Custom can use the character's class color for the accent, as long as it reads
+    -- against the background and the panels; otherwise the picked accent stays.
+    if ns.AccountSettings().themePreset == "custom" and ns.AccountSettings().themeClassAccent == true then
+        local c = ClassColor()
+        if not c then
+            classAccentPending = true
+        elseif Contrast(c, ns.THEME.bg) >= 3 and Contrast(c, ns.THEME.panel) >= 3 then
+            Paint("accent", c.r, c.g, c.b)
+        end
     end
     if themeShipped.accent then Paint("accentSoft", Lightened(ns.THEME.accent, 0.33)) end
     if themeShipped.line then Paint("grey", Lightened(ns.THEME.line, 0.03)) end
@@ -359,11 +395,16 @@ gameFontEvents:RegisterEvent("ADDON_LOADED")
 gameFontEvents:RegisterEvent("PLAYER_LOGIN")
 gameFontEvents:SetScript("OnEvent", function(self, event, name)
     if event == "ADDON_LOADED" and name ~= ADDON_NAME then return end
-    if event == "ADDON_LOADED" then ns.ApplyThemeColors() end
+    if event == "ADDON_LOADED" or ns.ThemeClassAccentPending() then ns.ApplyThemeColors() end
     local account = ns.AccountSettings()
     local game, combat = FontPath(account.gameFont), FontPath(account.combatFont)
     if not (game or combat) then
-        self:UnregisterAllEvents()
+        -- Still waiting for the class: stay for PLAYER_LOGIN.
+        if event == "ADDON_LOADED" and ns.ThemeClassAccentPending() then
+            self:UnregisterEvent("ADDON_LOADED")
+        else
+            self:UnregisterAllEvents()
+        end
         return
     end
     if game then STANDARD_TEXT_FONT, UNIT_NAME_FONT = game, game end

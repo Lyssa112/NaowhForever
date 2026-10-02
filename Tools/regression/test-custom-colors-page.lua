@@ -179,4 +179,25 @@ do
     Check(a.themeColors.bg.r == 0x0e / 255 and a.themeColors.accent.b == 0xed / 255, "the default theme's colors")
 end
 
+-- Class Color Accent: a switch beside Start From; the Accent swatch gives way while it is on.
+do
+    local a = { themePreset = "custom", themeColors = { bg = { r = 0.1, g = 0.1, b = 0.1 } } }
+    local e = Page(a)
+    local toggle = e.rows[2][2]
+    Check(toggle.type == "toggle" and toggle.text == "Class Color Accent", "the switch sits beside Start From")
+    Check(toggle.getValue() == false, "off by default")
+    Check(e.rows[5][2].type == "colorpicker" and e.rows[5][2].text == "Accent", "the Accent swatch is there while it is off")
+    toggle.setValue(true)
+    Check(a.themeClassAccent == true and e.refreshes == 1 and #e.confirms == 0, "on is stored and the page redraws")
+    e.build()
+    Check(e.rows[2][2].getValue() == true and #e.notes == 1 and e.notes[1] == HINT, "it reads back, and the hint shows")
+    Check(e.rows[5][2].type == "label", "the Accent swatch is not built while it is on")
+    e.rows[2][2].setValue(false)
+    Check(a.themeClassAccent == nil, "off clears it")
+    a.themeClassAccent = "yes"
+    e.build()
+    Check(e.rows[2][2].getValue() == false and e.rows[5][2].type == "colorpicker", "only true counts as on")
+    Check(#Page({ themePreset = "midnight" }).rows == 1, "presets have no switch")
+end
+
 print("PASS custom colors page: " .. cases .. " checks")

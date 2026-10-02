@@ -586,6 +586,7 @@ function ns.BuildSettingsPage(parent, y)
 
     _, h = W:SectionHeader(parent, "COLORS", y); y = y - h
     local function CustomSelected() return ns.ThemePresetKey() == "custom" end
+    local function classAccent() return ns.AccountSettings().themeClassAccent == true end
     -- A swatch drag calls setValue on every tick and has no OK callback, so the page is
     -- rebuilt once, on the first change, to bring the hint up.
     local function MarkColorsPending()
@@ -634,7 +635,16 @@ function ns.BuildSettingsPage(parent, y)
                       UI:RefreshPage(true)
                   end)
               end },
-            { type = "label", text = "" }
+            { type = "toggle", text = "Class Color Accent",
+              tooltip = "Use your character's class color as the accent, when it reads against "
+              .. "your Background and Panels (otherwise the Accent below stays). Follows whichever "
+              .. "character you log in on.|n|nTakes effect after a /reload.",
+              getValue = function() return classAccent() end,
+              setValue = function(v)
+                  ns.AccountSettings().themeClassAccent = v and true or nil
+                  colorsPending = true
+                  UI:RefreshPage(true)
+              end }
         ); y = y - h
         local function Swatch(key, text)
             return { type = "colorpicker", text = text, hasAlpha = false,
@@ -648,7 +658,9 @@ function ns.BuildSettingsPage(parent, y)
         end
         _, h = W:DualRow(parent, y, Swatch("bg", "Background"), Swatch("panel", "Panels")); y = y - h
         _, h = W:DualRow(parent, y, Swatch("line", "Borders & Lines"), Swatch("fg", "Text")); y = y - h
-        _, h = W:DualRow(parent, y, Swatch("muted", "Secondary Text"), Swatch("accent", "Accent")); y = y - h
+        -- The class color replaces the Accent swatch while it is on.
+        _, h = W:DualRow(parent, y, Swatch("muted", "Secondary Text"),
+            classAccent() and { type = "label", text = "" } or Swatch("accent", "Accent")); y = y - h
     end
     if colorsPending then
         _, h = W:Note(parent, "Reload UI to apply your color changes.", y); y = y - h

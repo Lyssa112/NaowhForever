@@ -10,6 +10,7 @@ local function NewFrame()
     function f:SetScript(name, fn) self[name] = fn end
     function f:RegisterEvent(e) self.events[e] = true end
     function f:UnregisterAllEvents() self.events = {} end
+    function f:UnregisterEvent(e) self.events[e] = nil end
     frames[#frames + 1] = f
     return f
 end
@@ -274,6 +275,66 @@ do
     Check(ns.Color("accent") == "|cffef4b56", "the cache follows the applied accent")
     Check(ns.Color("accent", "x") == "|cffef4b56x|r", "wrapped text")
     Check(ns.Color("fg") == "|cfff6eff0" and ns.Color("muted") == "|cffac9a9e", "fg and muted follow too")
+end
+
+-- Class color accent (Custom only), when it reads against the background and panels.
+do
+    local COLORS = { PALADIN = { r = 0.96, g = 0.55, b = 0.73 }, DEATHKNIGHT = { r = 0.77, g = 0.12, b = 0.23 } }
+    local class
+    local saved = { UnitClass = _G.UnitClass, RAID_CLASS_COLORS = _G.RAID_CLASS_COLORS }
+    _G.UnitClass = function() return "Name", class end
+    _G.RAID_CLASS_COLORS = COLORS
+    local function Loaded(account, token)
+        class = token
+        local ns, handler = Load(account)
+        Fire(handler, "ADDON_LOADED", "NaowhForever")
+        return ns, handler
+    end
+    local picks = { bg = { r = 0.05, g = 0.05, b = 0.07 }, panel = { r = 0.1, g = 0.1, b = 0.12 },
+        accent = { r = 0.2, g = 0.6, b = 0.2 } }
+    local function Custom(extra)
+        local a = { themePreset = "custom", themeColors = picks, themeClassAccent = true }
+        for k, v in pairs(extra or {}) do a[k] = v end
+        return a
+    end
+    local ns = Loaded(Custom(), "PALADIN")
+    Check(ns.THEME.accent.r == 0.96 and ns.THEME.accent.g == 0.55, "the class color becomes the accent")
+    Check(ns.THEME.accentSoft.r == 0.96 + (1 - 0.96) * 0.33, "the lighter accent derives from it")
+    Check(not ns.ThemeClassAccentPending(), "nothing waits for login once the class is known")
+    ns = Loaded(Custom(), "DEATHKNIGHT")
+    Check(ns.THEME.accent.r == 0.2 and ns.THEME.accent.g == 0.6, "a class color under 3:1 keeps the picked accent")
+    ns = Loaded({ themePreset = "custom", themeColors = picks }, "PALADIN")
+    Check(ns.THEME.accent.r == 0.2 and not ns.ThemeClassAccentPending(), "off: the picked accent")
+    ns = Loaded({ themePreset = "midnight", themeClassAccent = true }, "PALADIN")
+    Check(Is(ns.THEME.accent, "5b8cff") and not ns.ThemeClassAccentPending(), "presets keep their own accent")
+    ns = Loaded({ themeClassAccent = true }, "PALADIN")
+    Check(Is(ns.THEME.accent, SHIPPED.accent), "the default theme keeps its accent")
+    ns = Loaded(Custom({ themeClassAccent = "yes" }), "PALADIN")
+    Check(ns.THEME.accent.r == 0.2, "only true turns it on")
+
+    -- The class is not known at ADDON_LOADED: the picked accent holds, and PLAYER_LOGIN applies it.
+    for _, early in ipairs({ false, "UNKNOWNCLASS" }) do
+        local handler
+        ns, handler = Loaded(Custom(), early or nil)
+        local accent = ns.THEME.accent
+        Check(accent.r == 0.2 and ns.ThemeClassAccentPending(), "unknown class at load: the picked accent, login pending")
+        Check(handler.events.PLAYER_LOGIN and not handler.events.ADDON_LOADED,
+            "no fonts set: the frame stays for PLAYER_LOGIN only")
+        class = "PALADIN"
+        Fire(handler, "PLAYER_LOGIN")
+        Check(ns.THEME.accent == accent and accent.r == 0.96 and accent.g == 0.55, "login: the class color, in place")
+        Check(ns.THEME.accentSoft.r == 0.96 + (1 - 0.96) * 0.33, "login: the lighter accent follows")
+        Check(not ns.ThemeClassAccentPending() and next(handler.events) == nil, "login: done, nothing left registered")
+    end
+    local handler
+    ns, handler = Loaded(Custom(), nil)
+    Fire(handler, "PLAYER_LOGIN")
+    Check(ns.THEME.accent.r == 0.2 and next(handler.events) == nil, "still unknown at login: the picked accent, done")
+    local _
+    _, handler = Loaded(Custom(), "PALADIN")
+    Check(next(handler.events) == nil, "known at load: the frame is finished after ADDON_LOADED")
+
+    _G.UnitClass, _G.RAID_CLASS_COLORS = saved.UnitClass, saved.RAID_CLASS_COLORS
 end
 
 print("PASS custom colors: " .. cases .. " checks")
