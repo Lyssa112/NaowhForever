@@ -662,15 +662,25 @@ function ns.BuildSettingsPage(parent, y)
             { type = "toggle", text = "Add Themes to RestedXP",
               tooltip = "Adds NaowhUI and the eight Naowh themes to RestedXP Guides' theme list, in "
               .. "their colors and with RestedXP's own frames, and colors its waypoint arrow in the "
-              .. "theme's Accent with a layer over it. Pick one in RestedXP's Look and Feel "
-              .. "settings.|n|nTakes effect after a /reload.",
+              .. "theme's Accent. Pick one in RestedXP's Look and Feel settings.|n|nTakes effect "
+              .. "after a /reload.",
               getValue = ns.RXPThemesEnabled,
               setValue = function(v)
                   ns.SetRXPThemes(v)
                   colorsPending = true
                   UI:RefreshPage(true)
               end },
-            { type = "label", text = "" }
+            { type = "dropdown", text = "RestedXP Arrow",
+              values = { layer = "Colored layer", image = "Naowh arrow", off = "RestedXP's own" },
+              order = { "layer", "image", "off" },
+              tooltip = "How RestedXP's waypoint arrow looks while one of the Naowh themes is picked "
+              .. "in RestedXP. Colored layer: the theme's Accent over RestedXP's own arrow. Naowh "
+              .. "arrow: Naowh's own arrow image in the Accent, in place of RestedXP's. "
+              .. "RestedXP's own: its arrow as it is.",
+              disabled = function() return not ns.RXPThemesEnabled() end,
+              disabledTooltip = "Turn on Add Themes to RestedXP first.",
+              getValue = ns.RXPArrowStyle,
+              setValue = function(v) ns.SetRXPArrowStyle(v) end }
         ); y = y - h
     end
     if colorsPending then

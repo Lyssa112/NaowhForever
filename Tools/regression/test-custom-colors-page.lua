@@ -271,11 +271,28 @@ do
     for _, word in ipairs({ "NaowhUI", "eight Naowh themes", "waypoint arrow", "Look and Feel", "Takes effect after a /reload" }) do
         Check(toggle.tooltip:find(word, 1, true), "tooltip mentions " .. word)
     end
+    local arrow
+    for _, row in ipairs(e.rows) do
+        if row[1] == toggle then arrow = row[2] end
+    end
+    Check(arrow and arrow.type == "dropdown" and arrow.text == "RestedXP Arrow", "the arrow choice sits beside the toggle")
+    Check(#arrow.order == 3 and arrow.order[1] == "layer" and arrow.values.layer == "Colored layer"
+        and arrow.values.image == "Naowh arrow" and arrow.values.off == "RestedXP's own", "three ways to draw it")
+    Check(arrow.getValue() == "layer" and arrow.disabled() == true and arrow.disabledTooltip, "a layer by default, greyed out while the themes are off")
+    arrow.setValue("image")
+    Check(a.rxpArrow == "image" and arrow.getValue() == "image", "the choice is stored")
+    arrow.setValue("layer")
+    Check(a.rxpArrow == nil, "the default is stored as nothing")
     Check(#e.notes == 0, "no hint before a change")
     toggle.setValue(true)
     Check(a.rxpThemes == true and e.refreshes == 1 and #e.confirms == 0, "on is stored and the page redraws")
     e.build()
     Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == HINT, "it reads back, and the reload hint shows")
+    for _, row in ipairs(e.rows) do
+        if row[1].text == "Add Themes to RestedXP" then
+            Check(row[2].disabled() == false, "the arrow choice is available once the themes are on")
+        end
+    end
     Toggle(e).setValue(false)
     Check(a.rxpThemes == nil, "off clears it")
     local custom = Page({ themePreset = "custom" }, true)

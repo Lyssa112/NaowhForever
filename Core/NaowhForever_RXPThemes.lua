@@ -2,9 +2,10 @@
 --  NaowhForever_RXPThemes.lua -- NaowhUI and the eight Naowh themes in RestedXP Guides.
 --  RestedXP reads a global RXPGuides_Themes table once, while it starts, and registers every
 --  theme in it (its own RXPGuides_Themes addon fills the same table). Colors only: the frames
---  and icons are RestedXP's own, already installed. Its waypoint arrow gets a layer of the theme's
---  Accent on top while one of these themes is the active one; its own image is left as it is. Off
---  unless Settings > COLORS turns it on.
+--  and icons are RestedXP's own, already installed. Its waypoint arrow, which it cannot color,
+--  is drawn in the theme's Accent while one of these themes is the active one: by a layer over
+--  its image, or by Naowh's own arrow image, as the player picks. Off unless Settings > COLORS
+--  turns it on.
 -------------------------------------------------------------------------------
 local ns = _G.NaowhForever
 
@@ -84,16 +85,34 @@ local function Register()
 end
 
 -- RestedXP draws its waypoint arrow, the frame RXPG_ARROW, from an image its theme gives it (a dark
--- one) and has no setting to color it. While one of our themes is the active one, a layer of ours
--- lies over the arrow: the Accent, added to the arrow's own colors and clipped to its shape (the
--- arrow's own image is the mask). RestedXP's image is not touched. RestedXP turns the arrow with
--- SetRotation, and the mask is turned with it.
--- The Accent is lighter at the top and deeper at the bottom, as if lit from above, and not at
+-- one) and has no setting to color it. While one of our themes is the active one, the arrow is drawn
+-- the way the player picked (Settings > COLORS, RestedXP Arrow):
+--   layer  a layer of ours over the arrow: the Accent, added to the arrow's own colors and clipped
+--          to its shape (the arrow's own image is the mask). RestedXP's image is not touched;
+--   image  Naowh's own white arrow (Media/rxp_arrow.tga) in the Accent, in place of RestedXP's;
+--   off    RestedXP's own arrow, as it is.
+-- With any other RestedXP theme the arrow is left alone.
+local ARROW_IMAGE = "Interface\\AddOns\\NaowhForever\\Media\\rxp_arrow.tga"
+local ARROW_STYLES = { layer = true, image = true, off = true }
+local DEFAULT_ARROW = "layer"
+-- The layer's Accent is lighter at the top and deeper at the bottom, as if lit from above, and not at
 -- full strength, so the dark arrow underneath still shades it; flat, it reads as a neon shape.
 local TOP_TOWARD_WHITE = 0.22   -- how far the top goes from the Accent toward white
 local BOTTOM_SHARE = 0.72       -- how much of the Accent the bottom keeps
 local LAYER_STRENGTH = 0.9
-local layer
+
+local layer     -- our layer over the arrow, built the first time it is needed
+local swapped   -- the arrow shows our image in place of RestedXP's
+local tinted    -- the arrow's texture carries our tint
+local rxpImage  -- the image RestedXP last set, to hand back
+
+--- How the arrow is drawn while one of the Naowh themes is active: "layer" (the default), "image"
+--- or "off".
+---@return string
+function ns.RXPArrowStyle()
+    local style = ns.AccountSettings().rxpArrow
+    return ARROW_STYLES[style] and style or DEFAULT_ARROW
+end
 
 local function BuildLayer(arrow)
     local texture = arrow.texture
@@ -111,38 +130,78 @@ local function BuildLayer(arrow)
     return f
 end
 
-local function PaintArrow()
-    local arrow = _G.RXPG_ARROW
-    local texture = arrow and arrow.texture
-    if not texture then return end
+-- The active RestedXP theme, when it is one of ours.
+local function ActiveTheme()
     local rxp = _G.RXP
     local theme = rxp and rxp.activeTheme
-    local ours = type(theme) == "table" and type(theme.name) == "string"
-        and theme.name:find(NAME_PREFIX, 1, true) == 1 and type(theme.mapPins) == "table"
-    if not ours then
-        if layer then layer:Hide() end
-        return
+    if type(theme) == "table" and type(theme.name) == "string" and type(theme.mapPins) == "table"
+            and theme.name:find(NAME_PREFIX, 1, true) == 1 then
+        return theme
     end
+end
+
+local function PaintLayer(arrow, c)
     layer = layer or BuildLayer(arrow)
     if not layer then return end
-    local c = theme.mapPins
     layer.color:SetColorTexture(1, 1, 1, 1)
     layer.color:SetGradient("VERTICAL",
         CreateColor(c[1] * BOTTOM_SHARE, c[2] * BOTTOM_SHARE, c[3] * BOTTOM_SHARE, LAYER_STRENGTH),
         CreateColor(c[1] + (1 - c[1]) * TOP_TOWARD_WHITE, c[2] + (1 - c[2]) * TOP_TOWARD_WHITE,
             c[3] + (1 - c[3]) * TOP_TOWARD_WHITE, LAYER_STRENGTH))
-    layer.mask:SetTexture(texture:GetTexture(), "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    layer.mask:SetTexture(arrow.texture:GetTexture(), "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
     layer.mask:SetRotation(arrow.orientation or 0)
     layer:Show()
 end
 
--- RestedXP sets the arrow's image again whenever its theme loads or changes, so the layer is
--- painted after each of those.
+local function Paint()
+    local arrow = _G.RXPG_ARROW
+    local texture = arrow and arrow.texture
+    if not texture then return end
+    local theme = ActiveTheme()
+    local style = theme and ns.RXPArrowStyle() or "off"
+    if style == "layer" then
+        PaintLayer(arrow, theme.mapPins)
+    elseif layer then
+        layer:Hide()
+    end
+    if style == "image" then
+        local c = theme.mapPins
+        texture:SetTexture(ARROW_IMAGE)
+        texture:SetVertexColor(c[1], c[2], c[3], 1)
+        swapped, tinted = true, true
+    else
+        if swapped then
+            if rxpImage then texture:SetTexture(rxpImage) end
+            swapped = false
+        end
+        if tinted then
+            texture:SetVertexColor(1, 1, 1, 1)
+            tinted = false
+        end
+    end
+end
+
+-- RestedXP has just set the arrow's image again, because its theme loaded or changed: that is its
+-- own image now, and the arrow is drawn once more.
+local function OnRxpUpdate()
+    local arrow = _G.RXPG_ARROW
+    swapped = false
+    rxpImage = arrow and arrow.texture and arrow.texture:GetTexture()
+    Paint()
+end
+
+--- Saved for this computer, and applied at once when the arrow is already hooked.
+---@param style string "layer", "image" or "off"
+function ns.SetRXPArrowStyle(style)
+    ns.AccountSettings().rxpArrow = (ARROW_STYLES[style] and style ~= DEFAULT_ARROW) and style or nil
+    Paint()
+end
+
 local function HookArrow()
     local arrow = _G.RXPG_ARROW
     if not (arrow and arrow.texture and type(arrow.UpdateVisuals) == "function") then return end
-    hooksecurefunc(arrow, "UpdateVisuals", PaintArrow)
-    PaintArrow()
+    hooksecurefunc(arrow, "UpdateVisuals", OnRxpUpdate)
+    OnRxpUpdate()
 end
 
 -- When this addon has loaded: that is after the saved toggle can be read and before RestedXP

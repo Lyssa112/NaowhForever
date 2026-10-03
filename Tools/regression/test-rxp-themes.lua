@@ -176,15 +176,18 @@ do
     end
 end
 
--- The waypoint arrow: while one of our themes is the active one, a layer of its Accent lies over
--- RestedXP's arrow (clipped to the arrow's own image, turning with it); RestedXP's image is never
--- touched, and with any other theme there is no layer.
+-- The waypoint arrow: while one of our themes is the active one, by default a layer of its Accent
+-- lies over RestedXP's arrow (clipped to the arrow's own image, turning with it) and RestedXP's image
+-- is not touched; or Naowh's own arrow image in the Accent, or RestedXP's own arrow. With any other
+-- theme the arrow is left alone.
 do
     local IMAGE = "Interface/AddOns/RXPGuides/Textures/DarkMode/rxp_navigation_arrow-1"
     local function Arrow()
-        local a = { orientation = 1.25 }
+        local a = { orientation = 1.25, sets = {}, tints = {} }
         a.texture = { path = IMAGE }
         function a.texture:GetTexture() return self.path end
+        function a.texture:SetTexture(path) self.path = path; a.sets[#a.sets + 1] = path end
+        function a.texture:SetVertexColor(...) a.tints[#a.tints + 1] = { ... } end
         function a.texture:SetRotation() end   -- RestedXP's own call, which the hook follows
         function a:GetFrameLevel() return 3 end
         function a.UpdateVisuals() end
@@ -292,6 +295,72 @@ do
     e2.RXPG_ARROW = Arrow()
     Fire(f2, "NaowhForever"); Login(b2)
     Check(#e2.hooked == 0, "RestedXP not installed: nothing is hooked")
+
+    -- the style: the layer by default, saved only when it is another, and nothing else accepted
+    local account = {}
+    local _, styleNs = Load(account, true)
+    Check(styleNs.RXPArrowStyle() == "layer" and account.rxpArrow == nil, "the arrow is a layer by default")
+    styleNs.SetRXPArrowStyle("image")
+    Check(account.rxpArrow == "image" and styleNs.RXPArrowStyle() == "image", "the image style is stored")
+    styleNs.SetRXPArrowStyle("off")
+    Check(account.rxpArrow == "off" and styleNs.RXPArrowStyle() == "off", "so is off")
+    styleNs.SetRXPArrowStyle("layer")
+    Check(account.rxpArrow == nil and styleNs.RXPArrowStyle() == "layer", "the default is stored as nothing")
+    styleNs.SetRXPArrowStyle("bogus")
+    Check(account.rxpArrow == nil, "an unknown style is not stored")
+    account.rxpArrow = "junk"
+    Check(styleNs.RXPArrowStyle() == "layer", "an unknown saved style reads as the layer")
+
+    -- Naowh's own arrow image: in place of RestedXP's, in the Accent, and no layer
+    local OURS = "Interface\\AddOns\\NaowhForever\\Media\\rxp_arrow.tga"
+    local imageEnv, imageFrames, imageBoot, imageList = Start({ rxpThemes = true, rxpArrow = "image" }, "NaowhForever:rosenoir")
+    local drawn = imageEnv.RXPG_ARROW
+    Login(imageBoot)
+    Check(#imageEnv.hooked == 1 and #Layers(imageFrames, drawn) == 0, "image: only UpdateVisuals is hooked, and no layer is built")
+    Check(drawn.texture.path == OURS and #drawn.sets == 1, "image: Naowh's arrow image is on the arrow")
+    local tint = drawn.tints[#drawn.tints]
+    Check(Hex(tint) == "ff5fa2" and tint[4] == 1, "image: in Rose Noir's Accent")
+    -- RestedXP sets its own image again for its own theme, and the tint goes
+    imageEnv.RXP.activeTheme = { name = "DarkMode" }
+    drawn.texture.path = IMAGE
+    imageEnv.hooked[1][3](drawn)
+    Check(#drawn.sets == 1 and drawn.texture.path == IMAGE, "a theme of RestedXP's: its image is left on the arrow")
+    Check(Same(drawn.tints[#drawn.tints], { 1, 1, 1, 1 }), "and the tint is cleared")
+    -- and one of ours again: RestedXP sets its image, then ours goes on
+    imageEnv.RXP.activeTheme = imageList["NaowhForever:midnight"]
+    imageEnv.hooked[1][3](drawn)
+    tint = drawn.tints[#drawn.tints]
+    Check(drawn.texture.path == OURS and #drawn.sets == 2 and Hex(tint) == "5b8cff", "back to one of ours: the image and Midnight's Accent")
+
+    -- switching the style takes effect at once, and RestedXP's image is handed back
+    local styles = imageEnv.NaowhForever
+    styles.SetRXPArrowStyle("layer")
+    Check(drawn.texture.path == IMAGE and Same(drawn.tints[#drawn.tints], { 1, 1, 1, 1 }),
+        "to the layer: RestedXP's own image is back, untinted")
+    local switched = Layers(imageFrames, drawn)
+    Check(#switched == 1 and switched[1].shown == true, "and the layer is built and shown")
+    styles.SetRXPArrowStyle("off")
+    Check(switched[1].shown == false and drawn.texture.path == IMAGE, "to off: the layer is hidden, and the arrow is RestedXP's")
+    local setsBefore = #drawn.sets
+    styles.SetRXPArrowStyle("image")
+    Check(drawn.texture.path == OURS and #drawn.sets == setsBefore + 1 and switched[1].shown == false,
+        "back to the image: ours is on, and the layer stays hidden")
+    styles.SetRXPArrowStyle("off")
+    Check(drawn.texture.path == IMAGE, "off hands RestedXP's image back again")
+
+    -- off from the start: RestedXP's own arrow, untouched
+    local quietEnv, quietFrames, quietBoot = Start({ rxpThemes = true, rxpArrow = "off" }, "NaowhForever:rosenoir")
+    Login(quietBoot)
+    Check(#quietEnv.hooked == 1 and #Layers(quietFrames, quietEnv.RXPG_ARROW) == 0 and #quietEnv.RXPG_ARROW.sets == 0
+        and #quietEnv.RXPG_ARROW.tints == 0, "off: RestedXP's own arrow, untouched")
+
+    -- RestedXP not on one of our themes: no style does anything
+    for _, style in ipairs({ "layer", "image", "off" }) do
+        local e3, f3, b3 = Start({ rxpThemes = true, rxpArrow = style }, nil)
+        Login(b3)
+        Check(#Layers(f3, e3.RXPG_ARROW) == 0 and #e3.RXPG_ARROW.sets == 0 and #e3.RXPG_ARROW.tints == 0,
+            style .. ": with RestedXP's own theme the arrow is left alone")
+    end
 end
 
 -- The setting.

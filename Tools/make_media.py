@@ -335,6 +335,21 @@ def bag(x, y, size):
     return (255, 255, 255, int(round(255 * smooth(0, d))))
 
 
+def nav_arrow(x, y, size):
+    # RestedXP's waypoint arrow, point up, in two tones with a dark edge. The fill is white (the
+    # left half a little darker) so a vertex color tints it, and the edge stays dark.
+    u, v = x / size, y / size
+    d = polygon_dist(u, v, [(0.5, 0.05), (0.89, 0.93), (0.5, 0.71), (0.11, 0.93)]) * size
+    fill = smooth(0, d)
+    edge = smooth(size * 0.04, d)
+    alpha = fill + edge * (1 - fill)
+    if alpha <= 0:
+        return (0, 0, 0, 0)
+    shade, dark = (255 if u >= 0.5 else 205), 24
+    rgb = int(round((shade * fill + dark * edge * (1 - fill)) / alpha))
+    return (rgb, rgb, rgb, int(round(255 * alpha)))
+
+
 os.makedirs(OUT, exist_ok=True)
 # y runs down the image.
 write_tga(os.path.join(OUT, "chevron_up.tga"), 64, stroke(64, [(0.22, 0.64), (0.5, 0.36), (0.78, 0.64)], 0.12))
@@ -361,3 +376,4 @@ write_tga(os.path.join(OUT, "star.tga"), 64, star)
 write_tga(os.path.join(OUT, "swords.tga"), 64, crossed_swords)
 write_tga(os.path.join(OUT, "people.tga"), 64, people)
 write_tga(os.path.join(OUT, "bag.tga"), 64, bag)
+write_tga(os.path.join(OUT, "rxp_arrow.tga"), 64, nav_arrow)
