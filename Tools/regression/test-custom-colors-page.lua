@@ -255,62 +255,71 @@ do
     Check(Build(function() return {} end) and #frames == 2 and Shown() == 0, "no colors, no chips")
 end
 
--- Add Themes to RestedXP: only with RestedXP Guides installed, off by default, a reload to apply.
+-- Add Themes to RestedXP: only with RestedXP Guides installed, off by default, a reload to apply. With it off nothing
+-- else of RestedXP's is shown; with it on, the arrow choices and the four looks that can be switched off appear.
 do
     local function Toggle(e)
         for _, row in ipairs(e.rows) do
-            if row[1].text == "Add Themes to RestedXP" then return row[1] end
+            if row[1].text == "Add Themes to RestedXP" then return row[1], row[2] end
         end
+    end
+    local function Pair(page, name)
+        for _, row in ipairs(page.rows) do
+            if row[1].text == name then return row[1], row[2] end
+        end
+    end
+    local function Hidden(page)
+        for _, name in ipairs({ "Naowh Arrow Shape", "Use Addon Font", "Quest List Dividers" }) do
+            if Pair(page, name) then return false end
+        end
+        for _, row in ipairs(page.rows) do
+            if row[2] and row[2].text == "RestedXP Arrow" then return false end
+        end
+        return true
     end
     Check(Toggle(Page({})) == nil and Toggle(Page({}, false)) == nil, "no RestedXP toggle without RestedXP Guides")
     local a = {}
     local e = Page(a, true)
-    local toggle = Toggle(e)
+    local toggle, beside = Toggle(e)
     Check(toggle and toggle.type == "toggle", "the toggle is there with RestedXP Guides installed")
     Check(toggle.getValue() == false and a.rxpThemes == nil, "off by default")
-    for _, word in ipairs({ "NaowhUI", "eight Naowh themes", "waypoint arrow", "Look and Feel", "Takes effect after a /reload" }) do
+    for _, word in ipairs({ "NaowhUI", "eight Naowh themes", "waypoint arrow", "Look and Feel", "Addon Font", "Takes effect after a /reload" }) do
         Check(toggle.tooltip:find(word, 1, true), "tooltip mentions " .. word)
     end
-    local arrow
-    for _, row in ipairs(e.rows) do
-        if row[1] == toggle then arrow = row[2] end
-    end
-    Check(arrow and arrow.type == "dropdown" and arrow.text == "RestedXP Arrow", "the arrow choice sits beside the toggle")
-    Check(#arrow.order == 3 and arrow.order[1] == "layer" and arrow.values.layer == "Colored layer"
-        and arrow.values.image == "Naowh arrow" and arrow.values.off == "RestedXP's own", "three ways to draw it")
-    Check(arrow.getValue() == "layer" and arrow.disabled() == true and arrow.disabledTooltip, "a layer by default, greyed out while the themes are off")
-    arrow.setValue("image")
-    Check(a.rxpArrow == "image" and arrow.getValue() == "image", "the choice is stored")
-    arrow.setValue("layer")
-    Check(a.rxpArrow == nil, "the default is stored as nothing")
+
+    -- off: only the toggle is shown, with nothing beside it
+    Check(beside.type == "label" and beside.text == "", "with the themes off, nothing is beside the toggle")
+    Check(Hidden(e), "and none of the other RestedXP choices is shown")
     Check(#e.notes == 0, "no hint before a change")
     local refreshed = e.refreshes
-    arrow.setValue("image")
-    Check(e.refreshes == refreshed + 1, "picking an arrow style redraws the page, so the choices below follow it")
-    arrow.setValue("layer")
-    refreshed = e.refreshes
     toggle.setValue(true)
     Check(a.rxpThemes == true and e.refreshes == refreshed + 1 and #e.confirms == 0, "on is stored and the page redraws")
     e.build()
     Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == HINT, "it reads back, and the reload hint shows")
-    for _, row in ipairs(e.rows) do
-        if row[1].text == "Add Themes to RestedXP" then
-            Check(row[2].disabled() == false, "the arrow choice is available once the themes are on")
-        end
-    end
+    Check(not Hidden(e), "and the choices are shown")
 
-    -- the shape and the glow of Naowh's arrow: the next row, only usable with the themes on and Naowh arrow picked
-    local shape, glow
-    for _, row in ipairs(e.rows) do
-        if row[1].text == "Naowh Arrow Shape" then shape, glow = row[1], row[2] end
-    end
+    -- on: the arrow choice sits beside the toggle
+    local _, arrow = Toggle(e)
+    Check(arrow and arrow.type == "dropdown" and arrow.text == "RestedXP Arrow", "the arrow choice sits beside the toggle")
+    Check(#arrow.order == 3 and arrow.order[1] == "layer" and arrow.values.layer == "Colored layer"
+        and arrow.values.image == "Naowh arrow" and arrow.values.off == "RestedXP's own", "three ways to draw it")
+    Check(arrow.getValue() == "layer" and arrow.disabled == nil, "a layer by default, and never greyed out: it is only shown with the themes on")
+    refreshed = e.refreshes
+    arrow.setValue("image")
+    Check(a.rxpArrow == "image" and arrow.getValue() == "image" and e.refreshes == refreshed + 1,
+        "the choice is stored, and the page redraws so the choices below follow it")
+    arrow.setValue("layer")
+    Check(a.rxpArrow == nil, "the default is stored as nothing")
+
+    -- the shape and the glow of Naowh's arrow: the next row, only usable with Naowh arrow picked
+    local shape, glow = Pair(e, "Naowh Arrow Shape")
     Check(shape and shape.type == "dropdown" and glow and glow.type == "toggle" and glow.text == "Naowh Arrow Glow",
         "the shape and the glow are the next row")
     Check(#shape.order == 2 and shape.order[1] == "kite" and shape.order[2] == "wide" and shape.values.kite == "Kite"
         and shape.values.wide == "Wide kite", "a kite or a wide kite")
     Check(shape.getValue() == "kite" and glow.getValue() == false, "a kite without a glow by default")
     Check(shape.disabled() == true and glow.disabled() == true and shape.disabledTooltip and glow.disabledTooltip,
-        "greyed out with the themes on but the layer as the arrow style")
+        "greyed out with the layer as the arrow style")
     arrow.setValue("image")
     Check(shape.disabled() == false and glow.disabled() == false, "usable once Naowh arrow is picked")
     shape.setValue("wide")
@@ -319,38 +328,25 @@ do
         "the choices are stored")
     shape.setValue("kite")
     glow.setValue(false)
+    arrow.setValue("layer")
     Check(a.rxpArrowShape == nil and a.rxpArrowGlow == nil, "the defaults are stored as nothing")
-    Toggle(e).setValue(false)
-    Check(a.rxpThemes == nil, "off clears it")
-    Check(shape.disabled() == true and glow.disabled() == true, "greyed out again with the themes off, whatever the arrow style")
 
-    -- the four looks that can be switched off: after the arrow rows, on by default, usable with the themes on
-    local font, text, dividers, bars
-    for _, row in ipairs(e.rows) do
-        if row[1].text == "Use Addon Font" then font, text = row[1], row[2] end
-        if row[1].text == "Quest List Dividers" then dividers, bars = row[1], row[2] end
-    end
+    -- the four looks that can be switched off: after the arrow rows, on by default, never greyed out
+    local font, text = Pair(e, "Use Addon Font")
+    local dividers, bars = Pair(e, "Quest List Dividers")
     Check(font and text and dividers and bars and font.type == "toggle" and text.type == "toggle"
         and dividers.type == "toggle" and bars.type == "toggle", "four more switches")
     Check(text.text == "Use Theme Text Color" and bars.text == "Themed Title Bar and Footer", "named for what they do")
     Check(font.getValue() == true and text.getValue() == true and dividers.getValue() == true and bars.getValue() == true,
         "all on by default")
-    Check(font.disabled() == true and text.disabled() == true and dividers.disabled() == true and bars.disabled() == true
-        and font.disabledTooltip and bars.disabledTooltip, "greyed out while the themes are off")
-    Toggle(e).setValue(true)
-    Check(font.disabled() == false and text.disabled() == false and dividers.disabled() == false and bars.disabled() == false,
-        "usable with the themes on")
+    Check(font.disabled == nil and text.disabled == nil and dividers.disabled == nil and bars.disabled == nil, "and never greyed out")
     for _, word in ipairs({ "Addon Font", "Takes effect after a /reload" }) do
         Check(font.tooltip:find(word, 1, true), "the font tooltip mentions " .. word)
     end
     Check(text.tooltip:find("Takes effect after a /reload", 1, true), "so does the text color's")
     Check(not dividers.tooltip:find("/reload", 1, true) and not bars.tooltip:find("/reload", 1, true), "the live ones do not")
+
     -- each switch on its own: the font and the text color want a reload, the other two apply at once
-    local function Pair(page, name)
-        for _, row in ipairs(page.rows) do
-            if row[1].text == name then return row[1], row[2] end
-        end
-    end
     local fp = Page({ rxpThemes = true }, true)
     local fpFont, fpText = Pair(fp, "Use Addon Font")
     fpFont.setValue(false)
@@ -375,10 +371,22 @@ do
     dp.build()
     Check(dp.account.rxpBars == false and dpBars.getValue() == false and dp.refreshes == 0 and #dp.notes == 0,
         "the title bar alone: the same")
-    Toggle(e).setValue(false)
+
+    -- turned off again, the choices are hidden again (a fresh page: the slice is rebuilt in the newest page's environment)
+    local again = Page({ rxpThemes = true }, true)
+    Toggle(again).setValue(false)
+    again.build()
+    Check(again.account.rxpThemes == nil, "off clears it")
+    Check(Hidden(again) and select(2, Toggle(again)).type == "label", "and the choices are hidden again")
+
+    -- the row counts with Custom: one toggle row with the themes off, four rows with them on
+    local plain = #Page({ themePreset = "custom" }).rows
     local custom = Page({ themePreset = "custom" }, true)
-    Check(Toggle(custom) and #custom.rows == #Page({ themePreset = "custom" }).rows + 4, "with Custom the RestedXP rows are four more than without RestedXP")
-    Check(custom.rows[#custom.rows][1].text == "Quest List Dividers", "and the dividers row is the last, above the Reload button")
+    Check(Toggle(custom) and #custom.rows == plain + 1, "with Custom and the themes off, RestedXP adds the one toggle row")
+    Check(custom.rows[#custom.rows][1].text == "Add Themes to RestedXP", "and it is the last, above the Reload button")
+    local onCustom = Page({ themePreset = "custom", rxpThemes = true }, true)
+    Check(#onCustom.rows == plain + 4, "with the themes on, RestedXP adds four rows")
+    Check(onCustom.rows[#onCustom.rows][1].text == "Quest List Dividers", "and the dividers row is the last, above the Reload button")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

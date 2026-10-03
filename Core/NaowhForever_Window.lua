@@ -656,100 +656,91 @@ function ns.BuildSettingsPage(parent, y)
         _, h = W:DualRow(parent, y, Swatch("line", "Borders & Lines"), Swatch("fg", "Text")); y = y - h
         _, h = W:DualRow(parent, y, Swatch("muted", "Secondary Text"), Swatch("accent", "Accent")); y = y - h
     end
-    -- Only with RestedXP Guides installed. It reads its themes once, as it starts, hence the reload.
+    -- Only with RestedXP Guides installed. It reads its themes once, as it starts, hence the reload. The
+    -- choices that follow mean nothing without the themes, so they are only shown with them on.
     if ns.RXPThemesAvailable and ns.RXPThemesAvailable() then
-        _, h = W:DualRow(parent, y,
-            { type = "toggle", text = "Add Themes to RestedXP",
-              tooltip = "Adds NaowhUI and the eight Naowh themes to RestedXP Guides' theme list, in "
-              .. "their colors and your Addon Font, with RestedXP's own frames, and colors its "
-              .. "waypoint arrow in the theme's Accent. Pick one in RestedXP's Look and Feel "
-              .. "settings.|n|nTakes effect after a /reload.",
-              getValue = ns.RXPThemesEnabled,
-              setValue = function(v)
-                  ns.SetRXPThemes(v)
-                  colorsPending = true
-                  UI:RefreshPage(true)
-              end },
-            { type = "dropdown", text = "RestedXP Arrow",
-              values = { layer = "Colored layer", image = "Naowh arrow", off = "RestedXP's own" },
-              order = { "layer", "image", "off" },
-              tooltip = "How RestedXP's waypoint arrow looks while one of the Naowh themes is picked "
-              .. "in RestedXP. Colored layer: the theme's Accent over RestedXP's own arrow. Naowh "
-              .. "arrow: Naowh's own arrow image in the Accent, in place of RestedXP's. "
-              .. "RestedXP's own: its arrow as it is.",
-              disabled = function() return not ns.RXPThemesEnabled() end,
-              disabledTooltip = "Turn on Add Themes to RestedXP first.",
-              getValue = ns.RXPArrowStyle,
-              setValue = function(v)
-                  ns.SetRXPArrowStyle(v)
-                  UI:RefreshPage(true)
-              end }
-        ); y = y - h
-        -- Only Naowh's own arrow has a shape and a glow to choose.
-        local function NotNaowhArrow()
-            return not ns.RXPThemesEnabled() or ns.RXPArrowStyle() ~= "image"
+        local themesToggle = { type = "toggle", text = "Add Themes to RestedXP",
+            tooltip = "Adds NaowhUI and the eight Naowh themes to RestedXP Guides' theme list, in "
+            .. "their colors and your Addon Font, with RestedXP's own frames, and colors its "
+            .. "waypoint arrow in the theme's Accent. Pick one in RestedXP's Look and Feel "
+            .. "settings.|n|nTakes effect after a /reload.",
+            getValue = ns.RXPThemesEnabled,
+            setValue = function(v)
+                ns.SetRXPThemes(v)
+                colorsPending = true
+                UI:RefreshPage(true)
+            end }
+        if not ns.RXPThemesEnabled() then
+            _, h = W:DualRow(parent, y, themesToggle, { type = "label", text = "" }); y = y - h
+        else
+            _, h = W:DualRow(parent, y, themesToggle,
+                { type = "dropdown", text = "RestedXP Arrow",
+                  values = { layer = "Colored layer", image = "Naowh arrow", off = "RestedXP's own" },
+                  order = { "layer", "image", "off" },
+                  tooltip = "How RestedXP's waypoint arrow looks while one of the Naowh themes is picked "
+                  .. "in RestedXP. Colored layer: the theme's Accent over RestedXP's own arrow. Naowh "
+                  .. "arrow: Naowh's own arrow image in the Accent, in place of RestedXP's. "
+                  .. "RestedXP's own: its arrow as it is.",
+                  getValue = ns.RXPArrowStyle,
+                  setValue = function(v)
+                      ns.SetRXPArrowStyle(v)
+                      UI:RefreshPage(true)
+                  end }
+            ); y = y - h
+            -- Only Naowh's own arrow has a shape and a glow to choose.
+            local function NotNaowhArrow() return ns.RXPArrowStyle() ~= "image" end
+            local pickFirst = "Pick Naowh arrow in RestedXP Arrow first."
+            _, h = W:DualRow(parent, y,
+                { type = "dropdown", text = "Naowh Arrow Shape",
+                  values = { kite = "Kite", wide = "Wide kite" },
+                  order = { "kite", "wide" },
+                  tooltip = "The shape of Naowh's arrow in RestedXP: the kite, or the same kite with its "
+                  .. "base 14% wider.",
+                  disabled = NotNaowhArrow,
+                  disabledTooltip = pickFirst,
+                  getValue = ns.RXPArrowShape,
+                  setValue = function(v) ns.SetRXPArrowShape(v) end },
+                { type = "toggle", text = "Naowh Arrow Glow",
+                  tooltip = "A soft glow in the theme's Accent around Naowh's arrow in RestedXP. The "
+                  .. "arrow is drawn smaller to make room for it.",
+                  disabled = NotNaowhArrow,
+                  disabledTooltip = pickFirst,
+                  getValue = ns.RXPArrowGlow,
+                  setValue = function(v) ns.SetRXPArrowGlow(v) end }
+            ); y = y - h
+            _, h = W:DualRow(parent, y,
+                { type = "toggle", text = "Use Addon Font",
+                  tooltip = "Draws RestedXP's guide text, title bar and arrow text in the Addon Font from "
+                  .. "FONT above. Off keeps RestedXP's own font.|n|nTakes effect after a /reload.",
+                  getValue = ns.RXPFontEnabled,
+                  setValue = function(v)
+                      ns.SetRXPFont(v)
+                      colorsPending = true
+                      UI:RefreshPage(true)
+                  end },
+                { type = "toggle", text = "Use Theme Text Color",
+                  tooltip = "Draws RestedXP's text in the theme's Text color. Off keeps RestedXP's own "
+                  .. "white.|n|nTakes effect after a /reload.",
+                  getValue = ns.RXPTextColorEnabled,
+                  setValue = function(v)
+                      ns.SetRXPTextColor(v)
+                      colorsPending = true
+                      UI:RefreshPage(true)
+                  end }
+            ); y = y - h
+            _, h = W:DualRow(parent, y,
+                { type = "toggle", text = "Quest List Dividers",
+                  tooltip = "A thin line between the rows of RestedXP's quest list, in the theme's "
+                  .. "Borders & Lines color, like the lines between the rows in this window.",
+                  getValue = ns.RXPDividersEnabled,
+                  setValue = function(v) ns.SetRXPDividers(v) end },
+                { type = "toggle", text = "Themed Title Bar and Footer",
+                  tooltip = "Shows the theme's Background in RestedXP's title bar and footer instead of "
+                  .. "its black banner.",
+                  getValue = ns.RXPBarsEnabled,
+                  setValue = function(v) ns.SetRXPBars(v) end }
+            ); y = y - h
         end
-        local pickFirst = "Turn on Add Themes to RestedXP and pick Naowh arrow in RestedXP Arrow first."
-        _, h = W:DualRow(parent, y,
-            { type = "dropdown", text = "Naowh Arrow Shape",
-              values = { kite = "Kite", wide = "Wide kite" },
-              order = { "kite", "wide" },
-              tooltip = "The shape of Naowh's arrow in RestedXP: the kite, or the same kite with its base "
-              .. "14% wider.",
-              disabled = NotNaowhArrow,
-              disabledTooltip = pickFirst,
-              getValue = ns.RXPArrowShape,
-              setValue = function(v) ns.SetRXPArrowShape(v) end },
-            { type = "toggle", text = "Naowh Arrow Glow",
-              tooltip = "A soft glow in the theme's Accent around Naowh's arrow in RestedXP. The arrow is "
-              .. "drawn a little smaller to make room for it.",
-              disabled = NotNaowhArrow,
-              disabledTooltip = pickFirst,
-              getValue = ns.RXPArrowGlow,
-              setValue = function(v) ns.SetRXPArrowGlow(v) end }
-        ); y = y - h
-        local function ThemesOff() return not ns.RXPThemesEnabled() end
-        local turnOn = "Turn on Add Themes to RestedXP first."
-        _, h = W:DualRow(parent, y,
-            { type = "toggle", text = "Use Addon Font",
-              tooltip = "Draws RestedXP's guide text, title bar and arrow text in the Addon Font from FONT "
-              .. "above. Off keeps RestedXP's own font.|n|nTakes effect after a /reload.",
-              disabled = ThemesOff,
-              disabledTooltip = turnOn,
-              getValue = ns.RXPFontEnabled,
-              setValue = function(v)
-                  ns.SetRXPFont(v)
-                  colorsPending = true
-                  UI:RefreshPage(true)
-              end },
-            { type = "toggle", text = "Use Theme Text Color",
-              tooltip = "Draws RestedXP's text in the theme's Text color. Off keeps RestedXP's own white."
-              .. "|n|nTakes effect after a /reload.",
-              disabled = ThemesOff,
-              disabledTooltip = turnOn,
-              getValue = ns.RXPTextColorEnabled,
-              setValue = function(v)
-                  ns.SetRXPTextColor(v)
-                  colorsPending = true
-                  UI:RefreshPage(true)
-              end }
-        ); y = y - h
-        _, h = W:DualRow(parent, y,
-            { type = "toggle", text = "Quest List Dividers",
-              tooltip = "A thin line between the rows of RestedXP's quest list, in the theme's Borders & "
-              .. "Lines color, like the lines between the rows in this window.",
-              disabled = ThemesOff,
-              disabledTooltip = turnOn,
-              getValue = ns.RXPDividersEnabled,
-              setValue = function(v) ns.SetRXPDividers(v) end },
-            { type = "toggle", text = "Themed Title Bar and Footer",
-              tooltip = "Shows the theme's Background in RestedXP's title bar and footer instead of its "
-              .. "black banner.",
-              disabled = ThemesOff,
-              disabledTooltip = turnOn,
-              getValue = ns.RXPBarsEnabled,
-              setValue = function(v) ns.SetRXPBars(v) end }
-        ); y = y - h
     end
     if colorsPending then
         _, h = W:Note(parent, "Reload UI to apply your color changes.", y); y = y - h
