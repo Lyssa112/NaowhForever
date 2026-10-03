@@ -92,6 +92,13 @@ local NAMES = { [""] = "NaowhUI", midnight = "Midnight", slate = "Slate", obsidi
     cottoncandy = "Cotton Candy" }
 local function NameOf(key) return "NaowhForever:" .. (key == "" and "default" or key) end
 local RXP_OWN = { "RXP Blue", "RXP Red", "RXP Gold", "DarkMode", "RXP Green", "Custom" }
+local TEX = "Interface/AddOns/RXPGuides/Textures/"
+local WHITE = "Interface/BUTTONS/WHITE8X8"
+-- RestedXP's frame borders whose thin light line suits each theme's Accent: lavender (its blue set),
+-- teal, tan, grey. Written out here on its own, so a wrong table in the module cannot hide behind itself.
+local BORDER = { [""] = TEX, midnight = TEX, aubergine = TEX, cottoncandy = TEX,
+    slate = TEX .. "Green/", forest = TEX .. "Green/", obsidian = TEX .. "GoldAssistant/",
+    crimson = TEX .. "Hardcore/", rosenoir = TEX .. "Hardcore/" }
 
 -- Off by default: nothing is written, whatever else is going on.
 do
@@ -132,9 +139,12 @@ do
         Check(Same(theme.mapPins, { p[6].r, p[6].g, p[6].b, 1 }), key .. ": map pins in the Accent")
         Check(Same(theme.textColor, { p[4].r, p[4].g, p[4].b }), key .. ": Text")
         Check(theme.tooltip == "|cff" .. Hex(theme.mapPins), key .. ": the tooltip color is the Accent")
-        Check(theme.texturePath == "Interface/AddOns/RXPGuides/Textures/DarkMode/", key .. ": RestedXP's own neutral frames")
-        Check(theme.edges.edge == theme.texturePath .. "rxp-borders" and theme.edges.guideName == theme.texturePath .. "rxp-borders",
-            key .. ": the window borders are from the same frames")
+        Check(theme.texturePath == TEX .. "DarkMode/", key .. ": RestedXP's own DarkMode logo and icons")
+        local border = BORDER[key] .. "rxp-borders"
+        Check(theme.edges.edge == border and theme.edges.guideName == border, key .. ": the window borders of its set")
+        Check(not theme.edges.edge:find("DarkMode", 1, true), key .. ": not the near-black line of DarkMode")
+        Check(theme.bgTextures.edge == WHITE and theme.bgTextures.bottom == WHITE and theme.bgTextures.guideName == WHITE,
+            key .. ": every frame, the title bar and footer too, has a fill to color")
     end
     Check(Count(seen) == 9, "every theme has its own name")
     for _, own in ipairs(RXP_OWN) do
@@ -361,6 +371,92 @@ do
         Check(#Layers(f3, e3.RXPG_ARROW) == 0 and #e3.RXPG_ARROW.sets == 0 and #e3.RXPG_ARROW.tints == 0,
             style .. ": with RestedXP's own theme the arrow is left alone")
     end
+end
+
+-- The classic window's title bar and footer: a fill under a banner image, black in the set these themes
+-- take their icons from. While one of ours is the active theme the image is hidden, so the fill (the
+-- theme's Panels color) shows; with any other theme the image is never touched.
+do
+    local function Banner()
+        local b = { alphas = {} }
+        function b:SetTexture() end   -- RestedXP's own call, which the hook follows
+        function b:SetAlpha(alpha) self.alphas[#self.alphas + 1] = alpha; self.alpha = alpha end
+        return b
+    end
+    local function Start(account, active)
+        local env, _, frames, boot = Load(account, true)
+        env.RXPFrame = { GuideName = { bg = Banner() }, Footer = { bg = Banner() } }
+        Fire(frames, "NaowhForever")
+        env.RXP = { activeTheme = active and env.RXPGuides_Themes[active] or { name = "RXP Blue" } }
+        return env, boot
+    end
+    -- the function hooked onto a banner's SetTexture
+    local function Hook(env, banner)
+        for _, h in ipairs(env.hooked) do
+            if h[1] == banner and h[2] == "SetTexture" then return h[3] end
+        end
+    end
+
+    -- one of ours is active at login: both banners are hidden at once
+    local env, boot = Start({ rxpThemes = true }, "NaowhForever:crimson")
+    local title, footer = env.RXPFrame.GuideName.bg, env.RXPFrame.Footer.bg
+    Check(#env.hooked == 0 and #title.alphas == 0 and #footer.alphas == 0, "nothing is hooked or hidden before login")
+    Login(boot)
+    Check(#env.hooked == 2 and Hook(env, title) and Hook(env, footer), "both banners' SetTexture are hooked")
+    Check(title.alpha == 0 and footer.alpha == 0, "and both are hidden at once")
+    -- RestedXP sets its banner again whenever it draws its theme, and the hook hides it again
+    title.alpha = 1
+    Hook(env, title)(title, TEX .. "DarkMode/rxp-banner")
+    Check(title.alpha == 0 and footer.alpha == 0, "RestedXP sets its banner again: hidden again")
+    -- another theme of RestedXP's: the banners come back, once
+    env.RXP.activeTheme = { name = "DarkMode" }
+    Hook(env, title)(title)
+    Check(title.alpha == 1 and footer.alpha == 1, "a theme of RestedXP's: the banners are shown")
+    local sets = #title.alphas + #footer.alphas
+    Hook(env, footer)(footer)
+    Check(#title.alphas + #footer.alphas == sets, "and not set again while they are RestedXP's")
+    -- one of ours again
+    env.RXP.activeTheme = env.RXPGuides_Themes["NaowhForever:midnight"]
+    Hook(env, footer)(footer)
+    Check(title.alpha == 0 and footer.alpha == 0, "back to one of ours: hidden again")
+
+    -- RestedXP's own theme at login: hooked, and the banners are never touched
+    local own, ownBoot = Start({ rxpThemes = true }, nil)
+    Login(ownBoot)
+    local ownTitle, ownFooter = own.RXPFrame.GuideName.bg, own.RXPFrame.Footer.bg
+    Check(Hook(own, ownTitle) and Hook(own, ownFooter), "RestedXP's own theme: the banners are hooked")
+    Check(#ownTitle.alphas == 0 and #ownFooter.alphas == 0, "but never touched")
+    Hook(own, ownTitle)(ownTitle)
+    own.RXP.activeTheme = { name = "xNaowhForever:crimson", mapPins = { 1, 0, 0, 1 } }
+    Hook(own, ownFooter)(ownFooter)
+    Check(#ownTitle.alphas == 0 and #ownFooter.alphas == 0, "not when RestedXP sets them again, and only a name that starts with ours counts")
+    -- and one of ours picked later hides them
+    own.RXP.activeTheme = own.RXPGuides_Themes["NaowhForever:slate"]
+    Hook(own, ownFooter)(ownFooter)
+    Check(ownTitle.alpha == 0 and ownFooter.alpha == 0, "one of ours picked later: hidden")
+
+    -- off: no login event, nothing hooked or hidden
+    local off, offBoot = Start({}, nil)
+    Login(offBoot)
+    Check(#off.hooked == 0 and #off.RXPFrame.GuideName.bg.alphas == 0 and #off.RXPFrame.Footer.bg.alphas == 0,
+        "off: nothing is hooked, nothing is hidden")
+
+    -- RestedXP without the pieces: no error, and only what is there is hooked
+    local function Bare(window, active)
+        local e, _, f, b = Load({ rxpThemes = true }, true)
+        e.RXPFrame = window
+        Fire(f, "NaowhForever")
+        e.RXP = { activeTheme = active and e.RXPGuides_Themes[active] or nil }
+        Login(b)
+        return e
+    end
+    Check(#Bare(nil).hooked == 0 and #Bare({}).hooked == 0, "no window, or one without bars: nothing is hooked")
+    Check(#Bare({ GuideName = {}, Footer = {} }).hooked == 0, "bars without banners: nothing is hooked")
+    local half = { GuideName = { bg = Banner() }, Footer = { bg = {} } }
+    Check(#Bare(half, "NaowhForever:crimson").hooked == 1 and half.GuideName.bg.alpha == 0,
+        "the banner that is there is hooked and hidden; the other is skipped")
+    local mute = { GuideName = { bg = { SetTexture = function() end } } }
+    Check(#Bare(mute, "NaowhForever:crimson").hooked == 1, "a banner that cannot be hidden is hooked and left alone")
 end
 
 -- The setting.

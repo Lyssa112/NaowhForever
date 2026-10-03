@@ -1,22 +1,38 @@
 -------------------------------------------------------------------------------
 --  NaowhForever_RXPThemes.lua -- NaowhUI and the eight Naowh themes in RestedXP Guides.
 --  RestedXP reads a global RXPGuides_Themes table once, while it starts, and registers every
---  theme in it (its own RXPGuides_Themes addon fills the same table). Colors only: the frames
---  and icons are RestedXP's own, already installed. Its waypoint arrow, which it cannot color,
---  is drawn in the theme's Accent while one of these themes is the active one: by a layer over
---  its image, or by Naowh's own arrow image, as the player picks. Off unless Settings > COLORS
---  turns it on.
+--  theme in it (its own RXPGuides_Themes addon fills the same table). The frames, borders and
+--  icons are RestedXP's own, already installed. Two things a theme cannot color are done here,
+--  while one of these themes is the active one: the title bar and footer show the theme's Panels
+--  color instead of a black banner image, and the waypoint arrow is drawn in the theme's Accent,
+--  by a layer over its image or by Naowh's own arrow image, as the player picks. Off unless
+--  Settings > COLORS turns it on.
 -------------------------------------------------------------------------------
 local ns = _G.NaowhForever
 
 local RXP_ADDON = "RXPGuides"
--- RestedXP's neutral grey frames and icons, which sit under any theme color.
-local TEXTURES = "Interface/AddOns/RXPGuides/Textures/DarkMode/"
+local RXP_TEXTURES = "Interface/AddOns/RXPGuides/Textures/"
+-- RestedXP's DarkMode set: its logo and icons, which sit under any theme color.
+local TEXTURES = RXP_TEXTURES .. "DarkMode/"
+local WHITE = "Interface/BUTTONS/WHITE8X8"
 local AUTHOR = "Naowh Forever"
 local NAME_PREFIX = "NaowhForever:"
 local DEFAULT_KEY, DEFAULT_NAME = "default", "NaowhUI"
 -- The frame highlight is RestedXP's soft edge color, not a solid one, as in its other themes.
 local HIGHLIGHT_ALPHA = 0.5
+
+-- Every set of RestedXP's textures draws the same dark frame around its windows, with a thin line inside
+-- it. In DarkMode, which these themes take their icons from, that line is almost black, so the frames
+-- of a lighter theme read as black; in the other sets it is lavender (RestedXP's blue), teal, tan or
+-- grey. A theme's frames are the ones whose line suits its Accent.
+local LAVENDER, TEAL, TAN, GREY = RXP_TEXTURES, RXP_TEXTURES .. "Green/", RXP_TEXTURES .. "GoldAssistant/",
+    RXP_TEXTURES .. "Hardcore/"
+local BORDERS = {
+    [""] = LAVENDER, midnight = LAVENDER, aubergine = LAVENDER, cottoncandy = LAVENDER,
+    slate = TEAL, forest = TEAL,
+    obsidian = TAN,
+    crimson = GREY, rosenoir = GREY,
+}
 
 --- Whether RestedXP Guides is installed, which is when the toggle is offered.
 ---@return boolean
@@ -51,6 +67,7 @@ local function Theme(key)
     local c = {}
     for i, token in ipairs(ns.THEME_EDITABLE) do c[token] = palette[i] end
     local preset = ns.THEME_PRESETS[key]
+    local borders = (BORDERS[key] or TEXTURES) .. "rxp-borders"
     return {
         name = NAME_PREFIX .. (key == "" and DEFAULT_KEY or key),
         displayName = preset and preset.name or DEFAULT_NAME,
@@ -64,8 +81,11 @@ local function Theme(key)
         tooltip = "|cff" .. Hex(c.accent),
         textColor = { c.fg.r, c.fg.g, c.fg.b },
         texturePath = TEXTURES,
-        -- Left out, RestedXP would fill these in from its blue theme, borders included.
-        edges = { edge = TEXTURES .. "rxp-borders", guideName = TEXTURES .. "rxp-borders" },
+        -- The title bar and footer are a fill under a banner image, and RestedXP's blue theme gives them
+        -- no fill. With one, hiding the banner (below) shows the Panels color.
+        bgTextures = { edge = WHITE, bottom = WHITE, guideName = WHITE },
+        -- Left out, RestedXP would fill these in from its blue theme.
+        edges = { edge = borders, guideName = borders },
     }
 end
 
@@ -204,9 +224,42 @@ local function HookArrow()
     OnRxpUpdate()
 end
 
+-- The classic window's title bar and footer are a fill under a banner image, which in the set these
+-- themes take their icons from is plain black. While one of ours is the active theme the image is
+-- hidden and the fill shows: the theme's Panels color. RestedXP sets the image again whenever it
+-- draws its theme, so that is watched, and with any other theme the image is left as it is.
+local BARS = { "GuideName", "Footer" }
+local barsHidden   -- the banner images are hidden by us
+
+local function Banner(name)
+    local window = _G.RXPFrame
+    local bar = type(window) == "table" and window[name]
+    local banner = type(bar) == "table" and bar.bg
+    return type(banner) == "table" and banner or nil
+end
+
+local function PaintBars()
+    local hide = ActiveTheme() ~= nil
+    if not hide and not barsHidden then return end
+    for _, name in ipairs(BARS) do
+        local banner = Banner(name)
+        if banner and type(banner.SetAlpha) == "function" then banner:SetAlpha(hide and 0 or 1) end
+    end
+    barsHidden = hide
+end
+
+local function HookBars()
+    for _, name in ipairs(BARS) do
+        local banner = Banner(name)
+        if banner and type(banner.SetTexture) == "function" then hooksecurefunc(banner, "SetTexture", PaintBars) end
+    end
+    PaintBars()
+end
+
 -- When this addon has loaded: that is after the saved toggle can be read and before RestedXP
--- starts (it loads after Naowh Forever, and imports in its own ADDON_LOADED). The arrow exists once
--- every addon has loaded, so that part waits for PLAYER_LOGIN, and only while the themes are on.
+-- starts (it loads after Naowh Forever, and imports in its own ADDON_LOADED). The arrow and the
+-- window exist once every addon has loaded, so those parts wait for PLAYER_LOGIN, and only while
+-- the themes are on.
 local boot = CreateFrame("Frame")
 boot:RegisterEvent("ADDON_LOADED")
 boot:SetScript("OnEvent", function(self, event, name)
@@ -220,5 +273,6 @@ boot:SetScript("OnEvent", function(self, event, name)
     else
         self:UnregisterAllEvents()
         HookArrow()
+        HookBars()
     end
 end)
