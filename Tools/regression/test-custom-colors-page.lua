@@ -275,7 +275,7 @@ do
         end
     end
     local function Hidden(page)
-        for _, name in ipairs({ "RestedXP Arrow", "Naowh Arrow Shape", "Naowh Arrow Glow", "Naowh Arrow Size", "Naowh Arrow Text Gap", "Use Addon Font",
+        for _, name in ipairs({ "RestedXP Arrow", "Naowh Arrow Shape", "Naowh Arrow Glow", "Naowh Arrow Size", "Show Arrow Text", "Naowh Arrow Text Gap", "Use Addon Font",
                 "Use Theme Text Color" }) do
             for _, row in ipairs(page.rows) do
                 if row[1].text == name or (row[2] and row[2].text == name) then return false end
@@ -316,8 +316,8 @@ do
     Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == RXP_HINT, "it reads back, and the RestedXP reload hint shows")
     Check(not Hidden(e), "and the choices are shown")
 
-    Check(Layout(e) == "Add Themes to RestedXP|, RestedXP Arrow|, Use Addon Font|Use Theme Text Color",
-        "with the themes on: the toggle, the arrow choice, and the font and text color")
+    Check(Layout(e) == "Add Themes to RestedXP|, RestedXP Arrow|, Show Arrow Text|, Use Addon Font|Use Theme Text Color",
+        "with the themes on: the toggle, the arrow choice, the arrow text, and the font and text color")
     local arrow, noShape = Pair(e, "RestedXP Arrow")
     Check(arrow and arrow.type == "dropdown" and noShape.type == "label" and noShape.text == "",
         "the arrow choice is the next row, with nothing beside it until Naowh arrow is picked")
@@ -335,7 +335,8 @@ do
         "with the layer as the arrow style, the choices for Naowh's arrow are not shown")
     local imaged = Page({ rxpThemes = true, rxpArrow = "image" }, true)
     Check(Layout(imaged) == "Add Themes to RestedXP|, RestedXP Arrow|Naowh Arrow Shape, Naowh Arrow Glow|Naowh Arrow Size, "
-        .. "Naowh Arrow Text Gap|, Use Addon Font|Use Theme Text Color", "with Naowh arrow picked: the arrow and its shape, its glow and size, its text gap, then the font and text color")
+        .. "Show Arrow Text|Naowh Arrow Text Gap, Use Addon Font|Use Theme Text Color",
+        "with Naowh arrow picked: the arrow and its shape, its glow and size, the arrow text and its gap, then the font and text color")
     local _, shape = Pair(imaged, "RestedXP Arrow")
     local glow, size = Pair(imaged, "Naowh Arrow Glow")
     Check(shape.type == "dropdown" and glow.type == "toggle" and size.type == "slider", "a dropdown, a toggle and a slider")
@@ -356,7 +357,13 @@ do
     Check(imaged.account.rxpArrowSize == 150 and size.getValue() == 150 and imaged.refreshes == 0, "a size is stored, and the page is not redrawn")
     size.setValue(90)
     Check(imaged.account.rxpArrowSize == nil, "the default is stored as nothing")
-    local gap = Pair(imaged, "Naowh Arrow Text Gap")
+    local arrowText, gap = Pair(imaged, "Show Arrow Text")
+    Check(arrowText.type == "toggle" and arrowText.getValue() == true and arrowText.disabled == nil, "the arrow text is a switch, on by default")
+    Check(arrowText.tooltip:find("any arrow style", 1, true), "for any arrow style")
+    arrowText.setValue(false)
+    Check(imaged.account.rxpArrowText == false and arrowText.getValue() == false and imaged.refreshes == 0, "off is stored, and the page is not redrawn")
+    arrowText.setValue(true)
+    Check(imaged.account.rxpArrowText == nil, "on is stored as nothing")
     Check(gap.type == "slider" and gap.min == 0 and gap.max == 20 and gap.step == 1 and gap.getValue() == 4,
         "the text gap is a slider from 0 to 20, 4 by default")
     Check(gap.tooltip:find("pixels", 1, true), "its tooltip says the unit")
@@ -412,10 +419,10 @@ do
     Check(Toggle(custom) and #custom.rows == plain + 1, "with Custom and the themes off, RestedXP adds the one toggle row")
     Check(custom.rows[#custom.rows][1].text == "Add Themes to RestedXP", "and it is the last, above the Reload button")
     local onCustom = Page({ themePreset = "custom", rxpThemes = true }, true)
-    Check(#onCustom.rows == plain + 3, "with the themes on, RestedXP adds three rows: the toggle, the arrow, and the font and text")
+    Check(#onCustom.rows == plain + 4, "with the themes on, RestedXP adds four rows: the toggle, the arrow, the arrow text, and the font and text")
     Check(onCustom.rows[#onCustom.rows][1].text == "Use Addon Font", "and the font row is the last, above the Reload button")
     local onImage = Page({ themePreset = "custom", rxpThemes = true, rxpArrow = "image" }, true)
-    Check(#onImage.rows == plain + 5, "with Naowh arrow picked, two more: the glow and size, and the text gap")
+    Check(#onImage.rows == plain + 5, "with Naowh arrow picked, one more: the glow and size")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

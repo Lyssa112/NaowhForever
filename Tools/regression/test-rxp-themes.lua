@@ -271,6 +271,9 @@ do
         a.text = { point = { "TOP", a, "BOTTOM", 0, -5 } }   -- as RestedXP anchors it
         function a.text:GetPoint() return unpack(self.point) end
         function a.text:SetPoint(...) self.point = { ... } end
+        a.text.hides, a.text.shows = 0, 0
+        function a.text:Hide() self.hidden = true; self.hides = self.hides + 1 end
+        function a.text:Show() self.hidden = false; self.shows = self.shows + 1 end
         function a:HookScript(name, fn) a.scripts = a.scripts or {}; a.scripts[name] = fn end
         function a:GetFrameLevel() return 3 end
         function a.UpdateVisuals() end
@@ -616,6 +619,42 @@ do
     Check(gapNs.RXPArrowGap() == 20, "a saved gap out of range is brought back into it")
     gapAccount.rxpArrowGap = 7.4
     Check(gapNs.RXPArrowGap() == 7, "and a saved gap that is not whole is rounded")
+
+    -- the text under the arrow: shown by default; switched off, hidden with any arrow style while one of ours is active
+    local textAccount = {}
+    local _, textNs = Load(textAccount, true)
+    Check(textNs.RXPArrowTextEnabled() == true and textAccount.rxpArrowText == nil, "the arrow text is on by default")
+    textNs.SetRXPArrowText(false)
+    Check(textNs.RXPArrowTextEnabled() == false and textAccount.rxpArrowText == false, "off is saved as false")
+    textNs.SetRXPArrowText(true)
+    Check(textAccount.rxpArrowText == nil, "on is saved as nothing")
+    for _, style in ipairs({ "layer", "image", "off" }) do
+        local textEnv, _, textBoot = Start({ rxpThemes = true, rxpArrow = style }, "NaowhForever:rosenoir")
+        local line = textEnv.RXPG_ARROW.text
+        Login(textBoot)
+        Check(line.hides == 0 and line.hidden == nil, style .. ": the text is left alone while it is on")
+        textEnv.NaowhForever.SetRXPArrowText(false)
+        Check(line.hidden == true, style .. ": switched off, the text goes at once")
+        textEnv.NaowhForever.SetRXPArrowText(false)
+        Check(line.hides == 1, style .. ": and is not hidden again")
+        textEnv.NaowhForever.SetRXPArrowText(true)
+        Check(line.hidden == false and line.shows == 1, style .. ": switched on, it is back")
+        textEnv.NaowhForever.SetRXPArrowText(true)
+        Check(line.shows == 1, style .. ": and not shown again")
+    end
+    local hiddenEnv, _, hiddenBoot = Start({ rxpThemes = true, rxpArrowText = false }, "NaowhForever:rosenoir")
+    local hiddenLine = hiddenEnv.RXPG_ARROW.text
+    Login(hiddenBoot)
+    Check(hiddenLine.hidden == true, "switched off from the start: hidden at login")
+    hiddenEnv.RXP.activeTheme = { name = "DarkMode" }
+    hiddenEnv.hooked[1][3](hiddenEnv.RXPG_ARROW)
+    Check(hiddenLine.hidden == false, "a theme of RestedXP's: its text is shown")
+    hiddenEnv.RXP.activeTheme = hiddenEnv.RXPGuides_Themes["NaowhForever:midnight"]
+    hiddenEnv.hooked[1][3](hiddenEnv.RXPG_ARROW)
+    Check(hiddenLine.hidden == true, "and one of ours again: hidden again")
+    local ownEnv, _, ownBoot = Start({ rxpThemes = true, rxpArrowText = false }, nil)
+    Login(ownBoot)
+    Check(ownEnv.RXPG_ARROW.text.hides == 0 and ownEnv.RXPG_ARROW.text.hidden == nil, "RestedXP's own theme: the text is never touched")
 
     local wideEnv, _, wideBoot = Start({ rxpThemes = true, rxpArrow = "image", rxpArrowShape = "wide", rxpArrowGlow = true },
         "NaowhForever:rosenoir")

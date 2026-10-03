@@ -715,15 +715,19 @@ function ns.BuildSettingsPage(parent, y)
                       getValue = ns.RXPArrowSize,
                       setValue = function(v) ns.SetRXPArrowSize(v) end }
                 ); y = y - h
-                local gapMin, gapMax = ns.RXPArrowGapRange()
-                _, h = W:DualRow(parent, y,
-                    { type = "slider", text = "Naowh Arrow Text Gap", min = gapMin, max = gapMax, step = 1,
-                      tooltip = "Extra space, in pixels, between Naowh's arrow and the distance text under it.",
-                      getValue = ns.RXPArrowGap,
-                      setValue = function(v) ns.SetRXPArrowGap(v) end },
-                    { type = "label", text = "" }
-                ); y = y - h
             end
+            local gapMin, gapMax = ns.RXPArrowGapRange()
+            _, h = W:DualRow(parent, y,
+                { type = "toggle", text = "Show Arrow Text",
+                  tooltip = "The step and distance text under RestedXP's waypoint arrow, with any arrow style. "
+                  .. "Off removes it.",
+                  getValue = ns.RXPArrowTextEnabled,
+                  setValue = function(v) ns.SetRXPArrowText(v) end },
+                image and { type = "slider", text = "Naowh Arrow Text Gap", min = gapMin, max = gapMax, step = 1,
+                  tooltip = "Extra space, in pixels, between Naowh's arrow and the text under it.",
+                  getValue = ns.RXPArrowGap,
+                  setValue = function(v) ns.SetRXPArrowGap(v) end } or { type = "label", text = "" }
+            ); y = y - h
             _, h = W:DualRow(parent, y,
                 Switch("Use Addon Font",
                     "Draws RestedXP's guide text, title bar and arrow text in the Addon Font from FONT "

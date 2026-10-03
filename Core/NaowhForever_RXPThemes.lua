@@ -153,6 +153,15 @@ function ns.SetRXPArrowGap(gap)
 end
 
 ---@return boolean
+function ns.RXPArrowTextEnabled() return Wanted("rxpArrowText") end
+
+---@param on boolean
+function ns.SetRXPArrowText(on)
+    Want("rxpArrowText", on)
+    PaintArrow()
+end
+
+---@return boolean
 function ns.RXPArrowGlow()
     return ns.AccountSettings().rxpArrowGlow == true
 end
@@ -243,6 +252,7 @@ local swapped   -- our image is on the arrow in place of RestedXP's
 local fitted    -- how many times the frame our image is drawn; set while our image and tint are on
 local rxpImage  -- the image RestedXP last set
 local textHome  -- where RestedXP anchored the distance text, as GetPoint gives it
+local textHidden  -- we have hidden that text
 
 local function BuildLayer(arrow)
     local texture = arrow.texture
@@ -318,6 +328,19 @@ local function HandBack(arrow, texture)
     end
 end
 
+-- RestedXP only sets the text, never shows or hides it.
+local function PaintText(arrow, theme)
+    local text = arrow.text
+    if type(text) ~= "table" or type(text.Hide) ~= "function" then return end
+    local hide = theme ~= nil and not ns.RXPArrowTextEnabled()
+    if hide and not textHidden then
+        text:Hide()
+    elseif textHidden and not hide then
+        text:Show()
+    end
+    textHidden = hide
+end
+
 function PaintArrow()
     local arrow = _G.RXPG_ARROW
     local texture = arrow and arrow.texture
@@ -334,6 +357,7 @@ function PaintArrow()
     else
         HandBack(arrow, texture)
     end
+    PaintText(arrow, theme)
 end
 
 -- RestedXP has just set its own image again (its theme loaded or changed).
