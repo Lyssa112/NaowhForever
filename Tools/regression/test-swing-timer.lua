@@ -114,6 +114,8 @@ local function Session(settings, opts)
             t[name] = function(...) orig(...); post(...) end
         end,
         issecretvalue = function(v) return v == SECRET end,
+        -- A restricted number still says it is a number; it is using it that raises an error.
+        type = function(v) if v == SECRET then return "number" end return type(v) end,
         GetTime = function() return log.now end,
         GetNetStats = function() return 0, 0, 20, 60 end,
         UnitClass = function() return "Class", opts.class or "WARRIOR" end,
@@ -577,6 +579,106 @@ Case("switching the module off forgets the seal", function()
     assert(Is(Fill(log, 1), S.Get("mhColor")), "back on in combat: no seal is known")
 end)
 
+Case("a seal's color ends when its 30 seconds run out, in combat too", function()
+    local S, log = Session(SealSettings(), { class = "PALADIN", combat = true })
+    Cast(log, 20154)
+    local start = log.now
+    assert(log.Live() == 1, "one count running")
+    log.Advance(start + 29.9)
+    assert(Is(Fill(log, 1), S.Get("sealRighteousnessColor")), "still up at 29.9 seconds")
+    log.Advance(start + 30)
+    assert(Is(Fill(log, 1), S.Get("mhColor")) and Is(Fill(log, 2), S.Get("ohColor")), "gone at 30 seconds")
+    assert(log.Live() == 0, "and nothing is left counting")
+    Cast(log, 20375)
+    assert(Is(Fill(log, 1), S.Get("sealCommandColor")), "a new seal shows again")
+end)
+
+Case("a recast or a twist starts the count again", function()
+    local S, log = Session(SealSettings(), { class = "PALADIN", combat = true })
+    Cast(log, 20154)
+    log.Advance(120)
+    Cast(log, 20154)
+    log.Advance(131)
+    assert(Is(Fill(log, 1), S.Get("sealRighteousnessColor")) and log.Live() == 1, "the first count is gone, the new one runs")
+    log.Advance(140)
+    Cast(log, 20375)
+    log.Advance(155)
+    assert(Is(Fill(log, 1), S.Get("sealCommandColor")), "a twist counts its own 30 seconds")
+    log.Advance(170)
+    assert(Is(Fill(log, 1), S.Get("mhColor")) and log.Live() == 0)
+end)
+
+Case("dying, turning the setting off or the module off stops the count", function()
+    local _, log = Session(SealSettings(), { class = "PALADIN" })
+    Cast(log, 20154)
+    assert(log.Live() == 1)
+    log.Fire("PLAYER_DEAD")
+    assert(log.Live() == 0, "dying")
+    Cast(log, 20154)
+    log.Set("sealColors", false)
+    assert(log.Live() == 0, "Color by Active Seal off")
+    log.Set("sealColors", true)
+    Cast(log, 20154)
+    log.Set("enabled", false)
+    assert(log.Live() == 0, "the module off")
+end)
+
+Case("a seal buff that can be read gives the real length and what is left", function()
+    local opts = { class = "PALADIN", auras = { { spellId = 20915, duration = 34, expirationTime = 120 } } }
+    local S, log = Session(SealSettings(), opts)
+    assert(Is(Fill(log, 1), S.Get("sealCommandColor")), "up at login")
+    log.Advance(119.9)
+    assert(Is(Fill(log, 1), S.Get("sealCommandColor")), "20 seconds were left, not 30")
+    log.Advance(120)
+    assert(Is(Fill(log, 1), S.Get("mhColor")) and log.Live() == 0, "gone when its buff says")
+    opts.combat = true
+    Cast(log, 20154)
+    log.Advance(153.9)
+    assert(Is(Fill(log, 1), S.Get("sealRighteousnessColor")), "the next cast lasts the 34 seconds that were read")
+    log.Advance(154)
+    assert(Is(Fill(log, 1), S.Get("mhColor")))
+end)
+
+Case("a scan corrects the count, and a scan without the seal ends it", function()
+    local opts = { class = "PALADIN" }
+    local S, log = Session(SealSettings(), opts)
+    Cast(log, 20154)
+    log.Advance(110)
+    opts.auras = { { spellId = 20154, duration = 34, expirationTime = 134 } }
+    log.Fire("PLAYER_REGEN_ENABLED")
+    log.Advance(133.9)
+    assert(Is(Fill(log, 1), S.Get("sealRighteousnessColor")) and log.Live() == 1, "the buff said 24 seconds were left")
+    log.Advance(134)
+    assert(Is(Fill(log, 1), S.Get("mhColor")))
+    Cast(log, 20375)
+    opts.auras = {}
+    log.Fire("PLAYER_REGEN_ENABLED")
+    assert(Is(Fill(log, 1), S.Get("mhColor")) and log.Live() == 0, "no seal buff: the color and the count end")
+end)
+
+Case("a seal buff already past its end counts nothing", function()
+    local S, log = Session(SealSettings(), { class = "PALADIN", auras = { { spellId = 20375, duration = 34, expirationTime = 90 } } })
+    assert(Is(Fill(log, 1), S.Get("sealCommandColor")), "still listed, so still shown")
+    assert(log.timers[#log.timers].at == log.now, "for no time at all")
+    log.Advance(log.now)
+    assert(Is(Fill(log, 1), S.Get("mhColor")))
+end)
+
+Case("a seal buff with no readable end leaves the count alone", function()
+    local opts = { class = "PALADIN" }
+    local S, log = Session(SealSettings(), opts)
+    Cast(log, 20154)
+    for _, aura in ipairs({ { spellId = 20154 }, { spellId = 20154, duration = SECRET, expirationTime = SECRET } }) do
+        opts.auras = { aura }
+        log.Fire("PLAYER_REGEN_ENABLED")
+        assert(Is(Fill(log, 1), S.Get("sealRighteousnessColor")) and log.Live() == 1)
+    end
+    log.Advance(129.9)
+    assert(Is(Fill(log, 1), S.Get("sealRighteousnessColor")), "still counting from the cast")
+    log.Advance(130)
+    assert(Is(Fill(log, 1), S.Get("mhColor")), "30 seconds, as before")
+end)
+
 Case("the Bars page offers the seals to a paladin only", function()
     local function Find(page, text)
         for i, row in ipairs(page.rows) do
@@ -588,7 +690,7 @@ Case("the Bars page offers the seals to a paladin only", function()
     assert(page.headers[#page.headers]:find("^SEALS") and page.headers[#page.headers - 1] == "QUEUED ATTACKS", "after the queued attacks")
     local toggle, at = Find(page, "Color by Active Seal")
     assert(toggle and toggle.type == "toggle" and toggle.key == "sealColors" and toggle.getValue() == false)
-    for _, word in ipairs({ "Class Colors", "Apply Theme to Bar Colours", "out of combat" }) do
+    for _, word in ipairs({ "Class Colors", "Apply Theme to Bar Colours", "30 seconds", "in combat too", "out of combat" }) do
         assert(toggle.tooltip:find(word, 1, true), "the tooltip mentions " .. word)
     end
     assert(toggle.disabled() == false, "usable while the module is on")

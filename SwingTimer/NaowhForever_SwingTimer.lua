@@ -91,6 +91,8 @@ local QUEUE_SPELLS = {
 -- Paladin seals, rank 1 of each. Every rank carries its seal's name, and the name is what is
 -- matched, so a rank missing from here still counts. While one is up the melee bars take its
 -- color (Color by Active Seal).
+-- Every seal lasts 30 seconds, and 34 with the Seal Duration Increase item effect: a seal
+-- buff that can be read replaces this with its real length.
 local SEAL_SPELLS = {
     { id = 20154, key = "sealRighteousnessColor", text = "Seal of Righteousness" },
     { id = 20375, key = "sealCommandColor", text = "Seal of Command" },
@@ -120,7 +122,7 @@ local frame, unlockActive, unlocked, inCombat, pendingApply, timeFormat
 local rows, byType = {}, {}
 local live = 0
 local queueSpells, queued = {}, false
-local sealByName, seal = {}, false
+local sealByName, seal, sealTimer, sealSeconds = {}, false, nil, 30
 local isHunter, moving, latency, castEnd = false, false, 0, nil
 
 local function On()
@@ -480,26 +482,51 @@ end
 local function SetSeal(entry)
     if entry == seal then return end
     seal = entry
+    if not entry and sealTimer then
+        sealTimer:Cancel()
+        sealTimer = nil
+    end
     PaintMelee()
 end
 
--- The client hides the player's buffs from addons in combat, so a seal change there is only
--- seen as the cast. Out of combat the buffs are read as well, which drops a seal that ran
--- out or was lost; in combat the last seal stands.
+-- The client hides the player's buffs from addons in combat, so nothing there says a seal has
+-- run out: it is counted from the cast, and from its buff when that can be read.
+local function RunOutIn(seconds)
+    if sealTimer then sealTimer:Cancel() end
+    sealTimer = C_Timer.NewTimer(seconds, function()
+        sealTimer = nil
+        SetSeal(false)
+    end)
+end
+
+-- The seal buff's real length, and what is left of it.
+local function CountFrom(aura)
+    local ends, length = aura.expirationTime, aura.duration
+    if Plain(length) and type(length) == "number" and length > 0 then sealSeconds = length end
+    if Plain(ends) and type(ends) == "number" and ends > 0 then
+        RunOutIn(math.max(ends - GetTime(), 0))
+    end
+end
+
+-- Out of combat the buffs say which seal is up, which drops one that is gone; in combat the
+-- seal being counted stands.
 local function ReadSeal()
     if not SealsOn() then
         SetSeal(false)
         return
     end
     if InCombatLockdown() or C_Secrets.ShouldAurasBeSecret() then return end
-    local found = false
     for i = 1, 40 do
         local aura = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
         if not aura then break end
-        found = SealOf(aura.spellId) or false
-        if found then break end
+        local entry = SealOf(aura.spellId)
+        if entry then
+            SetSeal(entry)
+            CountFrom(aura)
+            return
+        end
     end
-    SetSeal(found)
+    SetSeal(false)
 end
 
 -------------------------------------------------------------------------------
@@ -680,7 +707,10 @@ events:SetScript("OnEvent", function(_, event, a1, a2, a3, a4, a5)
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
         -- a3 = spellID
         local cast = SealOf(a3)
-        if cast then SetSeal(cast) end
+        if cast then
+            SetSeal(cast)
+            RunOutIn(sealSeconds)
+        end
     elseif event == "UNIT_SPELLCAST_STOP" or event == "UNIT_SPELLCAST_CHANNEL_STOP" then
         castEnd = nil
         UpdateCastTick()
@@ -757,7 +787,7 @@ local function Apply()
     unlocked = unlockActive and On() == true
     if not (On() or unlocked) then
         events:UnregisterAllEvents()
-        seal = false
+        SetSeal(false)
         if frame then
             for i = 1, #rows do
                 if rows[i].live then IdleRow(rows[i]) end
@@ -930,9 +960,10 @@ function ns.BuildSwingTimerPage(parent, y)
         _, h = W:Feature(parent, y,
             S.Toggle("sealColors", "Color by Active Seal",
                 "While a Seal is up, the melee bars take its color, over Class Colors and Apply "
-                .. "Theme to Bar Colours. It follows your Seal casts, so a twist shows at once; "
-                .. "your buffs are checked as well when the game lets addons read them, which is "
-                .. "out of combat.", "enabled")
+                .. "Theme to Bar Colours. It follows your Seal casts and counts each seal's 30 "
+                .. "seconds, so a twist or a seal running out shows at once, in combat too; your "
+                .. "buffs are checked as well when the game lets addons read them, which is out "
+                .. "of combat.", "enabled")
         ); y = y - h
         for i = 1, #SEAL_SPELLS, 2 do
             local left, right = SEAL_SPELLS[i], SEAL_SPELLS[i + 1]

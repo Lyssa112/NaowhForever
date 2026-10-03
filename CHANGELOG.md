@@ -168,8 +168,9 @@
 - Swing Timer: Color by Active Seal (SEALS on the Bars page, off by default, Paladins only)
   colors the melee bars by the Seal you have up, with a color to pick for each of
   Righteousness, Command, Crusader, Justice, Light, Wisdom, Fury and Martyrdom. It follows
-  your Seal casts, so a twist shows at once, and takes over from Class Colors and Apply Theme
-  to Bar Colours while a seal is up.
+  your Seal casts and counts each seal's 30 seconds, so a twist or a seal running out shows
+  at once, in combat too, and takes over from Class Colors and Apply Theme to Bar Colours
+  while a seal is up.
 
 ### Changed
 - The options window's sidebar header shows the NaowhUI Forever logo, and the search box beside it is narrower.
