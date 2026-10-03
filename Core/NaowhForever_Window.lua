@@ -480,9 +480,9 @@ local function MinimapButtonOn(mod)
     return account.microMenu and account.microMenu.buttons[mod.name] == true
 end
 
--- Set by any change in the COLORS section, and only cleared by a reload, which is when the
--- colors apply.
+-- Set by any change in COLORS or RESTEDXP; only a reload clears it.
 local colorsPending = false
+local rxpPending = false
 
 function ns.BuildMinimapIcons(parent, y)
     local W = UI.Widgets
@@ -656,24 +656,35 @@ function ns.BuildSettingsPage(parent, y)
         _, h = W:DualRow(parent, y, Swatch("line", "Borders & Lines"), Swatch("fg", "Text")); y = y - h
         _, h = W:DualRow(parent, y, Swatch("muted", "Secondary Text"), Swatch("accent", "Accent")); y = y - h
     end
-    -- Only with RestedXP Guides installed. It reads its themes once, as it starts, hence the reload. The
-    -- choices that follow mean nothing without the themes, so they are only shown with them on.
+    if colorsPending then
+        _, h = W:Note(parent, "Reload UI to apply your color changes.", y); y = y - h
+    end
+
+    -- Only with RestedXP Guides installed. The choices mean nothing without the themes, so they wait for them.
     if ns.RXPThemesAvailable and ns.RXPThemesAvailable() then
-        local themesToggle = { type = "toggle", text = "Add Themes to RestedXP",
-            tooltip = "Adds NaowhUI and the eight Naowh themes to RestedXP Guides' theme list, in "
-            .. "their colors and your Addon Font, with RestedXP's own frames, and colors its "
-            .. "waypoint arrow in the theme's Accent. Pick one in RestedXP's Look and Feel "
-            .. "settings.|n|nTakes effect after a /reload.",
-            getValue = ns.RXPThemesEnabled,
-            setValue = function(v)
-                ns.SetRXPThemes(v)
-                colorsPending = true
-                UI:RefreshPage(true)
-            end }
+        _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
+        -- reload: RestedXP reads it as it starts.
+        local function Switch(text, tooltip, get, set, reload)
+            return { type = "toggle", text = text,
+                tooltip = reload and (tooltip .. "|n|nTakes effect after a /reload.") or tooltip,
+                getValue = get,
+                setValue = function(v)
+                    set(v)
+                    if reload then
+                        rxpPending = true
+                        UI:RefreshPage(true)
+                    end
+                end }
+        end
+        local themesSwitch = Switch("Add Themes to RestedXP",
+            "Adds NaowhUI and the eight Naowh themes to RestedXP Guides' theme list, in their colors and "
+            .. "your Addon Font, with RestedXP's own frames, and colors its waypoint arrow in the theme's "
+            .. "Accent. Pick one in RestedXP's Look and Feel settings.",
+            ns.RXPThemesEnabled, ns.SetRXPThemes, true)
         if not ns.RXPThemesEnabled() then
-            _, h = W:DualRow(parent, y, themesToggle, { type = "label", text = "" }); y = y - h
+            _, h = W:DualRow(parent, y, themesSwitch, { type = "label", text = "" }); y = y - h
         else
-            _, h = W:DualRow(parent, y, themesToggle,
+            _, h = W:DualRow(parent, y, themesSwitch,
                 { type = "dropdown", text = "RestedXP Arrow",
                   values = { layer = "Colored layer", image = "Naowh arrow", off = "RestedXP's own" },
                   order = { "layer", "image", "off" },
@@ -687,7 +698,6 @@ function ns.BuildSettingsPage(parent, y)
                       UI:RefreshPage(true)
                   end }
             ); y = y - h
-            -- Only Naowh's own arrow has a shape and a glow to choose.
             local function NotNaowhArrow() return ns.RXPArrowStyle() ~= "image" end
             local pickFirst = "Pick Naowh arrow in RestedXP Arrow first."
             _, h = W:DualRow(parent, y,
@@ -708,41 +718,28 @@ function ns.BuildSettingsPage(parent, y)
                   setValue = function(v) ns.SetRXPArrowGlow(v) end }
             ); y = y - h
             _, h = W:DualRow(parent, y,
-                { type = "toggle", text = "Use Addon Font",
-                  tooltip = "Draws RestedXP's guide text, title bar and arrow text in the Addon Font from "
-                  .. "FONT above. Off keeps RestedXP's own font.|n|nTakes effect after a /reload.",
-                  getValue = ns.RXPFontEnabled,
-                  setValue = function(v)
-                      ns.SetRXPFont(v)
-                      colorsPending = true
-                      UI:RefreshPage(true)
-                  end },
-                { type = "toggle", text = "Use Theme Text Color",
-                  tooltip = "Draws RestedXP's text in the theme's Text color. Off keeps RestedXP's own "
-                  .. "white.|n|nTakes effect after a /reload.",
-                  getValue = ns.RXPTextColorEnabled,
-                  setValue = function(v)
-                      ns.SetRXPTextColor(v)
-                      colorsPending = true
-                      UI:RefreshPage(true)
-                  end }
+                Switch("Use Addon Font",
+                    "Draws RestedXP's guide text, title bar and arrow text in the Addon Font from FONT "
+                    .. "above. Off keeps RestedXP's own font.",
+                    ns.RXPFontEnabled, ns.SetRXPFont, true),
+                Switch("Use Theme Text Color",
+                    "Draws RestedXP's text in the theme's Text color. Off keeps RestedXP's own white.",
+                    ns.RXPTextColorEnabled, ns.SetRXPTextColor, true)
             ); y = y - h
             _, h = W:DualRow(parent, y,
-                { type = "toggle", text = "Quest List Dividers",
-                  tooltip = "A thin line between the rows of RestedXP's quest list, in the theme's "
-                  .. "Borders & Lines color, like the lines between the rows in this window.",
-                  getValue = ns.RXPDividersEnabled,
-                  setValue = function(v) ns.SetRXPDividers(v) end },
-                { type = "toggle", text = "Themed Title Bar and Footer",
-                  tooltip = "Shows the theme's Background in RestedXP's title bar and footer instead of "
-                  .. "its black banner.",
-                  getValue = ns.RXPBarsEnabled,
-                  setValue = function(v) ns.SetRXPBars(v) end }
+                Switch("Quest List Dividers",
+                    "A thin line between the rows of RestedXP's quest list, in the theme's Borders & Lines "
+                    .. "color, like the lines between the rows in this window.",
+                    ns.RXPDividersEnabled, ns.SetRXPDividers),
+                Switch("Themed Title Bar and Footer",
+                    "Shows the theme's Background in RestedXP's title bar and footer instead of its black "
+                    .. "banner.",
+                    ns.RXPBarsEnabled, ns.SetRXPBars)
             ); y = y - h
         end
-    end
-    if colorsPending then
-        _, h = W:Note(parent, "Reload UI to apply your color changes.", y); y = y - h
+        if rxpPending then
+            _, h = W:Note(parent, "Reload UI to apply your RestedXP changes.", y); y = y - h
+        end
     end
     _, h = W:ReloadButton(parent, y); y = y - h
 

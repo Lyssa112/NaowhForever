@@ -1,35 +1,19 @@
 -------------------------------------------------------------------------------
---  NaowhForever_RXPThemes.lua -- NaowhUI and the eight Naowh themes in RestedXP Guides.
---  RestedXP reads a global RXPGuides_Themes table once, while it starts, and registers every
---  theme in it (its own RXPGuides_Themes addon fills the same table). The frames, borders and
---  icons are RestedXP's own, already installed; its text is in the Addon Font (Settings > FONT)
---  and the theme's Text color. Three things a theme cannot color are done here,
---  while one of these themes is the active one: the title bar and footer show the theme's
---  Background instead of a black banner image, the quest list gets a thin rule between its rows
---  like Naowh's own lists, and the waypoint arrow is drawn in the theme's Accent, by a layer over
---  its image or by Naowh's own arrow image, as the player picks. Off unless Settings > COLORS
---  turns it on; there the font, the text color, the quest list rules and the title bar and footer
---  can each be switched off.
+--  NaowhForever_RXPThemes.lua -- NaowhUI and the eight Naowh themes in RestedXP Guides, and hooks that
+--  color its arrow, title bar and quest list. Off unless Settings > RESTEDXP turns it on.
 -------------------------------------------------------------------------------
 local ns = _G.NaowhForever
 
 local RXP_ADDON = "RXPGuides"
+local NAME_PREFIX = "NaowhForever:"
+local AUTHOR = "Naowh Forever"
+local DEFAULT_KEY, DEFAULT_NAME = "default", "NaowhUI"
+
 local RXP_TEXTURES = "Interface/AddOns/RXPGuides/Textures/"
--- RestedXP's DarkMode set: its logo and icons, which sit under any theme color.
 local TEXTURES = RXP_TEXTURES .. "DarkMode/"
 local WHITE = "Interface/BUTTONS/WHITE8X8"
-local AUTHOR = "Naowh Forever"
-local NAME_PREFIX = "NaowhForever:"
-local DEFAULT_KEY, DEFAULT_NAME = "default", "NaowhUI"
--- The frame highlight is RestedXP's soft edge color, not a solid one, as in its other themes.
-local HIGHLIGHT_ALPHA = 0.5
--- The rules between Naowh's own list rows are the Borders & Lines color at this opacity.
-local RULE_ALPHA = 0.6
 
--- Every set of RestedXP's textures draws the same dark frame around its windows, with a thin line inside
--- it. In DarkMode, which these themes take their icons from, that line is almost black, so the frames
--- of a lighter theme read as black; in the other sets it is lavender (RestedXP's blue), teal, tan or
--- grey. A theme's frames are the ones whose line suits its Accent.
+-- DarkMode's frame line is almost black; RestedXP's other sets have a light one, picked to suit each Accent.
 local LAVENDER, TEAL, TAN, GREY = RXP_TEXTURES, RXP_TEXTURES .. "Green/", RXP_TEXTURES .. "GoldAssistant/",
     RXP_TEXTURES .. "Hardcore/"
 local BORDERS = {
@@ -39,7 +23,32 @@ local BORDERS = {
     crimson = GREY, rosenoir = GREY,
 }
 
---- Whether RestedXP Guides is installed, which is when the toggle is offered.
+local HIGHLIGHT_ALPHA = 0.5
+local RULE_ALPHA = 0.6
+local RULE_DROP = 3   -- quest rows are 3 apart; the rule sits at the far edge of that gap
+
+local MEDIA = "Interface\\AddOns\\NaowhForever\\Media\\"
+local ARROW_IMAGES = {   -- by shape, then by glow
+    kite = { [false] = MEDIA .. "rxp_arrow.tga", [true] = MEDIA .. "rxp_arrow_glow.tga" },
+    wide = { [false] = MEDIA .. "rxp_arrow_wide.tga", [true] = MEDIA .. "rxp_arrow_wide_glow.tga" },
+}
+local DEFAULT_SHAPE = "kite"
+local ARROW_STYLES = { layer = true, image = true, off = true }
+local DEFAULT_ARROW = "layer"
+-- Naowh's image is drawn ARROW_SIZE times RestedXP's arrow frame; with a glow the kite fills only
+-- GLOW_FILL of it (Tools/make_media.py), so that image is drawn larger to keep the kite the same size.
+local ARROW_SIZE = 1.2
+local GLOW_FILL = 0.76
+-- The layer is lighter at the top and deeper at the bottom, and not full strength, so the dark arrow still shades it.
+local TOP_TOWARD_WHITE = 0.22
+local BOTTOM_SHARE = 0.72
+local LAYER_STRENGTH = 0.9
+
+-------------------------------------------------------------------------------
+--  Settings
+-------------------------------------------------------------------------------
+local PaintArrow, PaintBars, PaintRules   -- defined below; a change repaints at once
+
 ---@return boolean
 function ns.RXPThemesAvailable()
     return C_AddOns.DoesAddOnExist(RXP_ADDON) == true
@@ -50,13 +59,12 @@ function ns.RXPThemesEnabled()
     return ns.AccountSettings().rxpThemes == true
 end
 
---- Saved for this computer; read when the addon loads, so a change takes effect after a reload.
 ---@param on boolean
 function ns.SetRXPThemes(on)
     ns.AccountSettings().rxpThemes = on and true or nil
 end
 
--- Four looks that are on unless the player switches them off (Settings > COLORS); saved as false when off.
+-- On unless saved as false.
 local function Wanted(key)
     return ns.AccountSettings()[key] ~= false
 end
@@ -65,29 +73,75 @@ local function Want(key, on)
     if on then ns.AccountSettings()[key] = nil else ns.AccountSettings()[key] = false end
 end
 
---- Whether RestedXP's text is in the Addon Font, else its own font. Read when RestedXP imports the
---- themes, so a change takes effect after a reload.
+-- The font and text color are in the themes, which RestedXP reads as it starts: they take a reload.
 ---@return boolean
 function ns.RXPFontEnabled() return Wanted("rxpFont") end
 
 ---@param on boolean
 function ns.SetRXPFont(on) Want("rxpFont", on) end
 
---- Whether RestedXP's text is in the theme's Text color, else its own white. Takes a reload, too.
 ---@return boolean
 function ns.RXPTextColorEnabled() return Wanted("rxpTextColor") end
 
 ---@param on boolean
 function ns.SetRXPTextColor(on) Want("rxpTextColor", on) end
 
---- Whether the quest list has a rule between its rows. Applied at once.
 ---@return boolean
 function ns.RXPDividersEnabled() return Wanted("rxpDividers") end
 
---- Whether the title bar and footer show the theme's color instead of the black banner. Applied at once.
+---@param on boolean
+function ns.SetRXPDividers(on)
+    Want("rxpDividers", on)
+    PaintRules()
+end
+
 ---@return boolean
 function ns.RXPBarsEnabled() return Wanted("rxpBars") end
 
+---@param on boolean
+function ns.SetRXPBars(on)
+    Want("rxpBars", on)
+    PaintBars()
+end
+
+---@return string "layer", "image" or "off"
+function ns.RXPArrowStyle()
+    local style = ns.AccountSettings().rxpArrow
+    return ARROW_STYLES[style] and style or DEFAULT_ARROW
+end
+
+---@param style string
+function ns.SetRXPArrowStyle(style)
+    ns.AccountSettings().rxpArrow = (ARROW_STYLES[style] and style ~= DEFAULT_ARROW) and style or nil
+    PaintArrow()
+end
+
+---@return string "kite" or "wide"
+function ns.RXPArrowShape()
+    local shape = ns.AccountSettings().rxpArrowShape
+    return ARROW_IMAGES[shape] and shape or DEFAULT_SHAPE
+end
+
+---@param shape string
+function ns.SetRXPArrowShape(shape)
+    ns.AccountSettings().rxpArrowShape = (ARROW_IMAGES[shape] and shape ~= DEFAULT_SHAPE) and shape or nil
+    PaintArrow()
+end
+
+---@return boolean
+function ns.RXPArrowGlow()
+    return ns.AccountSettings().rxpArrowGlow == true
+end
+
+---@param on boolean
+function ns.SetRXPArrowGlow(on)
+    ns.AccountSettings().rxpArrowGlow = on and true or nil
+    PaintArrow()
+end
+
+-------------------------------------------------------------------------------
+--  Themes
+-------------------------------------------------------------------------------
 local function Rgba(c, alpha)
     return { c.r, c.g, c.b, alpha }
 end
@@ -97,8 +151,7 @@ local function Hex(c)
         math.floor(c.b * 255 + 0.5))
 end
 
--- One RestedXP theme from a Naowh palette: a preset's key, or "" for the default theme. The
--- palettes are the ones the Theme row previews, so the player's own theme never leaks in.
+-- One theme from a preset's palette, or the default theme for key "".
 local function Theme(key)
     local palette = ns.ThemePalette(key)
     local c = {}
@@ -109,28 +162,22 @@ local function Theme(key)
         name = NAME_PREFIX .. (key == "" and DEFAULT_KEY or key),
         displayName = preset and preset.name or DEFAULT_NAME,
         author = AUTHOR,
-        -- The window, and the step frames on it, are the Background, as in the addon's own windows.
         background = Rgba(c.bg, 1),
         bottomFrameBG = Rgba(c.bg, 1),
         bottomFrameHighlight = Rgba(c.accent, HIGHLIGHT_ALPHA),
-        -- Not a RestedXP field: the rules between the quest list rows, read back from the active theme.
-        dividerColor = Rgba(c.line, RULE_ALPHA),
+        dividerColor = Rgba(c.line, RULE_ALPHA),   -- ours, not RestedXP's
         mapPins = Rgba(c.accent, 1),
         tooltip = "|cff" .. Hex(c.accent),
-        -- The Text color and the Addon Font (found afresh: UIFontPath would remember what it finds this
-        -- early); left out, RestedXP uses its own.
+        -- Left out, RestedXP uses its own. AddonFontPath, not UIFontPath: that one remembers what it finds,
+        -- and this runs before every addon has loaded.
         textColor = ns.RXPTextColorEnabled() and { c.fg.r, c.fg.g, c.fg.b } or nil,
         font = ns.RXPFontEnabled() and ns.AddonFontPath() or nil,
         texturePath = TEXTURES,
-        -- The title bar and footer are a fill under a banner image, and RestedXP's blue theme gives them
-        -- no fill. With one, hiding the banner (below) shows the Background color.
-        bgTextures = { edge = WHITE, bottom = WHITE, guideName = WHITE },
-        -- Left out, RestedXP would fill these in from its blue theme.
+        bgTextures = { edge = WHITE, bottom = WHITE, guideName = WHITE },   -- the bars need a fill to show
         edges = { edge = borders, guideName = borders },
     }
 end
 
--- Adds the nine themes to the table RestedXP imports from, next to whatever other addons put there.
 local function Register()
     local list = _G.RXPGuides_Themes
     if type(list) ~= "table" then
@@ -145,61 +192,32 @@ local function Register()
     end
 end
 
--- RestedXP draws its waypoint arrow, the frame RXPG_ARROW, from an image its theme gives it (a dark
--- one) and has no setting to color it. While one of our themes is the active one, the arrow is drawn
--- the way the player picked (Settings > COLORS, RestedXP Arrow):
---   layer  a layer of ours over the arrow: the Accent, added to the arrow's own colors and clipped
---          to its shape (the arrow's own image is the mask). RestedXP's image is not touched;
---   image  Naowh's own arrow (Media/rxp_arrow*.tga) in the Accent, in place of RestedXP's: a kite or
---          a wider one, with or without a soft glow, as the player picks;
---   off    RestedXP's own arrow, as it is.
--- With any other RestedXP theme the arrow is left alone.
-local MEDIA = "Interface\\AddOns\\NaowhForever\\Media\\"
--- Naowh's arrow images by shape, then by glow (drawn by Tools/make_media.py).
-local ARROW_IMAGES = {
-    kite = { [false] = MEDIA .. "rxp_arrow.tga", [true] = MEDIA .. "rxp_arrow_glow.tga" },
-    wide = { [false] = MEDIA .. "rxp_arrow_wide.tga", [true] = MEDIA .. "rxp_arrow_wide_glow.tga" },
-}
-local DEFAULT_SHAPE = "kite"
--- Naowh's arrow is drawn a bit larger than the frame RestedXP gives its own: the kite comes out ARROW_SIZE
--- times the frame, and the image's edges overflow it (nothing clips them). With a glow the kite fills only
--- GLOW_FILL of the image (Tools/make_media.py), so that image is drawn larger still, for a kite of the same size.
-local ARROW_SIZE = 1.2
-local GLOW_FILL = 0.76
-local ARROW_STYLES = { layer = true, image = true, off = true }
-local DEFAULT_ARROW = "layer"
--- The layer's Accent is lighter at the top and deeper at the bottom, as if lit from above, and not at
--- full strength, so the dark arrow underneath still shades it; flat, it reads as a neon shape.
-local TOP_TOWARD_WHITE = 0.22   -- how far the top goes from the Accent toward white
-local BOTTOM_SHARE = 0.72       -- how much of the Accent the bottom keeps
-local LAYER_STRENGTH = 0.9
-
-local layer     -- our layer over the arrow, built the first time it is needed
-local swapped   -- the arrow shows our image in place of RestedXP's
-local fitted    -- how many times the frame our image is drawn, while it is the one on the arrow
-local tinted    -- the arrow's texture carries our tint
-local rxpImage  -- the image RestedXP last set, to hand back
-
---- How the arrow is drawn while one of the Naowh themes is active: "layer" (the default), "image"
---- or "off".
----@return string
-function ns.RXPArrowStyle()
-    local style = ns.AccountSettings().rxpArrow
-    return ARROW_STYLES[style] and style or DEFAULT_ARROW
+-------------------------------------------------------------------------------
+--  Hooks into RestedXP's window. Each checks what it needs and does nothing without it.
+-------------------------------------------------------------------------------
+local function ActiveTheme()
+    local rxp = _G.RXP
+    local theme = rxp and rxp.activeTheme
+    if type(theme) == "table" and type(theme.name) == "string" and type(theme.mapPins) == "table"
+            and theme.name:find(NAME_PREFIX, 1, true) == 1 then
+        return theme
+    end
 end
 
---- The shape of Naowh's arrow image: "kite" (the default), or "wide" with a base 14% wider.
----@return string
-function ns.RXPArrowShape()
-    local shape = ns.AccountSettings().rxpArrowShape
-    return ARROW_IMAGES[shape] and shape or DEFAULT_SHAPE
+-- t[k1][k2]... when every step is a table, else nil.
+local function Dig(t, ...)
+    for i = 1, select("#", ...) do
+        if type(t) ~= "table" then return nil end
+        t = t[select(i, ...)]
+    end
+    return t
 end
 
---- Whether Naowh's arrow image has a soft glow around it (off by default).
----@return boolean
-function ns.RXPArrowGlow()
-    return ns.AccountSettings().rxpArrowGlow == true
-end
+-- The arrow
+local layer     -- our layer over the arrow
+local swapped   -- our image is on the arrow in place of RestedXP's
+local fitted    -- how many times the frame our image is drawn; set while our image and tint are on
+local rxpImage  -- the image RestedXP last set
 
 local function BuildLayer(arrow)
     local texture = arrow.texture
@@ -217,17 +235,7 @@ local function BuildLayer(arrow)
     return f
 end
 
--- The active RestedXP theme, when it is one of ours.
-local function ActiveTheme()
-    local rxp = _G.RXP
-    local theme = rxp and rxp.activeTheme
-    if type(theme) == "table" and type(theme.name) == "string" and type(theme.mapPins) == "table"
-            and theme.name:find(NAME_PREFIX, 1, true) == 1 then
-        return theme
-    end
-end
-
-local function PaintLayer(arrow, c)
+local function ShowLayer(arrow, c)
     layer = layer or BuildLayer(arrow)
     if not layer then return end
     layer.color:SetColorTexture(1, 1, 1, 1)
@@ -240,8 +248,7 @@ local function PaintLayer(arrow, c)
     layer:Show()
 end
 
--- Our image over the arrow's frame, `scale` times its size around the same center (the arrow turns
--- about that center, so it still turns in place).
+-- The image over the arrow's frame, `scale` times its size around the same center, so it still turns in place.
 local function Fit(arrow, texture, scale)
     if type(texture.ClearAllPoints) ~= "function" or type(arrow.GetSize) ~= "function" then return end
     local w, h = arrow:GetSize()
@@ -251,78 +258,60 @@ local function Fit(arrow, texture, scale)
     texture:SetPoint("BOTTOMRIGHT", arrow, "BOTTOMRIGHT", dx, -dy)
 end
 
-local function Paint()
+local function ShowImage(arrow, texture, c)
+    texture:SetTexture(ARROW_IMAGES[ns.RXPArrowShape()][ns.RXPArrowGlow()])
+    texture:SetVertexColor(c[1], c[2], c[3], 1)
+    fitted = ns.RXPArrowGlow() and ARROW_SIZE / GLOW_FILL or ARROW_SIZE
+    Fit(arrow, texture, fitted)
+    swapped = true
+end
+
+local function HandBack(texture)
+    if fitted then
+        fitted = nil
+        if type(texture.SetAllPoints) == "function" then
+            texture:ClearAllPoints()
+            texture:SetAllPoints()
+        end
+        texture:SetVertexColor(1, 1, 1, 1)
+    end
+    if swapped then
+        if rxpImage then texture:SetTexture(rxpImage) end
+        swapped = false
+    end
+end
+
+function PaintArrow()
     local arrow = _G.RXPG_ARROW
     local texture = arrow and arrow.texture
     if not texture then return end
     local theme = ActiveTheme()
     local style = theme and ns.RXPArrowStyle() or "off"
     if style == "layer" then
-        PaintLayer(arrow, theme.mapPins)
+        ShowLayer(arrow, theme.mapPins)
     elseif layer then
         layer:Hide()
     end
     if style == "image" then
-        local c = theme.mapPins
-        texture:SetTexture(ARROW_IMAGES[ns.RXPArrowShape()][ns.RXPArrowGlow()])
-        texture:SetVertexColor(c[1], c[2], c[3], 1)
-        fitted = ns.RXPArrowGlow() and ARROW_SIZE / GLOW_FILL or ARROW_SIZE
-        Fit(arrow, texture, fitted)
-        swapped, tinted = true, true
+        ShowImage(arrow, texture, theme.mapPins)
     else
-        if fitted then
-            fitted = nil
-            if type(texture.SetAllPoints) == "function" then
-                texture:ClearAllPoints()
-                texture:SetAllPoints()
-            end
-        end
-        if swapped then
-            if rxpImage then texture:SetTexture(rxpImage) end
-            swapped = false
-        end
-        if tinted then
-            texture:SetVertexColor(1, 1, 1, 1)
-            tinted = false
-        end
+        HandBack(texture)
     end
 end
 
--- RestedXP has just set the arrow's image again, because its theme loaded or changed: that is its
--- own image now, and the arrow is drawn once more.
+-- RestedXP has just set its own image again (its theme loaded or changed).
 local function OnRxpUpdate()
     local arrow = _G.RXPG_ARROW
     swapped = false
     rxpImage = arrow and arrow.texture and arrow.texture:GetTexture()
-    Paint()
-end
-
---- Saved for this computer, and applied at once when the arrow is already hooked.
----@param style string "layer", "image" or "off"
-function ns.SetRXPArrowStyle(style)
-    ns.AccountSettings().rxpArrow = (ARROW_STYLES[style] and style ~= DEFAULT_ARROW) and style or nil
-    Paint()
-end
-
---- Saved for this computer, and applied at once when Naowh's arrow is the one drawn.
----@param shape string "kite" or "wide"
-function ns.SetRXPArrowShape(shape)
-    ns.AccountSettings().rxpArrowShape = (ARROW_IMAGES[shape] and shape ~= DEFAULT_SHAPE) and shape or nil
-    Paint()
-end
-
----@param on boolean
-function ns.SetRXPArrowGlow(on)
-    ns.AccountSettings().rxpArrowGlow = on and true or nil
-    Paint()
+    PaintArrow()
 end
 
 local function HookArrow()
     local arrow = _G.RXPG_ARROW
     if not (arrow and arrow.texture and type(arrow.UpdateVisuals) == "function") then return end
     hooksecurefunc(arrow, "UpdateVisuals", OnRxpUpdate)
-    -- RestedXP's Arrow Size setting resizes the frame without drawing the arrow again.
-    if type(arrow.HookScript) == "function" then
+    if type(arrow.HookScript) == "function" then   -- its Arrow Size setting resizes the frame silently
         arrow:HookScript("OnSizeChanged", function()
             if fitted then Fit(arrow, arrow.texture, fitted) end
         end)
@@ -330,21 +319,17 @@ local function HookArrow()
     OnRxpUpdate()
 end
 
--- The classic window's title bar and footer are a fill under a banner image, which in the set these
--- themes take their icons from is plain black. While one of ours is the active theme the image is
--- hidden and the fill shows: the theme's Background. RestedXP sets the image again whenever it
--- draws its theme, so that is watched, and with any other theme the image is left as it is.
+-- The title bar and footer: a fill under a banner image that is plain black in DarkMode. The image is
+-- hidden so the fill shows; RestedXP sets it again whenever it draws its theme, so SetTexture is watched.
 local BARS = { "GuideName", "Footer" }
-local barsHidden   -- the banner images are hidden by us
+local barsHidden
 
 local function Banner(name)
-    local window = _G.RXPFrame
-    local bar = type(window) == "table" and window[name]
-    local banner = type(bar) == "table" and bar.bg
+    local banner = Dig(_G.RXPFrame, name, "bg")
     return type(banner) == "table" and banner or nil
 end
 
-local function PaintBars()
+function PaintBars()
     local hide = ActiveTheme() ~= nil and ns.RXPBarsEnabled()
     if not hide and not barsHidden then return end
     for _, name in ipairs(BARS) do
@@ -352,13 +337,6 @@ local function PaintBars()
         if banner and type(banner.SetAlpha) == "function" then banner:SetAlpha(hide and 0 or 1) end
     end
     barsHidden = hide
-end
-
---- Applied at once.
----@param on boolean
-function ns.SetRXPBars(on)
-    Want("rxpBars", on)
-    PaintBars()
 end
 
 local function HookBars()
@@ -369,20 +347,13 @@ local function HookBars()
     PaintBars()
 end
 
--- The classic window's quest list is rows with no line between them. With the rows the same dark as
--- the gaps they would run together, so while one of ours is the active theme each row gets a 1px rule,
--- like the rules between the rows of Naowh's own lists. A row's text sits near its top, and the next row
--- starts 3 below it, so the rule is drawn at the far edge of that gap: that is about halfway between the
--- text above and the text below. The rows are made when a guide loads, and that ends in SetStep, so
--- SetStep is watched; the rules are drawn again only when the theme or the number of rows has changed.
-local RULE_DROP = 3
+-- The quest list: a rule at the bottom of each row. Rows are made when a guide loads, which ends in
+-- SetStep, so that is watched; rules are redrawn only when the theme, the switch or the row count changes.
 local rules = setmetatable({}, { __mode = "k" })   -- row -> its rule
-local ruleTheme, ruleOn, ruleRows   -- what the rules were last drawn for
+local ruleTheme, ruleOn, ruleRows
 
-local function PaintRules()
-    local window = _G.RXPFrame
-    local scroll = type(window) == "table" and window.ScrollChild
-    local list = type(scroll) == "table" and scroll.framePool
+function PaintRules()
+    local list = Dig(_G.RXPFrame, "ScrollChild", "framePool")
     if type(list) ~= "table" then return end
     local theme, on = ActiveTheme(), ns.RXPDividersEnabled()
     if theme == ruleTheme and on == ruleOn and #list == ruleRows then return end
@@ -407,23 +378,14 @@ local function PaintRules()
     end
 end
 
---- Applied at once.
----@param on boolean
-function ns.SetRXPDividers(on)
-    Want("rxpDividers", on)
-    PaintRules()
-end
-
 local function HookRules()
     local rxp = _G.RXP
     if type(rxp) == "table" and type(rxp.SetStep) == "function" then hooksecurefunc(rxp, "SetStep", PaintRules) end
     PaintRules()
 end
 
--- When this addon has loaded: that is after the saved toggle can be read and before RestedXP
--- starts (it loads after Naowh Forever, and imports in its own ADDON_LOADED). The arrow and the
--- window exist once every addon has loaded, so those parts wait for PLAYER_LOGIN, and only while
--- the themes are on.
+-- Themes go in while our addon loads, before RestedXP (which loads after it) imports them; the hooks
+-- need RestedXP's frames, so they wait for PLAYER_LOGIN.
 local boot = CreateFrame("Frame")
 boot:RegisterEvent("ADDON_LOADED")
 boot:SetScript("OnEvent", function(self, event, name)

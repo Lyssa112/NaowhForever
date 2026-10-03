@@ -1,7 +1,5 @@
--- NaowhUI and the eight Naowh themes in RestedXP Guides (Core/NaowhForever_RXPThemes.lua): written to
--- RestedXP's RXPGuides_Themes table only when the player turned it on and RestedXP Guides is installed.
--- The real Core and the real module are loaded, in the order the TOC lists them. Run with Lua 5.1 from
--- the repository root.
+-- The RestedXP themes and hooks (Core/NaowhForever_RXPThemes.lua), run against the real Core. Run with
+-- Lua 5.1 from the repository root.
 local function Read(path)
     local f = assert(io.open(path, "rb"))
     local s = f:read("*a"); f:close()
@@ -35,7 +33,6 @@ end
 -- fonts: when given, LibSharedMedia is there and holds these fonts.
 local function Load(account, installed, existing, fonts)
     local frames = {}
-    -- A texture or a mask: it records what the module asks of it.
     local function Region()
         local r = {}
         function r:SetAllPoints() self.allPoints = true end
@@ -110,8 +107,7 @@ local function NameOf(key) return "NaowhForever:" .. (key == "" and "default" or
 local RXP_OWN = { "RXP Blue", "RXP Red", "RXP Gold", "DarkMode", "RXP Green", "Custom" }
 local TEX = "Interface/AddOns/RXPGuides/Textures/"
 local WHITE = "Interface/BUTTONS/WHITE8X8"
--- RestedXP's frame borders whose thin light line suits each theme's Accent: lavender (its blue set),
--- teal, tan, grey. Written out here on its own, so a wrong table in the module cannot hide behind itself.
+-- Written out apart from the module, so a wrong table there cannot hide behind itself.
 local BORDER = { [""] = TEX, midnight = TEX, aubergine = TEX, cottoncandy = TEX,
     slate = TEX .. "Green/", forest = TEX .. "Green/", obsidian = TEX .. "GoldAssistant/",
     crimson = TEX .. "Hardcore/", rosenoir = TEX .. "Hardcore/" }
@@ -168,7 +164,6 @@ do
         Check(not list[own] and not seen[own], "RestedXP's own theme " .. own .. " is never overwritten")
     end
 
-    -- The values themselves, pinned: a wrong mapping cannot hide behind re-deriving it.
     local default, midnight = list["NaowhForever:default"], list["NaowhForever:midnight"]
     Check(Hex(default.background) == "0e0f11" and Hex(default.bottomFrameBG) == "0e0f11", "NaowhUI: Background for the window and the step frames")
     Check(Hex(default.dividerColor) == "2e3136" and Hex(midnight.dividerColor) == "2a3550", "the rules: NaowhUI's and Midnight's Borders & Lines")
@@ -204,8 +199,7 @@ do
     end
 end
 
--- The font: RestedXP draws its text in a theme's font, and these themes use the Addon Font from Settings > FONT,
--- as it is when RestedXP imports them. The player's Text color is the theme's own Text.
+-- The font and the text color.
 do
     local NAOWH = "Interface\\AddOns\\NaowhForever\\Media\\Fonts\\Naowh.ttf"
     local function Fonts(account, fonts)
@@ -241,7 +235,6 @@ do
     Check(laterNs.UIFontPath() == "Fonts\\Later.ttf", "the addon's own font is still found once the later addon has loaded")
     Check(env.RXPGuides_Themes[NameOf("")].font == NAOWH, "while the RestedXP theme took the fallback at the time")
 
-    -- Switched off in Settings: left out, so RestedXP fills in its own.
     local plain = Fonts({ rxpThemes = true, rxpFont = false }, {})
     local plainFont = true
     for _, key in ipairs(KEYS) do
@@ -255,16 +248,12 @@ do
     end
     Check(noText, "the text color switched off: none in any theme, and the font is still there")
 
-    -- The text color is the theme's Text, as the palette has it.
     local colors = Fonts({ rxpThemes = true }, {})
     Check(Hex(colors[NameOf("")].textColor) == "f0f1f3" and Hex(colors[NameOf("crimson")].textColor) == "f6eff0",
         "the basic text color: NaowhUI's and Crimson's Text")
 end
 
--- The waypoint arrow: while one of our themes is the active one, by default a layer of its Accent
--- lies over RestedXP's arrow (clipped to the arrow's own image, turning with it) and RestedXP's image
--- is not touched; or Naowh's own arrow image in the Accent, or RestedXP's own arrow. With any other
--- theme the arrow is left alone.
+-- The waypoint arrow.
 do
     local IMAGE = "Interface/AddOns/RXPGuides/Textures/DarkMode/rxp_navigation_arrow-1"
     local function Arrow()
@@ -300,7 +289,6 @@ do
         return out
     end
 
-    -- one of ours is active at login: hooked, and the layer is built and painted at once
     local env, frames, boot, list = Start({ rxpThemes = true }, "NaowhForever:rosenoir")
     local arrow = env.RXPG_ARROW
     Check(#env.hooked == 0 and #Layers(frames, arrow) == 0, "nothing is hooked or built before login")
@@ -314,7 +302,6 @@ do
     Check(layer.level == 4 and layer.shown == true, "above the arrow, and shown")
     local color, mask = layer.colorRegion, layer.maskRegion
     Check(color.blend == "ADD" and Same(color.rgba, { 1, 1, 1, 1 }), "an added layer, white until its gradient colors it")
-    -- The Accent, lighter at the top and deeper at the bottom, at 90% strength.
     local function Close(got, want)
         for i = 1, 4 do if math.abs(got[i] - want[i]) > 1e-9 then return false end end
         return true
@@ -336,7 +323,6 @@ do
     Check(mask.rotation == 0.5, "and it turns with the arrow")
     Check(arrow.texture.path == IMAGE, "RestedXP's own image is untouched")
 
-    -- RestedXP sets its image again when its theme changes, and the hook runs after it
     env.RXP.activeTheme = { name = "DarkMode" }
     env.hooked[1][3](arrow)
     Check(layer.shown == false and #Layers(frames, arrow) == 1, "a theme of RestedXP's: the layer is hidden, not rebuilt")
@@ -348,7 +334,6 @@ do
         and mask.path == arrow.texture.path and #Layers(frames, arrow) == 1,
         "back to one of ours: shown, in Midnight's Accent, from the arrow's image of the moment")
 
-    -- RestedXP's own theme at login: hooked, but no layer is ever built
     env, frames, boot = Start({ rxpThemes = true }, nil)
     Login(boot)
     Check(#env.hooked == 1 and #Layers(frames, env.RXPG_ARROW) == 0, "RestedXP's own theme: no layer is built")
@@ -356,13 +341,11 @@ do
     env.hooked[1][3]()
     Check(#Layers(frames, env.RXPG_ARROW) == 0, "only a name that starts with ours counts")
 
-    -- off: no login event, nothing hooked
     local off, _, offBoot = Start({}, nil)
     Check(next(offBoot.events) == nil and #off.hooked == 0, "off: no event left, nothing hooked")
     Login(offBoot)
     Check(#off.hooked == 0, "off: login does nothing")
 
-    -- RestedXP without the pieces: no error, and nothing built
     local e2, _, f2, b2 = Load({ rxpThemes = true }, true)
     Fire(f2, "NaowhForever"); Login(b2)
     Check(#e2.hooked == 0 and next(b2.events) == nil, "no arrow frame: nothing to do")
@@ -387,7 +370,6 @@ do
     Fire(f2, "NaowhForever"); Login(b2)
     Check(#e2.hooked == 0, "RestedXP not installed: nothing is hooked")
 
-    -- the style: the layer by default, saved only when it is another, and nothing else accepted
     local account = {}
     local _, styleNs = Load(account, true)
     Check(styleNs.RXPArrowStyle() == "layer" and account.rxpArrow == nil, "the arrow is a layer by default")
@@ -402,7 +384,6 @@ do
     account.rxpArrow = "junk"
     Check(styleNs.RXPArrowStyle() == "layer", "an unknown saved style reads as the layer")
 
-    -- Naowh's own arrow image: in place of RestedXP's, in the Accent, and no layer
     local OURS = "Interface\\AddOns\\NaowhForever\\Media\\rxp_arrow.tga"
     local imageEnv, imageFrames, imageBoot, imageList = Start({ rxpThemes = true, rxpArrow = "image" }, "NaowhForever:rosenoir")
     local drawn = imageEnv.RXPG_ARROW
@@ -411,19 +392,16 @@ do
     Check(drawn.texture.path == OURS and #drawn.sets == 1, "image: Naowh's arrow image is on the arrow")
     local tint = drawn.tints[#drawn.tints]
     Check(Hex(tint) == "ff5fa2" and tint[4] == 1, "image: in Rose Noir's Accent")
-    -- RestedXP sets its own image again for its own theme, and the tint goes
     imageEnv.RXP.activeTheme = { name = "DarkMode" }
     drawn.texture.path = IMAGE
     imageEnv.hooked[1][3](drawn)
     Check(#drawn.sets == 1 and drawn.texture.path == IMAGE, "a theme of RestedXP's: its image is left on the arrow")
     Check(Same(drawn.tints[#drawn.tints], { 1, 1, 1, 1 }), "and the tint is cleared")
-    -- and one of ours again: RestedXP sets its image, then ours goes on
     imageEnv.RXP.activeTheme = imageList["NaowhForever:midnight"]
     imageEnv.hooked[1][3](drawn)
     tint = drawn.tints[#drawn.tints]
     Check(drawn.texture.path == OURS and #drawn.sets == 2 and Hex(tint) == "5b8cff", "back to one of ours: the image and Midnight's Accent")
 
-    -- switching the style takes effect at once, and RestedXP's image is handed back
     local styles = imageEnv.NaowhForever
     styles.SetRXPArrowStyle("layer")
     Check(drawn.texture.path == IMAGE and Same(drawn.tints[#drawn.tints], { 1, 1, 1, 1 }),
@@ -439,7 +417,6 @@ do
     styles.SetRXPArrowStyle("off")
     Check(drawn.texture.path == IMAGE, "off hands RestedXP's image back again")
 
-    -- the shape and the glow: the kite without a glow by default, stored only when not, nothing else accepted
     local shapeAccount = {}
     local _, shapeNs = Load(shapeAccount, true)
     Check(shapeNs.RXPArrowShape() == "kite" and shapeNs.RXPArrowGlow() == false and shapeAccount.rxpArrowShape == nil
@@ -459,7 +436,6 @@ do
     shapeAccount.rxpArrowGlow = "yes"
     Check(shapeNs.RXPArrowGlow() == false, "only true turns the glow on")
 
-    -- Naowh's arrow changes at once with the shape and the glow, in the Accent, and only while it is drawn
     local MEDIA = "Interface\\AddOns\\NaowhForever\\Media\\"
     styles.SetRXPArrowStyle("image")
     for _, want in ipairs({ { "kite", false, "rxp_arrow.tga" }, { "kite", true, "rxp_arrow_glow.tga" },
@@ -469,7 +445,6 @@ do
         Check(drawn.texture.path == MEDIA .. want[3], want[1] .. (want[2] and " with" or " without") .. " a glow: " .. want[3])
     end
     Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "and it keeps the Accent")
-    -- each setter on its own repaints: from the kite without a glow, one call changes one thing
     styles.SetRXPArrowShape("kite")
     styles.SetRXPArrowGlow(false)
     Check(drawn.texture.path == MEDIA .. "rxp_arrow.tga", "back to the kite without a glow")
@@ -534,19 +509,16 @@ do
     sizeEnv.NaowhForever.SetRXPArrowStyle("off")
     Check(Spread(sized) == "all", "nor does RestedXP's own arrow")
 
-    -- saved wide and glow: that image is on the arrow at login
     local wideEnv, _, wideBoot = Start({ rxpThemes = true, rxpArrow = "image", rxpArrowShape = "wide", rxpArrowGlow = true },
         "NaowhForever:rosenoir")
     Login(wideBoot)
     Check(wideEnv.RXPG_ARROW.texture.path == MEDIA .. "rxp_arrow_wide_glow.tga", "saved wide with a glow: that image at login")
 
-    -- off from the start: RestedXP's own arrow, untouched
     local quietEnv, quietFrames, quietBoot = Start({ rxpThemes = true, rxpArrow = "off" }, "NaowhForever:rosenoir")
     Login(quietBoot)
     Check(#quietEnv.hooked == 1 and #Layers(quietFrames, quietEnv.RXPG_ARROW) == 0 and #quietEnv.RXPG_ARROW.sets == 0
         and #quietEnv.RXPG_ARROW.tints == 0, "off: RestedXP's own arrow, untouched")
 
-    -- RestedXP not on one of our themes: no style does anything
     for _, style in ipairs({ "layer", "image", "off" }) do
         local e3, f3, b3 = Start({ rxpThemes = true, rxpArrow = style }, nil)
         Login(b3)
@@ -555,9 +527,7 @@ do
     end
 end
 
--- The classic window's title bar and footer: a fill under a banner image, black in the set these themes
--- take their icons from. While one of ours is the active theme the image is hidden, so the fill (the
--- theme's Background) shows; with any other theme the image is never touched.
+-- The title bar and footer.
 do
     local function Banner()
         local b = { alphas = {} }
@@ -572,37 +542,31 @@ do
         env.RXP = { activeTheme = active and env.RXPGuides_Themes[active] or { name = "RXP Blue" } }
         return env, boot
     end
-    -- the function hooked onto a banner's SetTexture
     local function Hook(env, banner)
         for _, h in ipairs(env.hooked) do
             if h[1] == banner and h[2] == "SetTexture" then return h[3] end
         end
     end
 
-    -- one of ours is active at login: both banners are hidden at once
     local env, boot = Start({ rxpThemes = true }, "NaowhForever:crimson")
     local title, footer = env.RXPFrame.GuideName.bg, env.RXPFrame.Footer.bg
     Check(#env.hooked == 0 and #title.alphas == 0 and #footer.alphas == 0, "nothing is hooked or hidden before login")
     Login(boot)
     Check(#env.hooked == 2 and Hook(env, title) and Hook(env, footer), "both banners' SetTexture are hooked")
     Check(title.alpha == 0 and footer.alpha == 0, "and both are hidden at once")
-    -- RestedXP sets its banner again whenever it draws its theme, and the hook hides it again
     title.alpha = 1
     Hook(env, title)(title, TEX .. "DarkMode/rxp-banner")
     Check(title.alpha == 0 and footer.alpha == 0, "RestedXP sets its banner again: hidden again")
-    -- another theme of RestedXP's: the banners come back, once
     env.RXP.activeTheme = { name = "DarkMode" }
     Hook(env, title)(title)
     Check(title.alpha == 1 and footer.alpha == 1, "a theme of RestedXP's: the banners are shown")
     local sets = #title.alphas + #footer.alphas
     Hook(env, footer)(footer)
     Check(#title.alphas + #footer.alphas == sets, "and not set again while they are RestedXP's")
-    -- one of ours again
     env.RXP.activeTheme = env.RXPGuides_Themes["NaowhForever:midnight"]
     Hook(env, footer)(footer)
     Check(title.alpha == 0 and footer.alpha == 0, "back to one of ours: hidden again")
 
-    -- RestedXP's own theme at login: hooked, and the banners are never touched
     local own, ownBoot = Start({ rxpThemes = true }, nil)
     Login(ownBoot)
     local ownTitle, ownFooter = own.RXPFrame.GuideName.bg, own.RXPFrame.Footer.bg
@@ -612,12 +576,10 @@ do
     own.RXP.activeTheme = { name = "xNaowhForever:crimson", mapPins = { 1, 0, 0, 1 } }
     Hook(own, ownFooter)(ownFooter)
     Check(#ownTitle.alphas == 0 and #ownFooter.alphas == 0, "not when RestedXP sets them again, and only a name that starts with ours counts")
-    -- and one of ours picked later hides them
     own.RXP.activeTheme = own.RXPGuides_Themes["NaowhForever:slate"]
     Hook(own, ownFooter)(ownFooter)
     Check(ownTitle.alpha == 0 and ownFooter.alpha == 0, "one of ours picked later: hidden")
 
-    -- switched off in Settings: the banners are left alone, and switching is at once
     local kept, keptBoot = Start({ rxpThemes = true, rxpBars = false }, "NaowhForever:crimson")
     Login(keptBoot)
     local keptTitle, keptFooter = kept.RXPFrame.GuideName.bg, kept.RXPFrame.Footer.bg
@@ -627,13 +589,11 @@ do
     kept.NaowhForever.SetRXPBars(false)
     Check(keptTitle.alpha == 1 and keptFooter.alpha == 1, "switched off: RestedXP's banners come back at once")
 
-    -- off: no login event, nothing hooked or hidden
     local off, offBoot = Start({}, nil)
     Login(offBoot)
     Check(#off.hooked == 0 and #off.RXPFrame.GuideName.bg.alphas == 0 and #off.RXPFrame.Footer.bg.alphas == 0,
         "off: nothing is hooked, nothing is hidden")
 
-    -- RestedXP without the pieces: no error, and only what is there is hooked
     local function Bare(window, active)
         local e, _, f, b = Load({ rxpThemes = true }, true)
         e.RXPFrame = window
@@ -651,11 +611,8 @@ do
     Check(#Bare(mute, "NaowhForever:crimson").hooked == 1, "a banner that cannot be hidden is hooked and left alone")
 end
 
--- The classic window's quest list: rows with no line between them. While one of ours is the active theme
--- each row gets a 1px rule in the 3px gap below it, in Borders & Lines at 60% like Naowh's own lists; with
--- any other theme there are none. The rows are made when a guide loads, which ends in SetStep.
+-- The quest list rules.
 do
-    -- a texture that records what the module asks of it
     local function Rule(layer)
         local t = { layer = layer, points = {}, paints = 0, hides = 0 }
         function t:SetPoint(...) self.points[#self.points + 1] = { ... } end
@@ -684,14 +641,12 @@ do
             activeTheme = active and env.RXPGuides_Themes[active] or { name = "RXP Blue" } }
         return env, boot, pool
     end
-    -- the function hooked onto SetStep
     local function Hook(env)
         for _, h in ipairs(env.hooked) do
             if h[1] == env.RXP and h[2] == "SetStep" then return h[3] end
         end
     end
 
-    -- one of ours is active at login: every row has its rule at once
     local env, boot, pool = Start({ rxpThemes = true }, "NaowhForever:crimson", 2)
     Check(#env.hooked == 0 and #pool[1].textures == 0, "nothing is hooked or drawn before login")
     Login(boot)
@@ -707,7 +662,6 @@ do
         Check(Hex(rule.rgba) == "3d2429" and rule.rgba[4] == 0.6, "row " .. i .. ": Crimson's Borders & Lines at 60%")
     end
 
-    -- a guide with more steps adds rows; the old rules are not drawn again
     pool[3] = Row()
     Hook(env)()
     Check(#pool[3].textures == 1 and pool[3].textures[1].shown == true, "a new row gets its rule")
@@ -717,12 +671,10 @@ do
     Hook(env)()
     Check(pool[1].textures[1].paints == before and pool[3].textures[1].paints == 1, "nothing changed: nothing is drawn")
 
-    -- another of ours: the same rules, in its color
     env.RXP.activeTheme = env.RXPGuides_Themes["NaowhForever:midnight"]
     Hook(env)()
     Check(#pool[2].textures == 1 and Hex(pool[2].textures[1].rgba) == "2a3550", "another of ours: the same rule in Midnight's Borders & Lines")
 
-    -- a theme of RestedXP's: the rules go, once
     env.RXP.activeTheme = { name = "DarkMode" }
     Hook(env)()
     Check(pool[1].textures[1].shown == false and pool[3].textures[1].shown == false, "a theme of RestedXP's: no rules")
@@ -733,7 +685,6 @@ do
     Hook(env)()
     Check(pool[1].textures[1].shown == true and #pool[1].textures == 1, "back to one of ours: shown again, not made again")
 
-    -- RestedXP's own theme at login: hooked, and no rule is ever made
     local own, ownBoot, ownPool = Start({ rxpThemes = true }, nil, 2)
     Login(ownBoot)
     Check(Hook(own) and #ownPool[1].textures == 0, "RestedXP's own theme: hooked, no rules made")
@@ -744,7 +695,6 @@ do
     Hook(own)()
     Check(#ownPool[1].textures == 1 and ownPool[2].textures[1].shown == true, "one of ours picked later: the rules appear")
 
-    -- switched off in Settings: no rules at login, and switching is at once
     local quiet, quietBoot, quietPool = Start({ rxpThemes = true, rxpDividers = false }, "NaowhForever:crimson", 2)
     Login(quietBoot)
     Check(#quietPool[1].textures == 0 and #quiet.hooked == 1, "dividers switched off: hooked, but no rules are made")
@@ -756,12 +706,10 @@ do
     quiet.NaowhForever.SetRXPDividers(true)
     Check(#quietPool[1].textures == 1 and quietPool[1].textures[1].shown == true, "and back, without making them again")
 
-    -- off: no login event, nothing hooked or drawn
     local off, offBoot, offPool = Start({}, nil, 2)
     Login(offBoot)
     Check(#off.hooked == 0 and #offPool[1].textures == 0, "off: nothing is hooked, nothing is drawn")
 
-    -- RestedXP without the pieces: no error, and only what is there is used
     local function Bare(window, rxp)
         local e, _, f, b = Load({ rxpThemes = true }, true)
         e.RXPFrame = window
@@ -779,7 +727,7 @@ do
     Check(#Bare(plain, { SetStep = function() end }).hooked == 1, "a row that cannot make a texture is skipped")
 end
 
--- The four looks that can be switched off: on by default, saved as false when off, and only false turns them off.
+-- The four looks that can be switched off.
 do
     for _, option in ipairs({ { "RXPFontEnabled", "SetRXPFont", "rxpFont" },
             { "RXPTextColorEnabled", "SetRXPTextColor", "rxpTextColor" },

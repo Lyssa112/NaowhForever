@@ -16,10 +16,14 @@ local section = source:sub(first, last - 1)
 local chunk = assert(loadstring("local parent, y = ...; local _, h; " .. section .. " return y"))
 
 -- The pending flag has to outlive a rebuild, so it lives at file scope, above the builder.
-local flag = assert(source:find("\nlocal colorsPending = false\n", 1, true))
-assert(flag < assert(source:find("function ns.BuildSettingsPage", 1, true)), "flag is file scope")
+local build = assert(source:find("function ns.BuildSettingsPage", 1, true))
+for _, name in ipairs({ "colorsPending", "rxpPending" }) do
+    local flag = assert(source:find("\nlocal " .. name .. " = false\n", 1, true))
+    assert(flag < build, name .. " is file scope")
+end
 
 local HINT = "Reload UI to apply your color changes."
+local RXP_HINT = "Reload UI to apply your RestedXP changes."
 local cases = 0
 local function Check(ok, label) assert(ok, label); cases = cases + 1 end
 Check(not section:find("ReloadUI", 1, true), "the section never calls ReloadUI itself")
@@ -45,9 +49,12 @@ local function Page(account, rxp)
     local e = { confirms = {}, refreshes = 0, account = account }
     local ns = RealCore(account, rxp)
     ns.Confirm = function(text, onYes) e.confirms[#e.confirms + 1] = { text = text, yes = onYes } end
-    local env = { ns = ns, W = {}, colorsPending = false,
+    local env = { ns = ns, W = {}, colorsPending = false, rxpPending = false,
         UI = { RefreshPage = function() e.refreshes = e.refreshes + 1 end } }
-    function env.W:SectionHeader() return nil, 0 end
+    function env.W:SectionHeader(_, text)
+        e.headers[#e.headers + 1] = text
+        return nil, 0
+    end
     function env.W:DualRow(_, _, left, right)
         e.rows[#e.rows + 1] = { left, right }
         return nil, 0
@@ -59,7 +66,7 @@ local function Page(account, rxp)
     setmetatable(env, { __index = _G })
     setfenv(chunk, env)
     function e.build()
-        e.rows, e.notes = {}, {}
+        e.rows, e.notes, e.headers = {}, {}, {}
         chunk({}, 0)
         e.theme = e.rows[1][1]
     end
@@ -255,8 +262,7 @@ do
     Check(Build(function() return {} end) and #frames == 2 and Shown() == 0, "no colors, no chips")
 end
 
--- Add Themes to RestedXP: only with RestedXP Guides installed, off by default, a reload to apply. With it off nothing
--- else of RestedXP's is shown; with it on, the arrow choices and the four looks that can be switched off appear.
+-- The RESTEDXP section.
 do
     local function Toggle(e)
         for _, row in ipairs(e.rows) do
@@ -278,16 +284,17 @@ do
         return true
     end
     Check(Toggle(Page({})) == nil and Toggle(Page({}, false)) == nil, "no RestedXP toggle without RestedXP Guides")
+    Check(table.concat(Page({}).headers, ",") == "COLORS", "and no RESTEDXP section either")
     local a = {}
     local e = Page(a, true)
     local toggle, beside = Toggle(e)
+    Check(table.concat(e.headers, ",") == "COLORS,RESTEDXP", "RestedXP Guides installed: a RESTEDXP section of its own, even with the themes off")
     Check(toggle and toggle.type == "toggle", "the toggle is there with RestedXP Guides installed")
     Check(toggle.getValue() == false and a.rxpThemes == nil, "off by default")
     for _, word in ipairs({ "NaowhUI", "eight Naowh themes", "waypoint arrow", "Look and Feel", "Addon Font", "Takes effect after a /reload" }) do
         Check(toggle.tooltip:find(word, 1, true), "tooltip mentions " .. word)
     end
 
-    -- off: only the toggle is shown, with nothing beside it
     Check(beside.type == "label" and beside.text == "", "with the themes off, nothing is beside the toggle")
     Check(Hidden(e), "and none of the other RestedXP choices is shown")
     Check(#e.notes == 0, "no hint before a change")
@@ -295,10 +302,9 @@ do
     toggle.setValue(true)
     Check(a.rxpThemes == true and e.refreshes == refreshed + 1 and #e.confirms == 0, "on is stored and the page redraws")
     e.build()
-    Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == HINT, "it reads back, and the reload hint shows")
+    Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == RXP_HINT, "it reads back, and the RestedXP reload hint shows")
     Check(not Hidden(e), "and the choices are shown")
 
-    -- on: the arrow choice sits beside the toggle
     local _, arrow = Toggle(e)
     Check(arrow and arrow.type == "dropdown" and arrow.text == "RestedXP Arrow", "the arrow choice sits beside the toggle")
     Check(#arrow.order == 3 and arrow.order[1] == "layer" and arrow.values.layer == "Colored layer"
@@ -311,7 +317,6 @@ do
     arrow.setValue("layer")
     Check(a.rxpArrow == nil, "the default is stored as nothing")
 
-    -- the shape and the glow of Naowh's arrow: the next row, only usable with Naowh arrow picked
     local shape, glow = Pair(e, "Naowh Arrow Shape")
     Check(shape and shape.type == "dropdown" and glow and glow.type == "toggle" and glow.text == "Naowh Arrow Glow",
         "the shape and the glow are the next row")
@@ -331,7 +336,6 @@ do
     arrow.setValue("layer")
     Check(a.rxpArrowShape == nil and a.rxpArrowGlow == nil, "the defaults are stored as nothing")
 
-    -- the four looks that can be switched off: after the arrow rows, on by default, never greyed out
     local font, text = Pair(e, "Use Addon Font")
     local dividers, bars = Pair(e, "Quest List Dividers")
     Check(font and text and dividers and bars and font.type == "toggle" and text.type == "toggle"
@@ -346,13 +350,12 @@ do
     Check(text.tooltip:find("Takes effect after a /reload", 1, true), "so does the text color's")
     Check(not dividers.tooltip:find("/reload", 1, true) and not bars.tooltip:find("/reload", 1, true), "the live ones do not")
 
-    -- each switch on its own: the font and the text color want a reload, the other two apply at once
     local fp = Page({ rxpThemes = true }, true)
     local fpFont, fpText = Pair(fp, "Use Addon Font")
     fpFont.setValue(false)
     fp.build()
     Check(fp.account.rxpFont == false and fp.account.rxpTextColor == nil and fpFont.getValue() == false and fpText.getValue() == true
-        and fp.refreshes == 1 and #fp.notes == 1 and fp.notes[1] == HINT, "the font alone: stored, the page redraws, and the reload hint shows")
+        and fp.refreshes == 1 and #fp.notes == 1 and fp.notes[1] == RXP_HINT, "the font alone: stored, the page redraws, and the reload hint shows")
     fpFont.setValue(true)
     Check(fp.account.rxpFont == nil and fpFont.getValue() == true, "on is stored as nothing")
     local tp = Page({ rxpThemes = true }, true)
@@ -360,7 +363,7 @@ do
     tpText.setValue(false)
     tp.build()
     Check(tp.account.rxpTextColor == false and tp.account.rxpFont == nil and tpText.getValue() == false and tpFont.getValue() == true
-        and tp.refreshes == 1 and #tp.notes == 1 and tp.notes[1] == HINT, "the text color alone: the same")
+        and tp.refreshes == 1 and #tp.notes == 1 and tp.notes[1] == RXP_HINT, "the text color alone: the same")
     local dp = Page({ rxpThemes = true }, true)
     local dpDividers, dpBars = Pair(dp, "Quest List Dividers")
     dpDividers.setValue(false)
@@ -372,14 +375,23 @@ do
     Check(dp.account.rxpBars == false and dpBars.getValue() == false and dp.refreshes == 0 and #dp.notes == 0,
         "the title bar alone: the same")
 
-    -- turned off again, the choices are hidden again (a fresh page: the slice is rebuilt in the newest page's environment)
+    local both = Page({ rxpThemes = true }, true)
+    both.theme.setValue("crimson")
+    both.build()
+    Check(#both.notes == 1 and both.notes[1] == HINT, "a color change brings up the color hint, not the RestedXP one")
+    local bothFont = Pair(both, "Use Addon Font")
+    bothFont.setValue(false)
+    both.build()
+    Check(#both.notes == 2 and both.notes[1] == HINT and both.notes[2] == RXP_HINT,
+        "and after a RestedXP change as well, both: the color one first")
+
+    -- a fresh page: the slice is rebuilt in the newest page's environment
     local again = Page({ rxpThemes = true }, true)
     Toggle(again).setValue(false)
     again.build()
     Check(again.account.rxpThemes == nil, "off clears it")
     Check(Hidden(again) and select(2, Toggle(again)).type == "label", "and the choices are hidden again")
 
-    -- the row counts with Custom: one toggle row with the themes off, four rows with them on
     local plain = #Page({ themePreset = "custom" }).rows
     local custom = Page({ themePreset = "custom" }, true)
     Check(Toggle(custom) and #custom.rows == plain + 1, "with Custom and the themes off, RestedXP adds the one toggle row")

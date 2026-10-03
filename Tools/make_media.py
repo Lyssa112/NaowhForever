@@ -335,16 +335,21 @@ def bag(x, y, size):
     return (255, 255, 255, int(round(255 * smooth(0, d))))
 
 
+# The waypoint arrow's facets (left outer, left inner, right inner, right outer) as how much of the tint
+# each keeps, and its dark edge.
+ARROW_SHADES = (158, 204, 255, 230)
+ARROW_EDGE = 24
+
+
 def nav_arrow(wide, glow):
-    # RestedXP's waypoint arrow, point up: a kite folded into four facets, with a dark edge and a thin
-    # line inside it. Grey over white, so a vertex color tints it; the lightest part is the tint itself.
-    # wide: the base 14% wider. glow: a soft halo around it (white alpha, so it takes the tint too), with
-    # the kite drawn smaller to leave it room. Measured in units of a 97-unit-tall kite, y down from the
-    # tip, so the drawing can be compared with the design sketches.
-    half = 49.0 if wide else 43.0              # how far the wing tips are from the middle
-    shrink = 0.76 if glow else 1.0
-    glow_reach, glow_peak = 22.0, 0.9          # how far the halo reaches, and how strong it is at the edge
-    unit = 0.88 / 97.0                         # one unit, as a share of the canvas
+    # The waypoint arrow, point up: a kite in four facets with a dark edge and a thin line inside, grey over
+    # white so a vertex color tints it. wide: base 14% wider. glow: a soft halo, with the kite drawn
+    # smaller to leave it room (GLOW_FILL in Core/NaowhForever_RXPThemes.lua). Units are a 97-tall kite.
+    half = 49.0 if wide else 43.0              # wing tips from the middle
+    shrink = 0.76 if glow else 1.0             # how much of the image the kite fills
+    glow_reach, glow_peak = 22.0, 0.9          # halo reach, and its strength at the edge
+    unit = 0.88 / 97.0                         # one unit as a share of the canvas
+    outer_left, inner_left, inner_right, outer_right = ARROW_SHADES
 
     def canvas(px, py):
         u, v = 0.5 + px * unit, 0.05 + (py + 50) * unit
@@ -357,24 +362,24 @@ def nav_arrow(wide, glow):
         u, v = x / size, y / size
         d = polygon_dist(u, v, outer) * size
         unit_px = unit * shrink * size
-        # which facet: the crease runs from the tip to a third of the way along the lower edge
+        # the crease runs from the tip to a third of the way along the lower edge
         px = ((0.5 + (u - 0.5) / shrink) - 0.5) / unit
         py = ((0.5 + (v - 0.5) / shrink) - 0.05) / unit - 50
         folded = (half / 3.0) * (py + 50) - 81.0 * abs(px) >= 0
         if px < 0:
-            shade = 204 if folded else 158
+            shade = inner_left if folded else outer_left
         else:
-            shade = 255 if folded else 230
+            shade = inner_right if folded else outer_right
         fill = smooth(0, d)
         edge = smooth(size * 0.028, d)
         line = smooth(1.1, abs(polygon_dist(u, v, inner)) * size) * fill
         halo = 0.0
         if glow:
-            away = max(0.0, d) / (glow_reach * unit_px)   # 0 at the kite's edge, 1 where the halo ends
+            away = max(0.0, d) / (glow_reach * unit_px)   # 0 at the edge, 1 where the halo ends
             if away < 1.0:
                 halo = glow_peak * (1.0 - away) ** 1.6
-        rgb, alpha = (255.0 if glow else 24.0), 0.0
-        for color, cover in ((255.0, halo), (24.0, edge), (float(shade), fill), (255.0, line)):
+        rgb, alpha = (255.0 if glow else float(ARROW_EDGE)), 0.0
+        for color, cover in ((255.0, halo), (float(ARROW_EDGE), edge), (float(shade), fill), (255.0, line)):
             if cover <= 0:
                 continue
             total = cover + alpha * (1 - cover)

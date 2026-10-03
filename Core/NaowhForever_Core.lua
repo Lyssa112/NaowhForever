@@ -385,9 +385,7 @@ function ns.FontInset(size)
     return size * STEM_INSET
 end
 
---- The Addon Font setting as a file path, looked up afresh each time. UIFontPath keeps its first
---- answer, which is right once the UI is being built; asked before every addon has loaded, a font
---- from a later addon would not be found yet and would be remembered as missing.
+--- The Addon Font as a file path, looked up each time; UIFontPath keeps its first answer.
 ---@return string
 function ns.AddonFontPath()
     return FontPath(ns.AccountSettings().uiFont or "Naowh") or STANDARD_TEXT_FONT
