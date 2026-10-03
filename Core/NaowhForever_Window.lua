@@ -678,10 +678,10 @@ function ns.BuildSettingsPage(parent, y)
             .. "your Addon Font, with RestedXP's own frames, and colors its waypoint arrow in the theme's "
             .. "Accent. Pick one in RestedXP's Look and Feel settings.",
             ns.RXPThemesEnabled, ns.SetRXPThemes)
-        if not ns.RXPThemesEnabled() then
-            _, h = W:DualRow(parent, y, themesSwitch, { type = "label", text = "" }); y = y - h
-        else
-            _, h = W:DualRow(parent, y, themesSwitch,
+        _, h = W:DualRow(parent, y, themesSwitch, { type = "label", text = "" }); y = y - h
+        if ns.RXPThemesEnabled() then
+            local image = ns.RXPArrowStyle() == "image"
+            _, h = W:DualRow(parent, y,
                 { type = "dropdown", text = "RestedXP Arrow",
                   values = { layer = "Colored layer", image = "Naowh arrow", off = "RestedXP's own" },
                   order = { "layer", "image", "off" },
@@ -693,30 +693,27 @@ function ns.BuildSettingsPage(parent, y)
                   setValue = function(v)
                       ns.SetRXPArrowStyle(v)
                       UI:RefreshPage(true)
-                  end }
+                  end },
+                image and { type = "dropdown", text = "Naowh Arrow Shape",
+                  values = { kite = "Kite", wide = "Wide kite" },
+                  order = { "kite", "wide" },
+                  tooltip = "The shape of Naowh's arrow in RestedXP: the kite, or the same kite with its "
+                  .. "base 14% wider.",
+                  getValue = ns.RXPArrowShape,
+                  setValue = function(v) ns.SetRXPArrowShape(v) end } or { type = "label", text = "" }
             ); y = y - h
-            if ns.RXPArrowStyle() == "image" then
+            if image then
+                local sizeMin, sizeMax, sizeStep = ns.RXPArrowSizeRange()
                 _, h = W:DualRow(parent, y,
-                    { type = "dropdown", text = "Naowh Arrow Shape",
-                      values = { kite = "Kite", wide = "Wide kite" },
-                      order = { "kite", "wide" },
-                      tooltip = "The shape of Naowh's arrow in RestedXP: the kite, or the same kite with its "
-                      .. "base 14% wider.",
-                      getValue = ns.RXPArrowShape,
-                      setValue = function(v) ns.SetRXPArrowShape(v) end },
                     { type = "toggle", text = "Naowh Arrow Glow",
                       tooltip = "A soft glow in the theme's Accent around Naowh's arrow in RestedXP.",
                       getValue = ns.RXPArrowGlow,
-                      setValue = function(v) ns.SetRXPArrowGlow(v) end }
-                ); y = y - h
-                local sizeMin, sizeMax, sizeStep = ns.RXPArrowSizeRange()
-                _, h = W:DualRow(parent, y,
+                      setValue = function(v) ns.SetRXPArrowGlow(v) end },
                     { type = "slider", text = "Naowh Arrow Size", min = sizeMin, max = sizeMax, step = sizeStep,
                       tooltip = "How big Naowh's arrow is, as a percent of the arrow RestedXP draws. RestedXP's "
                       .. "own Arrow Size setting still applies on top.",
                       getValue = ns.RXPArrowSize,
-                      setValue = function(v) ns.SetRXPArrowSize(v) end },
-                    { type = "label", text = "" }
+                      setValue = function(v) ns.SetRXPArrowSize(v) end }
                 ); y = y - h
             end
             _, h = W:DualRow(parent, y,

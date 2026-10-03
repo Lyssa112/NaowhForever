@@ -275,13 +275,23 @@ do
         end
     end
     local function Hidden(page)
-        for _, name in ipairs({ "Naowh Arrow Shape", "Naowh Arrow Size", "Use Addon Font" }) do
-            if Pair(page, name) then return false end
-        end
-        for _, row in ipairs(page.rows) do
-            if row[2] and row[2].text == "RestedXP Arrow" then return false end
+        for _, name in ipairs({ "RestedXP Arrow", "Naowh Arrow Shape", "Naowh Arrow Glow", "Naowh Arrow Size", "Use Addon Font",
+                "Use Theme Text Color" }) do
+            for _, row in ipairs(page.rows) do
+                if row[1].text == name or (row[2] and row[2].text == name) then return false end
+            end
         end
         return true
+    end
+    -- the RestedXP rows after the Theme rows, each as "left|right"
+    local function Layout(page)
+        local out = {}
+        for i = #page.rows, 1, -1 do
+            local row = page.rows[i]
+            table.insert(out, 1, (row[1].text or "") .. "|" .. (row[2] and row[2].text or ""))
+            if row[1].text == "Add Themes to RestedXP" then break end
+        end
+        return table.concat(out, ", ")
     end
     Check(Toggle(Page({})) == nil and Toggle(Page({}, false)) == nil, "no RestedXP toggle without RestedXP Guides")
     Check(table.concat(Page({}).headers, ",") == "COLORS", "and no RESTEDXP section either")
@@ -295,7 +305,8 @@ do
         Check(toggle.tooltip:find(word, 1, true), "tooltip mentions " .. word)
     end
 
-    Check(beside.type == "label" and beside.text == "", "with the themes off, nothing is beside the toggle")
+    Check(beside.type == "label" and beside.text == "", "nothing is beside the toggle")
+    Check(Layout(e) == "Add Themes to RestedXP|", "with the themes off, the toggle is the only RestedXP row")
     Check(Hidden(e), "and none of the other RestedXP choices is shown")
     Check(#e.notes == 0, "no hint before a change")
     local refreshed = e.refreshes
@@ -305,8 +316,11 @@ do
     Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == RXP_HINT, "it reads back, and the RestedXP reload hint shows")
     Check(not Hidden(e), "and the choices are shown")
 
-    local _, arrow = Toggle(e)
-    Check(arrow and arrow.type == "dropdown" and arrow.text == "RestedXP Arrow", "the arrow choice sits beside the toggle")
+    Check(Layout(e) == "Add Themes to RestedXP|, RestedXP Arrow|, Use Addon Font|Use Theme Text Color",
+        "with the themes on: the toggle, the arrow choice, and the font and text color")
+    local arrow, noShape = Pair(e, "RestedXP Arrow")
+    Check(arrow and arrow.type == "dropdown" and noShape.type == "label" and noShape.text == "",
+        "the arrow choice is the next row, with nothing beside it until Naowh arrow is picked")
     Check(#arrow.order == 3 and arrow.order[1] == "layer" and arrow.values.layer == "Colored layer"
         and arrow.values.image == "Naowh arrow" and arrow.values.off == "RestedXP's own", "three ways to draw it")
     Check(arrow.getValue() == "layer" and arrow.disabled == nil, "a layer by default, and never greyed out: it is only shown with the themes on")
@@ -320,9 +334,11 @@ do
     Check(Pair(e, "Naowh Arrow Shape") == nil and Pair(e, "Naowh Arrow Size") == nil,
         "with the layer as the arrow style, the choices for Naowh's arrow are not shown")
     local imaged = Page({ rxpThemes = true, rxpArrow = "image" }, true)
-    local shape, glow = Pair(imaged, "Naowh Arrow Shape")
-    Check(shape and shape.type == "dropdown" and glow and glow.type == "toggle" and glow.text == "Naowh Arrow Glow",
-        "with Naowh arrow picked, the shape and the glow are the next row")
+    Check(Layout(imaged) == "Add Themes to RestedXP|, RestedXP Arrow|Naowh Arrow Shape, Naowh Arrow Glow|Naowh Arrow Size, "
+        .. "Use Addon Font|Use Theme Text Color", "with Naowh arrow picked: the arrow and its shape, its glow and size, then the font and text color")
+    local _, shape = Pair(imaged, "RestedXP Arrow")
+    local glow, size = Pair(imaged, "Naowh Arrow Glow")
+    Check(shape.type == "dropdown" and glow.type == "toggle" and size.type == "slider", "a dropdown, a toggle and a slider")
     Check(#shape.order == 2 and shape.order[1] == "kite" and shape.order[2] == "wide" and shape.values.kite == "Kite"
         and shape.values.wide == "Wide kite", "a kite or a wide kite")
     Check(shape.getValue() == "kite" and glow.getValue() == false, "a kite without a glow by default")
@@ -334,8 +350,6 @@ do
     shape.setValue("kite")
     glow.setValue(false)
     Check(imaged.account.rxpArrowShape == nil and imaged.account.rxpArrowGlow == nil, "the defaults are stored as nothing")
-    local size, spare = Pair(imaged, "Naowh Arrow Size")
-    Check(size and size.type == "slider" and spare.type == "label" and spare.text == "", "the size is a slider on the row after")
     Check(size.min == 60 and size.max == 200 and size.step == 5 and size.getValue() == 90, "from 60 to 200, 90 by default")
     Check(size.tooltip:find("percent", 1, true) and size.tooltip:find("Arrow Size", 1, true), "its tooltip says what it is a percent of")
     size.setValue(150)
@@ -390,10 +404,10 @@ do
     Check(Toggle(custom) and #custom.rows == plain + 1, "with Custom and the themes off, RestedXP adds the one toggle row")
     Check(custom.rows[#custom.rows][1].text == "Add Themes to RestedXP", "and it is the last, above the Reload button")
     local onCustom = Page({ themePreset = "custom", rxpThemes = true }, true)
-    Check(#onCustom.rows == plain + 2, "with the themes on, RestedXP adds two rows: the toggle, and the font and text")
+    Check(#onCustom.rows == plain + 3, "with the themes on, RestedXP adds three rows: the toggle, the arrow, and the font and text")
     Check(onCustom.rows[#onCustom.rows][1].text == "Use Addon Font", "and the font row is the last, above the Reload button")
     local onImage = Page({ themePreset = "custom", rxpThemes = true, rxpArrow = "image" }, true)
-    Check(#onImage.rows == plain + 4, "with Naowh arrow picked, two more: the shape and glow, and the size")
+    Check(#onImage.rows == plain + 4, "with Naowh arrow picked, one more: the glow and size")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")
