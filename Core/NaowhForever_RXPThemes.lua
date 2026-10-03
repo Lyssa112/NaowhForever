@@ -1,6 +1,7 @@
 -------------------------------------------------------------------------------
---  NaowhForever_RXPThemes.lua -- NaowhUI and the eight Naowh themes in RestedXP Guides, and hooks that
---  color its arrow, title bar and quest list. Off unless Settings > RESTEDXP turns it on.
+--  NaowhForever_RXPThemes.lua -- NaowhUI, the eight Naowh themes and the player's current theme in
+--  RestedXP Guides, and hooks that color its arrow, title bar and quest list. Off unless Settings >
+--  RESTEDXP turns it on.
 -------------------------------------------------------------------------------
 local ns = _G.NaowhForever
 
@@ -8,6 +9,7 @@ local RXP_ADDON = "RXPGuides"
 local NAME_PREFIX = "NaowhForever:"
 local AUTHOR = "Naowh Forever"
 local DEFAULT_KEY, DEFAULT_NAME = "default", "NaowhUI"
+local CURRENT_KEY, CURRENT_NAME = "current", "Naowh (current)"   -- follows the player's own theme
 
 local RXP_TEXTURES = "Interface/AddOns/RXPGuides/Textures/"
 local TEXTURES = RXP_TEXTURES .. "DarkMode/"
@@ -21,6 +23,7 @@ local BORDERS = {
     slate = TEAL, forest = TEAL,
     obsidian = TAN,
     crimson = GREY, rosenoir = GREY,
+    custom = GREY,
 }
 
 local HIGHLIGHT_ALPHA = 0.5
@@ -184,16 +187,15 @@ local function Hex(c)
         math.floor(c.b * 255 + 0.5))
 end
 
--- One theme from a preset's palette, or the default theme for key "".
-local function Theme(key)
-    local palette = ns.ThemePalette(key)
+-- One theme from a Naowh palette: source is a preset's key, "" for the default theme, or "custom".
+local function Theme(id, displayName, source)
+    local palette = ns.ThemePalette(source)
     local c = {}
     for i, token in ipairs(ns.THEME_EDITABLE) do c[token] = palette[i] end
-    local preset = ns.THEME_PRESETS[key]
-    local borders = (BORDERS[key] or TEXTURES) .. "rxp-borders"
+    local borders = (BORDERS[source] or TEXTURES) .. "rxp-borders"
     return {
-        name = NAME_PREFIX .. (key == "" and DEFAULT_KEY or key),
-        displayName = preset and preset.name or DEFAULT_NAME,
+        name = NAME_PREFIX .. id,
+        displayName = displayName,
         author = AUTHOR,
         background = Rgba(c.bg, 1),
         bottomFrameBG = Rgba(c.bg, 1),
@@ -217,12 +219,13 @@ local function Register()
         list = {}
         _G.RXPGuides_Themes = list
     end
-    local keys = { "" }
-    for _, key in ipairs(ns.THEME_PRESET_ORDER) do keys[#keys + 1] = key end
-    for _, key in ipairs(keys) do
-        local theme = Theme(key)
+    local function Add(id, displayName, source)
+        local theme = Theme(id, displayName, source)
         list[theme.name] = theme
     end
+    Add(DEFAULT_KEY, DEFAULT_NAME, "")
+    for _, key in ipairs(ns.THEME_PRESET_ORDER) do Add(key, ns.THEME_PRESETS[key].name, key) end
+    Add(CURRENT_KEY, CURRENT_NAME, ns.ThemePresetKey())
 end
 
 -------------------------------------------------------------------------------

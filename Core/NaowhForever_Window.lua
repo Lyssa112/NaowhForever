@@ -674,9 +674,10 @@ function ns.BuildSettingsPage(parent, y)
                 end }
         end
         local themesSwitch = Switch("Add Themes to RestedXP",
-            "Adds NaowhUI and the eight Naowh themes to RestedXP Guides' theme list, in their colors and "
-            .. "your Addon Font, with RestedXP's own frames, and colors its waypoint arrow in the theme's "
-            .. "Accent. Pick one in RestedXP's Look and Feel settings.",
+            "Adds NaowhUI, the eight Naowh themes and Naowh (current), which follows the theme you picked "
+            .. "above, to RestedXP Guides' theme list, in their colors and your Addon Font, with RestedXP's "
+            .. "own frames, and colors its waypoint arrow in the theme's Accent. Pick one in RestedXP's "
+            .. "Look and Feel settings.",
             ns.RXPThemesEnabled, ns.SetRXPThemes)
         _, h = W:DualRow(parent, y, themesSwitch, { type = "label", text = "" }); y = y - h
         if ns.RXPThemesEnabled() then

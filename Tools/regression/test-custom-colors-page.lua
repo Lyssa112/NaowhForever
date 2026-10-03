@@ -301,7 +301,7 @@ do
     Check(table.concat(e.headers, ",") == "COLORS,RESTEDXP", "RestedXP Guides installed: a RESTEDXP section of its own, even with the themes off")
     Check(toggle and toggle.type == "toggle", "the toggle is there with RestedXP Guides installed")
     Check(toggle.getValue() == false and a.rxpThemes == nil, "off by default")
-    for _, word in ipairs({ "NaowhUI", "eight Naowh themes", "waypoint arrow", "Look and Feel", "Addon Font", "Takes effect after a /reload" }) do
+    for _, word in ipairs({ "NaowhUI", "eight Naowh themes", "Naowh (current)", "waypoint arrow", "Look and Feel", "Addon Font", "Takes effect after a /reload" }) do
         Check(toggle.tooltip:find(word, 1, true), "tooltip mentions " .. word)
     end
 

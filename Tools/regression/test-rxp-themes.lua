@@ -129,12 +129,12 @@ do
     Check(ns.RXPThemesAvailable() == false, "not installed")
 end
 
--- On, with RestedXP installed: nine themes, from the palettes the Theme row previews.
+-- On, with RestedXP installed: the nine fixed themes, from the palettes the Theme row previews, and the current one.
 do
     local env, ns, frames, boot = Load({ rxpThemes = true }, true)
     Fire(frames, "NaowhForever")
     local list = env.RXPGuides_Themes
-    Check(type(list) == "table" and Count(list) == 9, "nine themes are registered")
+    Check(type(list) == "table" and Count(list) == 10, "ten themes are registered")
     Check(boot.events.PLAYER_LOGIN and not boot.events.ADDON_LOADED, "then it waits for login, for the arrow")
     Login(boot)
     Check(next(boot.events) == nil, "and is unregistered after login")
@@ -179,10 +179,10 @@ do
     local env, _, frames = Load({ rxpThemes = true }, true, existing)
     Fire(frames, "NaowhForever")
     Check(env.RXPGuides_Themes == existing and existing.RoseGold == other, "the table and the other addon's theme are kept")
-    Check(Count(existing) == 10, "ten themes: theirs and our nine")
+    Check(Count(existing) == 11, "eleven themes: theirs and our ten")
 end
 
--- The player's own theme never leaks in: the nine are the fixed ones.
+-- The player's own theme never leaks into the nine fixed ones.
 do
     for _, account in ipairs({
         { rxpThemes = true, themePreset = "crimson" },
@@ -191,12 +191,52 @@ do
         local env, ns, frames = Load(account, true)
         Fire(frames, "NaowhForever")   -- Core applies the player's theme first, then the module registers
         local list = env.RXPGuides_Themes
-        Check(Count(list) == 9, "still nine themes")
+        Check(Count(list) == 10, "still ten themes")
         Check(ns.THEME.accent.r ~= 0 or ns.THEME.accent.g ~= 0x91 / 255, "the player's theme is applied to the addon itself")
         Check(Hex(list["NaowhForever:default"].mapPins) == "0091ed" and Hex(list["NaowhForever:default"].background) == "0e0f11",
             "NaowhUI is still the default theme's colors")
         Check(Hex(list["NaowhForever:crimson"].mapPins) == "ef4b56", "Crimson is still Crimson")
     end
+end
+
+-- Naowh (current): the player's own theme, a preset or Custom colors, in a tenth entry.
+do
+    local function Current(account)
+        local env, ns, frames = Load(account, true)
+        Fire(frames, "NaowhForever")
+        return env.RXPGuides_Themes["NaowhForever:current"], env.RXPGuides_Themes, ns
+    end
+    local theme = Current({ rxpThemes = true })
+    Check(theme and theme.name == "NaowhForever:current" and theme.displayName == "Naowh (current)"
+        and theme.author == "Naowh Forever", "registered under its own name")
+    Check(Hex(theme.background) == "0e0f11" and Hex(theme.mapPins) == "0091ed" and Hex(theme.dividerColor) == "2e3136"
+        and Hex(theme.textColor) == "f0f1f3", "with Naowh's default theme: NaowhUI's colors")
+    Check(theme.edges.edge == TEX .. "rxp-borders" and theme.texturePath == TEX .. "DarkMode/", "and its frame line")
+
+    local list
+    theme, list = Current({ rxpThemes = true, themePreset = "crimson" })
+    Check(Hex(theme.background) == "140a0c" and Hex(theme.bottomFrameBG) == "140a0c" and Hex(theme.mapPins) == "ef4b56"
+        and Hex(theme.dividerColor) == "3d2429" and Hex(theme.textColor) == "f6eff0", "with a preset picked: that preset's colors")
+    Check(theme.edges.edge == TEX .. "Hardcore/rxp-borders" and theme.edges.guideName == TEX .. "Hardcore/rxp-borders",
+        "and the frame line of its set")
+    Check(Hex(list["NaowhForever:crimson"].mapPins) == "ef4b56" and Hex(list["NaowhForever:default"].mapPins) == "0091ed",
+        "while the fixed themes are what they were")
+
+    theme, list = Current({ rxpThemes = true, themePreset = "custom",
+        themeColors = { bg = { r = 1, g = 0, b = 0 }, accent = { r = 0, g = 1, b = 0 }, fg = { r = 0, g = 0, b = 1 } } })
+    Check(Same(theme.background, { 1, 0, 0, 1 }) and Same(theme.bottomFrameBG, { 1, 0, 0, 1 }), "with Custom colors: the Background picked")
+    Check(Same(theme.mapPins, { 0, 1, 0, 1 }) and Same(theme.bottomFrameHighlight, { 0, 1, 0, 0.5 }) and theme.tooltip == "|cff00ff00",
+        "and the Accent")
+    Check(Same(theme.textColor, { 0, 0, 1 }), "and the Text")
+    Check(Hex(theme.dividerColor) == "2e3136", "a color not picked is the addon's own")
+    Check(theme.edges.edge == TEX .. "Hardcore/rxp-borders", "with the neutral frame line")
+    Check(Hex(list["NaowhForever:default"].background) == "0e0f11" and Hex(list["NaowhForever:midnight"].background) == "0b1020",
+        "and the fixed themes are untouched")
+
+    local env, _, frames = Load({ rxpThemes = true, rxpFont = false, rxpTextColor = false }, true)
+    Fire(frames, "NaowhForever")
+    local plain = env.RXPGuides_Themes["NaowhForever:current"]
+    Check(plain.font == nil and plain.textColor == nil, "the font and the text color switches are honored here too")
 end
 
 -- The font and the text color.
@@ -211,7 +251,7 @@ do
         for _, key in ipairs(KEYS) do
             if list[NameOf(key)].font ~= path then return false end
         end
-        return true
+        return list["NaowhForever:current"].font == path
     end
 
     local list = Fonts({ rxpThemes = true }, {})
