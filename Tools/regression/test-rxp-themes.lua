@@ -67,6 +67,7 @@ local function Load(account, installed, existing, fonts)
         C_AddOns = { DoesAddOnExist = function(name) return installed and name == "RXPGuides" end },
         NaowhForeverDB = { account = account, profiles = {}, charActive = {} } }
     env._G = env
+    env.InCombatLockdown = function() return env.inCombat == true end
     if fonts then
         local lsm = MediaStub(fonts)
         env.LibStub = function(name) if name == "LibSharedMedia-3.0" then return lsm end end
@@ -92,6 +93,10 @@ end
 -- Only the module's own frame: Core has login work of its own, which is not under test.
 local function Login(boot)
     if boot.events.PLAYER_LOGIN and boot.OnEvent then boot.OnEvent(boot, "PLAYER_LOGIN") end
+end
+local function CombatEnds(env, boot)
+    env.inCombat = false
+    if boot.events.PLAYER_REGEN_ENABLED and boot.OnEvent then boot.OnEvent(boot, "PLAYER_REGEN_ENABLED") end
 end
 local function Count(t)
     local n = 0
@@ -341,6 +346,36 @@ do
     rxp.settings.profile.activeTheme = "RXP Blue"
     pickedNs.SetRXPThemeChoice("current")
     Check(rxp.settings.profile.activeTheme == CURRENT and #rxp.reloads == 3, "and the current theme again: picked again")
+
+    -- in combat the reload (which scales RestedXP's protected target frame) waits for the end of it
+    rxp = Rxp("RXP Blue", true, false)
+    local combatEnv, _, combatBoot = Session({ rxpThemes = true, rxpTheme = "current" }, rxp)
+    combatEnv.inCombat = true
+    Login(combatBoot)
+    Check(rxp.settings.profile.activeTheme == "RXP Blue" and #rxp.reloads == 0, "login in combat: RestedXP is not touched")
+    Check(combatBoot.events.PLAYER_REGEN_ENABLED == true and not combatBoot.events.PLAYER_LOGIN, "and the end of combat is waited for")
+    CombatEnds(combatEnv, combatBoot)
+    Check(rxp.settings.profile.activeTheme == CURRENT and #rxp.reloads == 1, "which puts RestedXP on the theme")
+    Check(next(combatBoot.events) == nil, "and nothing is listened for after that")
+
+    rxp = Rxp("RXP Blue", true, false)
+    local pickEnv, pickNs, pickBoot = Session({ rxpThemes = true }, rxp)
+    pickEnv.inCombat = true
+    pickNs.SetRXPThemeChoice("current")
+    pickNs.SetRXPThemeChoice("slate")
+    Check(rxp.settings.profile.activeTheme == "RXP Blue" and #rxp.reloads == 0, "picked in combat: RestedXP is not touched")
+    CombatEnds(pickEnv, pickBoot)
+    Check(rxp.settings.profile.activeTheme == "NaowhForever:slate" and #rxp.reloads == 1, "and the last pick is applied once, after it")
+
+    rxp = Rxp(CURRENT, true, false)
+    local idleEnv, idleNs, idleBoot = Session({ rxpThemes = true }, rxp)
+    idleEnv.inCombat = true
+    idleNs.SetRXPThemeChoice("current")
+    idleNs.SetRXPThemeChoice("")
+    idleNs.SetRXPThemeChoice("bogus")
+    rxp.themes = {}
+    idleNs.SetRXPThemeChoice("slate")
+    Check(idleBoot.events.PLAYER_REGEN_ENABLED == nil, "in combat with nothing to apply: the end of combat is not waited for")
 
     -- missing pieces: no error
     for _, broken in ipairs({ {}, { settings = {} }, { settings = { profile = {} }, themes = { [CURRENT] = {} } },

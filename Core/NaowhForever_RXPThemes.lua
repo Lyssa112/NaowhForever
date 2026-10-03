@@ -52,6 +52,7 @@ local LAYER_STRENGTH = 0.9
 --  Settings
 -------------------------------------------------------------------------------
 local PaintArrow, ApplyTheme   -- defined below; a change applies at once
+local boot                     -- our frame, which also waits for the end of combat
 
 ---@return boolean
 function ns.RXPThemesAvailable()
@@ -279,7 +280,8 @@ local function Dig(t, ...)
 end
 
 -- RestedXP on the theme picked in Settings, through its own theme reload (which only runs with its live
--- reload setting on, so that is on for the call).
+-- reload setting on, so that is on for the call). The reload scales its protected target frame, so
+-- in combat it waits for the end of it.
 function ApplyTheme()
     local rxp = _G.RXP
     local profile = Dig(rxp, "settings", "profile")
@@ -287,6 +289,10 @@ function ApplyTheme()
     local name = NAME_PREFIX .. key
     if key == "" or type(profile) ~= "table" or type(rxp.ReloadTheme) ~= "function" or not Dig(rxp, "themes", name)
             or profile.activeTheme == name then
+        return
+    end
+    if InCombatLockdown() then
+        boot:RegisterEvent("PLAYER_REGEN_ENABLED")
         return
     end
     profile.activeTheme = name
@@ -498,7 +504,7 @@ end
 
 -- Themes go in while our addon loads, before RestedXP (which loads after it) imports them; the hooks
 -- need RestedXP's frames, so they wait for PLAYER_LOGIN.
-local boot = CreateFrame("Frame")
+boot = CreateFrame("Frame")
 boot:RegisterEvent("ADDON_LOADED")
 boot:SetScript("OnEvent", function(self, event, name)
     if event == "ADDON_LOADED" then
@@ -508,6 +514,9 @@ boot:SetScript("OnEvent", function(self, event, name)
             Register()
             self:RegisterEvent("PLAYER_LOGIN")
         end
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        ApplyTheme()
     else
         self:UnregisterAllEvents()
         ApplyTheme()
