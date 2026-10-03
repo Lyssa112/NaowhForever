@@ -466,7 +466,7 @@ do
     Check(#drawn.sets == setsNow and drawn.texture.path == IMAGE, "and so does RestedXP's own arrow")
     styles.SetRXPArrowShape("kite")
 
-    -- Naowh's arrow is drawn larger than the frame RestedXP gives its own: 1.2 times, and 1.2 / 0.76 times with a glow
+    -- Naowh's arrow is drawn larger than the frame RestedXP gives its own: 0.9 times, and 0.9 / 0.76 times with a glow
     -- (whose kite fills 76% of the image), around the same center. Anything else gets RestedXP's anchors back.
     local function Spread(frame)
         local pts = frame.texture.points
@@ -487,17 +487,17 @@ do
     local sized = sizeEnv.RXPG_ARROW
     Check(Spread(sized) == "all", "before login, RestedXP's own anchors")
     Login(sizeBoot)
-    Check(Overflow(sized, 1.2), "the Naowh arrow image is 1.2 times the frame, around the same center")
+    Check(Overflow(sized, 0.9), "the Naowh arrow image is 0.9 times the frame, around the same center")
     sizeEnv.NaowhForever.SetRXPArrowGlow(true)
-    Check(Overflow(sized, 1.2 / 0.76), "with a glow, larger still, so the kite stays the same size")
+    Check(Overflow(sized, 0.9 / 0.76), "with a glow, larger still, so the kite stays the same size")
     sizeEnv.NaowhForever.SetRXPArrowShape("wide")
-    Check(Overflow(sized, 1.2 / 0.76), "and the shape does not change that")
+    Check(Overflow(sized, 0.9 / 0.76), "and the shape does not change that")
     sizeEnv.NaowhForever.SetRXPArrowGlow(false)
-    Check(Overflow(sized, 1.2), "without it, back to 1.2")
+    Check(Overflow(sized, 0.9), "without it, back to 0.9")
     sized.w, sized.h = 64, 64
     sized.scripts.OnSizeChanged()
     local x1 = Spread(sized)
-    Check(type(x1) == "number" and Near(x1, -64 * 0.2 / 2), "RestedXP's Arrow Size resizing the frame: the image follows it")
+    Check(type(x1) == "number" and Near(x1, -64 * (0.9 - 1) / 2), "RestedXP's Arrow Size resizing the frame: the image follows it")
     sized.w, sized.h = 32, 32
     sized.scripts.OnSizeChanged()
     sizeEnv.NaowhForever.SetRXPArrowStyle("layer")
@@ -509,15 +509,15 @@ do
     sizeEnv.NaowhForever.SetRXPArrowStyle("off")
     Check(Spread(sized) == "all", "nor does RestedXP's own arrow")
 
-    -- the size: a percent of RestedXP's frame, 120 by default, in steps of 5 from 60 to 200
+    -- the size: a percent of RestedXP's frame, 90 by default, in steps of 5 from 60 to 200
     local sizeAccount = {}
     local _, sizeNs = Load(sizeAccount, true)
     local lo, hi, step = sizeNs.RXPArrowSizeRange()
     Check(lo == 60 and hi == 200 and step == 5, "from 60 to 200 percent in steps of 5")
-    Check(sizeNs.RXPArrowSize() == 120 and sizeAccount.rxpArrowSize == nil, "120 by default")
+    Check(sizeNs.RXPArrowSize() == 90 and sizeAccount.rxpArrowSize == nil, "90 by default")
     sizeNs.SetRXPArrowSize(150)
     Check(sizeAccount.rxpArrowSize == 150 and sizeNs.RXPArrowSize() == 150, "a size is stored")
-    sizeNs.SetRXPArrowSize(120)
+    sizeNs.SetRXPArrowSize(90)
     Check(sizeAccount.rxpArrowSize == nil, "the default is stored as nothing")
     sizeNs.SetRXPArrowSize(153)
     Check(sizeAccount.rxpArrowSize == 155, "rounded to a step")
@@ -528,7 +528,7 @@ do
     sizeNs.SetRXPArrowSize("bogus")
     Check(sizeAccount.rxpArrowSize == nil, "something that is not a number is not stored")
     sizeAccount.rxpArrowSize = "junk"
-    Check(sizeNs.RXPArrowSize() == 120, "and an unreadable saved size reads as 120")
+    Check(sizeNs.RXPArrowSize() == 90, "and an unreadable saved size reads as 90")
     sizeAccount.rxpArrowSize = 7
     Check(sizeNs.RXPArrowSize() == 60, "a saved size out of range is brought back into it")
 
@@ -542,12 +542,12 @@ do
     sizeEnv.NaowhForever.SetRXPArrowGlow(false)
     sizeEnv.NaowhForever.SetRXPArrowSize(60)
     Check(Overflow(sized, 0.6), "60 percent: smaller than the frame, around the same center")
-    sizeEnv.NaowhForever.SetRXPArrowSize(120)
-    Check(Overflow(sized, 1.2), "and back to 120")
+    sizeEnv.NaowhForever.SetRXPArrowSize(90)
+    Check(Overflow(sized, 0.9), "and back to 90")
     sizeEnv.NaowhForever.SetRXPArrowStyle("layer")
     sizeEnv.NaowhForever.SetRXPArrowSize(200)
     Check(Spread(sized) == "all", "with the layer as the style, a size leaves RestedXP's anchors alone")
-    sizeEnv.NaowhForever.SetRXPArrowSize(120)
+    sizeEnv.NaowhForever.SetRXPArrowSize(90)
 
     local wideEnv, _, wideBoot = Start({ rxpThemes = true, rxpArrow = "image", rxpArrowShape = "wide", rxpArrowGlow = true },
         "NaowhForever:rosenoir")

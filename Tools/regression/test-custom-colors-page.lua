@@ -336,11 +336,11 @@ do
     Check(imaged.account.rxpArrowShape == nil and imaged.account.rxpArrowGlow == nil, "the defaults are stored as nothing")
     local size, spare = Pair(imaged, "Naowh Arrow Size")
     Check(size and size.type == "slider" and spare.type == "label" and spare.text == "", "the size is a slider on the row after")
-    Check(size.min == 60 and size.max == 200 and size.step == 5 and size.getValue() == 120, "from 60 to 200, 120 by default")
+    Check(size.min == 60 and size.max == 200 and size.step == 5 and size.getValue() == 90, "from 60 to 200, 90 by default")
     Check(size.tooltip:find("percent", 1, true) and size.tooltip:find("Arrow Size", 1, true), "its tooltip says what it is a percent of")
     size.setValue(150)
     Check(imaged.account.rxpArrowSize == 150 and size.getValue() == 150 and imaged.refreshes == 0, "a size is stored, and the page is not redrawn")
-    size.setValue(120)
+    size.setValue(90)
     Check(imaged.account.rxpArrowSize == nil, "the default is stored as nothing")
 
     local font, text = Pair(e, "Use Addon Font")

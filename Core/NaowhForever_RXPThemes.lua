@@ -37,7 +37,7 @@ local ARROW_STYLES = { layer = true, image = true, off = true }
 local DEFAULT_ARROW = "layer"
 -- Naowh's image is drawn this percent of RestedXP's arrow frame; with a glow the kite fills only
 -- GLOW_FILL of it (Tools/make_media.py), so that image is drawn larger to keep the kite the same size.
-local SIZE_MIN, SIZE_MAX, SIZE_STEP, DEFAULT_SIZE = 60, 200, 5, 120
+local SIZE_MIN, SIZE_MAX, SIZE_STEP, DEFAULT_SIZE = 60, 200, 5, 90
 local GLOW_FILL = 0.76
 -- The layer is lighter at the top and deeper at the bottom, and not full strength, so the dark arrow still shades it.
 local TOP_TOWARD_WHITE = 0.22
