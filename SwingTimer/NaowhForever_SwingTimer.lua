@@ -956,7 +956,7 @@ function ns.BuildSwingTimerPage(parent, y)
     ); y = y - h
 
     if select(2, UnitClass("player")) == "PALADIN" then
-        _, h = W:SectionHeader(parent, "SEALS" .. UI.STATUS.untested, y); y = y - h
+        _, h = W:SectionHeader(parent, "SEALS", y); y = y - h
         _, h = W:Feature(parent, y,
             S.Toggle("sealColors", "Color by Active Seal",
                 "While a Seal is up, the melee bars take its color, over Class Colors and Apply "
