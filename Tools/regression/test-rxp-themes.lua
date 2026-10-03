@@ -620,15 +620,6 @@ do
     Hook(own, ownFooter)(ownFooter)
     Check(ownTitle.alpha == 0 and ownFooter.alpha == 0, "one of ours picked later: hidden")
 
-    local kept, keptBoot = Start({ rxpThemes = true, rxpBars = false }, "NaowhForever:crimson")
-    Login(keptBoot)
-    local keptTitle, keptFooter = kept.RXPFrame.GuideName.bg, kept.RXPFrame.Footer.bg
-    Check(#keptTitle.alphas == 0 and #keptFooter.alphas == 0 and Hook(kept, keptTitle), "switched off: hooked, banners untouched")
-    kept.NaowhForever.SetRXPBars(true)
-    Check(keptTitle.alpha == 0 and keptFooter.alpha == 0, "switched on: hidden at once")
-    kept.NaowhForever.SetRXPBars(false)
-    Check(keptTitle.alpha == 1 and keptFooter.alpha == 1, "switched off: RestedXP's banners come back at once")
-
     local off, offBoot = Start({}, nil)
     Login(offBoot)
     Check(#off.hooked == 0 and #off.RXPFrame.GuideName.bg.alphas == 0 and #off.RXPFrame.Footer.bg.alphas == 0,
@@ -735,17 +726,6 @@ do
     Hook(own)()
     Check(#ownPool[1].textures == 1 and ownPool[2].textures[1].shown == true, "one of ours picked later: the rules appear")
 
-    local quiet, quietBoot, quietPool = Start({ rxpThemes = true, rxpDividers = false }, "NaowhForever:crimson", 2)
-    Login(quietBoot)
-    Check(#quietPool[1].textures == 0 and #quiet.hooked == 1, "dividers switched off: hooked, but no rules are made")
-    quiet.NaowhForever.SetRXPDividers(true)
-    Check(#quietPool[1].textures == 1 and quietPool[1].textures[1].shown == true and quietPool[2].textures[1].shown == true,
-        "switched on: the rules appear at once")
-    quiet.NaowhForever.SetRXPDividers(false)
-    Check(quietPool[1].textures[1].shown == false and quietPool[2].textures[1].shown == false, "switched off: they go at once")
-    quiet.NaowhForever.SetRXPDividers(true)
-    Check(#quietPool[1].textures == 1 and quietPool[1].textures[1].shown == true, "and back, without making them again")
-
     local off, offBoot, offPool = Start({}, nil, 2)
     Login(offBoot)
     Check(#off.hooked == 0 and #offPool[1].textures == 0, "off: nothing is hooked, nothing is drawn")
@@ -767,11 +747,10 @@ do
     Check(#Bare(plain, { SetStep = function() end }).hooked == 1, "a row that cannot make a texture is skipped")
 end
 
--- The four looks that can be switched off.
+-- The two looks that can be switched off.
 do
     for _, option in ipairs({ { "RXPFontEnabled", "SetRXPFont", "rxpFont" },
-            { "RXPTextColorEnabled", "SetRXPTextColor", "rxpTextColor" },
-            { "RXPDividersEnabled", "SetRXPDividers", "rxpDividers" }, { "RXPBarsEnabled", "SetRXPBars", "rxpBars" } }) do
+            { "RXPTextColorEnabled", "SetRXPTextColor", "rxpTextColor" } }) do
         local get, set, key = option[1], option[2], option[3]
         local account = {}
         local _, ns = Load(account, true)

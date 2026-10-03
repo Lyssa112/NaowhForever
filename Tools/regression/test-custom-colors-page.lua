@@ -275,7 +275,7 @@ do
         end
     end
     local function Hidden(page)
-        for _, name in ipairs({ "Naowh Arrow Shape", "Naowh Arrow Size", "Use Addon Font", "Quest List Dividers" }) do
+        for _, name in ipairs({ "Naowh Arrow Shape", "Naowh Arrow Size", "Use Addon Font" }) do
             if Pair(page, name) then return false end
         end
         for _, row in ipairs(page.rows) do
@@ -344,18 +344,14 @@ do
     Check(imaged.account.rxpArrowSize == nil, "the default is stored as nothing")
 
     local font, text = Pair(e, "Use Addon Font")
-    local dividers, bars = Pair(e, "Quest List Dividers")
-    Check(font and text and dividers and bars and font.type == "toggle" and text.type == "toggle"
-        and dividers.type == "toggle" and bars.type == "toggle", "four more switches")
-    Check(text.text == "Use Theme Text Color" and bars.text == "Themed Title Bar and Footer", "named for what they do")
-    Check(font.getValue() == true and text.getValue() == true and dividers.getValue() == true and bars.getValue() == true,
-        "all on by default")
-    Check(font.disabled == nil and text.disabled == nil and dividers.disabled == nil and bars.disabled == nil, "and never greyed out")
+    Check(font and text and font.type == "toggle" and text.type == "toggle", "two more switches, in one row")
+    Check(text.text == "Use Theme Text Color", "named for what they do")
+    Check(font.getValue() == true and text.getValue() == true, "both on by default")
+    Check(font.disabled == nil and text.disabled == nil, "and never greyed out")
     for _, word in ipairs({ "Addon Font", "Takes effect after a /reload" }) do
         Check(font.tooltip:find(word, 1, true), "the font tooltip mentions " .. word)
     end
     Check(text.tooltip:find("Takes effect after a /reload", 1, true), "so does the text color's")
-    Check(not dividers.tooltip:find("/reload", 1, true) and not bars.tooltip:find("/reload", 1, true), "the live ones do not")
 
     local fp = Page({ rxpThemes = true }, true)
     local fpFont, fpText = Pair(fp, "Use Addon Font")
@@ -371,16 +367,6 @@ do
     tp.build()
     Check(tp.account.rxpTextColor == false and tp.account.rxpFont == nil and tpText.getValue() == false and tpFont.getValue() == true
         and tp.refreshes == 1 and #tp.notes == 1 and tp.notes[1] == RXP_HINT, "the text color alone: the same")
-    local dp = Page({ rxpThemes = true }, true)
-    local dpDividers, dpBars = Pair(dp, "Quest List Dividers")
-    dpDividers.setValue(false)
-    dp.build()
-    Check(dp.account.rxpDividers == false and dp.account.rxpBars == nil and dpDividers.getValue() == false and dpBars.getValue() == true
-        and dp.refreshes == 0 and #dp.notes == 0, "the dividers alone: stored, applied at once, no reload hint")
-    dpBars.setValue(false)
-    dp.build()
-    Check(dp.account.rxpBars == false and dpBars.getValue() == false and dp.refreshes == 0 and #dp.notes == 0,
-        "the title bar alone: the same")
 
     local both = Page({ rxpThemes = true }, true)
     both.theme.setValue("crimson")
@@ -404,10 +390,10 @@ do
     Check(Toggle(custom) and #custom.rows == plain + 1, "with Custom and the themes off, RestedXP adds the one toggle row")
     Check(custom.rows[#custom.rows][1].text == "Add Themes to RestedXP", "and it is the last, above the Reload button")
     local onCustom = Page({ themePreset = "custom", rxpThemes = true }, true)
-    Check(#onCustom.rows == plain + 3, "with the themes on, RestedXP adds three rows: the toggle, the font and text, the dividers and bars")
-    Check(onCustom.rows[#onCustom.rows][1].text == "Quest List Dividers", "and the dividers row is the last, above the Reload button")
+    Check(#onCustom.rows == plain + 2, "with the themes on, RestedXP adds two rows: the toggle, and the font and text")
+    Check(onCustom.rows[#onCustom.rows][1].text == "Use Addon Font", "and the font row is the last, above the Reload button")
     local onImage = Page({ themePreset = "custom", rxpThemes = true, rxpArrow = "image" }, true)
-    Check(#onImage.rows == plain + 5, "with Naowh arrow picked, two more: the shape and glow, and the size")
+    Check(#onImage.rows == plain + 4, "with Naowh arrow picked, two more: the shape and glow, and the size")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

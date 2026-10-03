@@ -47,7 +47,7 @@ local LAYER_STRENGTH = 0.9
 -------------------------------------------------------------------------------
 --  Settings
 -------------------------------------------------------------------------------
-local PaintArrow, PaintBars, PaintRules   -- defined below; a change repaints at once
+local PaintArrow   -- defined below; a change repaints at once
 
 ---@return boolean
 function ns.RXPThemesAvailable()
@@ -85,24 +85,6 @@ function ns.RXPTextColorEnabled() return Wanted("rxpTextColor") end
 
 ---@param on boolean
 function ns.SetRXPTextColor(on) Want("rxpTextColor", on) end
-
----@return boolean
-function ns.RXPDividersEnabled() return Wanted("rxpDividers") end
-
----@param on boolean
-function ns.SetRXPDividers(on)
-    Want("rxpDividers", on)
-    PaintRules()
-end
-
----@return boolean
-function ns.RXPBarsEnabled() return Wanted("rxpBars") end
-
----@param on boolean
-function ns.SetRXPBars(on)
-    Want("rxpBars", on)
-    PaintBars()
-end
 
 ---@return string "layer", "image" or "off"
 function ns.RXPArrowStyle()
@@ -352,8 +334,8 @@ local function Banner(name)
     return type(banner) == "table" and banner or nil
 end
 
-function PaintBars()
-    local hide = ActiveTheme() ~= nil and ns.RXPBarsEnabled()
+local function PaintBars()
+    local hide = ActiveTheme() ~= nil
     if not hide and not barsHidden then return end
     for _, name in ipairs(BARS) do
         local banner = Banner(name)
@@ -371,17 +353,17 @@ local function HookBars()
 end
 
 -- The quest list: a rule at the bottom of each row. Rows are made when a guide loads, which ends in
--- SetStep, so that is watched; rules are redrawn only when the theme, the switch or the row count changes.
+-- SetStep, so that is watched; rules are redrawn only when the theme or the row count changes.
 local rules = setmetatable({}, { __mode = "k" })   -- row -> its rule
-local ruleTheme, ruleOn, ruleRows
+local ruleTheme, ruleRows
 
-function PaintRules()
+local function PaintRules()
     local list = Dig(_G.RXPFrame, "ScrollChild", "framePool")
     if type(list) ~= "table" then return end
-    local theme, on = ActiveTheme(), ns.RXPDividersEnabled()
-    if theme == ruleTheme and on == ruleOn and #list == ruleRows then return end
-    ruleTheme, ruleOn, ruleRows = theme, on, #list
-    local color = theme and on and theme.dividerColor
+    local theme = ActiveTheme()
+    if theme == ruleTheme and #list == ruleRows then return end
+    ruleTheme, ruleRows = theme, #list
+    local color = theme and theme.dividerColor
     if type(color) ~= "table" then color = nil end
     for _, row in ipairs(list) do
         local rule = rules[row]

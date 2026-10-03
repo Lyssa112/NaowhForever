@@ -663,24 +663,21 @@ function ns.BuildSettingsPage(parent, y)
     -- Only with RestedXP Guides installed. The choices mean nothing without the themes, so they wait for them.
     if ns.RXPThemesAvailable and ns.RXPThemesAvailable() then
         _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
-        -- reload: RestedXP reads it as it starts.
-        local function Switch(text, tooltip, get, set, reload)
-            return { type = "toggle", text = text,
-                tooltip = reload and (tooltip .. "|n|nTakes effect after a /reload.") or tooltip,
+        -- RestedXP reads these as it starts, so each one asks for a reload.
+        local function Switch(text, tooltip, get, set)
+            return { type = "toggle", text = text, tooltip = tooltip .. "|n|nTakes effect after a /reload.",
                 getValue = get,
                 setValue = function(v)
                     set(v)
-                    if reload then
-                        rxpPending = true
-                        UI:RefreshPage(true)
-                    end
+                    rxpPending = true
+                    UI:RefreshPage(true)
                 end }
         end
         local themesSwitch = Switch("Add Themes to RestedXP",
             "Adds NaowhUI and the eight Naowh themes to RestedXP Guides' theme list, in their colors and "
             .. "your Addon Font, with RestedXP's own frames, and colors its waypoint arrow in the theme's "
             .. "Accent. Pick one in RestedXP's Look and Feel settings.",
-            ns.RXPThemesEnabled, ns.SetRXPThemes, true)
+            ns.RXPThemesEnabled, ns.SetRXPThemes)
         if not ns.RXPThemesEnabled() then
             _, h = W:DualRow(parent, y, themesSwitch, { type = "label", text = "" }); y = y - h
         else
@@ -726,20 +723,10 @@ function ns.BuildSettingsPage(parent, y)
                 Switch("Use Addon Font",
                     "Draws RestedXP's guide text, title bar and arrow text in the Addon Font from FONT "
                     .. "above. Off keeps RestedXP's own font.",
-                    ns.RXPFontEnabled, ns.SetRXPFont, true),
+                    ns.RXPFontEnabled, ns.SetRXPFont),
                 Switch("Use Theme Text Color",
                     "Draws RestedXP's text in the theme's Text color. Off keeps RestedXP's own white.",
-                    ns.RXPTextColorEnabled, ns.SetRXPTextColor, true)
-            ); y = y - h
-            _, h = W:DualRow(parent, y,
-                Switch("Quest List Dividers",
-                    "A thin line between the rows of RestedXP's quest list, in the theme's Borders & Lines "
-                    .. "color, like the lines between the rows in this window.",
-                    ns.RXPDividersEnabled, ns.SetRXPDividers),
-                Switch("Themed Title Bar and Footer",
-                    "Shows the theme's Background in RestedXP's title bar and footer instead of its black "
-                    .. "banner.",
-                    ns.RXPBarsEnabled, ns.SetRXPBars)
+                    ns.RXPTextColorEnabled, ns.SetRXPTextColor)
             ); y = y - h
         end
         if rxpPending then
