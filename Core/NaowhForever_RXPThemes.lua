@@ -261,10 +261,12 @@ local function HookBars()
 end
 
 -- The classic window's quest list is rows with no line between them. With the rows the same dark as
--- the gaps they would run together, so while one of ours is the active theme each row gets a 1px rule
--- at its bottom, like the rules between the rows of Naowh's own lists. The rows are made when a guide
--- loads, and that ends in SetStep, so SetStep is watched; the rules are drawn again only when the theme
--- or the number of rows has changed.
+-- the gaps they would run together, so while one of ours is the active theme each row gets a 1px rule,
+-- like the rules between the rows of Naowh's own lists. A row's text sits near its top, and the next row
+-- starts 3 below it, so the rule is drawn at the far edge of that gap: that is about halfway between the
+-- text above and the text below. The rows are made when a guide loads, and that ends in SetStep, so
+-- SetStep is watched; the rules are drawn again only when the theme or the number of rows has changed.
+local RULE_DROP = 3
 local rules = setmetatable({}, { __mode = "k" })   -- row -> its rule
 local ruleTheme, ruleRows   -- what the rules were last drawn for
 
@@ -282,8 +284,8 @@ local function PaintRules()
         local rule = rules[row]
         if color and not rule and type(row) == "table" and type(row.CreateTexture) == "function" then
             rule = row:CreateTexture(nil, "ARTWORK")
-            rule:SetPoint("BOTTOMLEFT")
-            rule:SetPoint("BOTTOMRIGHT")
+            rule:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, -RULE_DROP)
+            rule:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, -RULE_DROP)
             rule:SetHeight(1)
             rules[row] = rule
         end

@@ -462,13 +462,13 @@ do
 end
 
 -- The classic window's quest list: rows with no line between them. While one of ours is the active theme
--- each row gets a 1px rule at its bottom, in Borders & Lines at 60% like Naowh's own lists; with any other
--- theme there are none. The rows are made when a guide loads, which ends in SetStep.
+-- each row gets a 1px rule in the 3px gap below it, in Borders & Lines at 60% like Naowh's own lists; with
+-- any other theme there are none. The rows are made when a guide loads, which ends in SetStep.
 do
     -- a texture that records what the module asks of it
     local function Rule(layer)
         local t = { layer = layer, points = {}, paints = 0, hides = 0 }
-        function t:SetPoint(point) self.points[#self.points + 1] = point end
+        function t:SetPoint(...) self.points[#self.points + 1] = { ... } end
         function t:SetHeight(height) self.height = height end
         function t:SetColorTexture(...) self.rgba = { ... }; self.paints = self.paints + 1 end
         function t:Show() self.shown = true end
@@ -508,8 +508,12 @@ do
     Check(#env.hooked == 1 and Hook(env), "SetStep is hooked")
     for i, row in ipairs(pool) do
         local rule = row.textures[1]
-        Check(#row.textures == 1 and rule.layer == "ARTWORK" and rule.height == 1 and rule.shown == true
-            and Same(rule.points, { "BOTTOMLEFT", "BOTTOMRIGHT" }), "row " .. i .. ": a 1px rule along its bottom")
+        Check(#row.textures == 1 and rule.layer == "ARTWORK" and rule.height == 1 and rule.shown == true,
+            "row " .. i .. ": one 1px rule, shown")
+        local left, right = rule.points[1], rule.points[2]
+        Check(#rule.points == 2 and left[1] == "BOTTOMLEFT" and left[2] == row and left[3] == "BOTTOMLEFT" and left[4] == 0
+            and left[5] == -3 and right[1] == "BOTTOMRIGHT" and right[2] == row and right[3] == "BOTTOMRIGHT"
+            and right[4] == 0 and right[5] == -3, "row " .. i .. ": along the far edge of the 3px gap below the row")
         Check(Hex(rule.rgba) == "3d2429" and rule.rgba[4] == 0.6, "row " .. i .. ": Crimson's Borders & Lines at 60%")
     end
 
