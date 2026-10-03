@@ -24,17 +24,37 @@ end
 -- installed: whether RestedXP Guides exists. existing: what another addon already put in the table.
 local function Load(account, installed, existing)
     local frames = {}
-    local function NewFrame()
-        local f = { events = {} }
+    -- A texture or a mask: it records what the module asks of it.
+    local function Region()
+        local r = {}
+        function r:SetAllPoints() self.allPoints = true end
+        function r:SetColorTexture(...) self.rgba = { ... } end
+        function r:SetGradient(orientation, low, high) self.gradient = { orientation, low, high } end
+        function r:SetBlendMode(mode) self.blend = mode end
+        function r:AddMaskTexture(mask) self.masks = self.masks or {}; self.masks[#self.masks + 1] = mask end
+        function r:SetTexture(path, wrapH, wrapV) self.path, self.wrapH, self.wrapV = path, wrapH, wrapV end
+        function r:SetRotation(radians) self.rotation = radians end
+        return r
+    end
+    local function NewFrame(_, _, parent)
+        local f = { events = {}, parent = parent }
         setmetatable(f, { __index = function() return function() end end })
         function f:SetScript(name, fn) self[name] = fn end
         function f:RegisterEvent(e) self.events[e] = true end
         function f:UnregisterEvent(e) self.events[e] = nil end
         function f:UnregisterAllEvents() self.events = {} end
+        function f:SetFrameLevel(level) self.level = level end
+        function f:CreateTexture() self.colorRegion = Region(); return self.colorRegion end
+        function f:CreateMaskTexture() self.maskRegion = Region(); return self.maskRegion end
+        function f:Show() self.shown = true end
+        function f:Hide() self.shown = false end
         frames[#frames + 1] = f
         return f
     end
-    local env = { CreateFrame = NewFrame, RXPGuides_Themes = existing,
+    local hooked = {}
+    local env = { CreateFrame = NewFrame, RXPGuides_Themes = existing, hooked = hooked,
+        CreateColor = function(r, g, b, a) return { r, g, b, a } end,
+        hooksecurefunc = function(tbl, name, fn) hooked[#hooked + 1] = { tbl, name, fn } end,
         C_AddOns = { DoesAddOnExist = function(name) return installed and name == "RXPGuides" end },
         NaowhForeverDB = { account = account, profiles = {}, charActive = {} } }
     env._G = env
@@ -55,6 +75,10 @@ local function Fire(frames, name)
     for _, f in ipairs(frames) do
         if f.events.ADDON_LOADED and f.OnEvent then f.OnEvent(f, "ADDON_LOADED", name) end
     end
+end
+-- Only the module's own frame: Core has login work of its own, which is not under test.
+local function Login(boot)
+    if boot.events.PLAYER_LOGIN and boot.OnEvent then boot.OnEvent(boot, "PLAYER_LOGIN") end
 end
 local function Count(t)
     local n = 0
@@ -92,7 +116,9 @@ do
     Fire(frames, "NaowhForever")
     local list = env.RXPGuides_Themes
     Check(type(list) == "table" and Count(list) == 9, "nine themes are registered")
-    Check(next(boot.events) == nil, "and the event is unregistered")
+    Check(boot.events.PLAYER_LOGIN and not boot.events.ADDON_LOADED, "then it waits for login, for the arrow")
+    Login(boot)
+    Check(next(boot.events) == nil, "and is unregistered after login")
     local seen = {}
     for _, key in ipairs(KEYS) do
         local theme = list[NameOf(key)]
@@ -148,6 +174,124 @@ do
             "NaowhUI is still the default theme's colors")
         Check(Hex(list["NaowhForever:crimson"].mapPins) == "ef4b56", "Crimson is still Crimson")
     end
+end
+
+-- The waypoint arrow: while one of our themes is the active one, a layer of its Accent lies over
+-- RestedXP's arrow (clipped to the arrow's own image, turning with it); RestedXP's image is never
+-- touched, and with any other theme there is no layer.
+do
+    local IMAGE = "Interface/AddOns/RXPGuides/Textures/DarkMode/rxp_navigation_arrow-1"
+    local function Arrow()
+        local a = { orientation = 1.25 }
+        a.texture = { path = IMAGE }
+        function a.texture:GetTexture() return self.path end
+        function a.texture:SetRotation() end   -- RestedXP's own call, which the hook follows
+        function a:GetFrameLevel() return 3 end
+        function a.UpdateVisuals() end
+        return a
+    end
+    local function Start(account, active)
+        local env, _, frames, boot = Load(account, true)
+        env.RXPG_ARROW = Arrow()
+        Fire(frames, "NaowhForever")
+        local list = env.RXPGuides_Themes
+        env.RXP = { activeTheme = active and list[active] or { name = "RXP Blue" } }
+        return env, frames, boot, list
+    end
+    local function Layers(frames, arrow)
+        local out = {}
+        for _, f in ipairs(frames) do
+            if f.parent == arrow then out[#out + 1] = f end
+        end
+        return out
+    end
+
+    -- one of ours is active at login: hooked, and the layer is built and painted at once
+    local env, frames, boot, list = Start({ rxpThemes = true }, "NaowhForever:rosenoir")
+    local arrow = env.RXPG_ARROW
+    Check(#env.hooked == 0 and #Layers(frames, arrow) == 0, "nothing is hooked or built before login")
+    Login(boot)
+    Check(#env.hooked == 2 and env.hooked[1][1] == arrow and env.hooked[1][2] == "UpdateVisuals",
+        "RestedXP's UpdateVisuals is hooked")
+    Check(env.hooked[2][1] == arrow.texture and env.hooked[2][2] == "SetRotation", "and so is its arrow's SetRotation")
+    local layers = Layers(frames, arrow)
+    Check(#layers == 1, "one layer, a child of the arrow")
+    local layer = layers[1]
+    Check(layer.level == 4 and layer.shown == true, "above the arrow, and shown")
+    local color, mask = layer.colorRegion, layer.maskRegion
+    Check(color.blend == "ADD" and Same(color.rgba, { 1, 1, 1, 1 }), "an added layer, white until its gradient colors it")
+    -- The Accent, lighter at the top and deeper at the bottom, at 90% strength.
+    local function Close(got, want)
+        for i = 1, 4 do if math.abs(got[i] - want[i]) > 1e-9 then return false end end
+        return true
+    end
+    local function Gradient(accent)
+        return { accent[1] * 0.72, accent[2] * 0.72, accent[3] * 0.72, 0.9 },
+            { accent[1] + (1 - accent[1]) * 0.22, accent[2] + (1 - accent[2]) * 0.22,
+              accent[3] + (1 - accent[3]) * 0.22, 0.9 }
+    end
+    local deep, light = Gradient(list["NaowhForever:rosenoir"].mapPins)
+    Check(color.gradient[1] == "VERTICAL" and Close(color.gradient[2], deep) and Close(color.gradient[3], light),
+        "Rose Noir's Accent, deeper at the bottom and lighter at the top")
+    Check(Hex(color.gradient[2]) == "b84475" and Hex(color.gradient[3]) == "ff82b6", "and those are the colors, pinned")
+    Check(color.masks and color.masks[1] == mask, "clipped by the mask")
+    Check(mask.path == IMAGE and mask.wrapH == "CLAMPTOBLACKADDITIVE" and mask.wrapV == "CLAMPTOBLACKADDITIVE",
+        "the mask is the arrow's own image")
+    Check(mask.rotation == 1.25, "turned the way the arrow is")
+    env.hooked[2][3](arrow.texture, 0.5)
+    Check(mask.rotation == 0.5, "and it turns with the arrow")
+    Check(arrow.texture.path == IMAGE, "RestedXP's own image is untouched")
+
+    -- RestedXP sets its image again when its theme changes, and the hook runs after it
+    env.RXP.activeTheme = { name = "DarkMode" }
+    env.hooked[1][3](arrow)
+    Check(layer.shown == false and #Layers(frames, arrow) == 1, "a theme of RestedXP's: the layer is hidden, not rebuilt")
+    env.RXP.activeTheme = list["NaowhForever:midnight"]
+    arrow.texture.path = "Interface/AddOns/RXPGuides/Textures/Other/rxp_navigation_arrow-1"
+    env.hooked[1][3](arrow)
+    deep, light = Gradient(list["NaowhForever:midnight"].mapPins)
+    Check(layer.shown == true and Close(color.gradient[2], deep) and Close(color.gradient[3], light)
+        and mask.path == arrow.texture.path and #Layers(frames, arrow) == 1,
+        "back to one of ours: shown, in Midnight's Accent, from the arrow's image of the moment")
+
+    -- RestedXP's own theme at login: hooked, but no layer is ever built
+    env, frames, boot = Start({ rxpThemes = true }, nil)
+    Login(boot)
+    Check(#env.hooked == 1 and #Layers(frames, env.RXPG_ARROW) == 0, "RestedXP's own theme: no layer is built")
+    env.RXP.activeTheme = { name = "xNaowhForever:default", mapPins = { 1, 0, 0, 1 } }
+    env.hooked[1][3]()
+    Check(#Layers(frames, env.RXPG_ARROW) == 0, "only a name that starts with ours counts")
+
+    -- off: no login event, nothing hooked
+    local off, _, offBoot = Start({}, nil)
+    Check(next(offBoot.events) == nil and #off.hooked == 0, "off: no event left, nothing hooked")
+    Login(offBoot)
+    Check(#off.hooked == 0, "off: login does nothing")
+
+    -- RestedXP without the pieces: no error, and nothing built
+    local e2, _, f2, b2 = Load({ rxpThemes = true }, true)
+    Fire(f2, "NaowhForever"); Login(b2)
+    Check(#e2.hooked == 0 and next(b2.events) == nil, "no arrow frame: nothing to do")
+    e2, _, f2, b2 = Load({ rxpThemes = true }, true)
+    e2.RXPG_ARROW = { UpdateVisuals = function() end }
+    Fire(f2, "NaowhForever"); Login(b2)
+    Check(#e2.hooked == 0, "no arrow texture: nothing is hooked")
+    e2, _, f2, b2 = Load({ rxpThemes = true }, true)
+    e2.RXPG_ARROW = Arrow()
+    Fire(f2, "NaowhForever"); Login(b2)
+    Check(#e2.hooked == 1 and #Layers(f2, e2.RXPG_ARROW) == 0, "no RXP table: hooked, and nothing built")
+    e2, _, f2, b2 = Load({ rxpThemes = true }, true)
+    local fixed = Arrow()
+    fixed.texture.SetRotation = nil
+    e2.RXPG_ARROW = fixed
+    Fire(f2, "NaowhForever")
+    e2.RXP = { activeTheme = e2.RXPGuides_Themes["NaowhForever:default"] }
+    Login(b2)
+    Check(#e2.hooked == 1 and #Layers(f2, fixed) == 0, "an arrow that cannot be turned: no layer")
+    e2, _, f2, b2 = Load({ rxpThemes = true }, false)
+    e2.RXPG_ARROW = Arrow()
+    Fire(f2, "NaowhForever"); Login(b2)
+    Check(#e2.hooked == 0, "RestedXP not installed: nothing is hooked")
 end
 
 -- The setting.

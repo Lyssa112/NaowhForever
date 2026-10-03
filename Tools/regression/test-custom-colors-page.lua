@@ -268,7 +268,7 @@ do
     local toggle = Toggle(e)
     Check(toggle and toggle.type == "toggle", "the toggle is there with RestedXP Guides installed")
     Check(toggle.getValue() == false and a.rxpThemes == nil, "off by default")
-    for _, word in ipairs({ "NaowhUI", "eight Naowh themes", "Look and Feel", "Takes effect after a /reload" }) do
+    for _, word in ipairs({ "NaowhUI", "eight Naowh themes", "waypoint arrow", "Look and Feel", "Takes effect after a /reload" }) do
         Check(toggle.tooltip:find(word, 1, true), "tooltip mentions " .. word)
     end
     Check(#e.notes == 0, "no hint before a change")
