@@ -339,10 +339,11 @@ def nav_arrow(wide, glow):
     # RestedXP's waypoint arrow, point up: a kite folded into four facets, with a dark edge and a thin
     # line inside it. Grey over white, so a vertex color tints it; the lightest part is the tint itself.
     # wide: the base 14% wider. glow: a soft halo around it (white alpha, so it takes the tint too), with
-    # the kite drawn 15% smaller to leave it room. Measured in units of a 97-unit-tall kite, y down from
-    # the tip, so the drawing can be compared with the design sketches.
+    # the kite drawn smaller to leave it room. Measured in units of a 97-unit-tall kite, y down from the
+    # tip, so the drawing can be compared with the design sketches.
     half = 49.0 if wide else 43.0              # how far the wing tips are from the middle
-    shrink = 0.85 if glow else 1.0
+    shrink = 0.76 if glow else 1.0
+    glow_reach, glow_peak = 22.0, 0.9          # how far the halo reaches, and how strong it is at the edge
     unit = 0.88 / 97.0                         # one unit, as a share of the canvas
 
     def canvas(px, py):
@@ -369,10 +370,9 @@ def nav_arrow(wide, glow):
         line = smooth(1.1, abs(polygon_dist(u, v, inner)) * size) * fill
         halo = 0.0
         if glow:
-            keep = 1.0
-            for reach, opacity in ((9, 0.12), (5.5, 0.22), (3, 0.4)):
-                keep *= 1 - opacity * smooth(reach * unit_px, d)
-            halo = 1 - keep
+            away = max(0.0, d) / (glow_reach * unit_px)   # 0 at the kite's edge, 1 where the halo ends
+            if away < 1.0:
+                halo = glow_peak * (1.0 - away) ** 1.6
         rgb, alpha = (255.0 if glow else 24.0), 0.0
         for color, cover in ((255.0, halo), (24.0, edge), (float(shade), fill), (255.0, line)):
             if cover <= 0:
