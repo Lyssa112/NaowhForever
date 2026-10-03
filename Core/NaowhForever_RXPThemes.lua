@@ -3,8 +3,8 @@
 --  RestedXP reads a global RXPGuides_Themes table once, while it starts, and registers every
 --  theme in it (its own RXPGuides_Themes addon fills the same table). The frames, borders and
 --  icons are RestedXP's own, already installed. Two things a theme cannot color are done here,
---  while one of these themes is the active one: the title bar and footer show the theme's Panels
---  color instead of a black banner image, and the waypoint arrow is drawn in the theme's Accent,
+--  while one of these themes is the active one: the title bar and footer show the theme's
+--  Background instead of a black banner image, and the waypoint arrow is drawn in the theme's Accent,
 --  by a layer over its image or by Naowh's own arrow image, as the player picks. Off unless
 --  Settings > COLORS turns it on.
 -------------------------------------------------------------------------------
@@ -72,17 +72,16 @@ local function Theme(key)
         name = NAME_PREFIX .. (key == "" and DEFAULT_KEY or key),
         displayName = preset and preset.name or DEFAULT_NAME,
         author = AUTHOR,
-        -- One step lighter than the addon's own windows: these frames sit over the game world, where
-        -- the darkest colors read as black.
-        background = Rgba(c.panel, 1),
-        bottomFrameBG = Rgba(c.line, 1),
+        -- As in the addon's own windows: the window is the Background, and the step frames on it are Panels.
+        background = Rgba(c.bg, 1),
+        bottomFrameBG = Rgba(c.panel, 1),
         bottomFrameHighlight = Rgba(c.accent, HIGHLIGHT_ALPHA),
         mapPins = Rgba(c.accent, 1),
         tooltip = "|cff" .. Hex(c.accent),
         textColor = { c.fg.r, c.fg.g, c.fg.b },
         texturePath = TEXTURES,
         -- The title bar and footer are a fill under a banner image, and RestedXP's blue theme gives them
-        -- no fill. With one, hiding the banner (below) shows the Panels color.
+        -- no fill. With one, hiding the banner (below) shows the Background color.
         bgTextures = { edge = WHITE, bottom = WHITE, guideName = WHITE },
         -- Left out, RestedXP would fill these in from its blue theme.
         edges = { edge = borders, guideName = borders },
@@ -226,7 +225,7 @@ end
 
 -- The classic window's title bar and footer are a fill under a banner image, which in the set these
 -- themes take their icons from is plain black. While one of ours is the active theme the image is
--- hidden and the fill shows: the theme's Panels color. RestedXP sets the image again whenever it
+-- hidden and the fill shows: the theme's Background. RestedXP sets the image again whenever it
 -- draws its theme, so that is watched, and with any other theme the image is left as it is.
 local BARS = { "GuideName", "Footer" }
 local barsHidden   -- the banner images are hidden by us

@@ -133,8 +133,8 @@ do
         seen[theme.name] = true
         Check(theme.displayName == NAMES[key] and theme.author == "Naowh Forever", key .. ": name and author")
         local p = ns.ThemePalette(key)   -- bg, panel, line, fg, muted, accent
-        Check(Same(theme.background, { p[2].r, p[2].g, p[2].b, 1 }), key .. ": the window is the Panels color")
-        Check(Same(theme.bottomFrameBG, { p[3].r, p[3].g, p[3].b, 1 }), key .. ": the step frames are the Borders & Lines color")
+        Check(Same(theme.background, { p[1].r, p[1].g, p[1].b, 1 }), key .. ": the window is the Background color")
+        Check(Same(theme.bottomFrameBG, { p[2].r, p[2].g, p[2].b, 1 }), key .. ": the step frames are the Panels color")
         Check(Same(theme.bottomFrameHighlight, { p[6].r, p[6].g, p[6].b, 0.5 }), key .. ": the Accent at half opacity")
         Check(Same(theme.mapPins, { p[6].r, p[6].g, p[6].b, 1 }), key .. ": map pins in the Accent")
         Check(Same(theme.textColor, { p[4].r, p[4].g, p[4].b }), key .. ": Text")
@@ -153,10 +153,10 @@ do
 
     -- The values themselves, pinned: a wrong mapping cannot hide behind re-deriving it.
     local default, midnight = list["NaowhForever:default"], list["NaowhForever:midnight"]
-    Check(Hex(default.background) == "1a1c1f" and Hex(default.bottomFrameBG) == "2e3136", "NaowhUI: Panels and Borders & Lines")
+    Check(Hex(default.background) == "0e0f11" and Hex(default.bottomFrameBG) == "1a1c1f", "NaowhUI: Background and Panels")
     Check(Hex(default.mapPins) == "0091ed" and default.tooltip == "|cff0091ed", "NaowhUI: the blue Accent")
     Check(Hex(default.textColor) == "f0f1f3", "NaowhUI: Text")
-    Check(Hex(midnight.background) == "151c30" and Hex(midnight.mapPins) == "5b8cff", "Midnight: Panels and Accent")
+    Check(Hex(midnight.background) == "0b1020" and Hex(midnight.mapPins) == "5b8cff", "Midnight: Background and Accent")
 end
 
 -- Another addon's themes stay, and the same table is used.
@@ -180,7 +180,7 @@ do
         local list = env.RXPGuides_Themes
         Check(Count(list) == 9, "still nine themes")
         Check(ns.THEME.accent.r ~= 0 or ns.THEME.accent.g ~= 0x91 / 255, "the player's theme is applied to the addon itself")
-        Check(Hex(list["NaowhForever:default"].mapPins) == "0091ed" and Hex(list["NaowhForever:default"].background) == "1a1c1f",
+        Check(Hex(list["NaowhForever:default"].mapPins) == "0091ed" and Hex(list["NaowhForever:default"].background) == "0e0f11",
             "NaowhUI is still the default theme's colors")
         Check(Hex(list["NaowhForever:crimson"].mapPins) == "ef4b56", "Crimson is still Crimson")
     end
@@ -375,7 +375,7 @@ end
 
 -- The classic window's title bar and footer: a fill under a banner image, black in the set these themes
 -- take their icons from. While one of ours is the active theme the image is hidden, so the fill (the
--- theme's Panels color) shows; with any other theme the image is never touched.
+-- theme's Background) shows; with any other theme the image is never touched.
 do
     local function Banner()
         local b = { alphas = {} }
