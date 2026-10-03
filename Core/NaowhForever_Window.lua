@@ -681,14 +681,23 @@ function ns.BuildSettingsPage(parent, y)
             ns.RXPThemesEnabled, ns.SetRXPThemes)
         _, h = W:DualRow(parent, y, themesSwitch, { type = "label", text = "" }); y = y - h
         if ns.RXPThemesEnabled() then
+            local choices, choiceOrder = ns.RXPThemeChoices()
             _, h = W:DualRow(parent, y,
-                { type = "toggle", text = "Use Naowh (current) in RestedXP",
-                  tooltip = "Makes Naowh (current) RestedXP's theme and keeps it so at every login, so RestedXP "
-                  .. "follows the theme or Custom colors you pick here. Off leaves RestedXP on whichever "
-                  .. "theme it is set to. Needs Add Themes to RestedXP on and a reload before it can apply.",
+                { type = "toggle", text = "Use Current Theme for RestedXP",
+                  tooltip = "Makes Naowh (current), which follows the theme or Custom colors you pick here, "
+                  .. "RestedXP's theme at every login. Off lets you pick one of the other themes instead. "
+                  .. "Needs a reload after Add Themes to RestedXP before it can apply.",
                   getValue = ns.RXPAutoThemeEnabled,
-                  setValue = function(v) ns.SetRXPAutoTheme(v) end },
-                { type = "label", text = "" }
+                  setValue = function(v)
+                      ns.SetRXPAutoTheme(v)
+                      UI:RefreshPage(true)
+                  end },
+                ns.RXPAutoThemeEnabled() and { type = "label", text = "" }
+                or { type = "dropdown", text = "RestedXP Theme", values = choices, order = choiceOrder,
+                  tooltip = "The Naowh theme RestedXP is put on at every login. Leave as it is keeps whichever "
+                  .. "theme RestedXP is set to.",
+                  getValue = ns.RXPThemeChoice,
+                  setValue = function(v) ns.SetRXPThemeChoice(v) end }
             ); y = y - h
             local image = ns.RXPArrowStyle() == "image"
             _, h = W:DualRow(parent, y,

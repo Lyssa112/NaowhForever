@@ -275,7 +275,7 @@ do
         end
     end
     local function Hidden(page)
-        for _, name in ipairs({ "Use Naowh (current) in RestedXP", "RestedXP Arrow", "Naowh Arrow Shape", "Naowh Arrow Glow", "Naowh Arrow Size", "Show Arrow Text", "Naowh Arrow Text Gap", "Use Addon Font",
+        for _, name in ipairs({ "Use Current Theme for RestedXP", "RestedXP Theme", "RestedXP Arrow", "Naowh Arrow Shape", "Naowh Arrow Glow", "Naowh Arrow Size", "Show Arrow Text", "Naowh Arrow Text Gap", "Use Addon Font",
                 "Use Theme Text Color" }) do
             for _, row in ipairs(page.rows) do
                 if row[1].text == name or (row[2] and row[2].text == name) then return false end
@@ -316,18 +316,29 @@ do
     Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == RXP_HINT, "it reads back, and the RestedXP reload hint shows")
     Check(not Hidden(e), "and the choices are shown")
 
-    Check(Layout(e) == "Add Themes to RestedXP|, Use Naowh (current) in RestedXP|, RestedXP Arrow|, Show Arrow Text|, "
+    Check(Layout(e) == "Add Themes to RestedXP|, Use Current Theme for RestedXP|RestedXP Theme, RestedXP Arrow|, Show Arrow Text|, "
         .. "Use Addon Font|Use Theme Text Color",
         "with the themes on: the toggle, the automatic theme, the arrow choice, the arrow text, and the font and text color")
-    local auto, autoSide = Pair(e, "Use Naowh (current) in RestedXP")
-    Check(auto and auto.type == "toggle" and autoSide.type == "label" and autoSide.text == "", "the automatic theme is a switch of its own, below the toggle")
-    Check(auto.getValue() == false and e.account.rxpAutoTheme == nil, "off by default")
-    Check(auto.tooltip:find("Naowh (current)", 1, true) and auto.tooltip:find("every login", 1, true), "its tooltip says what it does")
+    local auto, picker = Pair(e, "Use Current Theme for RestedXP")
+    Check(auto and auto.type == "toggle" and picker.type == "dropdown" and picker.text == "RestedXP Theme",
+        "the current theme is a switch below the toggle, with a dropdown for the other themes beside it")
+    Check(auto.getValue() == false and e.account.rxpAutoTheme == nil and picker.getValue() == "", "both off by default")
+    Check(auto.tooltip:find("Naowh (current)", 1, true) and auto.tooltip:find("every login", 1, true), "the switch's tooltip says what it does")
+    Check(#picker.order == 10 and picker.order[1] == "" and picker.values[""] == "Leave as it is" and picker.values.default == "NaowhUI"
+        and picker.values.crimson == "Crimson", "the dropdown: leave as it is, NaowhUI and the eight presets")
+    Check(picker.disabled == nil, "never greyed out: it is not shown when it does not apply")
     local refreshesBefore = e.refreshes
+    picker.setValue("crimson")
+    Check(e.account.rxpTheme == "crimson" and picker.getValue() == "crimson" and e.refreshes == refreshesBefore,
+        "a pick is stored, and the page is not redrawn")
+    picker.setValue("")
+    Check(e.account.rxpTheme == nil, "Leave as it is clears it")
     auto.setValue(true)
-    Check(e.account.rxpAutoTheme == true and auto.getValue() == true and e.refreshes == refreshesBefore, "on is stored, and the page is not redrawn")
+    Check(e.account.rxpAutoTheme == true and e.refreshes == refreshesBefore + 1, "the switch on is stored, and the page redraws")
     auto.setValue(false)
-    Check(e.account.rxpAutoTheme == nil, "off clears it")
+    local lit = Page({ rxpThemes = true, rxpAutoTheme = true }, true)
+    local litAuto, litSide = Pair(lit, "Use Current Theme for RestedXP")
+    Check(litAuto.getValue() == true and litSide.type == "label" and litSide.text == "", "with the switch on, the dropdown is not shown")
     local arrow, noShape = Pair(e, "RestedXP Arrow")
     Check(arrow and arrow.type == "dropdown" and noShape.type == "label" and noShape.text == "",
         "the arrow choice is the next row, with nothing beside it until Naowh arrow is picked")
@@ -344,7 +355,7 @@ do
     Check(Pair(e, "Naowh Arrow Shape") == nil and Pair(e, "Naowh Arrow Size") == nil,
         "with the layer as the arrow style, the choices for Naowh's arrow are not shown")
     local imaged = Page({ rxpThemes = true, rxpArrow = "image" }, true)
-    Check(Layout(imaged) == "Add Themes to RestedXP|, Use Naowh (current) in RestedXP|, RestedXP Arrow|Naowh Arrow Shape, Naowh Arrow Glow|Naowh Arrow Size, "
+    Check(Layout(imaged) == "Add Themes to RestedXP|, Use Current Theme for RestedXP|RestedXP Theme, RestedXP Arrow|Naowh Arrow Shape, Naowh Arrow Glow|Naowh Arrow Size, "
         .. "Show Arrow Text|Naowh Arrow Text Gap, Use Addon Font|Use Theme Text Color",
         "with Naowh arrow picked: the arrow and its shape, its glow and size, the arrow text and its gap, then the font and text color")
     local _, shape = Pair(imaged, "RestedXP Arrow")

@@ -51,7 +51,7 @@ local LAYER_STRENGTH = 0.9
 -------------------------------------------------------------------------------
 --  Settings
 -------------------------------------------------------------------------------
-local PaintArrow, UseCurrentTheme   -- defined below; a change applies at once
+local PaintArrow, ApplyTheme   -- defined below; a change applies at once
 
 ---@return boolean
 function ns.RXPThemesAvailable()
@@ -76,7 +76,35 @@ end
 ---@param on boolean
 function ns.SetRXPAutoTheme(on)
     ns.AccountSettings().rxpAutoTheme = on and true or nil
-    if on then UseCurrentTheme() end
+    ApplyTheme()
+end
+
+-- Without the current theme, the player can pick one of the others: the default's and the presets'.
+---@return table values by id
+---@return table order
+function ns.RXPThemeChoices()
+    local values, order = { [""] = "Leave as it is", [DEFAULT_KEY] = DEFAULT_NAME }, { "", DEFAULT_KEY }
+    for _, key in ipairs(ns.THEME_PRESET_ORDER) do
+        values[key] = ns.THEME_PRESETS[key].name
+        order[#order + 1] = key
+    end
+    return values, order
+end
+
+local function ThemeId(key)
+    return key == DEFAULT_KEY or (type(key) == "string" and ns.THEME_PRESETS[key] ~= nil)
+end
+
+---@return string "" or a theme's id
+function ns.RXPThemeChoice()
+    local key = ns.AccountSettings().rxpTheme
+    return ThemeId(key) and key or ""
+end
+
+---@param key string
+function ns.SetRXPThemeChoice(key)
+    ns.AccountSettings().rxpTheme = ThemeId(key) and key or nil
+    ApplyTheme()
 end
 
 -- On unless saved as false.
@@ -260,13 +288,20 @@ local function Dig(t, ...)
     return t
 end
 
--- Naowh (current) as RestedXP's theme, through its own theme reload (which only runs with its live
--- reload setting on, so that is on for the call).
-function UseCurrentTheme()
+-- The theme the player wants RestedXP on: Naowh (current), else the one picked, else none.
+local function WantedTheme()
+    if ns.RXPAutoThemeEnabled() then return NAME_PREFIX .. CURRENT_KEY end
+    local key = ns.RXPThemeChoice()
+    return key ~= "" and NAME_PREFIX .. key or nil
+end
+
+-- RestedXP on that theme, through its own theme reload (which only runs with its live reload setting
+-- on, so that is on for the call).
+function ApplyTheme()
     local rxp = _G.RXP
     local profile = Dig(rxp, "settings", "profile")
-    local name = NAME_PREFIX .. CURRENT_KEY
-    if type(profile) ~= "table" or type(rxp.ReloadTheme) ~= "function" or not Dig(rxp, "themes", name)
+    local name = WantedTheme()
+    if not name or type(profile) ~= "table" or type(rxp.ReloadTheme) ~= "function" or not Dig(rxp, "themes", name)
             or profile.activeTheme == name then
         return
     end
@@ -491,7 +526,7 @@ boot:SetScript("OnEvent", function(self, event, name)
         end
     else
         self:UnregisterAllEvents()
-        if ns.RXPAutoThemeEnabled() then UseCurrentTheme() end
+        ApplyTheme()
         HookArrow()
         HookBars()
         HookRules()
