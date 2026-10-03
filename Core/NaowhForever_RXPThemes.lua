@@ -72,9 +72,9 @@ local function Theme(key)
         name = NAME_PREFIX .. (key == "" and DEFAULT_KEY or key),
         displayName = preset and preset.name or DEFAULT_NAME,
         author = AUTHOR,
-        -- As in the addon's own windows: the window is the Background, and the step frames on it are Panels.
+        -- The window, and the step frames on it, are the Background, as in the addon's own windows.
         background = Rgba(c.bg, 1),
-        bottomFrameBG = Rgba(c.panel, 1),
+        bottomFrameBG = Rgba(c.bg, 1),
         bottomFrameHighlight = Rgba(c.accent, HIGHLIGHT_ALPHA),
         mapPins = Rgba(c.accent, 1),
         tooltip = "|cff" .. Hex(c.accent),
