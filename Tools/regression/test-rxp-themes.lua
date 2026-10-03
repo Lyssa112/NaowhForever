@@ -239,6 +239,92 @@ do
     Check(plain.font == nil and plain.textColor == nil, "the font and the text color switches are honored here too")
 end
 
+-- Naowh (current) as RestedXP's theme, picked for the player.
+do
+    local CURRENT = "NaowhForever:current"
+    -- RestedXP as far as this needs it: the settings, the registered themes, and a theme reload that reports
+    -- what the live reload setting and the active theme were while it ran.
+    local function Rxp(active, registered, live)
+        local rxp = { settings = { profile = { activeTheme = active, enableThemeLiveReload = live } }, reloads = {},
+            themes = registered and { [CURRENT] = {} } or {} }
+        function rxp:ReloadTheme()
+            local profile = self.settings.profile
+            self.reloads[#self.reloads + 1] = { live = profile.enableThemeLiveReload, active = profile.activeTheme }
+        end
+        return rxp
+    end
+    local function Session(account, rxp)
+        local env, ns, frames, boot = Load(account, true)
+        Fire(frames, "NaowhForever")
+        env.RXP = rxp
+        return env, ns, boot
+    end
+
+    local account = {}
+    local _, ns = Load(account, true)
+    Check(ns.RXPAutoThemeEnabled() == false and account.rxpAutoTheme == nil, "off by default")
+    ns.SetRXPAutoTheme(true)
+    Check(account.rxpAutoTheme == true and ns.RXPAutoThemeEnabled() == true, "on is stored")
+    ns.SetRXPAutoTheme(false)
+    Check(account.rxpAutoTheme == nil, "off clears it")
+    account.rxpAutoTheme = "yes"
+    Check(ns.RXPAutoThemeEnabled() == false, "only true turns it on")
+
+    -- off: RestedXP's own choice is left alone
+    local rxp = Rxp("RXP Blue", true, false)
+    local _, _, boot = Session({ rxpThemes = true }, rxp)
+    Login(boot)
+    Check(rxp.settings.profile.activeTheme == "RXP Blue" and #rxp.reloads == 0, "off: RestedXP keeps its own theme at login")
+
+    -- on: at login the theme is picked through RestedXP's own reload, with the live reload setting on for it only
+    rxp = Rxp("RXP Blue", true, false)
+    _, _, boot = Session({ rxpThemes = true, rxpAutoTheme = true }, rxp)
+    Login(boot)
+    Check(rxp.settings.profile.activeTheme == CURRENT and #rxp.reloads == 1, "on: Naowh (current) is picked at login, with one reload")
+    Check(rxp.reloads[1].live == true and rxp.reloads[1].active == CURRENT, "which saw the new theme and the live reload on")
+    Check(rxp.settings.profile.enableThemeLiveReload == false, "and the player's own live reload setting is back as it was")
+    rxp = Rxp("RXP Blue", true, true)
+    _, _, boot = Session({ rxpThemes = true, rxpAutoTheme = true }, rxp)
+    Login(boot)
+    Check(rxp.settings.profile.enableThemeLiveReload == true, "a live reload setting that was on stays on")
+
+    -- already picked, or not there to pick: nothing to do
+    rxp = Rxp(CURRENT, true, false)
+    _, _, boot = Session({ rxpThemes = true, rxpAutoTheme = true }, rxp)
+    Login(boot)
+    Check(#rxp.reloads == 0, "already RestedXP's theme: no reload")
+    rxp = Rxp("RXP Blue", false, false)
+    _, _, boot = Session({ rxpThemes = true, rxpAutoTheme = true }, rxp)
+    Login(boot)
+    Check(rxp.settings.profile.activeTheme == "RXP Blue" and #rxp.reloads == 0, "the theme not registered with RestedXP: left alone")
+
+    -- switching it on in Settings applies at once when RestedXP has the theme
+    rxp = Rxp("RXP Blue", true, false)
+    local _, liveNs = Session({ rxpThemes = true }, rxp)
+    liveNs.SetRXPAutoTheme(true)
+    Check(rxp.settings.profile.activeTheme == CURRENT and #rxp.reloads == 1, "switched on in Settings: picked at once")
+    liveNs.SetRXPAutoTheme(false)
+    Check(rxp.settings.profile.activeTheme == CURRENT and #rxp.reloads == 1, "switched off: RestedXP is left on it until the player picks another")
+    rxp.settings.profile.activeTheme = "RXP Blue"
+    liveNs.SetRXPAutoTheme(true)
+    Check(rxp.settings.profile.activeTheme == CURRENT and #rxp.reloads == 2, "and on again: picked again")
+
+    -- missing pieces: no error
+    for _, broken in ipairs({ {}, { settings = {} }, { settings = { profile = {} }, themes = { [CURRENT] = {} } },
+            { settings = { profile = {} }, themes = {}, ReloadTheme = function() end } }) do
+        local _, brokenNs, brokenBoot = Session({ rxpThemes = true, rxpAutoTheme = true }, broken)
+        Login(brokenBoot)
+        brokenNs.SetRXPAutoTheme(true)
+    end
+    Check(true, "RestedXP without the settings, themes or reload: no error")
+    -- an error inside RestedXP's reload is not swallowed, and the live reload setting is still given back
+    rxp = Rxp("RXP Blue", true, false)
+    function rxp:ReloadTheme() error("boom") end
+    local _, failNs = Session({ rxpThemes = true }, rxp)
+    local ok = pcall(failNs.SetRXPAutoTheme, true)
+    Check(not ok and rxp.settings.profile.enableThemeLiveReload == false, "an error in RestedXP's reload is raised, with the setting given back")
+end
+
 -- The font and the text color.
 do
     local NAOWH = "Interface\\AddOns\\NaowhForever\\Media\\Fonts\\Naowh.ttf"

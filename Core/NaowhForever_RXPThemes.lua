@@ -51,7 +51,7 @@ local LAYER_STRENGTH = 0.9
 -------------------------------------------------------------------------------
 --  Settings
 -------------------------------------------------------------------------------
-local PaintArrow   -- defined below; a change repaints at once
+local PaintArrow, UseCurrentTheme   -- defined below; a change applies at once
 
 ---@return boolean
 function ns.RXPThemesAvailable()
@@ -66,6 +66,17 @@ end
 ---@param on boolean
 function ns.SetRXPThemes(on)
     ns.AccountSettings().rxpThemes = on and true or nil
+end
+
+---@return boolean
+function ns.RXPAutoThemeEnabled()
+    return ns.AccountSettings().rxpAutoTheme == true
+end
+
+---@param on boolean
+function ns.SetRXPAutoTheme(on)
+    ns.AccountSettings().rxpAutoTheme = on and true or nil
+    if on then UseCurrentTheme() end
 end
 
 -- On unless saved as false.
@@ -247,6 +258,24 @@ local function Dig(t, ...)
         t = t[select(i, ...)]
     end
     return t
+end
+
+-- Naowh (current) as RestedXP's theme, through its own theme reload (which only runs with its live
+-- reload setting on, so that is on for the call).
+function UseCurrentTheme()
+    local rxp = _G.RXP
+    local profile = Dig(rxp, "settings", "profile")
+    local name = NAME_PREFIX .. CURRENT_KEY
+    if type(profile) ~= "table" or type(rxp.ReloadTheme) ~= "function" or not Dig(rxp, "themes", name)
+            or profile.activeTheme == name then
+        return
+    end
+    profile.activeTheme = name
+    local live = profile.enableThemeLiveReload
+    profile.enableThemeLiveReload = true
+    local ok, err = pcall(rxp.ReloadTheme, rxp)
+    profile.enableThemeLiveReload = live
+    if not ok then error(err, 0) end
 end
 
 -- The arrow
@@ -462,6 +491,7 @@ boot:SetScript("OnEvent", function(self, event, name)
         end
     else
         self:UnregisterAllEvents()
+        if ns.RXPAutoThemeEnabled() then UseCurrentTheme() end
         HookArrow()
         HookBars()
         HookRules()
