@@ -335,19 +335,55 @@ def bag(x, y, size):
     return (255, 255, 255, int(round(255 * smooth(0, d))))
 
 
-def nav_arrow(x, y, size):
-    # RestedXP's waypoint arrow, point up, in two tones with a dark edge. The fill is white (the
-    # left half a little darker) so a vertex color tints it, and the edge stays dark.
-    u, v = x / size, y / size
-    d = polygon_dist(u, v, [(0.5, 0.05), (0.89, 0.93), (0.5, 0.71), (0.11, 0.93)]) * size
-    fill = smooth(0, d)
-    edge = smooth(size * 0.04, d)
-    alpha = fill + edge * (1 - fill)
-    if alpha <= 0:
-        return (0, 0, 0, 0)
-    shade, dark = (255 if u >= 0.5 else 205), 24
-    rgb = int(round((shade * fill + dark * edge * (1 - fill)) / alpha))
-    return (rgb, rgb, rgb, int(round(255 * alpha)))
+def nav_arrow(wide, glow):
+    # RestedXP's waypoint arrow, point up: a kite folded into four facets, with a dark edge and a thin
+    # line inside it. Grey over white, so a vertex color tints it; the lightest part is the tint itself.
+    # wide: the base 14% wider. glow: a soft halo around it (white alpha, so it takes the tint too), with
+    # the kite drawn 15% smaller to leave it room. Measured in units of a 97-unit-tall kite, y down from
+    # the tip, so the drawing can be compared with the design sketches.
+    half = 49.0 if wide else 43.0              # how far the wing tips are from the middle
+    shrink = 0.85 if glow else 1.0
+    unit = 0.88 / 97.0                         # one unit, as a share of the canvas
+
+    def canvas(px, py):
+        u, v = 0.5 + px * unit, 0.05 + (py + 50) * unit
+        return 0.5 + (u - 0.5) * shrink, 0.5 + (v - 0.5) * shrink
+
+    outer = [canvas(*p) for p in ((0, -50), (half, 47), (0, 23), (-half, 47))]
+    inner = [canvas(*p) for p in ((0, -33), (0.78 * half, 38), (0, 21), (-0.78 * half, 38))]
+
+    def pixel(x, y, size):
+        u, v = x / size, y / size
+        d = polygon_dist(u, v, outer) * size
+        unit_px = unit * shrink * size
+        # which facet: the crease runs from the tip to a third of the way along the lower edge
+        px = ((0.5 + (u - 0.5) / shrink) - 0.5) / unit
+        py = ((0.5 + (v - 0.5) / shrink) - 0.05) / unit - 50
+        folded = (half / 3.0) * (py + 50) - 81.0 * abs(px) >= 0
+        if px < 0:
+            shade = 204 if folded else 158
+        else:
+            shade = 255 if folded else 230
+        fill = smooth(0, d)
+        edge = smooth(size * 0.028, d)
+        line = smooth(1.1, abs(polygon_dist(u, v, inner)) * size) * fill
+        halo = 0.0
+        if glow:
+            keep = 1.0
+            for reach, opacity in ((9, 0.12), (5.5, 0.22), (3, 0.4)):
+                keep *= 1 - opacity * smooth(reach * unit_px, d)
+            halo = 1 - keep
+        rgb, alpha = (255.0 if glow else 24.0), 0.0
+        for color, cover in ((255.0, halo), (24.0, edge), (float(shade), fill), (255.0, line)):
+            if cover <= 0:
+                continue
+            total = cover + alpha * (1 - cover)
+            rgb = (color * cover + rgb * alpha * (1 - cover)) / total
+            alpha = total
+        c = int(round(rgb))
+        return (c, c, c, int(round(255 * alpha)))
+
+    return pixel
 
 
 os.makedirs(OUT, exist_ok=True)
@@ -376,4 +412,7 @@ write_tga(os.path.join(OUT, "star.tga"), 64, star)
 write_tga(os.path.join(OUT, "swords.tga"), 64, crossed_swords)
 write_tga(os.path.join(OUT, "people.tga"), 64, people)
 write_tga(os.path.join(OUT, "bag.tga"), 64, bag)
-write_tga(os.path.join(OUT, "rxp_arrow.tga"), 64, nav_arrow)
+write_tga(os.path.join(OUT, "rxp_arrow.tga"), 128, nav_arrow(False, False))
+write_tga(os.path.join(OUT, "rxp_arrow_glow.tga"), 128, nav_arrow(False, True))
+write_tga(os.path.join(OUT, "rxp_arrow_wide.tga"), 128, nav_arrow(True, False))
+write_tga(os.path.join(OUT, "rxp_arrow_wide_glow.tga"), 128, nav_arrow(True, True))

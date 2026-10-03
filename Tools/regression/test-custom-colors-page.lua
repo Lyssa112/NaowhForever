@@ -284,8 +284,13 @@ do
     arrow.setValue("layer")
     Check(a.rxpArrow == nil, "the default is stored as nothing")
     Check(#e.notes == 0, "no hint before a change")
+    local refreshed = e.refreshes
+    arrow.setValue("image")
+    Check(e.refreshes == refreshed + 1, "picking an arrow style redraws the page, so the choices below follow it")
+    arrow.setValue("layer")
+    refreshed = e.refreshes
     toggle.setValue(true)
-    Check(a.rxpThemes == true and e.refreshes == 1 and #e.confirms == 0, "on is stored and the page redraws")
+    Check(a.rxpThemes == true and e.refreshes == refreshed + 1 and #e.confirms == 0, "on is stored and the page redraws")
     e.build()
     Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == HINT, "it reads back, and the reload hint shows")
     for _, row in ipairs(e.rows) do
@@ -293,11 +298,34 @@ do
             Check(row[2].disabled() == false, "the arrow choice is available once the themes are on")
         end
     end
+
+    -- the shape and the glow of Naowh's arrow: the next row, only usable with the themes on and Naowh arrow picked
+    local shape, glow
+    for _, row in ipairs(e.rows) do
+        if row[1].text == "Naowh Arrow Shape" then shape, glow = row[1], row[2] end
+    end
+    Check(shape and shape.type == "dropdown" and glow and glow.type == "toggle" and glow.text == "Naowh Arrow Glow",
+        "the shape and the glow are the next row")
+    Check(#shape.order == 2 and shape.order[1] == "kite" and shape.order[2] == "wide" and shape.values.kite == "Kite"
+        and shape.values.wide == "Wide kite", "a kite or a wide kite")
+    Check(shape.getValue() == "kite" and glow.getValue() == false, "a kite without a glow by default")
+    Check(shape.disabled() == true and glow.disabled() == true and shape.disabledTooltip and glow.disabledTooltip,
+        "greyed out with the themes on but the layer as the arrow style")
+    arrow.setValue("image")
+    Check(shape.disabled() == false and glow.disabled() == false, "usable once Naowh arrow is picked")
+    shape.setValue("wide")
+    glow.setValue(true)
+    Check(a.rxpArrowShape == "wide" and a.rxpArrowGlow == true and shape.getValue() == "wide" and glow.getValue() == true,
+        "the choices are stored")
+    shape.setValue("kite")
+    glow.setValue(false)
+    Check(a.rxpArrowShape == nil and a.rxpArrowGlow == nil, "the defaults are stored as nothing")
     Toggle(e).setValue(false)
     Check(a.rxpThemes == nil, "off clears it")
+    Check(shape.disabled() == true and glow.disabled() == true, "greyed out again with the themes off, whatever the arrow style")
     local custom = Page({ themePreset = "custom" }, true)
-    Check(Toggle(custom) and #custom.rows == #Page({ themePreset = "custom" }).rows + 1, "with Custom the toggle is one more row than without RestedXP")
-    Check(custom.rows[#custom.rows][1].text == "Add Themes to RestedXP", "and is the last row, above the Reload button")
+    Check(Toggle(custom) and #custom.rows == #Page({ themePreset = "custom" }).rows + 2, "with Custom the RestedXP rows are two more than without RestedXP")
+    Check(custom.rows[#custom.rows][1].text == "Naowh Arrow Shape", "and the shape row is the last, above the Reload button")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

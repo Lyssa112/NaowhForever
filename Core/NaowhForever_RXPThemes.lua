@@ -113,10 +113,17 @@ end
 -- the way the player picked (Settings > COLORS, RestedXP Arrow):
 --   layer  a layer of ours over the arrow: the Accent, added to the arrow's own colors and clipped
 --          to its shape (the arrow's own image is the mask). RestedXP's image is not touched;
---   image  Naowh's own white arrow (Media/rxp_arrow.tga) in the Accent, in place of RestedXP's;
+--   image  Naowh's own arrow (Media/rxp_arrow*.tga) in the Accent, in place of RestedXP's: a kite or
+--          a wider one, with or without a soft glow, as the player picks;
 --   off    RestedXP's own arrow, as it is.
 -- With any other RestedXP theme the arrow is left alone.
-local ARROW_IMAGE = "Interface\\AddOns\\NaowhForever\\Media\\rxp_arrow.tga"
+local MEDIA = "Interface\\AddOns\\NaowhForever\\Media\\"
+-- Naowh's arrow images by shape, then by glow (drawn by Tools/make_media.py).
+local ARROW_IMAGES = {
+    kite = { [false] = MEDIA .. "rxp_arrow.tga", [true] = MEDIA .. "rxp_arrow_glow.tga" },
+    wide = { [false] = MEDIA .. "rxp_arrow_wide.tga", [true] = MEDIA .. "rxp_arrow_wide_glow.tga" },
+}
+local DEFAULT_SHAPE = "kite"
 local ARROW_STYLES = { layer = true, image = true, off = true }
 local DEFAULT_ARROW = "layer"
 -- The layer's Accent is lighter at the top and deeper at the bottom, as if lit from above, and not at
@@ -136,6 +143,19 @@ local rxpImage  -- the image RestedXP last set, to hand back
 function ns.RXPArrowStyle()
     local style = ns.AccountSettings().rxpArrow
     return ARROW_STYLES[style] and style or DEFAULT_ARROW
+end
+
+--- The shape of Naowh's arrow image: "kite" (the default), or "wide" with a base 14% wider.
+---@return string
+function ns.RXPArrowShape()
+    local shape = ns.AccountSettings().rxpArrowShape
+    return ARROW_IMAGES[shape] and shape or DEFAULT_SHAPE
+end
+
+--- Whether Naowh's arrow image has a soft glow around it (off by default).
+---@return boolean
+function ns.RXPArrowGlow()
+    return ns.AccountSettings().rxpArrowGlow == true
 end
 
 local function BuildLayer(arrow)
@@ -190,7 +210,7 @@ local function Paint()
     end
     if style == "image" then
         local c = theme.mapPins
-        texture:SetTexture(ARROW_IMAGE)
+        texture:SetTexture(ARROW_IMAGES[ns.RXPArrowShape()][ns.RXPArrowGlow()])
         texture:SetVertexColor(c[1], c[2], c[3], 1)
         swapped, tinted = true, true
     else
@@ -218,6 +238,19 @@ end
 ---@param style string "layer", "image" or "off"
 function ns.SetRXPArrowStyle(style)
     ns.AccountSettings().rxpArrow = (ARROW_STYLES[style] and style ~= DEFAULT_ARROW) and style or nil
+    Paint()
+end
+
+--- Saved for this computer, and applied at once when Naowh's arrow is the one drawn.
+---@param shape string "kite" or "wide"
+function ns.SetRXPArrowShape(shape)
+    ns.AccountSettings().rxpArrowShape = (ARROW_IMAGES[shape] and shape ~= DEFAULT_SHAPE) and shape or nil
+    Paint()
+end
+
+---@param on boolean
+function ns.SetRXPArrowGlow(on)
+    ns.AccountSettings().rxpArrowGlow = on and true or nil
     Paint()
 end
 

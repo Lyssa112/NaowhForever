@@ -360,6 +360,64 @@ do
     styles.SetRXPArrowStyle("off")
     Check(drawn.texture.path == IMAGE, "off hands RestedXP's image back again")
 
+    -- the shape and the glow: the kite without a glow by default, stored only when not, nothing else accepted
+    local shapeAccount = {}
+    local _, shapeNs = Load(shapeAccount, true)
+    Check(shapeNs.RXPArrowShape() == "kite" and shapeNs.RXPArrowGlow() == false and shapeAccount.rxpArrowShape == nil
+        and shapeAccount.rxpArrowGlow == nil, "a kite without a glow by default")
+    shapeNs.SetRXPArrowShape("wide")
+    Check(shapeAccount.rxpArrowShape == "wide" and shapeNs.RXPArrowShape() == "wide", "the wide kite is stored")
+    shapeNs.SetRXPArrowShape("kite")
+    Check(shapeAccount.rxpArrowShape == nil and shapeNs.RXPArrowShape() == "kite", "the default shape is stored as nothing")
+    shapeNs.SetRXPArrowShape("round")
+    Check(shapeAccount.rxpArrowShape == nil, "an unknown shape is not stored")
+    shapeAccount.rxpArrowShape = "junk"
+    Check(shapeNs.RXPArrowShape() == "kite", "an unknown saved shape reads as the kite")
+    shapeNs.SetRXPArrowGlow(true)
+    Check(shapeAccount.rxpArrowGlow == true and shapeNs.RXPArrowGlow() == true, "the glow is stored")
+    shapeNs.SetRXPArrowGlow(false)
+    Check(shapeAccount.rxpArrowGlow == nil and shapeNs.RXPArrowGlow() == false, "no glow is stored as nothing")
+    shapeAccount.rxpArrowGlow = "yes"
+    Check(shapeNs.RXPArrowGlow() == false, "only true turns the glow on")
+
+    -- Naowh's arrow changes at once with the shape and the glow, in the Accent, and only while it is drawn
+    local MEDIA = "Interface\\AddOns\\NaowhForever\\Media\\"
+    styles.SetRXPArrowStyle("image")
+    for _, want in ipairs({ { "kite", false, "rxp_arrow.tga" }, { "kite", true, "rxp_arrow_glow.tga" },
+            { "wide", false, "rxp_arrow_wide.tga" }, { "wide", true, "rxp_arrow_wide_glow.tga" } }) do
+        styles.SetRXPArrowShape(want[1])
+        styles.SetRXPArrowGlow(want[2])
+        Check(drawn.texture.path == MEDIA .. want[3], want[1] .. (want[2] and " with" or " without") .. " a glow: " .. want[3])
+    end
+    Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "and it keeps the Accent")
+    -- each setter on its own repaints: from the kite without a glow, one call changes one thing
+    styles.SetRXPArrowShape("kite")
+    styles.SetRXPArrowGlow(false)
+    Check(drawn.texture.path == MEDIA .. "rxp_arrow.tga", "back to the kite without a glow")
+    styles.SetRXPArrowShape("wide")
+    Check(drawn.texture.path == MEDIA .. "rxp_arrow_wide.tga", "a new shape on its own changes the arrow")
+    styles.SetRXPArrowGlow(true)
+    Check(drawn.texture.path == MEDIA .. "rxp_arrow_wide_glow.tga", "a new glow on its own changes the arrow")
+    styles.SetRXPArrowShape("kite")
+    Check(drawn.texture.path == MEDIA .. "rxp_arrow_glow.tga", "and the shape back on its own")
+    styles.SetRXPArrowGlow(false)
+    styles.SetRXPArrowStyle("layer")
+    local setsNow = #drawn.sets
+    styles.SetRXPArrowShape("kite")
+    styles.SetRXPArrowGlow(false)
+    Check(#drawn.sets == setsNow and drawn.texture.path == IMAGE, "with the layer as the style, a new shape or glow leaves RestedXP's image alone")
+    styles.SetRXPArrowStyle("off")
+    setsNow = #drawn.sets
+    styles.SetRXPArrowShape("wide")
+    Check(#drawn.sets == setsNow and drawn.texture.path == IMAGE, "and so does RestedXP's own arrow")
+    styles.SetRXPArrowShape("kite")
+
+    -- saved wide and glow: that image is on the arrow at login
+    local wideEnv, _, wideBoot = Start({ rxpThemes = true, rxpArrow = "image", rxpArrowShape = "wide", rxpArrowGlow = true },
+        "NaowhForever:rosenoir")
+    Login(wideBoot)
+    Check(wideEnv.RXPG_ARROW.texture.path == MEDIA .. "rxp_arrow_wide_glow.tga", "saved wide with a glow: that image at login")
+
     -- off from the start: RestedXP's own arrow, untouched
     local quietEnv, quietFrames, quietBoot = Start({ rxpThemes = true, rxpArrow = "off" }, "NaowhForever:rosenoir")
     Login(quietBoot)
