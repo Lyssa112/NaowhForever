@@ -385,10 +385,16 @@ function ns.FontInset(size)
     return size * STEM_INSET
 end
 
+--- The Addon Font setting as a file path, looked up afresh each time. UIFontPath keeps its first
+--- answer, which is right once the UI is being built; asked before every addon has loaded, a font
+--- from a later addon would not be found yet and would be remembered as missing.
+---@return string
+function ns.AddonFontPath()
+    return FontPath(ns.AccountSettings().uiFont or "Naowh") or STANDARD_TEXT_FONT
+end
+
 function ns.UIFontPath()
-    if not uiFontPath then
-        uiFontPath = FontPath(ns.AccountSettings().uiFont or "Naowh") or STANDARD_TEXT_FONT
-    end
+    if not uiFontPath then uiFontPath = ns.AddonFontPath() end
     return uiFontPath
 end
 

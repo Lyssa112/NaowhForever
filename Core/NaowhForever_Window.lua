@@ -661,9 +661,9 @@ function ns.BuildSettingsPage(parent, y)
         _, h = W:DualRow(parent, y,
             { type = "toggle", text = "Add Themes to RestedXP",
               tooltip = "Adds NaowhUI and the eight Naowh themes to RestedXP Guides' theme list, in "
-              .. "their colors and with RestedXP's own frames, and colors its waypoint arrow in the "
-              .. "theme's Accent. Pick one in RestedXP's Look and Feel settings.|n|nTakes effect "
-              .. "after a /reload.",
+              .. "their colors and your Addon Font, with RestedXP's own frames, and colors its "
+              .. "waypoint arrow in the theme's Accent. Pick one in RestedXP's Look and Feel "
+              .. "settings.|n|nTakes effect after a /reload.",
               getValue = ns.RXPThemesEnabled,
               setValue = function(v)
                   ns.SetRXPThemes(v)

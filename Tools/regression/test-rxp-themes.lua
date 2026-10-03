@@ -21,8 +21,19 @@ local function Hex(c)
         math.floor(c[3] * 255 + 0.5))
 end
 
+-- A stand-in for LibSharedMedia: the fonts it holds, by name.
+local function MediaStub(fonts)
+    local lsm = { LOCALE_BIT_ruRU = 1, LOCALE_BIT_western = 2 }
+    function lsm:Register(kind, name, path)
+        if kind == "font" and not fonts[name] then fonts[name] = path end
+    end
+    function lsm:Fetch(_, name) return fonts[name] end
+    return lsm
+end
+
 -- installed: whether RestedXP Guides exists. existing: what another addon already put in the table.
-local function Load(account, installed, existing)
+-- fonts: when given, LibSharedMedia is there and holds these fonts.
+local function Load(account, installed, existing, fonts)
     local frames = {}
     -- A texture or a mask: it records what the module asks of it.
     local function Region()
@@ -53,11 +64,16 @@ local function Load(account, installed, existing)
     end
     local hooked = {}
     local env = { CreateFrame = NewFrame, RXPGuides_Themes = existing, hooked = hooked,
+        STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF",
         CreateColor = function(r, g, b, a) return { r, g, b, a } end,
         hooksecurefunc = function(tbl, name, fn) hooked[#hooked + 1] = { tbl, name, fn } end,
         C_AddOns = { DoesAddOnExist = function(name) return installed and name == "RXPGuides" end },
         NaowhForeverDB = { account = account, profiles = {}, charActive = {} } }
     env._G = env
+    if fonts then
+        local lsm = MediaStub(fonts)
+        env.LibStub = function(name) if name == "LibSharedMedia-3.0" then return lsm end end
+    end
     setmetatable(env, { __index = _G })
     local core = assert(loadstring(coreSource, "Core"))
     setfenv(core, env)
@@ -186,6 +202,49 @@ do
             "NaowhUI is still the default theme's colors")
         Check(Hex(list["NaowhForever:crimson"].mapPins) == "ef4b56", "Crimson is still Crimson")
     end
+end
+
+-- The font: RestedXP draws its text in a theme's font, and these themes use the Addon Font from Settings > FONT,
+-- as it is when RestedXP imports them. The player's Text color is the theme's own Text.
+do
+    local NAOWH = "Interface\\AddOns\\NaowhForever\\Media\\Fonts\\Naowh.ttf"
+    local function Fonts(account, fonts)
+        local env, ns, frames = Load(account, true, nil, fonts)
+        Fire(frames, "NaowhForever")
+        return env.RXPGuides_Themes, ns
+    end
+    local function AllHave(list, path)
+        for _, key in ipairs(KEYS) do
+            if list[NameOf(key)].font ~= path then return false end
+        end
+        return true
+    end
+
+    local list = Fonts({ rxpThemes = true }, {})
+    Check(AllHave(list, NAOWH), "the Addon Font by default is the Naowh font, in all nine themes")
+    list = Fonts({ rxpThemes = true, uiFont = "Fira" }, { Fira = "Fonts\\Fira.ttf" })
+    Check(AllHave(list, "Fonts\\Fira.ttf"), "a font picked as the Addon Font is the one in all nine themes")
+    local _, ns = Fonts({ rxpThemes = true }, {})
+    list = Fonts({ rxpThemes = true, uiFont = ns.BLIZZARD_FONT }, {})
+    Check(AllHave(list, "Fonts\\FRIZQT__.TTF"), "Blizzard Default is the game's own font")
+    list = Fonts({ rxpThemes = true, uiFont = "Gone" }, {})
+    Check(AllHave(list, NAOWH), "a font that is not there falls back to the Naowh font, as in the addon")
+    list = Fonts({ rxpThemes = true }, nil)
+    Check(AllHave(list, "Fonts\\FRIZQT__.TTF"), "without LibSharedMedia, the game's own font")
+
+    -- Asked this early, a font from an addon that loads later is not there yet; the addon's own answer must not
+    -- be spoiled by that, or its windows would lose the player's font for the whole session.
+    local fonts = {}
+    local env, laterNs, frames = Load({ rxpThemes = true, uiFont = "Later" }, true, nil, fonts)
+    Fire(frames, "NaowhForever")
+    fonts.Later = "Fonts\\Later.ttf"
+    Check(laterNs.UIFontPath() == "Fonts\\Later.ttf", "the addon's own font is still found once the later addon has loaded")
+    Check(env.RXPGuides_Themes[NameOf("")].font == NAOWH, "while the RestedXP theme took the fallback at the time")
+
+    -- The text color is the theme's Text, as the palette has it.
+    local colors = Fonts({ rxpThemes = true }, {})
+    Check(Hex(colors[NameOf("")].textColor) == "f0f1f3" and Hex(colors[NameOf("crimson")].textColor) == "f6eff0",
+        "the basic text color: NaowhUI's and Crimson's Text")
 end
 
 -- The waypoint arrow: while one of our themes is the active one, by default a layer of its Accent

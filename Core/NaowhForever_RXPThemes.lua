@@ -2,7 +2,8 @@
 --  NaowhForever_RXPThemes.lua -- NaowhUI and the eight Naowh themes in RestedXP Guides.
 --  RestedXP reads a global RXPGuides_Themes table once, while it starts, and registers every
 --  theme in it (its own RXPGuides_Themes addon fills the same table). The frames, borders and
---  icons are RestedXP's own, already installed. Three things a theme cannot color are done here,
+--  icons are RestedXP's own, already installed; its text is in the Addon Font (Settings > FONT)
+--  and the theme's Text color. Three things a theme cannot color are done here,
 --  while one of these themes is the active one: the title bar and footer show the theme's
 --  Background instead of a black banner image, the quest list gets a thin rule between its rows
 --  like Naowh's own lists, and the waypoint arrow is drawn in the theme's Accent, by a layer over
@@ -84,6 +85,8 @@ local function Theme(key)
         mapPins = Rgba(c.accent, 1),
         tooltip = "|cff" .. Hex(c.accent),
         textColor = { c.fg.r, c.fg.g, c.fg.b },
+        -- The Addon Font, found afresh: UIFontPath would remember what it finds this early.
+        font = ns.AddonFontPath(),
         texturePath = TEXTURES,
         -- The title bar and footer are a fill under a banner image, and RestedXP's blue theme gives them
         -- no fill. With one, hiding the banner (below) shows the Background color.
