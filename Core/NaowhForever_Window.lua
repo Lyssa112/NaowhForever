@@ -698,25 +698,30 @@ function ns.BuildSettingsPage(parent, y)
                       UI:RefreshPage(true)
                   end }
             ); y = y - h
-            local function NotNaowhArrow() return ns.RXPArrowStyle() ~= "image" end
-            local pickFirst = "Pick Naowh arrow in RestedXP Arrow first."
-            _, h = W:DualRow(parent, y,
-                { type = "dropdown", text = "Naowh Arrow Shape",
-                  values = { kite = "Kite", wide = "Wide kite" },
-                  order = { "kite", "wide" },
-                  tooltip = "The shape of Naowh's arrow in RestedXP: the kite, or the same kite with its "
-                  .. "base 14% wider.",
-                  disabled = NotNaowhArrow,
-                  disabledTooltip = pickFirst,
-                  getValue = ns.RXPArrowShape,
-                  setValue = function(v) ns.SetRXPArrowShape(v) end },
-                { type = "toggle", text = "Naowh Arrow Glow",
-                  tooltip = "A soft glow in the theme's Accent around Naowh's arrow in RestedXP.",
-                  disabled = NotNaowhArrow,
-                  disabledTooltip = pickFirst,
-                  getValue = ns.RXPArrowGlow,
-                  setValue = function(v) ns.SetRXPArrowGlow(v) end }
-            ); y = y - h
+            if ns.RXPArrowStyle() == "image" then
+                _, h = W:DualRow(parent, y,
+                    { type = "dropdown", text = "Naowh Arrow Shape",
+                      values = { kite = "Kite", wide = "Wide kite" },
+                      order = { "kite", "wide" },
+                      tooltip = "The shape of Naowh's arrow in RestedXP: the kite, or the same kite with its "
+                      .. "base 14% wider.",
+                      getValue = ns.RXPArrowShape,
+                      setValue = function(v) ns.SetRXPArrowShape(v) end },
+                    { type = "toggle", text = "Naowh Arrow Glow",
+                      tooltip = "A soft glow in the theme's Accent around Naowh's arrow in RestedXP.",
+                      getValue = ns.RXPArrowGlow,
+                      setValue = function(v) ns.SetRXPArrowGlow(v) end }
+                ); y = y - h
+                local sizeMin, sizeMax, sizeStep = ns.RXPArrowSizeRange()
+                _, h = W:DualRow(parent, y,
+                    { type = "slider", text = "Naowh Arrow Size", min = sizeMin, max = sizeMax, step = sizeStep,
+                      tooltip = "How big Naowh's arrow is, as a percent of the arrow RestedXP draws. RestedXP's "
+                      .. "own Arrow Size setting still applies on top.",
+                      getValue = ns.RXPArrowSize,
+                      setValue = function(v) ns.SetRXPArrowSize(v) end },
+                    { type = "label", text = "" }
+                ); y = y - h
+            end
             _, h = W:DualRow(parent, y,
                 Switch("Use Addon Font",
                     "Draws RestedXP's guide text, title bar and arrow text in the Addon Font from FONT "

@@ -275,7 +275,7 @@ do
         end
     end
     local function Hidden(page)
-        for _, name in ipairs({ "Naowh Arrow Shape", "Use Addon Font", "Quest List Dividers" }) do
+        for _, name in ipairs({ "Naowh Arrow Shape", "Naowh Arrow Size", "Use Addon Font", "Quest List Dividers" }) do
             if Pair(page, name) then return false end
         end
         for _, row in ipairs(page.rows) do
@@ -317,24 +317,31 @@ do
     arrow.setValue("layer")
     Check(a.rxpArrow == nil, "the default is stored as nothing")
 
-    local shape, glow = Pair(e, "Naowh Arrow Shape")
+    Check(Pair(e, "Naowh Arrow Shape") == nil and Pair(e, "Naowh Arrow Size") == nil,
+        "with the layer as the arrow style, the choices for Naowh's arrow are not shown")
+    local imaged = Page({ rxpThemes = true, rxpArrow = "image" }, true)
+    local shape, glow = Pair(imaged, "Naowh Arrow Shape")
     Check(shape and shape.type == "dropdown" and glow and glow.type == "toggle" and glow.text == "Naowh Arrow Glow",
-        "the shape and the glow are the next row")
+        "with Naowh arrow picked, the shape and the glow are the next row")
     Check(#shape.order == 2 and shape.order[1] == "kite" and shape.order[2] == "wide" and shape.values.kite == "Kite"
         and shape.values.wide == "Wide kite", "a kite or a wide kite")
     Check(shape.getValue() == "kite" and glow.getValue() == false, "a kite without a glow by default")
-    Check(shape.disabled() == true and glow.disabled() == true and shape.disabledTooltip and glow.disabledTooltip,
-        "greyed out with the layer as the arrow style")
-    arrow.setValue("image")
-    Check(shape.disabled() == false and glow.disabled() == false, "usable once Naowh arrow is picked")
+    Check(shape.disabled == nil and glow.disabled == nil, "and never greyed out")
     shape.setValue("wide")
     glow.setValue(true)
-    Check(a.rxpArrowShape == "wide" and a.rxpArrowGlow == true and shape.getValue() == "wide" and glow.getValue() == true,
-        "the choices are stored")
+    Check(imaged.account.rxpArrowShape == "wide" and imaged.account.rxpArrowGlow == true and shape.getValue() == "wide"
+        and glow.getValue() == true, "the choices are stored")
     shape.setValue("kite")
     glow.setValue(false)
-    arrow.setValue("layer")
-    Check(a.rxpArrowShape == nil and a.rxpArrowGlow == nil, "the defaults are stored as nothing")
+    Check(imaged.account.rxpArrowShape == nil and imaged.account.rxpArrowGlow == nil, "the defaults are stored as nothing")
+    local size, spare = Pair(imaged, "Naowh Arrow Size")
+    Check(size and size.type == "slider" and spare.type == "label" and spare.text == "", "the size is a slider on the row after")
+    Check(size.min == 60 and size.max == 200 and size.step == 5 and size.getValue() == 120, "from 60 to 200, 120 by default")
+    Check(size.tooltip:find("percent", 1, true) and size.tooltip:find("Arrow Size", 1, true), "its tooltip says what it is a percent of")
+    size.setValue(150)
+    Check(imaged.account.rxpArrowSize == 150 and size.getValue() == 150 and imaged.refreshes == 0, "a size is stored, and the page is not redrawn")
+    size.setValue(120)
+    Check(imaged.account.rxpArrowSize == nil, "the default is stored as nothing")
 
     local font, text = Pair(e, "Use Addon Font")
     local dividers, bars = Pair(e, "Quest List Dividers")
@@ -397,8 +404,10 @@ do
     Check(Toggle(custom) and #custom.rows == plain + 1, "with Custom and the themes off, RestedXP adds the one toggle row")
     Check(custom.rows[#custom.rows][1].text == "Add Themes to RestedXP", "and it is the last, above the Reload button")
     local onCustom = Page({ themePreset = "custom", rxpThemes = true }, true)
-    Check(#onCustom.rows == plain + 4, "with the themes on, RestedXP adds four rows")
+    Check(#onCustom.rows == plain + 3, "with the themes on, RestedXP adds three rows: the toggle, the font and text, the dividers and bars")
     Check(onCustom.rows[#onCustom.rows][1].text == "Quest List Dividers", "and the dividers row is the last, above the Reload button")
+    local onImage = Page({ themePreset = "custom", rxpThemes = true, rxpArrow = "image" }, true)
+    Check(#onImage.rows == plain + 5, "with Naowh arrow picked, two more: the shape and glow, and the size")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

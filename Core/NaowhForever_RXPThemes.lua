@@ -35,9 +35,9 @@ local ARROW_IMAGES = {   -- by shape, then by glow
 local DEFAULT_SHAPE = "kite"
 local ARROW_STYLES = { layer = true, image = true, off = true }
 local DEFAULT_ARROW = "layer"
--- Naowh's image is drawn ARROW_SIZE times RestedXP's arrow frame; with a glow the kite fills only
+-- Naowh's image is drawn this percent of RestedXP's arrow frame; with a glow the kite fills only
 -- GLOW_FILL of it (Tools/make_media.py), so that image is drawn larger to keep the kite the same size.
-local ARROW_SIZE = 1.2
+local SIZE_MIN, SIZE_MAX, SIZE_STEP, DEFAULT_SIZE = 60, 200, 5, 120
 local GLOW_FILL = 0.76
 -- The layer is lighter at the top and deeper at the bottom, and not full strength, so the dark arrow still shades it.
 local TOP_TOWARD_WHITE = 0.22
@@ -125,6 +125,29 @@ end
 ---@param shape string
 function ns.SetRXPArrowShape(shape)
     ns.AccountSettings().rxpArrowShape = (ARROW_IMAGES[shape] and shape ~= DEFAULT_SHAPE) and shape or nil
+    PaintArrow()
+end
+
+---@return number min
+---@return number max
+---@return number step
+function ns.RXPArrowSizeRange() return SIZE_MIN, SIZE_MAX, SIZE_STEP end
+
+local function ClampSize(size)
+    return math.min(SIZE_MAX, math.max(SIZE_MIN, math.floor(size / SIZE_STEP + 0.5) * SIZE_STEP))
+end
+
+---@return number percent of RestedXP's arrow frame
+function ns.RXPArrowSize()
+    local size = tonumber(ns.AccountSettings().rxpArrowSize)
+    return size and ClampSize(size) or DEFAULT_SIZE
+end
+
+---@param size number
+function ns.SetRXPArrowSize(size)
+    size = tonumber(size)
+    size = size and ClampSize(size)
+    ns.AccountSettings().rxpArrowSize = size ~= DEFAULT_SIZE and size or nil
     PaintArrow()
 end
 
@@ -261,7 +284,7 @@ end
 local function ShowImage(arrow, texture, c)
     texture:SetTexture(ARROW_IMAGES[ns.RXPArrowShape()][ns.RXPArrowGlow()])
     texture:SetVertexColor(c[1], c[2], c[3], 1)
-    fitted = ns.RXPArrowGlow() and ARROW_SIZE / GLOW_FILL or ARROW_SIZE
+    fitted = ns.RXPArrowSize() / 100 / (ns.RXPArrowGlow() and GLOW_FILL or 1)
     Fit(arrow, texture, fitted)
     swapped = true
 end

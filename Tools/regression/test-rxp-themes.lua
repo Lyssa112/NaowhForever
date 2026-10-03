@@ -509,6 +509,46 @@ do
     sizeEnv.NaowhForever.SetRXPArrowStyle("off")
     Check(Spread(sized) == "all", "nor does RestedXP's own arrow")
 
+    -- the size: a percent of RestedXP's frame, 120 by default, in steps of 5 from 60 to 200
+    local sizeAccount = {}
+    local _, sizeNs = Load(sizeAccount, true)
+    local lo, hi, step = sizeNs.RXPArrowSizeRange()
+    Check(lo == 60 and hi == 200 and step == 5, "from 60 to 200 percent in steps of 5")
+    Check(sizeNs.RXPArrowSize() == 120 and sizeAccount.rxpArrowSize == nil, "120 by default")
+    sizeNs.SetRXPArrowSize(150)
+    Check(sizeAccount.rxpArrowSize == 150 and sizeNs.RXPArrowSize() == 150, "a size is stored")
+    sizeNs.SetRXPArrowSize(120)
+    Check(sizeAccount.rxpArrowSize == nil, "the default is stored as nothing")
+    sizeNs.SetRXPArrowSize(153)
+    Check(sizeAccount.rxpArrowSize == 155, "rounded to a step")
+    sizeNs.SetRXPArrowSize(10)
+    Check(sizeAccount.rxpArrowSize == 60, "kept above the smallest")
+    sizeNs.SetRXPArrowSize(900)
+    Check(sizeAccount.rxpArrowSize == 200, "and below the largest")
+    sizeNs.SetRXPArrowSize("bogus")
+    Check(sizeAccount.rxpArrowSize == nil, "something that is not a number is not stored")
+    sizeAccount.rxpArrowSize = "junk"
+    Check(sizeNs.RXPArrowSize() == 120, "and an unreadable saved size reads as 120")
+    sizeAccount.rxpArrowSize = 7
+    Check(sizeNs.RXPArrowSize() == 60, "a saved size out of range is brought back into it")
+
+    -- it sizes the image at once, with or without a glow, as the kite is the same size either way
+    sized.w, sized.h = 32, 32
+    sizeEnv.NaowhForever.SetRXPArrowStyle("image")
+    sizeEnv.NaowhForever.SetRXPArrowSize(150)
+    Check(Overflow(sized, 1.5), "150 percent: the image is 1.5 times the frame")
+    sizeEnv.NaowhForever.SetRXPArrowGlow(true)
+    Check(Overflow(sized, 1.5 / 0.76), "and with a glow, larger by what the glow takes")
+    sizeEnv.NaowhForever.SetRXPArrowGlow(false)
+    sizeEnv.NaowhForever.SetRXPArrowSize(60)
+    Check(Overflow(sized, 0.6), "60 percent: smaller than the frame, around the same center")
+    sizeEnv.NaowhForever.SetRXPArrowSize(120)
+    Check(Overflow(sized, 1.2), "and back to 120")
+    sizeEnv.NaowhForever.SetRXPArrowStyle("layer")
+    sizeEnv.NaowhForever.SetRXPArrowSize(200)
+    Check(Spread(sized) == "all", "with the layer as the style, a size leaves RestedXP's anchors alone")
+    sizeEnv.NaowhForever.SetRXPArrowSize(120)
+
     local wideEnv, _, wideBoot = Start({ rxpThemes = true, rxpArrow = "image", rxpArrowShape = "wide", rxpArrowGlow = true },
         "NaowhForever:rosenoir")
     Login(wideBoot)
