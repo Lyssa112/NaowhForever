@@ -135,6 +135,7 @@ do
         local p = ns.ThemePalette(key)   -- bg, panel, line, fg, muted, accent
         Check(Same(theme.background, { p[1].r, p[1].g, p[1].b, 1 }), key .. ": the window is the Background color")
         Check(Same(theme.bottomFrameBG, { p[1].r, p[1].g, p[1].b, 1 }), key .. ": the step frames are the Background color too")
+        Check(Same(theme.dividerColor, { p[3].r, p[3].g, p[3].b, 0.6 }), key .. ": the rule between list rows is Borders & Lines at 60%")
         Check(Same(theme.bottomFrameHighlight, { p[6].r, p[6].g, p[6].b, 0.5 }), key .. ": the Accent at half opacity")
         Check(Same(theme.mapPins, { p[6].r, p[6].g, p[6].b, 1 }), key .. ": map pins in the Accent")
         Check(Same(theme.textColor, { p[4].r, p[4].g, p[4].b }), key .. ": Text")
@@ -154,6 +155,7 @@ do
     -- The values themselves, pinned: a wrong mapping cannot hide behind re-deriving it.
     local default, midnight = list["NaowhForever:default"], list["NaowhForever:midnight"]
     Check(Hex(default.background) == "0e0f11" and Hex(default.bottomFrameBG) == "0e0f11", "NaowhUI: Background for the window and the step frames")
+    Check(Hex(default.dividerColor) == "2e3136" and Hex(midnight.dividerColor) == "2a3550", "the rules: NaowhUI's and Midnight's Borders & Lines")
     Check(Hex(default.mapPins) == "0091ed" and default.tooltip == "|cff0091ed", "NaowhUI: the blue Accent")
     Check(Hex(default.textColor) == "f0f1f3", "NaowhUI: Text")
     Check(Hex(midnight.background) == "0b1020" and Hex(midnight.mapPins) == "5b8cff", "Midnight: Background and Accent")
@@ -457,6 +459,118 @@ do
         "the banner that is there is hooked and hidden; the other is skipped")
     local mute = { GuideName = { bg = { SetTexture = function() end } } }
     Check(#Bare(mute, "NaowhForever:crimson").hooked == 1, "a banner that cannot be hidden is hooked and left alone")
+end
+
+-- The classic window's quest list: rows with no line between them. While one of ours is the active theme
+-- each row gets a 1px rule at its bottom, in Borders & Lines at 60% like Naowh's own lists; with any other
+-- theme there are none. The rows are made when a guide loads, which ends in SetStep.
+do
+    -- a texture that records what the module asks of it
+    local function Rule(layer)
+        local t = { layer = layer, points = {}, paints = 0, hides = 0 }
+        function t:SetPoint(point) self.points[#self.points + 1] = point end
+        function t:SetHeight(height) self.height = height end
+        function t:SetColorTexture(...) self.rgba = { ... }; self.paints = self.paints + 1 end
+        function t:Show() self.shown = true end
+        function t:Hide() self.shown = false; self.hides = self.hides + 1 end
+        return t
+    end
+    local function Row()
+        local row = { textures = {} }
+        function row:CreateTexture(_, layer)
+            local t = Rule(layer)
+            self.textures[#self.textures + 1] = t
+            return t
+        end
+        return row
+    end
+    local function Start(account, active, rows)
+        local env, _, frames, boot = Load(account, true)
+        local pool = {}
+        for i = 1, rows do pool[i] = Row() end
+        env.RXPFrame = { ScrollChild = { framePool = pool } }
+        Fire(frames, "NaowhForever")
+        env.RXP = { SetStep = function() end,
+            activeTheme = active and env.RXPGuides_Themes[active] or { name = "RXP Blue" } }
+        return env, boot, pool
+    end
+    -- the function hooked onto SetStep
+    local function Hook(env)
+        for _, h in ipairs(env.hooked) do
+            if h[1] == env.RXP and h[2] == "SetStep" then return h[3] end
+        end
+    end
+
+    -- one of ours is active at login: every row has its rule at once
+    local env, boot, pool = Start({ rxpThemes = true }, "NaowhForever:crimson", 2)
+    Check(#env.hooked == 0 and #pool[1].textures == 0, "nothing is hooked or drawn before login")
+    Login(boot)
+    Check(#env.hooked == 1 and Hook(env), "SetStep is hooked")
+    for i, row in ipairs(pool) do
+        local rule = row.textures[1]
+        Check(#row.textures == 1 and rule.layer == "ARTWORK" and rule.height == 1 and rule.shown == true
+            and Same(rule.points, { "BOTTOMLEFT", "BOTTOMRIGHT" }), "row " .. i .. ": a 1px rule along its bottom")
+        Check(Hex(rule.rgba) == "3d2429" and rule.rgba[4] == 0.6, "row " .. i .. ": Crimson's Borders & Lines at 60%")
+    end
+
+    -- a guide with more steps adds rows; the old rules are not drawn again
+    pool[3] = Row()
+    Hook(env)()
+    Check(#pool[3].textures == 1 and pool[3].textures[1].shown == true, "a new row gets its rule")
+    Check(#pool[1].textures == 1 and pool[1].textures[1].paints == 2, "the first row is drawn again, but keeps its one rule")
+    local before = pool[1].textures[1].paints
+    Hook(env)()
+    Hook(env)()
+    Check(pool[1].textures[1].paints == before and pool[3].textures[1].paints == 1, "nothing changed: nothing is drawn")
+
+    -- another of ours: the same rules, in its color
+    env.RXP.activeTheme = env.RXPGuides_Themes["NaowhForever:midnight"]
+    Hook(env)()
+    Check(#pool[2].textures == 1 and Hex(pool[2].textures[1].rgba) == "2a3550", "another of ours: the same rule in Midnight's Borders & Lines")
+
+    -- a theme of RestedXP's: the rules go, once
+    env.RXP.activeTheme = { name = "DarkMode" }
+    Hook(env)()
+    Check(pool[1].textures[1].shown == false and pool[3].textures[1].shown == false, "a theme of RestedXP's: no rules")
+    local hides = pool[1].textures[1].hides
+    Hook(env)()
+    Check(pool[1].textures[1].hides == hides, "and they are not hidden again")
+    env.RXP.activeTheme = env.RXPGuides_Themes["NaowhForever:midnight"]
+    Hook(env)()
+    Check(pool[1].textures[1].shown == true and #pool[1].textures == 1, "back to one of ours: shown again, not made again")
+
+    -- RestedXP's own theme at login: hooked, and no rule is ever made
+    local own, ownBoot, ownPool = Start({ rxpThemes = true }, nil, 2)
+    Login(ownBoot)
+    Check(Hook(own) and #ownPool[1].textures == 0, "RestedXP's own theme: hooked, no rules made")
+    own.RXP.activeTheme = { name = "xNaowhForever:crimson", dividerColor = { 1, 0, 0, 1 } }
+    Hook(own)()
+    Check(#ownPool[1].textures == 0, "only a name that starts with ours counts")
+    own.RXP.activeTheme = own.RXPGuides_Themes["NaowhForever:slate"]
+    Hook(own)()
+    Check(#ownPool[1].textures == 1 and ownPool[2].textures[1].shown == true, "one of ours picked later: the rules appear")
+
+    -- off: no login event, nothing hooked or drawn
+    local off, offBoot, offPool = Start({}, nil, 2)
+    Login(offBoot)
+    Check(#off.hooked == 0 and #offPool[1].textures == 0, "off: nothing is hooked, nothing is drawn")
+
+    -- RestedXP without the pieces: no error, and only what is there is used
+    local function Bare(window, rxp)
+        local e, _, f, b = Load({ rxpThemes = true }, true)
+        e.RXPFrame = window
+        Fire(f, "NaowhForever")
+        e.RXP = rxp and { SetStep = rxp.SetStep, activeTheme = e.RXPGuides_Themes["NaowhForever:crimson"] } or nil
+        Login(b)
+        return e
+    end
+    Check(#Bare(nil, {}).hooked == 0, "no window and no SetStep: nothing is hooked")
+    Check(#Bare({}, { SetStep = function() end }).hooked == 1, "a window without a list: hooked, nothing drawn, no error")
+    Check(#Bare({ ScrollChild = {} }, { SetStep = function() end }).hooked == 1, "a list without rows: no error")
+    local empty = { ScrollChild = { framePool = {} } }
+    Check(#Bare(empty, { SetStep = function() end }).hooked == 1, "an empty list: no error")
+    local plain = { ScrollChild = { framePool = { {} } } }
+    Check(#Bare(plain, { SetStep = function() end }).hooked == 1, "a row that cannot make a texture is skipped")
 end
 
 -- The setting.

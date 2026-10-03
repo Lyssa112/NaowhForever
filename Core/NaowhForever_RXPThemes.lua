@@ -2,11 +2,12 @@
 --  NaowhForever_RXPThemes.lua -- NaowhUI and the eight Naowh themes in RestedXP Guides.
 --  RestedXP reads a global RXPGuides_Themes table once, while it starts, and registers every
 --  theme in it (its own RXPGuides_Themes addon fills the same table). The frames, borders and
---  icons are RestedXP's own, already installed. Two things a theme cannot color are done here,
+--  icons are RestedXP's own, already installed. Three things a theme cannot color are done here,
 --  while one of these themes is the active one: the title bar and footer show the theme's
---  Background instead of a black banner image, and the waypoint arrow is drawn in the theme's Accent,
---  by a layer over its image or by Naowh's own arrow image, as the player picks. Off unless
---  Settings > COLORS turns it on.
+--  Background instead of a black banner image, the quest list gets a thin rule between its rows
+--  like Naowh's own lists, and the waypoint arrow is drawn in the theme's Accent, by a layer over
+--  its image or by Naowh's own arrow image, as the player picks. Off unless Settings > COLORS
+--  turns it on.
 -------------------------------------------------------------------------------
 local ns = _G.NaowhForever
 
@@ -20,6 +21,8 @@ local NAME_PREFIX = "NaowhForever:"
 local DEFAULT_KEY, DEFAULT_NAME = "default", "NaowhUI"
 -- The frame highlight is RestedXP's soft edge color, not a solid one, as in its other themes.
 local HIGHLIGHT_ALPHA = 0.5
+-- The rules between Naowh's own list rows are the Borders & Lines color at this opacity.
+local RULE_ALPHA = 0.6
 
 -- Every set of RestedXP's textures draws the same dark frame around its windows, with a thin line inside
 -- it. In DarkMode, which these themes take their icons from, that line is almost black, so the frames
@@ -76,6 +79,8 @@ local function Theme(key)
         background = Rgba(c.bg, 1),
         bottomFrameBG = Rgba(c.bg, 1),
         bottomFrameHighlight = Rgba(c.accent, HIGHLIGHT_ALPHA),
+        -- Not a RestedXP field: the rules between the quest list rows, read back from the active theme.
+        dividerColor = Rgba(c.line, RULE_ALPHA),
         mapPins = Rgba(c.accent, 1),
         tooltip = "|cff" .. Hex(c.accent),
         textColor = { c.fg.r, c.fg.g, c.fg.b },
@@ -255,6 +260,48 @@ local function HookBars()
     PaintBars()
 end
 
+-- The classic window's quest list is rows with no line between them. With the rows the same dark as
+-- the gaps they would run together, so while one of ours is the active theme each row gets a 1px rule
+-- at its bottom, like the rules between the rows of Naowh's own lists. The rows are made when a guide
+-- loads, and that ends in SetStep, so SetStep is watched; the rules are drawn again only when the theme
+-- or the number of rows has changed.
+local rules = setmetatable({}, { __mode = "k" })   -- row -> its rule
+local ruleTheme, ruleRows   -- what the rules were last drawn for
+
+local function PaintRules()
+    local window = _G.RXPFrame
+    local scroll = type(window) == "table" and window.ScrollChild
+    local list = type(scroll) == "table" and scroll.framePool
+    if type(list) ~= "table" then return end
+    local theme = ActiveTheme()
+    if theme == ruleTheme and #list == ruleRows then return end
+    ruleTheme, ruleRows = theme, #list
+    local color = theme and theme.dividerColor
+    if type(color) ~= "table" then color = nil end
+    for _, row in ipairs(list) do
+        local rule = rules[row]
+        if color and not rule and type(row) == "table" and type(row.CreateTexture) == "function" then
+            rule = row:CreateTexture(nil, "ARTWORK")
+            rule:SetPoint("BOTTOMLEFT")
+            rule:SetPoint("BOTTOMRIGHT")
+            rule:SetHeight(1)
+            rules[row] = rule
+        end
+        if rule and color then
+            rule:SetColorTexture(color[1], color[2], color[3], color[4])
+            rule:Show()
+        elseif rule then
+            rule:Hide()
+        end
+    end
+end
+
+local function HookRules()
+    local rxp = _G.RXP
+    if type(rxp) == "table" and type(rxp.SetStep) == "function" then hooksecurefunc(rxp, "SetStep", PaintRules) end
+    PaintRules()
+end
+
 -- When this addon has loaded: that is after the saved toggle can be read and before RestedXP
 -- starts (it loads after Naowh Forever, and imports in its own ADDON_LOADED). The arrow and the
 -- window exist once every addon has loaded, so those parts wait for PLAYER_LOGIN, and only while
@@ -273,5 +320,6 @@ boot:SetScript("OnEvent", function(self, event, name)
         self:UnregisterAllEvents()
         HookArrow()
         HookBars()
+        HookRules()
     end
 end)
