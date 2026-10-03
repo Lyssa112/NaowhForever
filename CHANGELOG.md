@@ -153,6 +153,7 @@
   Bottom by default.
 - Threat Meter: Apply Theme to Your Bar (Colours, off by default) colors your bar in a darker shade of your theme's Accent instead of the color picked there. The tank and pull aggro colors are unchanged.
 - Swing Timer: Apply Theme to Bar Colours (Colours, off by default) colors the main hand bar with your theme's Accent, the off hand bar with its lighter Accent and the ranged bar with a deeper shade of it, instead of the colors picked there.
+- Settings: Add Themes to RestedXP (COLORS, off by default, shown when RestedXP Guides is installed) adds NaowhUI and the eight Naowh themes to RestedXP's theme list, in their colors with RestedXP's own frames. Reload to apply, then pick one in RestedXP's Look and Feel settings.
 
 ### Changed
 - The options window's sidebar header shows the NaowhUI Forever logo, and the search box beside it is narrower.

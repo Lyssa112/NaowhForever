@@ -656,6 +656,22 @@ function ns.BuildSettingsPage(parent, y)
         _, h = W:DualRow(parent, y, Swatch("line", "Borders & Lines"), Swatch("fg", "Text")); y = y - h
         _, h = W:DualRow(parent, y, Swatch("muted", "Secondary Text"), Swatch("accent", "Accent")); y = y - h
     end
+    -- Only with RestedXP Guides installed. It reads its themes once, as it starts, hence the reload.
+    if ns.RXPThemesAvailable and ns.RXPThemesAvailable() then
+        _, h = W:DualRow(parent, y,
+            { type = "toggle", text = "Add Themes to RestedXP",
+              tooltip = "Adds NaowhUI and the eight Naowh themes to RestedXP Guides' theme list, in "
+              .. "their colors and with RestedXP's own frames. Pick one in RestedXP's Look and Feel "
+              .. "settings.|n|nTakes effect after a /reload.",
+              getValue = ns.RXPThemesEnabled,
+              setValue = function(v)
+                  ns.SetRXPThemes(v)
+                  colorsPending = true
+                  UI:RefreshPage(true)
+              end },
+            { type = "label", text = "" }
+        ); y = y - h
+    end
     if colorsPending then
         _, h = W:Note(parent, "Reload UI to apply your color changes.", y); y = y - h
     end

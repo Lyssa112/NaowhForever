@@ -8,6 +8,7 @@ local function Read(path)
     return s
 end
 local coreSource = Read("Core/NaowhForever_Core.lua")
+local rxpSource = Read("Core/NaowhForever_RXPThemes.lua")
 local source = Read("Core/NaowhForever_Window.lua")
 local first = assert(source:find('_, h = W:SectionHeader(parent, "COLORS", y)', 1, true))
 local last = assert(source:find('_, h = W:ReloadButton(parent, y)', first, true))
@@ -23,22 +24,26 @@ local cases = 0
 local function Check(ok, label) assert(ok, label); cases = cases + 1 end
 Check(not section:find("ReloadUI", 1, true), "the section never calls ReloadUI itself")
 
-local function RealCore(account)
+local function RealCore(account, rxp)
     local frame = setmetatable({}, { __index = function() return function() end end })
     function frame:SetScript() end
     local env = { CreateFrame = function() return frame end,
+        C_AddOns = { DoesAddOnExist = function(name) return rxp == true and name == "RXPGuides" end },
         NaowhForeverDB = { account = account, profiles = {}, charActive = {} } }
     env._G = env
     setmetatable(env, { __index = _G })
     local core = assert(loadstring(coreSource, "Core"))
     setfenv(core, env)
     core("NaowhForever")
+    local module = assert(loadstring(rxpSource, "RXPThemes"))
+    setfenv(module, env)
+    module("NaowhForever")
     return env.NaowhForever
 end
 
-local function Page(account)
+local function Page(account, rxp)
     local e = { confirms = {}, refreshes = 0, account = account }
-    local ns = RealCore(account)
+    local ns = RealCore(account, rxp)
     ns.Confirm = function(text, onYes) e.confirms[#e.confirms + 1] = { text = text, yes = onYes } end
     local env = { ns = ns, W = {}, colorsPending = false,
         UI = { RefreshPage = function() e.refreshes = e.refreshes + 1 end } }
@@ -248,6 +253,34 @@ do
     Check(#frames == 10 and Shown() == 8 and #painted == 8 and painted[8][1] == 0.25, "more colors build only the missing chips and show them all")
     Check(Build(function() return List(3, 1) end) and #frames == 5 and Shown() == 3, "one chip per color from the start")
     Check(Build(function() return {} end) and #frames == 2 and Shown() == 0, "no colors, no chips")
+end
+
+-- Add Themes to RestedXP: only with RestedXP Guides installed, off by default, a reload to apply.
+do
+    local function Toggle(e)
+        for _, row in ipairs(e.rows) do
+            if row[1].text == "Add Themes to RestedXP" then return row[1] end
+        end
+    end
+    Check(Toggle(Page({})) == nil and Toggle(Page({}, false)) == nil, "no RestedXP toggle without RestedXP Guides")
+    local a = {}
+    local e = Page(a, true)
+    local toggle = Toggle(e)
+    Check(toggle and toggle.type == "toggle", "the toggle is there with RestedXP Guides installed")
+    Check(toggle.getValue() == false and a.rxpThemes == nil, "off by default")
+    for _, word in ipairs({ "NaowhUI", "eight Naowh themes", "Look and Feel", "Takes effect after a /reload" }) do
+        Check(toggle.tooltip:find(word, 1, true), "tooltip mentions " .. word)
+    end
+    Check(#e.notes == 0, "no hint before a change")
+    toggle.setValue(true)
+    Check(a.rxpThemes == true and e.refreshes == 1 and #e.confirms == 0, "on is stored and the page redraws")
+    e.build()
+    Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == HINT, "it reads back, and the reload hint shows")
+    Toggle(e).setValue(false)
+    Check(a.rxpThemes == nil, "off clears it")
+    local custom = Page({ themePreset = "custom" }, true)
+    Check(Toggle(custom) and #custom.rows == #Page({ themePreset = "custom" }).rows + 1, "with Custom the toggle is one more row than without RestedXP")
+    Check(custom.rows[#custom.rows][1].text == "Add Themes to RestedXP", "and is the last row, above the Reload button")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")
