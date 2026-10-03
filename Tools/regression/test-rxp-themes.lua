@@ -274,6 +274,12 @@ do
         function a.texture:SetTexture(path) self.path = path; a.sets[#a.sets + 1] = path end
         function a.texture:SetVertexColor(...) a.tints[#a.tints + 1] = { ... } end
         function a.texture:SetRotation() end   -- RestedXP's own call, which the hook follows
+        a.texture.points = "all"               -- how RestedXP makes it: SetAllPoints()
+        function a.texture:ClearAllPoints() self.points = {} end
+        function a.texture:SetPoint(...) self.points[#self.points + 1] = { ... } end
+        function a.texture:SetAllPoints() self.points = "all" end
+        function a:GetSize() return a.w or 32, a.h or 32 end
+        function a:HookScript(name, fn) a.scripts = a.scripts or {}; a.scripts[name] = fn end
         function a:GetFrameLevel() return 3 end
         function a.UpdateVisuals() end
         return a
@@ -484,6 +490,49 @@ do
     styles.SetRXPArrowShape("wide")
     Check(#drawn.sets == setsNow and drawn.texture.path == IMAGE, "and so does RestedXP's own arrow")
     styles.SetRXPArrowShape("kite")
+
+    -- Naowh's arrow is drawn larger than the frame RestedXP gives its own: 1.2 times, and 1.2 / 0.76 times with a glow
+    -- (whose kite fills 76% of the image), around the same center. Anything else gets RestedXP's anchors back.
+    local function Spread(frame)
+        local pts = frame.texture.points
+        if pts == "all" then return "all" end
+        local tl, br = pts[1], pts[2]
+        if #pts ~= 2 or tl[1] ~= "TOPLEFT" or tl[2] ~= frame or tl[3] ~= "TOPLEFT" or br[1] ~= "BOTTOMRIGHT"
+                or br[2] ~= frame or br[3] ~= "BOTTOMRIGHT" then return nil end
+        return tl[4], tl[5], br[4], br[5]
+    end
+    local function Near(a, b) return math.abs(a - b) < 1e-9 end
+    local function Overflow(frame, scale)
+        local x1, y1, x2, y2 = Spread(frame)
+        if type(x1) ~= "number" then return false end
+        local d = 32 * (scale - 1) / 2
+        return Near(x1, -d) and Near(y1, d) and Near(x2, d) and Near(y2, -d)
+    end
+    local sizeEnv, _, sizeBoot = Start({ rxpThemes = true, rxpArrow = "image" }, "NaowhForever:rosenoir")
+    local sized = sizeEnv.RXPG_ARROW
+    Check(Spread(sized) == "all", "before login, RestedXP's own anchors")
+    Login(sizeBoot)
+    Check(Overflow(sized, 1.2), "the Naowh arrow image is 1.2 times the frame, around the same center")
+    sizeEnv.NaowhForever.SetRXPArrowGlow(true)
+    Check(Overflow(sized, 1.2 / 0.76), "with a glow, larger still, so the kite stays the same size")
+    sizeEnv.NaowhForever.SetRXPArrowShape("wide")
+    Check(Overflow(sized, 1.2 / 0.76), "and the shape does not change that")
+    sizeEnv.NaowhForever.SetRXPArrowGlow(false)
+    Check(Overflow(sized, 1.2), "without it, back to 1.2")
+    sized.w, sized.h = 64, 64
+    sized.scripts.OnSizeChanged()
+    local x1 = Spread(sized)
+    Check(type(x1) == "number" and Near(x1, -64 * 0.2 / 2), "RestedXP's Arrow Size resizing the frame: the image follows it")
+    sized.w, sized.h = 32, 32
+    sized.scripts.OnSizeChanged()
+    sizeEnv.NaowhForever.SetRXPArrowStyle("layer")
+    Check(Spread(sized) == "all", "with the layer as the style, RestedXP's own anchors are back")
+    sized.w, sized.h = 64, 64
+    sized.scripts.OnSizeChanged()
+    Check(Spread(sized) == "all", "and a resize does not move them")
+    sizeEnv.NaowhForever.SetRXPArrowStyle("image")
+    sizeEnv.NaowhForever.SetRXPArrowStyle("off")
+    Check(Spread(sized) == "all", "nor does RestedXP's own arrow")
 
     -- saved wide and glow: that image is on the arrow at login
     local wideEnv, _, wideBoot = Start({ rxpThemes = true, rxpArrow = "image", rxpArrowShape = "wide", rxpArrowGlow = true },

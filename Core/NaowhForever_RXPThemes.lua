@@ -161,6 +161,11 @@ local ARROW_IMAGES = {
     wide = { [false] = MEDIA .. "rxp_arrow_wide.tga", [true] = MEDIA .. "rxp_arrow_wide_glow.tga" },
 }
 local DEFAULT_SHAPE = "kite"
+-- Naowh's arrow is drawn a bit larger than the frame RestedXP gives its own: the kite comes out ARROW_SIZE
+-- times the frame, and the image's edges overflow it (nothing clips them). With a glow the kite fills only
+-- GLOW_FILL of the image (Tools/make_media.py), so that image is drawn larger still, for a kite of the same size.
+local ARROW_SIZE = 1.2
+local GLOW_FILL = 0.76
 local ARROW_STYLES = { layer = true, image = true, off = true }
 local DEFAULT_ARROW = "layer"
 -- The layer's Accent is lighter at the top and deeper at the bottom, as if lit from above, and not at
@@ -171,6 +176,7 @@ local LAYER_STRENGTH = 0.9
 
 local layer     -- our layer over the arrow, built the first time it is needed
 local swapped   -- the arrow shows our image in place of RestedXP's
+local fitted    -- how many times the frame our image is drawn, while it is the one on the arrow
 local tinted    -- the arrow's texture carries our tint
 local rxpImage  -- the image RestedXP last set, to hand back
 
@@ -234,6 +240,17 @@ local function PaintLayer(arrow, c)
     layer:Show()
 end
 
+-- Our image over the arrow's frame, `scale` times its size around the same center (the arrow turns
+-- about that center, so it still turns in place).
+local function Fit(arrow, texture, scale)
+    if type(texture.ClearAllPoints) ~= "function" or type(arrow.GetSize) ~= "function" then return end
+    local w, h = arrow:GetSize()
+    local dx, dy = w * (scale - 1) / 2, h * (scale - 1) / 2
+    texture:ClearAllPoints()
+    texture:SetPoint("TOPLEFT", arrow, "TOPLEFT", -dx, dy)
+    texture:SetPoint("BOTTOMRIGHT", arrow, "BOTTOMRIGHT", dx, -dy)
+end
+
 local function Paint()
     local arrow = _G.RXPG_ARROW
     local texture = arrow and arrow.texture
@@ -249,8 +266,17 @@ local function Paint()
         local c = theme.mapPins
         texture:SetTexture(ARROW_IMAGES[ns.RXPArrowShape()][ns.RXPArrowGlow()])
         texture:SetVertexColor(c[1], c[2], c[3], 1)
+        fitted = ns.RXPArrowGlow() and ARROW_SIZE / GLOW_FILL or ARROW_SIZE
+        Fit(arrow, texture, fitted)
         swapped, tinted = true, true
     else
+        if fitted then
+            fitted = nil
+            if type(texture.SetAllPoints) == "function" then
+                texture:ClearAllPoints()
+                texture:SetAllPoints()
+            end
+        end
         if swapped then
             if rxpImage then texture:SetTexture(rxpImage) end
             swapped = false
@@ -295,6 +321,12 @@ local function HookArrow()
     local arrow = _G.RXPG_ARROW
     if not (arrow and arrow.texture and type(arrow.UpdateVisuals) == "function") then return end
     hooksecurefunc(arrow, "UpdateVisuals", OnRxpUpdate)
+    -- RestedXP's Arrow Size setting resizes the frame without drawing the arrow again.
+    if type(arrow.HookScript) == "function" then
+        arrow:HookScript("OnSizeChanged", function()
+            if fitted then Fit(arrow, arrow.texture, fitted) end
+        end)
+    end
     OnRxpUpdate()
 end
 

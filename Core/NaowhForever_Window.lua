@@ -701,8 +701,7 @@ function ns.BuildSettingsPage(parent, y)
                   getValue = ns.RXPArrowShape,
                   setValue = function(v) ns.SetRXPArrowShape(v) end },
                 { type = "toggle", text = "Naowh Arrow Glow",
-                  tooltip = "A soft glow in the theme's Accent around Naowh's arrow in RestedXP. The "
-                  .. "arrow is drawn smaller to make room for it.",
+                  tooltip = "A soft glow in the theme's Accent around Naowh's arrow in RestedXP.",
                   disabled = NotNaowhArrow,
                   disabledTooltip = pickFirst,
                   getValue = ns.RXPArrowGlow,
