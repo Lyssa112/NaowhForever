@@ -708,6 +708,48 @@ function ns.BuildSettingsPage(parent, y)
               getValue = ns.RXPArrowGlow,
               setValue = function(v) ns.SetRXPArrowGlow(v) end }
         ); y = y - h
+        local function ThemesOff() return not ns.RXPThemesEnabled() end
+        local turnOn = "Turn on Add Themes to RestedXP first."
+        _, h = W:DualRow(parent, y,
+            { type = "toggle", text = "Use Addon Font",
+              tooltip = "Draws RestedXP's guide text, title bar and arrow text in the Addon Font from FONT "
+              .. "above. Off keeps RestedXP's own font.|n|nTakes effect after a /reload.",
+              disabled = ThemesOff,
+              disabledTooltip = turnOn,
+              getValue = ns.RXPFontEnabled,
+              setValue = function(v)
+                  ns.SetRXPFont(v)
+                  colorsPending = true
+                  UI:RefreshPage(true)
+              end },
+            { type = "toggle", text = "Use Theme Text Color",
+              tooltip = "Draws RestedXP's text in the theme's Text color. Off keeps RestedXP's own white."
+              .. "|n|nTakes effect after a /reload.",
+              disabled = ThemesOff,
+              disabledTooltip = turnOn,
+              getValue = ns.RXPTextColorEnabled,
+              setValue = function(v)
+                  ns.SetRXPTextColor(v)
+                  colorsPending = true
+                  UI:RefreshPage(true)
+              end }
+        ); y = y - h
+        _, h = W:DualRow(parent, y,
+            { type = "toggle", text = "Quest List Dividers",
+              tooltip = "A thin line between the rows of RestedXP's quest list, in the theme's Borders & "
+              .. "Lines color, like the lines between the rows in this window.",
+              disabled = ThemesOff,
+              disabledTooltip = turnOn,
+              getValue = ns.RXPDividersEnabled,
+              setValue = function(v) ns.SetRXPDividers(v) end },
+            { type = "toggle", text = "Themed Title Bar and Footer",
+              tooltip = "Shows the theme's Background in RestedXP's title bar and footer instead of its "
+              .. "black banner.",
+              disabled = ThemesOff,
+              disabledTooltip = turnOn,
+              getValue = ns.RXPBarsEnabled,
+              setValue = function(v) ns.SetRXPBars(v) end }
+        ); y = y - h
     end
     if colorsPending then
         _, h = W:Note(parent, "Reload UI to apply your color changes.", y); y = y - h

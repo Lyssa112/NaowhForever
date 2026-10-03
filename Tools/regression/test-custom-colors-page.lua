@@ -323,9 +323,62 @@ do
     Toggle(e).setValue(false)
     Check(a.rxpThemes == nil, "off clears it")
     Check(shape.disabled() == true and glow.disabled() == true, "greyed out again with the themes off, whatever the arrow style")
+
+    -- the four looks that can be switched off: after the arrow rows, on by default, usable with the themes on
+    local font, text, dividers, bars
+    for _, row in ipairs(e.rows) do
+        if row[1].text == "Use Addon Font" then font, text = row[1], row[2] end
+        if row[1].text == "Quest List Dividers" then dividers, bars = row[1], row[2] end
+    end
+    Check(font and text and dividers and bars and font.type == "toggle" and text.type == "toggle"
+        and dividers.type == "toggle" and bars.type == "toggle", "four more switches")
+    Check(text.text == "Use Theme Text Color" and bars.text == "Themed Title Bar and Footer", "named for what they do")
+    Check(font.getValue() == true and text.getValue() == true and dividers.getValue() == true and bars.getValue() == true,
+        "all on by default")
+    Check(font.disabled() == true and text.disabled() == true and dividers.disabled() == true and bars.disabled() == true
+        and font.disabledTooltip and bars.disabledTooltip, "greyed out while the themes are off")
+    Toggle(e).setValue(true)
+    Check(font.disabled() == false and text.disabled() == false and dividers.disabled() == false and bars.disabled() == false,
+        "usable with the themes on")
+    for _, word in ipairs({ "Addon Font", "Takes effect after a /reload" }) do
+        Check(font.tooltip:find(word, 1, true), "the font tooltip mentions " .. word)
+    end
+    Check(text.tooltip:find("Takes effect after a /reload", 1, true), "so does the text color's")
+    Check(not dividers.tooltip:find("/reload", 1, true) and not bars.tooltip:find("/reload", 1, true), "the live ones do not")
+    -- each switch on its own: the font and the text color want a reload, the other two apply at once
+    local function Pair(page, name)
+        for _, row in ipairs(page.rows) do
+            if row[1].text == name then return row[1], row[2] end
+        end
+    end
+    local fp = Page({ rxpThemes = true }, true)
+    local fpFont, fpText = Pair(fp, "Use Addon Font")
+    fpFont.setValue(false)
+    fp.build()
+    Check(fp.account.rxpFont == false and fp.account.rxpTextColor == nil and fpFont.getValue() == false and fpText.getValue() == true
+        and fp.refreshes == 1 and #fp.notes == 1 and fp.notes[1] == HINT, "the font alone: stored, the page redraws, and the reload hint shows")
+    fpFont.setValue(true)
+    Check(fp.account.rxpFont == nil and fpFont.getValue() == true, "on is stored as nothing")
+    local tp = Page({ rxpThemes = true }, true)
+    local tpFont, tpText = Pair(tp, "Use Addon Font")
+    tpText.setValue(false)
+    tp.build()
+    Check(tp.account.rxpTextColor == false and tp.account.rxpFont == nil and tpText.getValue() == false and tpFont.getValue() == true
+        and tp.refreshes == 1 and #tp.notes == 1 and tp.notes[1] == HINT, "the text color alone: the same")
+    local dp = Page({ rxpThemes = true }, true)
+    local dpDividers, dpBars = Pair(dp, "Quest List Dividers")
+    dpDividers.setValue(false)
+    dp.build()
+    Check(dp.account.rxpDividers == false and dp.account.rxpBars == nil and dpDividers.getValue() == false and dpBars.getValue() == true
+        and dp.refreshes == 0 and #dp.notes == 0, "the dividers alone: stored, applied at once, no reload hint")
+    dpBars.setValue(false)
+    dp.build()
+    Check(dp.account.rxpBars == false and dpBars.getValue() == false and dp.refreshes == 0 and #dp.notes == 0,
+        "the title bar alone: the same")
+    Toggle(e).setValue(false)
     local custom = Page({ themePreset = "custom" }, true)
-    Check(Toggle(custom) and #custom.rows == #Page({ themePreset = "custom" }).rows + 2, "with Custom the RestedXP rows are two more than without RestedXP")
-    Check(custom.rows[#custom.rows][1].text == "Naowh Arrow Shape", "and the shape row is the last, above the Reload button")
+    Check(Toggle(custom) and #custom.rows == #Page({ themePreset = "custom" }).rows + 4, "with Custom the RestedXP rows are four more than without RestedXP")
+    Check(custom.rows[#custom.rows][1].text == "Quest List Dividers", "and the dividers row is the last, above the Reload button")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

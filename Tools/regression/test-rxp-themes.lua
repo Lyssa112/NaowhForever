@@ -241,6 +241,20 @@ do
     Check(laterNs.UIFontPath() == "Fonts\\Later.ttf", "the addon's own font is still found once the later addon has loaded")
     Check(env.RXPGuides_Themes[NameOf("")].font == NAOWH, "while the RestedXP theme took the fallback at the time")
 
+    -- Switched off in Settings: left out, so RestedXP fills in its own.
+    local plain = Fonts({ rxpThemes = true, rxpFont = false }, {})
+    local plainFont = true
+    for _, key in ipairs(KEYS) do
+        if plain[NameOf(key)].font ~= nil or plain[NameOf(key)].textColor == nil then plainFont = false end
+    end
+    Check(plainFont, "the font switched off: no font in any theme, and the text color is still there")
+    local plainText = Fonts({ rxpThemes = true, rxpTextColor = false }, {})
+    local noText = true
+    for _, key in ipairs(KEYS) do
+        if plainText[NameOf(key)].textColor ~= nil or plainText[NameOf(key)].font ~= NAOWH then noText = false end
+    end
+    Check(noText, "the text color switched off: none in any theme, and the font is still there")
+
     -- The text color is the theme's Text, as the palette has it.
     local colors = Fonts({ rxpThemes = true }, {})
     Check(Hex(colors[NameOf("")].textColor) == "f0f1f3" and Hex(colors[NameOf("crimson")].textColor) == "f6eff0",
@@ -554,6 +568,16 @@ do
     Hook(own, ownFooter)(ownFooter)
     Check(ownTitle.alpha == 0 and ownFooter.alpha == 0, "one of ours picked later: hidden")
 
+    -- switched off in Settings: the banners are left alone, and switching is at once
+    local kept, keptBoot = Start({ rxpThemes = true, rxpBars = false }, "NaowhForever:crimson")
+    Login(keptBoot)
+    local keptTitle, keptFooter = kept.RXPFrame.GuideName.bg, kept.RXPFrame.Footer.bg
+    Check(#keptTitle.alphas == 0 and #keptFooter.alphas == 0 and Hook(kept, keptTitle), "switched off: hooked, banners untouched")
+    kept.NaowhForever.SetRXPBars(true)
+    Check(keptTitle.alpha == 0 and keptFooter.alpha == 0, "switched on: hidden at once")
+    kept.NaowhForever.SetRXPBars(false)
+    Check(keptTitle.alpha == 1 and keptFooter.alpha == 1, "switched off: RestedXP's banners come back at once")
+
     -- off: no login event, nothing hooked or hidden
     local off, offBoot = Start({}, nil)
     Login(offBoot)
@@ -671,6 +695,18 @@ do
     Hook(own)()
     Check(#ownPool[1].textures == 1 and ownPool[2].textures[1].shown == true, "one of ours picked later: the rules appear")
 
+    -- switched off in Settings: no rules at login, and switching is at once
+    local quiet, quietBoot, quietPool = Start({ rxpThemes = true, rxpDividers = false }, "NaowhForever:crimson", 2)
+    Login(quietBoot)
+    Check(#quietPool[1].textures == 0 and #quiet.hooked == 1, "dividers switched off: hooked, but no rules are made")
+    quiet.NaowhForever.SetRXPDividers(true)
+    Check(#quietPool[1].textures == 1 and quietPool[1].textures[1].shown == true and quietPool[2].textures[1].shown == true,
+        "switched on: the rules appear at once")
+    quiet.NaowhForever.SetRXPDividers(false)
+    Check(quietPool[1].textures[1].shown == false and quietPool[2].textures[1].shown == false, "switched off: they go at once")
+    quiet.NaowhForever.SetRXPDividers(true)
+    Check(#quietPool[1].textures == 1 and quietPool[1].textures[1].shown == true, "and back, without making them again")
+
     -- off: no login event, nothing hooked or drawn
     local off, offBoot, offPool = Start({}, nil, 2)
     Login(offBoot)
@@ -692,6 +728,24 @@ do
     Check(#Bare(empty, { SetStep = function() end }).hooked == 1, "an empty list: no error")
     local plain = { ScrollChild = { framePool = { {} } } }
     Check(#Bare(plain, { SetStep = function() end }).hooked == 1, "a row that cannot make a texture is skipped")
+end
+
+-- The four looks that can be switched off: on by default, saved as false when off, and only false turns them off.
+do
+    for _, option in ipairs({ { "RXPFontEnabled", "SetRXPFont", "rxpFont" },
+            { "RXPTextColorEnabled", "SetRXPTextColor", "rxpTextColor" },
+            { "RXPDividersEnabled", "SetRXPDividers", "rxpDividers" }, { "RXPBarsEnabled", "SetRXPBars", "rxpBars" } }) do
+        local get, set, key = option[1], option[2], option[3]
+        local account = {}
+        local _, ns = Load(account, true)
+        Check(ns[get]() == true and account[key] == nil, get .. ": on by default")
+        ns[set](false)
+        Check(ns[get]() == false and account[key] == false, get .. ": off is saved as false")
+        ns[set](true)
+        Check(ns[get]() == true and account[key] == nil, get .. ": on is saved as nothing")
+        account[key] = 0
+        Check(ns[get]() == true, get .. ": only false turns it off")
+    end
 end
 
 -- The setting.

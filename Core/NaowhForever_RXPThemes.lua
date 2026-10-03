@@ -8,7 +8,8 @@
 --  Background instead of a black banner image, the quest list gets a thin rule between its rows
 --  like Naowh's own lists, and the waypoint arrow is drawn in the theme's Accent, by a layer over
 --  its image or by Naowh's own arrow image, as the player picks. Off unless Settings > COLORS
---  turns it on.
+--  turns it on; there the font, the text color, the quest list rules and the title bar and footer
+--  can each be switched off.
 -------------------------------------------------------------------------------
 local ns = _G.NaowhForever
 
@@ -55,6 +56,38 @@ function ns.SetRXPThemes(on)
     ns.AccountSettings().rxpThemes = on and true or nil
 end
 
+-- Four looks that are on unless the player switches them off (Settings > COLORS); saved as false when off.
+local function Wanted(key)
+    return ns.AccountSettings()[key] ~= false
+end
+
+local function Want(key, on)
+    if on then ns.AccountSettings()[key] = nil else ns.AccountSettings()[key] = false end
+end
+
+--- Whether RestedXP's text is in the Addon Font, else its own font. Read when RestedXP imports the
+--- themes, so a change takes effect after a reload.
+---@return boolean
+function ns.RXPFontEnabled() return Wanted("rxpFont") end
+
+---@param on boolean
+function ns.SetRXPFont(on) Want("rxpFont", on) end
+
+--- Whether RestedXP's text is in the theme's Text color, else its own white. Takes a reload, too.
+---@return boolean
+function ns.RXPTextColorEnabled() return Wanted("rxpTextColor") end
+
+---@param on boolean
+function ns.SetRXPTextColor(on) Want("rxpTextColor", on) end
+
+--- Whether the quest list has a rule between its rows. Applied at once.
+---@return boolean
+function ns.RXPDividersEnabled() return Wanted("rxpDividers") end
+
+--- Whether the title bar and footer show the theme's color instead of the black banner. Applied at once.
+---@return boolean
+function ns.RXPBarsEnabled() return Wanted("rxpBars") end
+
 local function Rgba(c, alpha)
     return { c.r, c.g, c.b, alpha }
 end
@@ -84,9 +117,10 @@ local function Theme(key)
         dividerColor = Rgba(c.line, RULE_ALPHA),
         mapPins = Rgba(c.accent, 1),
         tooltip = "|cff" .. Hex(c.accent),
-        textColor = { c.fg.r, c.fg.g, c.fg.b },
-        -- The Addon Font, found afresh: UIFontPath would remember what it finds this early.
-        font = ns.AddonFontPath(),
+        -- The Text color and the Addon Font (found afresh: UIFontPath would remember what it finds this
+        -- early); left out, RestedXP uses its own.
+        textColor = ns.RXPTextColorEnabled() and { c.fg.r, c.fg.g, c.fg.b } or nil,
+        font = ns.RXPFontEnabled() and ns.AddonFontPath() or nil,
         texturePath = TEXTURES,
         -- The title bar and footer are a fill under a banner image, and RestedXP's blue theme gives them
         -- no fill. With one, hiding the banner (below) shows the Background color.
@@ -279,13 +313,20 @@ local function Banner(name)
 end
 
 local function PaintBars()
-    local hide = ActiveTheme() ~= nil
+    local hide = ActiveTheme() ~= nil and ns.RXPBarsEnabled()
     if not hide and not barsHidden then return end
     for _, name in ipairs(BARS) do
         local banner = Banner(name)
         if banner and type(banner.SetAlpha) == "function" then banner:SetAlpha(hide and 0 or 1) end
     end
     barsHidden = hide
+end
+
+--- Applied at once.
+---@param on boolean
+function ns.SetRXPBars(on)
+    Want("rxpBars", on)
+    PaintBars()
 end
 
 local function HookBars()
@@ -304,17 +345,17 @@ end
 -- SetStep is watched; the rules are drawn again only when the theme or the number of rows has changed.
 local RULE_DROP = 3
 local rules = setmetatable({}, { __mode = "k" })   -- row -> its rule
-local ruleTheme, ruleRows   -- what the rules were last drawn for
+local ruleTheme, ruleOn, ruleRows   -- what the rules were last drawn for
 
 local function PaintRules()
     local window = _G.RXPFrame
     local scroll = type(window) == "table" and window.ScrollChild
     local list = type(scroll) == "table" and scroll.framePool
     if type(list) ~= "table" then return end
-    local theme = ActiveTheme()
-    if theme == ruleTheme and #list == ruleRows then return end
-    ruleTheme, ruleRows = theme, #list
-    local color = theme and theme.dividerColor
+    local theme, on = ActiveTheme(), ns.RXPDividersEnabled()
+    if theme == ruleTheme and on == ruleOn and #list == ruleRows then return end
+    ruleTheme, ruleOn, ruleRows = theme, on, #list
+    local color = theme and on and theme.dividerColor
     if type(color) ~= "table" then color = nil end
     for _, row in ipairs(list) do
         local rule = rules[row]
@@ -332,6 +373,13 @@ local function PaintRules()
             rule:Hide()
         end
     end
+end
+
+--- Applied at once.
+---@param on boolean
+function ns.SetRXPDividers(on)
+    Want("rxpDividers", on)
+    PaintRules()
 end
 
 local function HookRules()
