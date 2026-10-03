@@ -68,22 +68,12 @@ function ns.SetRXPThemes(on)
     ns.AccountSettings().rxpThemes = on and true or nil
 end
 
----@return boolean
-function ns.RXPAutoThemeEnabled()
-    return ns.AccountSettings().rxpAutoTheme == true
-end
-
----@param on boolean
-function ns.SetRXPAutoTheme(on)
-    ns.AccountSettings().rxpAutoTheme = on and true or nil
-    ApplyTheme()
-end
-
--- Without the current theme, the player can pick one of the others: the default's and the presets'.
+-- The theme RestedXP is put on: none (RestedXP keeps whichever it is on), the current one, NaowhUI or a preset.
 ---@return table values by id
 ---@return table order
 function ns.RXPThemeChoices()
-    local values, order = { [""] = "Leave as it is", [DEFAULT_KEY] = DEFAULT_NAME }, { "", DEFAULT_KEY }
+    local values = { [""] = "RestedXP (default)", [CURRENT_KEY] = "Current Theme", [DEFAULT_KEY] = DEFAULT_NAME }
+    local order = { "", CURRENT_KEY, DEFAULT_KEY }
     for _, key in ipairs(ns.THEME_PRESET_ORDER) do
         values[key] = ns.THEME_PRESETS[key].name
         order[#order + 1] = key
@@ -92,7 +82,7 @@ function ns.RXPThemeChoices()
 end
 
 local function ThemeId(key)
-    return key == DEFAULT_KEY or (type(key) == "string" and ns.THEME_PRESETS[key] ~= nil)
+    return key == CURRENT_KEY or key == DEFAULT_KEY or (type(key) == "string" and ns.THEME_PRESETS[key] ~= nil)
 end
 
 ---@return string "" or a theme's id
@@ -288,20 +278,14 @@ local function Dig(t, ...)
     return t
 end
 
--- The theme the player wants RestedXP on: Naowh (current), else the one picked, else none.
-local function WantedTheme()
-    if ns.RXPAutoThemeEnabled() then return NAME_PREFIX .. CURRENT_KEY end
-    local key = ns.RXPThemeChoice()
-    return key ~= "" and NAME_PREFIX .. key or nil
-end
-
--- RestedXP on that theme, through its own theme reload (which only runs with its live reload setting
--- on, so that is on for the call).
+-- RestedXP on the theme picked in Settings, through its own theme reload (which only runs with its live
+-- reload setting on, so that is on for the call).
 function ApplyTheme()
     local rxp = _G.RXP
     local profile = Dig(rxp, "settings", "profile")
-    local name = WantedTheme()
-    if not name or type(profile) ~= "table" or type(rxp.ReloadTheme) ~= "function" or not Dig(rxp, "themes", name)
+    local key = ns.RXPThemeChoice()
+    local name = NAME_PREFIX .. key
+    if key == "" or type(profile) ~= "table" or type(rxp.ReloadTheme) ~= "function" or not Dig(rxp, "themes", name)
             or profile.activeTheme == name then
         return
     end

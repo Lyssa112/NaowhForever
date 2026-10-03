@@ -679,26 +679,15 @@ function ns.BuildSettingsPage(parent, y)
             .. "own frames, and colors its waypoint arrow in the theme's Accent. Pick one in RestedXP's "
             .. "Look and Feel settings.",
             ns.RXPThemesEnabled, ns.SetRXPThemes)
-        _, h = W:DualRow(parent, y, themesSwitch, { type = "label", text = "" }); y = y - h
+        local choices, choiceOrder = ns.RXPThemeChoices()
+        _, h = W:DualRow(parent, y, themesSwitch,
+            ns.RXPThemesEnabled() and { type = "dropdown", text = "RestedXP Theme", values = choices, order = choiceOrder,
+              tooltip = "The theme RestedXP is put on at every login. RestedXP (default) keeps whichever theme "
+              .. "RestedXP is set to. Current Theme follows the theme or Custom colors you pick here.",
+              getValue = ns.RXPThemeChoice,
+              setValue = function(v) ns.SetRXPThemeChoice(v) end } or { type = "label", text = "" }
+        ); y = y - h
         if ns.RXPThemesEnabled() then
-            local choices, choiceOrder = ns.RXPThemeChoices()
-            _, h = W:DualRow(parent, y,
-                { type = "toggle", text = "Use Current Theme for RestedXP",
-                  tooltip = "Makes Naowh (current), which follows the theme or Custom colors you pick here, "
-                  .. "RestedXP's theme at every login. Off lets you pick one of the other themes instead. "
-                  .. "Needs a reload after Add Themes to RestedXP before it can apply.",
-                  getValue = ns.RXPAutoThemeEnabled,
-                  setValue = function(v)
-                      ns.SetRXPAutoTheme(v)
-                      UI:RefreshPage(true)
-                  end },
-                ns.RXPAutoThemeEnabled() and { type = "label", text = "" }
-                or { type = "dropdown", text = "RestedXP Theme", values = choices, order = choiceOrder,
-                  tooltip = "The Naowh theme RestedXP is put on at every login. Leave as it is keeps whichever "
-                  .. "theme RestedXP is set to.",
-                  getValue = ns.RXPThemeChoice,
-                  setValue = function(v) ns.SetRXPThemeChoice(v) end }
-            ); y = y - h
             local image = ns.RXPArrowStyle() == "image"
             _, h = W:DualRow(parent, y,
                 { type = "dropdown", text = "RestedXP Arrow",
