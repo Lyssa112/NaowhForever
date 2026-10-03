@@ -741,7 +741,7 @@ function W:DualRow(parent, yOffset, leftCfg, rightCfg)
 
     if not row._rule then
         row._rule = ns.Solid(row, "ARTWORK", T.line, 0.6)
-        row._rule:SetPoint("BOTTOMLEFT"); row._rule:SetPoint("BOTTOMRIGHT"); row._rule:SetHeight(1)
+        row._rule:SetPoint("BOTTOMLEFT"); row._rule:SetPoint("BOTTOMRIGHT"); ns.Hairline(row._rule, "h")
     end
     local function FitRegions()
         local width = math.max(1, parent:GetWidth() - UI.CONTENT_PAD * 2)
@@ -773,7 +773,7 @@ function W:DualRow(parent, yOffset, leftCfg, rightCfg)
         local divider = ns.Solid(row, "ARTWORK", T.line, 0.6)
         divider:SetPoint("TOP", row, "TOP", 0, -8)
         divider:SetPoint("BOTTOM", row, "BOTTOM", 0, 8)
-        divider:SetWidth(1)
+        ns.Hairline(divider, "v")
     else
         row._leftRegion = BuildRegion(row, leftCfg, 0, w)
     end
@@ -799,7 +799,7 @@ function W:SectionHeader(parent, text, yOffset)
     local sep = ns.Solid(f, "ARTWORK", T.line, 1)
     sep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
     sep:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
-    sep:SetHeight(1)
+    ns.Hairline(sep, "h")
     return f, HEADER_H
 end
 
@@ -1495,6 +1495,15 @@ function UI.ModuleSettings(key, defaults)
         return Row({ type = "dropdown", text = text, tooltip = tooltip,
             values = values, order = order }, k, on)
     end
+    -- A sound dropdown that plays the pick, as the Smart Reminders sound rows do.
+    function S.SoundDropdown(k, text, values, order, tooltip, on)
+        local cfg = S.Dropdown(k, text, values, order, tooltip, on)
+        cfg.setValue = function(v)
+            S.Set(k, v)
+            UI._PlayLSMSound(UI.SoundPathFor(v))
+        end
+        return cfg
+    end
     return S
 end
 
@@ -1531,7 +1540,11 @@ function UI.AppendSharedMediaSounds(paths, names, order)
     table.sort(sorted, function(a, b) return a:lower() < b:lower() end)
     for _, name in ipairs(sorted) do
         local key = "sm:" .. name
-        if not names[key] then
+        if name == "None" then
+            -- LibSharedMedia's own silent placeholder. It stays out of the list, but a
+            -- choice saved before keeps a readable name instead of the raw "sm:None".
+            names[key] = names[key] or "None"
+        elseif not names[key] then
             paths[key] = list[name]
             names[key] = name
             order[#order + 1] = key

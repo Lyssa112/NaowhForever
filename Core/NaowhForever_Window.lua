@@ -66,6 +66,14 @@ local MODULES = {
           { name = "Books", build = "BuildDiscoveryBooksPage", reuse = true, noscan = true },
           { name = "Settings", build = "BuildDiscoverySettingsPage", reuse = true },
       } },
+    -- The planner itself is a window of its own (open); only its settings live here.
+    { name = "Training Planner", group = "ADVENTURE", navIcon = "notes", settings = "TrainingSettings",
+      open = "ToggleTrainingWindow",
+      command = "training", short = "Training", icon = "Interface\\Icons\\INV_Misc_Book_11",
+      subtitle = "What you can train now, what each level brings and what it costs.",
+      tabs = {
+          { name = "Settings", build = "BuildTrainingSettingsPage", reuse = true },
+      } },
     { name = "Gear & Trinkets", group = "COMBAT", navIcon = "shield", settings = "QoLSettings", enabledKey = "gearSets",
       command = "gear", short = "Gear", icon = "Interface\\Icons\\INV_Chest_Plate04",
       subtitle = "Swap equipment sets from a bar, or on their own while you ride or rest.",
@@ -465,12 +473,14 @@ local function FitMainWindow()
     local fit = math.min((UIParent:GetWidth() - 32) / window:GetWidth(),
         (UIParent:GetHeight() - 32) / window:GetHeight())
     window:SetScale(math.min(ns.UIScale(), math.max(0.25, fit)))
+    ns.RefitPixels()
 end
 
 function ns.SetWindowScale(pct)
     ns.AccountSettings().windowScale = tonumber(pct) or 100
     FitMainWindow()
     for _, win in pairs(moduleWindows) do win:SetScale(ns.UIScale()) end
+    ns.RefitPixels()
 end
 
 -- Saved for this computer, like the window scale, under the key of the micro menu these
@@ -956,13 +966,13 @@ local function CreateWindow()
     top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(TOP_H)
     DragRegion(top, window)
     local topLine = ns.Solid(top, "ARTWORK", T.line, 1)
-    topLine:SetPoint("BOTTOMLEFT"); topLine:SetPoint("BOTTOMRIGHT"); topLine:SetHeight(1)
+    topLine:SetPoint("BOTTOMLEFT"); topLine:SetPoint("BOTTOMRIGHT"); ns.Hairline(topLine, "h")
     local brand = CreateFrame("Frame", nil, top)
     brand:SetPoint("TOPLEFT")
     brand:SetSize(SIDEBAR_W, TOP_H)
     ns.Solid(brand, "BACKGROUND", T.panel, 1):SetAllPoints()
     local brandEdge = ns.Solid(brand, "ARTWORK", T.line, 1)
-    brandEdge:SetPoint("TOPRIGHT"); brandEdge:SetPoint("BOTTOMRIGHT"); brandEdge:SetWidth(1)
+    brandEdge:SetPoint("TOPRIGHT"); brandEdge:SetPoint("BOTTOMRIGHT"); ns.Hairline(brandEdge, "v")
     local logo = brand:CreateTexture(nil, "ARTWORK")
     logo:SetTexture(BRAND_LOGO, nil, nil, "TRILINEAR")
     logo:SetSize(BRAND.width, BRAND.height)
@@ -988,7 +998,7 @@ local function CreateWindow()
     local sidebar = CreateFrame("Frame", nil, window)
     sidebar:SetPoint("TOPLEFT", 0, -TOP_H); sidebar:SetPoint("BOTTOMLEFT"); sidebar:SetWidth(SIDEBAR_W)
     local edge = ns.Solid(sidebar, "ARTWORK", T.line, 1)
-    edge:SetPoint("TOPRIGHT"); edge:SetPoint("BOTTOMRIGHT"); edge:SetWidth(1)
+    edge:SetPoint("TOPRIGHT"); edge:SetPoint("BOTTOMRIGHT"); ns.Hairline(edge, "v")
     local nav = NavigationScroll(sidebar, 16, 140, SIDEBAR_W)
     -- Modules list in MODULES order under their group; one with only unfinished tabs is left out.
     local groups, grouped = {}, {}
@@ -1009,14 +1019,15 @@ local function CreateWindow()
         if group ~= "" then
             local label = ns.Font(nav, 11, nil, T.muted)
             label:SetPoint("TOPLEFT", 20, ny - 10); label:SetText(ns.L(group))
-            ny = ny - 30
+            ny = ny - 28
         end
         for _, mod in ipairs(grouped[group]) do
             local btn = NavigationButton(nav, DisplayName(mod), ny,
                 function() ShowPage(lastPages[mod.name] or mod.tabs[1].key) end, mod.navIcon)
-            btn:SetHeight(32)
+            -- Spaced to fit every module in the default 790-high window (test-navigation.lua).
+            btn:SetHeight(30)
             navButtons[mod.name] = btn
-            ny = ny - 34
+            ny = ny - 32
         end
     end
     nav:SetHeight(-ny)
@@ -1024,7 +1035,7 @@ local function CreateWindow()
     local utility = CreateFrame("Frame", nil, sidebar)
     utility:SetPoint("BOTTOMLEFT", 0, 28); utility:SetPoint("BOTTOMRIGHT", 0, 28); utility:SetHeight(108)
     local utilityLine = ns.Solid(utility, "ARTWORK", T.line, 1)
-    utilityLine:SetPoint("TOPLEFT"); utilityLine:SetPoint("TOPRIGHT"); utilityLine:SetHeight(1)
+    utilityLine:SetPoint("TOPLEFT"); utilityLine:SetPoint("TOPRIGHT"); ns.Hairline(utilityLine, "h")
     for i, key in ipairs({ "Settings", "Profiles", "Patch Notes" }) do
         local icon = key == "Settings" and "settings" or (key == "Profiles" and "person" or "notes")
         local btn = NavigationButton(utility, ns.L(key), -4 - (i - 1) * 34, function() ShowPage(key) end, icon)
@@ -1059,12 +1070,12 @@ local function CreateWindow()
             tabStrips[mod.name]:Hide()
         end
     end
-    tabLine = ns.Solid(window, "ARTWORK", T.line, 1); tabLine:SetHeight(1)
+    tabLine = ns.Solid(window, "ARTWORK", T.line, 1); ns.Hairline(tabLine, "h")
 
     contentFooter = CreateFrame("Frame", nil, window)
     contentFooter:SetHeight(FOOTER_H)
     local footLine = ns.Solid(contentFooter, "ARTWORK", T.line, 1)
-    footLine:SetPoint("TOPLEFT"); footLine:SetPoint("TOPRIGHT"); footLine:SetHeight(1)
+    footLine:SetPoint("TOPLEFT"); footLine:SetPoint("TOPRIGHT"); ns.Hairline(footLine, "h")
     ns.AccentBorder(ns.ReloadButton(contentFooter, "Reload UI", 120, 30)):SetPoint("LEFT", 26, 0)
     ns.AccentBorder(ns.Button(contentFooter, "Close", 120, 30, function() window:Hide() end))
         :SetPoint("RIGHT", -30, 0)
@@ -1195,7 +1206,7 @@ local function CreateModuleWindow(mod)
     local line = ns.Solid(win, "ARTWORK", T.line, 1)
     line:SetPoint("TOPLEFT", win, "TOPLEFT", 0, -offset)
     line:SetPoint("TOPRIGHT", win, "TOPRIGHT", 0, -offset)
-    line:SetHeight(1)
+    ns.Hairline(line, "h")
 
     win.scrollFrame = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
     win.scrollFrame:SetPoint("TOPLEFT", win, "TOPLEFT", 10, -(offset + 5))

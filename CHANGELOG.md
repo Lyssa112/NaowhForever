@@ -3,6 +3,18 @@
 ## Unreleased
 
 ### Added
+- Training Planner (/nftraining, or its minimap and top bar button): a window with what your
+  next trainer visit costs against your gold, a road to 60 with a dot for every level that
+  brings spells (click one to see them), what is left to pay up to 60, the spells you can
+  train now as cards, and what waits on a rank, a talent or a later level. Each new rank says
+  how much stronger it is than the one before (+100%, and on its tooltip Fire damage 16-24 to
+  33-47). Search any spell of your class, and Show Learned lists what you know. Mini swaps
+  the window for a small bar with your next visit and your gold, to leave up while you level.
+  Right-click a spell to skip it or all its ranks, shift-click to link it. A toast on
+  level-up says how many spells wait and what they cost, and beside your class trainer a
+  panel ticks what you can learn with Learn All I Can Afford, then puts the new ranks on your
+  bars. Opening the trainer updates prices to what it asks, reputation discounts included.
+  Off by default.
 - Top Bar: Faded Opacity (with Show On Mouseover) sets how visible the bar and the FPS / MS
   readout stay while the mouse is away. 0% by default, invisible as before.
 - Blessings: in combat each click on a class button blesses the next member of that class who
@@ -206,8 +218,16 @@
 - Campfire: Show Active Camp Buffs is a dropdown: Off, Always or On Mouseover, which shows
   the buffs only while the mouse is over the camp icon. Your current setting is kept.
 - Dungeon Journal: its data is updated to WoW Forever build 1.60.1.70178.
+- Sound dropdowns play the sound when you pick it, as Smart Reminders' already did.
+- Threat Meter: Hide When Empty is now With Threat, a choice under Show, so Always really
+  means always. Your setting carries over; with In Combat it becomes With Threat. In a Group
+  can no longer hide the empty window, so choose With Threat for that.
 
 ### Fixed
+- Borders and divider lines no longer lose a side at some UI scales (the trainer popup's X
+  missing its left edge, a panel without its top line), and icons keep their black edge all
+  round. Every border, line and icon edge is now exactly one screen pixel, refitted when the
+  UI scale or window scale changes.
 - Opening a color swatch and closing it without picking no longer saves that color. A Custom
   theme color left at the default (including when Custom is first picked) no longer counts as
   changed, so the loot feed glow, XP bar quest and rested colors and the other HUD colors keep
@@ -260,6 +280,9 @@
 - QoL > Tools: a custom slash command that runs another slash command no longer makes your
   next chat message fail. Emotes like /dance work too. Macro commands like /cast, /use and
   /target, and /reload, can't be run this way; the command says so in chat.
+- Sound dropdowns list None once; the second was a silent placeholder from SharedMedia.
+  The QoL sound dropdowns (Combat Alert, Emote, Crosshair, Mouse Ring, Focus Cast Bar)
+  now offer None as well, so a sound can be turned back to silent.
 
 ## 0.5.17-beta
 
