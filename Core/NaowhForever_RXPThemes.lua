@@ -52,8 +52,10 @@ local function Theme(key)
         name = NAME_PREFIX .. (key == "" and DEFAULT_KEY or key),
         displayName = preset and preset.name or DEFAULT_NAME,
         author = AUTHOR,
-        background = Rgba(c.bg, 1),
-        bottomFrameBG = Rgba(c.panel, 1),
+        -- One step lighter than the addon's own windows: these frames sit over the game world, where
+        -- the darkest colors read as black.
+        background = Rgba(c.panel, 1),
+        bottomFrameBG = Rgba(c.line, 1),
         bottomFrameHighlight = Rgba(c.accent, HIGHLIGHT_ALPHA),
         mapPins = Rgba(c.accent, 1),
         tooltip = "|cff" .. Hex(c.accent),
