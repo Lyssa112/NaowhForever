@@ -39,6 +39,7 @@ local DEFAULT_ARROW = "layer"
 -- GLOW_FILL of it (Tools/make_media.py), so that image is drawn larger to keep the kite the same size.
 local SIZE_MIN, SIZE_MAX, SIZE_STEP, DEFAULT_SIZE = 60, 200, 5, 90
 local GLOW_FILL = 0.76
+local TEXT_GAP = 4   -- extra space between Naowh's image and the distance text under it
 -- The layer is lighter at the top and deeper at the bottom, and not full strength, so the dark arrow still shades it.
 local TOP_TOWARD_WHITE = 0.22
 local BOTTOM_SHARE = 0.72
@@ -223,6 +224,7 @@ local layer     -- our layer over the arrow
 local swapped   -- our image is on the arrow in place of RestedXP's
 local fitted    -- how many times the frame our image is drawn; set while our image and tint are on
 local rxpImage  -- the image RestedXP last set
+local textHome  -- where RestedXP anchored the distance text, as GetPoint gives it
 
 local function BuildLayer(arrow)
     local texture = arrow.texture
@@ -253,7 +255,17 @@ local function ShowLayer(arrow, c)
     layer:Show()
 end
 
--- The image over the arrow's frame, `scale` times its size around the same center, so it still turns in place.
+-- The distance text goes `down` lower than RestedXP puts it.
+local function MoveText(arrow, down)
+    local text = arrow.text
+    if type(text) ~= "table" or type(text.GetPoint) ~= "function" then return end
+    textHome = textHome or { text:GetPoint() }
+    local point, relativeTo, relativePoint, x, y = unpack(textHome)
+    text:SetPoint(point, relativeTo, relativePoint, x, y - down)
+end
+
+-- The image over the arrow's frame, `scale` times its size around the same center, so it still turns in
+-- place; and the distance text clear of wherever the image now reaches.
 local function Fit(arrow, texture, scale)
     if type(texture.ClearAllPoints) ~= "function" or type(arrow.GetSize) ~= "function" then return end
     local w, h = arrow:GetSize()
@@ -261,6 +273,7 @@ local function Fit(arrow, texture, scale)
     texture:ClearAllPoints()
     texture:SetPoint("TOPLEFT", arrow, "TOPLEFT", -dx, dy)
     texture:SetPoint("BOTTOMRIGHT", arrow, "BOTTOMRIGHT", dx, -dy)
+    MoveText(arrow, math.max(0, dy) + TEXT_GAP)
 end
 
 local function ShowImage(arrow, texture, c)
@@ -271,13 +284,14 @@ local function ShowImage(arrow, texture, c)
     swapped = true
 end
 
-local function HandBack(texture)
+local function HandBack(arrow, texture)
     if fitted then
         fitted = nil
         if type(texture.SetAllPoints) == "function" then
             texture:ClearAllPoints()
             texture:SetAllPoints()
         end
+        if textHome then arrow.text:SetPoint(unpack(textHome)) end
         texture:SetVertexColor(1, 1, 1, 1)
     end
     if swapped then
@@ -300,7 +314,7 @@ function PaintArrow()
     if style == "image" then
         ShowImage(arrow, texture, theme.mapPins)
     else
-        HandBack(texture)
+        HandBack(arrow, texture)
     end
 end
 

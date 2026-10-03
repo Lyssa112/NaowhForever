@@ -268,6 +268,9 @@ do
         function a.texture:SetPoint(...) self.points[#self.points + 1] = { ... } end
         function a.texture:SetAllPoints() self.points = "all" end
         function a:GetSize() return a.w or 32, a.h or 32 end
+        a.text = { point = { "TOP", a, "BOTTOM", 0, -5 } }   -- as RestedXP anchors it
+        function a.text:GetPoint() return unpack(self.point) end
+        function a.text:SetPoint(...) self.point = { ... } end
         function a:HookScript(name, fn) a.scripts = a.scripts or {}; a.scripts[name] = fn end
         function a:GetFrameLevel() return 3 end
         function a.UpdateVisuals() end
@@ -548,6 +551,33 @@ do
     sizeEnv.NaowhForever.SetRXPArrowSize(200)
     Check(Spread(sized) == "all", "with the layer as the style, a size leaves RestedXP's anchors alone")
     sizeEnv.NaowhForever.SetRXPArrowSize(90)
+
+    -- the distance text goes lower by what the image reaches below the frame, and 4 more; RestedXP's -5 comes back
+    local function TextAt(frame)
+        local t = frame.text.point
+        return t[1] == "TOP" and t[2] == frame and t[3] == "BOTTOM" and t[4] == 0 and t[5]
+    end
+    local function Lower(frame, below) return Near(TextAt(frame), -(5 + below + 4)) end
+    sized.w, sized.h = 32, 32
+    local sz = sizeEnv.NaowhForever
+    sz.SetRXPArrowStyle("image")
+    sz.SetRXPArrowSize(90)
+    Check(Lower(sized, 0), "an image smaller than the frame: the text is 4 lower")
+    sz.SetRXPArrowSize(150)
+    Check(Lower(sized, 8), "150 percent reaches 8 below the frame: the text is that much and 4 lower")
+    sz.SetRXPArrowGlow(true)
+    Check(Lower(sized, 16 * (1.5 / 0.76 - 1)), "and with a glow, by what the larger image reaches")
+    sz.SetRXPArrowGlow(false)
+    sized.w, sized.h = 64, 64
+    sized.scripts.OnSizeChanged()
+    Check(Lower(sized, 16), "RestedXP's Arrow Size resizing the frame: the text follows")
+    sized.w, sized.h = 32, 32
+    sz.SetRXPArrowStyle("layer")
+    Check(TextAt(sized) == -5, "with the layer as the style, RestedXP's own place for the text is back")
+    sz.SetRXPArrowStyle("image")
+    sz.SetRXPArrowStyle("off")
+    Check(TextAt(sized) == -5, "and with RestedXP's own arrow")
+    sz.SetRXPArrowSize(90)
 
     local wideEnv, _, wideBoot = Start({ rxpThemes = true, rxpArrow = "image", rxpArrowShape = "wide", rxpArrowGlow = true },
         "NaowhForever:rosenoir")
