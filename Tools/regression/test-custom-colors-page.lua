@@ -275,7 +275,7 @@ do
         end
     end
     local function Hidden(page)
-        for _, name in ipairs({ "RestedXP Arrow", "Naowh Arrow Shape", "Naowh Arrow Glow", "Naowh Arrow Size", "Use Addon Font",
+        for _, name in ipairs({ "RestedXP Arrow", "Naowh Arrow Shape", "Naowh Arrow Glow", "Naowh Arrow Size", "Naowh Arrow Text Gap", "Use Addon Font",
                 "Use Theme Text Color" }) do
             for _, row in ipairs(page.rows) do
                 if row[1].text == name or (row[2] and row[2].text == name) then return false end
@@ -335,7 +335,7 @@ do
         "with the layer as the arrow style, the choices for Naowh's arrow are not shown")
     local imaged = Page({ rxpThemes = true, rxpArrow = "image" }, true)
     Check(Layout(imaged) == "Add Themes to RestedXP|, RestedXP Arrow|Naowh Arrow Shape, Naowh Arrow Glow|Naowh Arrow Size, "
-        .. "Use Addon Font|Use Theme Text Color", "with Naowh arrow picked: the arrow and its shape, its glow and size, then the font and text color")
+        .. "Naowh Arrow Text Gap|, Use Addon Font|Use Theme Text Color", "with Naowh arrow picked: the arrow and its shape, its glow and size, its text gap, then the font and text color")
     local _, shape = Pair(imaged, "RestedXP Arrow")
     local glow, size = Pair(imaged, "Naowh Arrow Glow")
     Check(shape.type == "dropdown" and glow.type == "toggle" and size.type == "slider", "a dropdown, a toggle and a slider")
@@ -356,6 +356,14 @@ do
     Check(imaged.account.rxpArrowSize == 150 and size.getValue() == 150 and imaged.refreshes == 0, "a size is stored, and the page is not redrawn")
     size.setValue(90)
     Check(imaged.account.rxpArrowSize == nil, "the default is stored as nothing")
+    local gap = Pair(imaged, "Naowh Arrow Text Gap")
+    Check(gap.type == "slider" and gap.min == 0 and gap.max == 20 and gap.step == 1 and gap.getValue() == 4,
+        "the text gap is a slider from 0 to 20, 4 by default")
+    Check(gap.tooltip:find("pixels", 1, true), "its tooltip says the unit")
+    gap.setValue(9)
+    Check(imaged.account.rxpArrowGap == 9 and gap.getValue() == 9 and imaged.refreshes == 0, "a gap is stored, and the page is not redrawn")
+    gap.setValue(4)
+    Check(imaged.account.rxpArrowGap == nil, "the default is stored as nothing")
 
     local font, text = Pair(e, "Use Addon Font")
     Check(font and text and font.type == "toggle" and text.type == "toggle", "two more switches, in one row")
@@ -407,7 +415,7 @@ do
     Check(#onCustom.rows == plain + 3, "with the themes on, RestedXP adds three rows: the toggle, the arrow, and the font and text")
     Check(onCustom.rows[#onCustom.rows][1].text == "Use Addon Font", "and the font row is the last, above the Reload button")
     local onImage = Page({ themePreset = "custom", rxpThemes = true, rxpArrow = "image" }, true)
-    Check(#onImage.rows == plain + 4, "with Naowh arrow picked, one more: the glow and size")
+    Check(#onImage.rows == plain + 5, "with Naowh arrow picked, two more: the glow and size, and the text gap")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

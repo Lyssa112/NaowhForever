@@ -39,7 +39,7 @@ local DEFAULT_ARROW = "layer"
 -- GLOW_FILL of it (Tools/make_media.py), so that image is drawn larger to keep the kite the same size.
 local SIZE_MIN, SIZE_MAX, SIZE_STEP, DEFAULT_SIZE = 60, 200, 5, 90
 local GLOW_FILL = 0.76
-local TEXT_GAP = 4   -- extra space between Naowh's image and the distance text under it
+local GAP_MIN, GAP_MAX, DEFAULT_GAP = 0, 20, 4   -- extra space between Naowh's image and the distance text
 -- The layer is lighter at the top and deeper at the bottom, and not full strength, so the dark arrow still shades it.
 local TOP_TOWARD_WHITE = 0.22
 local BOTTOM_SHARE = 0.72
@@ -116,21 +116,39 @@ end
 ---@return number step
 function ns.RXPArrowSizeRange() return SIZE_MIN, SIZE_MAX, SIZE_STEP end
 
-local function ClampSize(size)
-    return math.min(SIZE_MAX, math.max(SIZE_MIN, math.floor(size / SIZE_STEP + 0.5) * SIZE_STEP))
+local function Snap(value, lo, hi, step)
+    return math.min(hi, math.max(lo, math.floor(value / step + 0.5) * step))
 end
 
 ---@return number percent of RestedXP's arrow frame
 function ns.RXPArrowSize()
     local size = tonumber(ns.AccountSettings().rxpArrowSize)
-    return size and ClampSize(size) or DEFAULT_SIZE
+    return size and Snap(size, SIZE_MIN, SIZE_MAX, SIZE_STEP) or DEFAULT_SIZE
 end
 
 ---@param size number
 function ns.SetRXPArrowSize(size)
     size = tonumber(size)
-    size = size and ClampSize(size)
+    size = size and Snap(size, SIZE_MIN, SIZE_MAX, SIZE_STEP)
     ns.AccountSettings().rxpArrowSize = size ~= DEFAULT_SIZE and size or nil
+    PaintArrow()
+end
+
+---@return number min
+---@return number max
+function ns.RXPArrowGapRange() return GAP_MIN, GAP_MAX end
+
+---@return number pixels
+function ns.RXPArrowGap()
+    local gap = tonumber(ns.AccountSettings().rxpArrowGap)
+    return gap and Snap(gap, GAP_MIN, GAP_MAX, 1) or DEFAULT_GAP
+end
+
+---@param gap number
+function ns.SetRXPArrowGap(gap)
+    gap = tonumber(gap)
+    gap = gap and Snap(gap, GAP_MIN, GAP_MAX, 1)
+    ns.AccountSettings().rxpArrowGap = gap ~= DEFAULT_GAP and gap or nil
     PaintArrow()
 end
 
@@ -273,7 +291,7 @@ local function Fit(arrow, texture, scale)
     texture:ClearAllPoints()
     texture:SetPoint("TOPLEFT", arrow, "TOPLEFT", -dx, dy)
     texture:SetPoint("BOTTOMRIGHT", arrow, "BOTTOMRIGHT", dx, -dy)
-    MoveText(arrow, math.max(0, dy) + TEXT_GAP)
+    MoveText(arrow, math.max(0, dy) + ns.RXPArrowGap())
 end
 
 local function ShowImage(arrow, texture, c)

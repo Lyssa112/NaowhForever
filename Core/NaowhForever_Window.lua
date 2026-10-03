@@ -715,6 +715,14 @@ function ns.BuildSettingsPage(parent, y)
                       getValue = ns.RXPArrowSize,
                       setValue = function(v) ns.SetRXPArrowSize(v) end }
                 ); y = y - h
+                local gapMin, gapMax = ns.RXPArrowGapRange()
+                _, h = W:DualRow(parent, y,
+                    { type = "slider", text = "Naowh Arrow Text Gap", min = gapMin, max = gapMax, step = 1,
+                      tooltip = "Extra space, in pixels, between Naowh's arrow and the distance text under it.",
+                      getValue = ns.RXPArrowGap,
+                      setValue = function(v) ns.SetRXPArrowGap(v) end },
+                    { type = "label", text = "" }
+                ); y = y - h
             end
             _, h = W:DualRow(parent, y,
                 Switch("Use Addon Font",

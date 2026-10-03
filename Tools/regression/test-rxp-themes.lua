@@ -534,6 +534,8 @@ do
     Check(sizeNs.RXPArrowSize() == 90, "and an unreadable saved size reads as 90")
     sizeAccount.rxpArrowSize = 7
     Check(sizeNs.RXPArrowSize() == 60, "a saved size out of range is brought back into it")
+    sizeAccount.rxpArrowSize = 153
+    Check(sizeNs.RXPArrowSize() == 155, "and a saved size between steps is rounded to one")
 
     -- it sizes the image at once, with or without a glow, as the kite is the same size either way
     sized.w, sized.h = 32, 32
@@ -557,7 +559,7 @@ do
         local t = frame.text.point
         return t[1] == "TOP" and t[2] == frame and t[3] == "BOTTOM" and t[4] == 0 and t[5]
     end
-    local function Lower(frame, below) return Near(TextAt(frame), -(5 + below + 4)) end
+    local function Lower(frame, below, gap) return Near(TextAt(frame), -(5 + below + (gap or 4))) end
     sized.w, sized.h = 32, 32
     local sz = sizeEnv.NaowhForever
     sz.SetRXPArrowStyle("image")
@@ -572,12 +574,48 @@ do
     sized.scripts.OnSizeChanged()
     Check(Lower(sized, 16), "RestedXP's Arrow Size resizing the frame: the text follows")
     sized.w, sized.h = 32, 32
+    sz.SetRXPArrowSize(90)
+    sz.SetRXPArrowGap(10)
+    Check(Lower(sized, 0, 10), "a gap of 10 puts the text 10 lower instead of 4")
+    sz.SetRXPArrowGap(0)
+    Check(Lower(sized, 0, 0), "and a gap of 0 only the image's own overflow")
+    sz.SetRXPArrowGap(4)
     sz.SetRXPArrowStyle("layer")
-    Check(TextAt(sized) == -5, "with the layer as the style, RestedXP's own place for the text is back")
+    sz.SetRXPArrowGap(12)
+    Check(TextAt(sized) == -5, "with the layer as the style, a gap leaves RestedXP's own place for the text alone")
+    sz.SetRXPArrowGap(4)
+    Check(TextAt(sized) == -5, "and so does the style itself")
     sz.SetRXPArrowStyle("image")
     sz.SetRXPArrowStyle("off")
     Check(TextAt(sized) == -5, "and with RestedXP's own arrow")
     sz.SetRXPArrowSize(90)
+
+    -- the gap: pixels between the image and the text, 4 by default, from 0 to 20
+    local gapAccount = {}
+    local _, gapNs = Load(gapAccount, true)
+    local gapLo, gapHi = gapNs.RXPArrowGapRange()
+    Check(gapLo == 0 and gapHi == 20, "from 0 to 20 pixels")
+    Check(gapNs.RXPArrowGap() == 4 and gapAccount.rxpArrowGap == nil, "4 by default")
+    gapNs.SetRXPArrowGap(9)
+    Check(gapAccount.rxpArrowGap == 9 and gapNs.RXPArrowGap() == 9, "a gap is stored")
+    gapNs.SetRXPArrowGap(0)
+    Check(gapAccount.rxpArrowGap == 0 and gapNs.RXPArrowGap() == 0, "0 is a gap like any other")
+    gapNs.SetRXPArrowGap(4)
+    Check(gapAccount.rxpArrowGap == nil, "the default is stored as nothing")
+    gapNs.SetRXPArrowGap(7.4)
+    Check(gapAccount.rxpArrowGap == 7, "rounded to a whole pixel")
+    gapNs.SetRXPArrowGap(-3)
+    Check(gapAccount.rxpArrowGap == 0, "kept above 0")
+    gapNs.SetRXPArrowGap(99)
+    Check(gapAccount.rxpArrowGap == 20, "and below 20")
+    gapNs.SetRXPArrowGap("bogus")
+    Check(gapAccount.rxpArrowGap == nil, "something that is not a number is not stored")
+    gapAccount.rxpArrowGap = "junk"
+    Check(gapNs.RXPArrowGap() == 4, "and an unreadable saved gap reads as 4")
+    gapAccount.rxpArrowGap = 80
+    Check(gapNs.RXPArrowGap() == 20, "a saved gap out of range is brought back into it")
+    gapAccount.rxpArrowGap = 7.4
+    Check(gapNs.RXPArrowGap() == 7, "and a saved gap that is not whole is rounded")
 
     local wideEnv, _, wideBoot = Start({ rxpThemes = true, rxpArrow = "image", rxpArrowShape = "wide", rxpArrowGlow = true },
         "NaowhForever:rosenoir")
