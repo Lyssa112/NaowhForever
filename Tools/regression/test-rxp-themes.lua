@@ -104,10 +104,18 @@ local function Count(t)
     return n
 end
 
-local KEYS = { "", "midnight", "slate", "obsidian", "aubergine", "forest", "crimson", "rosenoir", "cottoncandy" }
-local NAMES = { [""] = "NaowhUI", midnight = "Midnight", slate = "Slate", obsidian = "Obsidian",
-    aubergine = "Aubergine", forest = "Forest", crimson = "Crimson", rosenoir = "Rose Noir",
-    cottoncandy = "Cotton Candy" }
+-- NaowhUI, then the presets as Core lists them, so a preset added there needs no new count here.
+local KEYS, NAMES = { "" }, { [""] = "NaowhUI" }
+do
+    local _, coreNs = Load({}, false)
+    for _, key in ipairs(coreNs.THEME_PRESET_ORDER) do
+        KEYS[#KEYS + 1] = key
+        NAMES[key] = coreNs.THEME_PRESETS[key].name
+    end
+end
+local FIXED = #KEYS            -- NaowhUI and every preset
+local REGISTERED = FIXED + 1   -- and Naowh (current)
+local LAST = KEYS[#KEYS]
 local function NameOf(key) return "NaowhForever:" .. (key == "" and "default" or key) end
 local RXP_OWN = { "RXP Blue", "RXP Red", "RXP Gold", "DarkMode", "RXP Green", "Custom" }
 local TEX = "Interface/AddOns/RXPGuides/Textures/"
@@ -132,12 +140,12 @@ do
     Check(ns.RXPThemesAvailable() == false, "not installed")
 end
 
--- On, with RestedXP installed: the nine fixed themes, from the palettes the Theme row previews, and the current one.
+-- On, with RestedXP installed: the fixed themes, from the palettes the Theme row previews, and the current one.
 do
     local env, ns, frames, boot = Load({ rxpThemes = true }, true)
     Fire(frames, "NaowhForever")
     local list = env.RXPGuides_Themes
-    Check(type(list) == "table" and Count(list) == 10, "ten themes are registered")
+    Check(type(list) == "table" and Count(list) == REGISTERED, "NaowhUI, every preset and the current theme are registered")
     Check(boot.events.PLAYER_LOGIN and not boot.events.ADDON_LOADED, "then it waits for login, for the arrow")
     Login(boot)
     Check(next(boot.events) == nil, "and is unregistered after login")
@@ -162,7 +170,7 @@ do
         Check(theme.bgTextures.edge == WHITE and theme.bgTextures.bottom == WHITE and theme.bgTextures.guideName == WHITE,
             key .. ": every frame, the title bar and footer too, has a fill to color")
     end
-    Check(Count(seen) == 9, "every theme has its own name")
+    Check(Count(seen) == FIXED, "every theme has its own name")
     for _, own in ipairs(RXP_OWN) do
         Check(not list[own] and not seen[own], "RestedXP's own theme " .. own .. " is never overwritten")
     end
@@ -182,10 +190,10 @@ do
     local env, _, frames = Load({ rxpThemes = true }, true, existing)
     Fire(frames, "NaowhForever")
     Check(env.RXPGuides_Themes == existing and existing.RoseGold == other, "the table and the other addon's theme are kept")
-    Check(Count(existing) == 11, "eleven themes: theirs and our ten")
+    Check(Count(existing) == REGISTERED + 1, "theirs and all of ours")
 end
 
--- The player's own theme never leaks into the nine fixed ones.
+-- The player's own theme never leaks into the fixed ones.
 do
     for _, account in ipairs({
         { rxpThemes = true, themePreset = "crimson" },
@@ -194,7 +202,7 @@ do
         local env, ns, frames = Load(account, true)
         Fire(frames, "NaowhForever")   -- Core applies the player's theme first, then the module registers
         local list = env.RXPGuides_Themes
-        Check(Count(list) == 10, "still ten themes")
+        Check(Count(list) == REGISTERED, "still the same themes")
         Check(ns.THEME.accent.r ~= 0 or ns.THEME.accent.g ~= 0x91 / 255, "the player's theme is applied to the addon itself")
         Check(Hex(list["NaowhForever:default"].mapPins) == "0091ed" and Hex(list["NaowhForever:default"].background) == "1a1c1f",
             "NaowhUI is still the default theme's colors")
@@ -202,7 +210,7 @@ do
     end
 end
 
--- Naowh (current): the player's own theme, a preset or Custom colors, in a tenth entry.
+-- Naowh (current): the player's own theme, a preset or Custom colors, in one more entry.
 do
     local function Current(account)
         local env, ns, frames = Load(account, true)
@@ -270,8 +278,11 @@ do
     local account = {}
     local _, ns = Load(account, true)
     local values, order = ns.RXPThemeChoices()
-    Check(#order == 11 and order[1] == "" and order[2] == "current" and order[3] == "default" and order[4] == "midnight"
-        and order[11] == "cottoncandy", "the choices: RestedXP's own, the current theme, NaowhUI, then the eight presets in their order")
+    local inOrder = #order == REGISTERED + 1 and order[1] == "" and order[2] == "current"
+    for i, key in ipairs(KEYS) do
+        if order[i + 2] ~= (key == "" and "default" or key) then inOrder = false end
+    end
+    Check(inOrder and order[#order] == LAST, "the choices: RestedXP's own, the current theme, NaowhUI, then the presets in their order")
     Check(values[""] == "RestedXP (default)" and values.current == "Current Theme" and values.default == "NaowhUI"
         and values.midnight == "Midnight" and values.rosenoir == "Rose Noir" and values.cottoncandy == "Cotton Candy",
         "the presets named as in Naowh's own Theme dropdown")
@@ -414,9 +425,11 @@ do
     local rxp = Up("RXP Blue", "RXP Blue")
     local env, _, boot = Early({ rxpThemes = true }, rxp)
     table.sort(rxp.registered)
-    Check(table.concat(rxp.registered, ",") == "NaowhForever:aubergine,NaowhForever:cottoncandy,NaowhForever:crimson,"
-        .. "NaowhForever:current,NaowhForever:default,NaowhForever:forest,NaowhForever:midnight,NaowhForever:obsidian,"
-        .. "NaowhForever:rosenoir,NaowhForever:slate", "RestedXP up already: NaowhUI, the eight presets and the current theme go in through RegisterTheme")
+    local want = { "NaowhForever:current" }
+    for _, key in ipairs(KEYS) do want[#want + 1] = NameOf(key) end
+    table.sort(want)
+    Check(table.concat(rxp.registered, ",") == table.concat(want, ","),
+        "RestedXP up already: NaowhUI, the presets and the current theme go in through RegisterTheme")
     Check(rxp.themes["NaowhForever:crimson"].author == "Naowh Forever" and rxp.themes["NaowhForever:crimson"].mapPins,
         "as whole themes")
     Check(env.RXPGuides_Themes == nil, "and the global list is not used")
@@ -434,7 +447,7 @@ do
     rxp = Up("RXP Blue", "NaowhForever:crimson")
     rxp.activeTheme = nil
     env, _, boot = Early({ rxpThemes = true }, rxp)
-    Check(#rxp.registered == 0 and Count(env.RXPGuides_Themes) == 10, "RestedXP not started yet: the global list, as before")
+    Check(#rxp.registered == 0 and Count(env.RXPGuides_Themes) == REGISTERED, "RestedXP not started yet: the global list, as before")
     Login(boot)
     Check(#rxp.reloads == 0, "and no reload: it imports them itself")
 
@@ -489,9 +502,9 @@ do
     end
 
     local list = Fonts({ rxpThemes = true }, {})
-    Check(AllHave(list, NAOWH), "the Addon Font by default is the Naowh font, in all nine themes")
+    Check(AllHave(list, NAOWH), "the Addon Font by default is the Naowh font, in every theme")
     list = Fonts({ rxpThemes = true, uiFont = "Fira" }, { Fira = "Fonts\\Fira.ttf" })
-    Check(AllHave(list, "Fonts\\Fira.ttf"), "a font picked as the Addon Font is the one in all nine themes")
+    Check(AllHave(list, "Fonts\\Fira.ttf"), "a font picked as the Addon Font is the one in every theme")
     local _, ns = Fonts({ rxpThemes = true }, {})
     list = Fonts({ rxpThemes = true, uiFont = ns.BLIZZARD_FONT }, {})
     Check(AllHave(list, "Fonts\\FRIZQT__.TTF"), "Blizzard Default is the game's own font")

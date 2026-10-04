@@ -59,6 +59,7 @@ end
 local function Page(account, rxp, up)
     local e = { confirms = {}, refreshes = 0, account = account, rxp = up }
     local ns = RealCore(account, rxp, up)
+    e.ns = ns
     ns.Confirm = function(text, onYes) e.confirms[#e.confirms + 1] = { text = text, yes = onYes } end
     local env = { ns = ns, W = {}, colorsPending = false, rxpPending = false,
         UI = { RefreshPage = function() e.refreshes = e.refreshes + 1 end } }
@@ -338,9 +339,11 @@ do
     local switch, picker = Pair(u, "Add Themes to RestedXP")
     Check(switch and picker.type == "dropdown" and picker.text == "RestedXP Theme", "the theme is a dropdown beside the toggle")
     Check(picker.getValue() == "" and u.account.rxpTheme == nil, "RestedXP's own while RestedXP is on its own, and nothing stored")
-    Check(#picker.order == 11 and picker.order[1] == "" and picker.order[2] == "current" and picker.order[3] == "default"
+    local presets = u.ns.THEME_PRESET_ORDER
+    Check(#picker.order == #presets + 3 and picker.order[1] == "" and picker.order[2] == "current" and picker.order[3] == "default"
+        and picker.order[#picker.order] == presets[#presets]
         and picker.values[""] == "RestedXP (default)" and picker.values.current == "Current Theme" and picker.values.default == "NaowhUI"
-        and picker.values.crimson == "Crimson", "RestedXP (default), Current Theme, NaowhUI and the eight presets")
+        and picker.values.crimson == "Crimson", "RestedXP (default), Current Theme, NaowhUI and every preset")
     Check(picker.tooltip == "The theme RestedXP uses: its own, or one of the Naowh themes.", "its tooltip is one short sentence")
     Check(picker.disabled == nil, "never greyed out: it is not shown when it does not apply")
     picker.setValue("crimson")
