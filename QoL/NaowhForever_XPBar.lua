@@ -533,6 +533,126 @@ local function TextsChanged(list)
     return changed
 end
 
+local function InsideText(which, level, xp, max, maxed, pct, rested)
+    if which == "level" then return "Level " .. level end
+    if which == "levelshort" then return "Lvl " .. level end
+    if which == "levelnum" then return tostring(level) end
+    if which == "xp" then return maxed and "Max Level" or (xp .. " / " .. max) end
+    if which == "percent" then return ("%.1f%%"):format(pct) end
+    if which == "rested" then return ("Rested %.1f%%"):format(rested / max * 100) end
+    return ""
+end
+
+local Look = {}
+
+function Look.New(b)
+    -- Coloured by PaintBar.
+    b.bg = ns.Solid(b, "BACKGROUND", T.bg, BG_ALPHA)
+    b.bg:SetAllPoints()
+
+    -- The track holds the fill and segments, the full width of the bar.
+    b.track = CreateFrame("Frame", nil, b)
+    b.track:SetAllPoints()
+    b.track:SetClipsChildren(true)
+    b.track:SetFrameLevel(b:GetFrameLevel() + 1)
+    b.fill = b.track:CreateTexture(nil, "ARTWORK")
+    b.fill:SetTexture("Interface\\Buttons\\WHITE8X8")
+    b.done = ns.Solid(b.track, "ARTWORK", QUEST, 1)
+    b.open = ns.Solid(b.track, "ARTWORK", QUEST, OPEN_ALPHA)
+    b.rested = ns.Solid(b.track, "ARTWORK", RESTED, 1)
+    b.rested:SetDrawLayer("ARTWORK", 0)
+    b.done:SetDrawLayer("ARTWORK", 1)
+    b.open:SetDrawLayer("ARTWORK", 1)
+
+    -- Above the track, whose own frame would otherwise cover the border.
+    ns.Border(b)._frame:SetFrameLevel(b:GetFrameLevel() + 4)
+
+    local text = CreateFrame("Frame", nil, b)
+    text:SetAllPoints()
+    text:SetFrameLevel(b:GetFrameLevel() + 5)
+    b.level = ns.Font(text, 14, "OUTLINE")
+    b.level:SetPoint("LEFT", b.track, "LEFT", INSIDE_INSET, 0)
+    b.level:SetJustifyH("LEFT")
+    b.value = ns.Font(text, 14, "OUTLINE")
+    b.value:SetPoint("CENTER", b.track, "CENTER")
+    b.pct = ns.Font(text, 14, "OUTLINE")
+    b.pct:SetPoint("RIGHT", b.track, "RIGHT", -INSIDE_INSET, 0)
+    b.pct:SetJustifyH("RIGHT")
+    b.inside = { b.level, b.value, b.pct }
+    for _, fs in ipairs(b.inside) do fs:SetWordWrap(false) end
+    b.placeInside = function(_, dx)
+        b.value:ClearAllPoints()
+        b.value:SetPoint("CENTER", b.track, "CENTER", dx, 0)
+    end
+    b.slots = {}
+    for i, slot in ipairs(SLOTS) do
+        local fs = ns.Font(b, SLOT_FONT, "OUTLINE")
+        fs:SetPoint(slot.point, b, slot.rel, slot.x or 0, slot.y)
+        fs:SetJustifyH(slot.justify)
+        fs:SetWordWrap(false)
+        b.slots[i] = fs
+    end
+    b.placeMid = function(i, dx)
+        local fs, slot = b.slots[i], SLOTS[i]
+        fs:ClearAllPoints()
+        fs:SetPoint(slot.point, b, slot.rel, dx, slot.y)
+    end
+end
+
+function Look.Size(b, w, h)
+    b:SetSize(w, h)
+    -- At the height's size, so the first fit measures from it; Update shrinks them if needed.
+    for _, fs in ipairs(b.inside) do SetSlotSize(fs, InsideFont(h)) end
+    -- Their size was just reset, so the next Update fits them again.
+    b._fitW = nil
+end
+
+function Look.Segments(b, total, pct, done, open, rested, max, maxed)
+    local x = Segment(b.fill, 0, total * pct / 100, total)
+    if maxed then
+        b.done:Hide(); b.open:Hide(); b.rested:Hide()
+        return
+    end
+    x = Segment(b.done, x, total * done / max, total)
+    if S.Get("xpBarIncomplete") then
+        Segment(b.open, x, total * open / max, total)
+    else
+        b.open:Hide()
+    end
+    -- Rested runs from the end of your XP like Blizzard's, the full height of the bar and
+    -- drawn over the quest segments, so a bar full of quest XP cannot push it off the
+    -- end. At least 3px, so a sliver of rest still reads.
+    local from = total * pct / 100
+    local w = math.min(math.max(total * rested / max, 3), total - from)
+    if rested > 0 and w >= 1 then
+        b.rested:ClearAllPoints()
+        b.rested:SetPoint("TOPLEFT", from, 0)
+        b.rested:SetPoint("BOTTOMLEFT", from, 0)
+        b.rested:SetWidth(w)
+        b.rested:Show()
+    else
+        b.rested:Hide()
+    end
+end
+
+function Look.Texts(b, level, xp, max, maxed, pct, rested)
+    for i, spot in ipairs(INSIDE) do
+        b.inside[i]:SetText(InsideText(S.Get(spot.key), level, xp, max, maxed, pct, rested))
+    end
+end
+
+-- Measuring and placing the texts only when one of them, or the bar, has changed.
+function Look.Fit(b, total, h)
+    local insideChanged = TextsChanged(b.inside)
+    local slotsChanged = TextsChanged(b.slots)
+    local font = ns.UIFontPath()
+    if insideChanged or slotsChanged or b._fitW ~= total or b._fitH ~= h or b._fitFont ~= font then
+        b._fitW, b._fitH, b._fitFont = total, h, font
+        FitInside(b.inside, total, h, b.placeInside)
+        FitSlots(b.slots, total, b.placeMid)
+    end
+end
+
 local function ShowsText(which)
     for _, slot in ipairs(SLOTS) do
         if S.Get(slot.key) == which then return true end
@@ -550,59 +670,17 @@ local function Update()
 
     local xp, max = UnitXP("player"), math.max(UnitXPMax("player"), 1)
     local pct = maxed and 100 or xp / max * 100
-    local values = {
-        none = "", level = "Level " .. UnitLevel("player"), levelshort = "Lvl " .. UnitLevel("player"),
-        levelnum = tostring(UnitLevel("player")),
-        xp = maxed and "Max Level" or (xp .. " / " .. max),
-        percent = ("%.1f%%"):format(pct),
-        rested = ("Rested %.1f%%"):format((GetXPExhaustion() or 0) / max * 100),
-    }
-    bar.level:SetText(values[S.Get("xpBarLeftText") or "level"] or "")
-    bar.value:SetText(values[S.Get("xpBarCenterText") or "xp"] or "")
-    bar.pct:SetText(values[S.Get("xpBarRightText") or "percent"] or "")
+    local rested = GetXPExhaustion() or 0
+    Look.Texts(bar, UnitLevel("player"), xp, max, maxed, pct, rested)
 
     -- The whole bar is the track: a full bar is 100%.
     local total = bar:GetWidth()
-
-    local x = Segment(bar.fill, 0, total * pct / 100, total)
-    if maxed then
-        bar.done:Hide(); bar.open:Hide(); bar.rested:Hide()
-    else
-        x = Segment(bar.done, x, total * questDone / max, total)
-        if S.Get("xpBarIncomplete") then
-            Segment(bar.open, x, total * questOpen / max, total)
-        else
-            bar.open:Hide()
-        end
-        -- Rested runs from the end of your XP like Blizzard's, the full height of the bar and
-        -- drawn over the quest segments, so a bar full of quest XP cannot push it off the
-        -- end. At least 3px, so a sliver of rest still reads.
-        local rested = GetXPExhaustion() or 0
-        local from = total * pct / 100
-        local w = math.min(math.max(total * rested / max, 3), total - from)
-        if rested > 0 and w >= 1 then
-            bar.rested:ClearAllPoints()
-            bar.rested:SetPoint("TOPLEFT", from, 0)
-            bar.rested:SetPoint("BOTTOMLEFT", from, 0)
-            bar.rested:SetWidth(w)
-            bar.rested:Show()
-        else
-            bar.rested:Hide()
-        end
-    end
+    Look.Segments(bar, total, pct, questDone, questOpen, rested, max, maxed)
 
     for i, slot in ipairs(SLOTS) do
         bar.slots[i]:SetText(SlotText(S.Get(slot.key), maxed, max))
     end
-    -- Measuring and placing the texts only when one of them, or the bar, has changed.
-    local insideChanged = TextsChanged(bar.inside)
-    local slotsChanged = TextsChanged(bar.slots)
-    local h, font = bar:GetHeight(), ns.UIFontPath()
-    if insideChanged or slotsChanged or bar._fitW ~= total or bar._fitH ~= h or bar._fitFont ~= font then
-        bar._fitW, bar._fitH, bar._fitFont = total, h, font
-        FitInside(bar.inside, total, h, bar.placeInside)
-        FitSlots(bar.slots, total, bar.placeMid)
-    end
+    Look.Fit(bar, total, bar:GetHeight())
     bar:Show()
 end
 
@@ -669,59 +747,10 @@ local function Create()
     bar:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" and IsControlKeyDown() then ns.ResetXPTicker() end
     end)
-    -- Coloured by PaintBar.
-    bar.bg = ns.Solid(bar, "BACKGROUND", T.bg, BG_ALPHA)
-    bar.bg:SetAllPoints()
+    Look.New(bar)
 
-    -- The track holds the fill and segments, the full width of the bar.
-    bar.track = CreateFrame("Frame", nil, bar)
-    bar.track:SetAllPoints()
-    bar.track:SetClipsChildren(true)
-    bar.track:SetFrameLevel(bar:GetFrameLevel() + 1)
-    bar.fill = bar.track:CreateTexture(nil, "ARTWORK")
-    bar.fill:SetTexture("Interface\\Buttons\\WHITE8X8")
-    bar.done = ns.Solid(bar.track, "ARTWORK", QUEST, 1)
-    bar.open = ns.Solid(bar.track, "ARTWORK", QUEST, OPEN_ALPHA)
-    bar.rested = ns.Solid(bar.track, "ARTWORK", RESTED, 1)
-    bar.rested:SetDrawLayer("ARTWORK", 0)
-    bar.done:SetDrawLayer("ARTWORK", 1)
-    bar.open:SetDrawLayer("ARTWORK", 1)
-
-    -- Above the track, whose own frame would otherwise cover the border.
-    ns.Border(bar)._frame:SetFrameLevel(bar:GetFrameLevel() + 4)
-
-    local text = CreateFrame("Frame", nil, bar)
-    text:SetAllPoints()
-    text:SetFrameLevel(bar:GetFrameLevel() + 5)
-    bar.level = ns.Font(text, 14, "OUTLINE")
-    bar.level:SetPoint("LEFT", bar.track, "LEFT", INSIDE_INSET, 0)
-    bar.level:SetJustifyH("LEFT")
-    bar.value = ns.Font(text, 14, "OUTLINE")
-    bar.value:SetPoint("CENTER", bar.track, "CENTER")
-    bar.pct = ns.Font(text, 14, "OUTLINE")
-    bar.pct:SetPoint("RIGHT", bar.track, "RIGHT", -INSIDE_INSET, 0)
-    bar.pct:SetJustifyH("RIGHT")
-    bar.inside = { bar.level, bar.value, bar.pct }
-    for _, fs in ipairs(bar.inside) do fs:SetWordWrap(false) end
-    bar.placeInside = function(_, dx)
-        bar.value:ClearAllPoints()
-        bar.value:SetPoint("CENTER", bar.track, "CENTER", dx, 0)
-    end
-    bar.slots = {}
-    for i, slot in ipairs(SLOTS) do
-        local fs = ns.Font(bar, SLOT_FONT, "OUTLINE")
-        fs:SetPoint(slot.point, bar, slot.rel, slot.x or 0, slot.y)
-        fs:SetJustifyH(slot.justify)
-        fs:SetWordWrap(false)
-        bar.slots[i] = fs
-    end
-    bar.placeMid = function(i, dx)
-        local fs, slot = bar.slots[i], SLOTS[i]
-        fs:ClearAllPoints()
-        fs:SetPoint(slot.point, bar, slot.rel, dx, slot.y)
-    end
-
-    bar.mover = ns.UI.AttachMover(bar, "XP Bar", function(pos) S.Set("xpBarPos", pos) end)
+    bar.mover = ns.UI.AttachMover(bar, "XP Bar", function(pos) S.Set("xpBarPos", pos) end, "QoL/XP",
+        "QoL/XP:xpBar")
 end
 
 local function Apply()
@@ -742,12 +771,7 @@ local function Apply()
     PaintBar(bar)
     if not sessionStart then sessionStart, sessionXP = time(), 0 end
 
-    local w, h = math.max(S.Get("xpBarWidth"), ns.XPBarMinWidth), S.Get("xpBarHeight")
-    bar:SetSize(w, h)
-    -- At the height's size, so the first fit measures from it; Update shrinks them if needed.
-    for _, fs in ipairs(bar.inside) do SetSlotSize(fs, InsideFont(h)) end
-    -- Their size was just reset, so the next Update fits them again.
-    bar._fitW = nil
+    Look.Size(bar, math.max(S.Get("xpBarWidth"), ns.XPBarMinWidth), S.Get("xpBarHeight"))
     Place()
 
     lastXP, lastXPMax = UnitXP("player"), UnitXPMax("player")
@@ -782,36 +806,47 @@ local SLOT_TEXTS = {
 }
 
 local PREVIEW_PAD = 12         -- around the preview's contents
-local PREVIEW_NOTE_H = 16
+local PREVIEW_NOTE_H = 16      -- the line that says the spots can be clicked
 local PREVIEW_SLOT_H = 18      -- a row of texts above or below the bar
 local PREVIEW_SLOT_GAP = 4     -- the live bar's slot.y
 local PREVIEW_BAR_MAX = 48     -- the Height slider's top, so the preview never changes height
 local PREVIEW_FALLBACK_W = 870 -- the options page's content width, before layout has run
-local PREVIEW_HOVER_ALPHA = 0.15
-local PREVIEW_H = PREVIEW_PAD * 2 + PREVIEW_NOTE_H + (PREVIEW_SLOT_H + PREVIEW_SLOT_GAP) * 2
-    + PREVIEW_BAR_MAX
+local PREVIEW_H = PREVIEW_PAD * 2 + PREVIEW_NOTE_H + (PREVIEW_SLOT_H + PREVIEW_SLOT_GAP) * 2 + PREVIEW_BAR_MAX
 
-local preview
+local SAMPLE_LEVEL, SAMPLE_MAX, SAMPLE_XP = 24, 23200, 9512
+local SAMPLE_DONE, SAMPLE_OPEN, SAMPLE_RESTED = 2784, 1856, 3596
+local SAMPLE_PLAYED, SAMPLE_THIS_LEVEL, SAMPLE_SESSION = 368520, 12540, 4320
+local SAMPLE_TO_LEVEL, SAMPLE_RATE = 9600, 8100
+local STATES = {
+    { key = "levelling", label = "Levelling", tip = "Partway through a level, with quests to hand in." },
+    { key = "rested", label = "Rested", tip = "With rested experience ahead of the fill." },
+}
 
--- What a slot shows: the live text while the bar runs, else a made-up example.
-local function PreviewSlotText(which, max)
-    if sessionStart then
-        local live = SlotText(which, AtMaxLevel(), max)
-        if live ~= "" then return live end
-    end
+local function PreviewSlotText(which, rested)
     local LABEL, VALUE = ns.Color("muted"), ns.Color("fg")
-    local samples = {
-        played = LABEL .. "Played:|r " .. VALUE .. "4d 6h 22m|r - " .. LABEL .. "This Level:|r "
-            .. VALUE .. "3d 11h 39m|r",
-        session = LABEL .. "Session:|r " .. VALUE .. "1h 12m|r",
-        completed = LABEL .. "Completed Quests:|r " .. questHex .. "12.0%|r",
-        completedxp = LABEL .. "Completed Quests:|r " .. questHex .. "2,784|r",
-        rested = LABEL .. "Rested:|r " .. restedHex .. "15.5%|r",
-        leveling = LABEL .. "Time to Level:|r " .. VALUE .. "2h 40m|r",
-        xphour = LABEL .. "XP/Hour:|r " .. VALUE .. "8.1k|r",
-    }
-    return samples[which] or ""
+    if which == "played" then
+        return LABEL .. "Played:|r " .. VALUE .. Duration(SAMPLE_PLAYED) .. "|r - " .. LABEL .. "This Level:|r "
+            .. VALUE .. Duration(SAMPLE_THIS_LEVEL) .. "|r"
+    elseif which == "session" then
+        return LABEL .. "Session:|r " .. VALUE .. Duration(SAMPLE_SESSION) .. "|r"
+    elseif which == "completed" then
+        return LABEL .. "Completed Quests:|r " .. questHex .. ("%.1f%%"):format(SAMPLE_DONE / SAMPLE_MAX * 100) .. "|r"
+    elseif which == "completedxp" then
+        return LABEL .. "Completed Quests:|r " .. questHex .. Grouped(SAMPLE_DONE) .. "|r"
+    elseif which == "rested" then
+        return LABEL .. "Rested:|r " .. restedHex .. ("%.1f%%"):format(rested / SAMPLE_MAX * 100) .. "|r"
+    elseif which == "leveling" then
+        return LABEL .. "Time to Level:|r " .. VALUE .. Duration(SAMPLE_TO_LEVEL) .. "|r"
+    elseif which == "xphour" then
+        return LABEL .. "XP/Hour:|r " .. VALUE .. Short(SAMPLE_RATE) .. "|r"
+    end
+    return ""
 end
+
+local PREVIEW_HOVER_ALPHA = 0.15
+local ZONE_PAD = 4             -- a clickable spot reaches this far past its text
+local SLOT_HINT = "|n|nCompleted Quests (both), Rested Experience, Time to Level and XP per Hour are "
+    .. "hidden at max level."
 
 -- Blizzard's menu, anchored under the spot, as the settings dropdowns open it.
 local function OpenChoices(zone)
@@ -851,22 +886,17 @@ local function ChoiceName(zone)
     return zone._choices.values[S.Get(zone._key)] or zone._choices.values.none
 end
 
--- spot is one entry of spots (INSIDE or SLOTS), the group whose texts it shares.
-local function NewZone(parent, spot, spots, choices, inset)
+-- A clickable spot over one of the preview's texts. spot is one entry of spots (INSIDE or
+-- SLOTS), the group whose texts it shares. It sits under the text, so its hover tints behind it.
+local function NewZone(parent, fs, spot, spots, choices, hint)
     local zone = CreateFrame("Button", nil, parent)
-    zone:EnableMouse(true)
-    zone._label, zone._key, zone._spots, zone._choices = spot.label, spot.key, spots, choices
-    local justify = spot.justify
+    zone._fs, zone._label, zone._key, zone._spots, zone._choices = fs, spot.label, spot.key, spots, choices
+    zone._hint = hint or ""
     zone.hover = ns.Solid(zone, "BACKGROUND", T.accent, PREVIEW_HOVER_ALPHA)
     zone.hover:SetAllPoints()
     zone.hover:Hide()
     zone.border = ns.Border(zone, T.accent)
     zone.border._frame:Hide()
-    zone.text = ns.Font(zone, SLOT_FONT, "OUTLINE")
-    zone.text:SetPoint("LEFT", inset, 0)
-    zone.text:SetPoint("RIGHT", -inset, 0)
-    zone.text:SetJustifyH(justify)
-    zone.text:SetWordWrap(false)
     -- Answering this keeps the menu manager from closing the menu before OnMouseDown toggles it.
     zone.HandlesGlobalMouseEvent = function(_, button, event)
         return event == "GLOBAL_MOUSE_DOWN" and button == "LeftButton"
@@ -876,8 +906,7 @@ local function NewZone(parent, spot, spots, choices, inset)
         self.hover:Show()
         self.border._frame:Show()
         ns.UI.ShowWidgetTooltip(self, self._label .. ": " .. ChoiceName(self) .. "|nClick to change."
-            .. (self._hint or ""),
-            { anchor = "cursor", justify = "LEFT" })
+            .. self._hint, { anchor = "cursor", justify = "LEFT" })
     end)
     zone:SetScript("OnLeave", function(self)
         self.hover:Hide()
@@ -890,161 +919,82 @@ local function NewZone(parent, spot, spots, choices, inset)
     return zone
 end
 
-local function NewPreview(parent)
-    local f = CreateFrame("Frame", nil, parent)
-    ns.Solid(f, "BACKGROUND", T.panel, 1):SetAllPoints()
-    ns.Border(f, { r = 0, g = 0, b = 0 })
-    f.note = ns.Font(f, 12, nil, T.muted)
-    f.note:SetPoint("TOPLEFT", PREVIEW_PAD, -PREVIEW_PAD)
-    f.note:SetText("Click a text on the bar, or a spot around it, to change what it shows.")
+-- As wide as what the spot shows, on the side its text is set to, so spots in a row never
+-- cover each other.
+local function HugText(zone, h)
+    local fs = zone._fs
+    local w = math.min(Natural(fs), fs:GetWidth()) + ZONE_PAD * 2
+    local justify = fs:GetJustifyH()
+    local point = justify == "LEFT" and "LEFT" or justify == "RIGHT" and "RIGHT" or "CENTER"
+    local dx = point == "LEFT" and -ZONE_PAD or point == "RIGHT" and ZONE_PAD or 0
+    zone:ClearAllPoints()
+    zone:SetPoint(point, fs, point, dx, 0)
+    zone:SetSize(w, h)
+end
 
-    local b = CreateFrame("Frame", nil, f)
-    f.bar = b
-    b.bg = ns.Solid(b, "BACKGROUND", T.bg, BG_ALPHA)
-    b.bg:SetAllPoints()
-    b.track = CreateFrame("Frame", nil, b)
-    b.track:SetAllPoints()
-    b.track:SetClipsChildren(true)
-    b.fill = b.track:CreateTexture(nil, "ARTWORK")
-    b.fill:SetTexture("Interface\\Buttons\\WHITE8X8")
-    b.done = ns.Solid(b.track, "ARTWORK", QUEST, 1)
-    b.done:SetDrawLayer("ARTWORK", 1)
-    b.rested = ns.Solid(b.track, "ARTWORK", RESTED, 1)
-    b.rested:SetDrawLayer("ARTWORK", 0)
-    ns.Border(b)._frame:SetFrameLevel(b:GetFrameLevel() + 4)
-
-    f.inside = {}
+local function NewPreview(stage)
+    local preview = CreateFrame("Frame", nil, stage)
+    preview:SetAllPoints()
+    preview.note = ns.Font(preview, 12, nil, T.muted)
+    preview.note:SetPoint("TOPLEFT", PREVIEW_PAD, -PREVIEW_PAD)
+    preview.note:SetText("Click a text on the bar, or a spot around it, to change what it shows.")
+    local b = CreateFrame("Frame", nil, preview)
+    preview.bar = b
+    -- Above the spots around it, whose texts it draws.
+    b:SetFrameLevel(preview:GetFrameLevel() + 2)
+    Look.New(b)
+    preview.inside, preview.slots = {}, {}
     for i, spot in ipairs(INSIDE) do
-        local zone = NewZone(b, spot, INSIDE, BAR_TEXTS, 0)
-        zone:SetFrameLevel(b:GetFrameLevel() + 5)
-        f.inside[i] = zone
+        local zone = NewZone(b, b.inside[i], spot, INSIDE, BAR_TEXTS)
+        -- Over the fill, under the bar's border and texts.
+        zone:SetFrameLevel(b:GetFrameLevel() + 3)
+        preview.inside[i] = zone
     end
-    f.slots = {}
     for i, slot in ipairs(SLOTS) do
-        local zone = NewZone(f, slot, SLOTS, SLOT_TEXTS, 0)
-        zone._hint = "|n|nCompleted Quests (both), Rested Experience, Time to Level and XP per "
-            .. "Hour are hidden at max level."
-        f.slots[i] = zone
+        local zone = NewZone(preview, b.slots[i], slot, SLOTS, SLOT_TEXTS, SLOT_HINT)
+        zone:SetFrameLevel(preview:GetFrameLevel() + 1)
+        preview.slots[i] = zone
     end
-    -- What the fitting measures and sizes: each spot's text, its width applied to the spot
-    -- around it, so a spot is as wide as what it shows.
-    local function Fit(zone)
-        local fs = zone.text
-        return {
-            GetText = function() return fs:GetText() end,
-            GetStringWidth = function() return fs:GetStringWidth() end,
-            GetUnboundedStringWidth = fs.GetUnboundedStringWidth
-                and function() return fs:GetUnboundedStringWidth() end or nil,
-            SetWidth = function(_, width) zone:SetWidth(width) end,
-            SetFont = function(_, ...) fs:SetFont(...) end,
-        }
-    end
-    f.fits, f.insideFits = {}, {}
-    for i, zone in ipairs(f.slots) do f.fits[i] = Fit(zone) end
-    for i, zone in ipairs(f.inside) do
-        f.insideFits[i] = Fit(zone)
-        f.insideFits[i]._fitSize = SLOT_FONT -- NewZone's size, until the first fit sets theirs
-    end
-    f:SetHeight(PREVIEW_H)
-    f:SetScript("OnSizeChanged", function(self) self:Refresh() end)
-
-    function f:Refresh()
-        UpdateTextColors()
-        local maxed = AtMaxLevel()
-        local xp, max = UnitXP("player"), math.max(UnitXPMax("player"), 1)
-        local muted = ns.Color("muted")
-        -- The texts first: the bar is drawn narrower when the ones beside it need the room.
-        for _, zone in ipairs(self.slots) do
-            local which = S.Get(zone._key) or "none"
-            zone.text:SetText(which == "none" and (muted .. "+ " .. zone._label .. "|r")
-                or PreviewSlotText(which, max))
-        end
-        local beside = 0
-        for _, i in ipairs(BESIDE) do beside = math.max(beside, Natural(self.fits[i])) end
-
-        local avail = self:GetWidth()
-        if avail <= 0 then avail = self:GetParent():GetWidth() - ns.UI.CONTENT_PAD * 2 end
-        if avail <= 0 then avail = PREVIEW_FALLBACK_W end
-        local w = math.min(math.max(S.Get("xpBarWidth"), ns.XPBarMinWidth),
-            avail - PREVIEW_PAD * 2 - (beside + SIDE_GAP) * 2)
-        local h = S.Get("xpBarHeight")
-        local pv = self.bar
-        PaintBar(pv)
-        pv:SetSize(w, h)
-        pv:ClearAllPoints()
-        -- Centred in the room the tallest bar would take.
-        pv:SetPoint("TOP", self, "TOP", 0, -(PREVIEW_PAD + PREVIEW_NOTE_H + PREVIEW_SLOT_H
-            + PREVIEW_SLOT_GAP + (PREVIEW_BAR_MAX - h) / 2))
-
-        local pct = maxed and 1 or xp / max
-        local x = Segment(pv.fill, 0, w * pct, w)
-        Segment(pv.done, x, maxed and 0 or w * questDone / max, w)
-        Segment(pv.rested, w * pct, maxed and 0 or w * (GetXPExhaustion() or 0) / max, w)
-
-        local values = {
-            none = "", level = "Level " .. UnitLevel("player"), levelshort = "Lvl " .. UnitLevel("player"),
-            levelnum = tostring(UnitLevel("player")),
-            xp = maxed and "Max Level" or (xp .. " / " .. max),
-            percent = ("%.1f%%"):format(pct * 100),
-            rested = ("Rested %.1f%%"):format((GetXPExhaustion() or 0) / max * 100),
-        }
-        for i, zone in ipairs(self.inside) do
-            local spot = INSIDE[i]
-            zone:ClearAllPoints()
-            zone:SetPoint(spot.point, pv, spot.point, spot.dir * INSIDE_INSET, 0)
-            zone:SetHeight(h)
-            local which = S.Get(zone._key) or "none"
-            zone.text:SetText(which == "none" and (muted .. "+ " .. zone._label .. "|r") or values[which])
-        end
-        FitInside(self.insideFits, w, h, function(_, dx)
-            local zone = self.inside[2]
-            zone:ClearAllPoints()
-            zone:SetPoint("CENTER", pv, "CENTER", dx, 0)
-        end)
-        -- Sized like the live bar's texts; an empty spot's placeholder counts as its text.
-        for i, zone in ipairs(self.slots) do
-            local slot = SLOTS[i]
-            zone:ClearAllPoints()
-            zone:SetPoint(slot.point, pv, slot.rel, slot.x or 0, slot.y)
-            zone:SetHeight(PREVIEW_SLOT_H)
-        end
-        FitSlots(self.fits, w, function(i, dx)
-            local zone, slot = self.slots[i], SLOTS[i]
-            zone:ClearAllPoints()
-            zone:SetPoint(slot.point, pv, slot.rel, dx, slot.y)
-        end)
-    end
-    return f
+    return preview
 end
 
--- The spots the preview stands for, so the settings search finds them and jumps to it.
-local SEARCH_LABELS, SEARCH_SET = {}, {}
-for _, spots in ipairs({ INSIDE, SLOTS }) do
-    for _, spot in ipairs(spots) do
-        SEARCH_LABELS[#SEARCH_LABELS + 1] = spot.label
-        SEARCH_SET[spot.label] = true
+-- An empty spot shows its name, so there is something to click.
+local function Placeholder(fs, spot)
+    if S.Get(spot.key) == "none" or not S.Get(spot.key) then
+        fs:SetText(ns.Color("muted") .. "+ " .. spot.label .. "|r")
     end
 end
-local SEARCH_TIP = "A text on or around the XP Bar. Click it on the preview to pick what it shows."
 
--- The preview under the XP Bar switch on the settings page. Hidden with the feature's options
--- while they are folded away, and built only when the page first shows it.
-function ns.BuildXPBarPreview(parent, y)
-    if ns.UI.searchScan then
-        ns.UI.ScanLabels(SEARCH_LABELS, SEARCH_TIP)
-        return nil, 0
+local function PaintPreview(preview, state)
+    UpdateTextColors()
+    local b = preview.bar
+    local rested = state == "rested" and SAMPLE_RESTED or 0
+    for i, slot in ipairs(SLOTS) do
+        b.slots[i]:SetText(PreviewSlotText(S.Get(slot.key), rested))
+        Placeholder(b.slots[i], slot)
     end
-    local f = ns.UI.Keep(parent, "xpBarPreview", NewPreview)
-    if parent._nsuiCollapsed then
-        f:Hide()
-        return f, 0
+    local beside = 0
+    for _, i in ipairs(BESIDE) do
+        SetSlotSize(b.slots[i], SLOT_FONT)
+        beside = math.max(beside, Natural(b.slots[i]))
     end
-    preview = f
-    f._searchLabels, f._searchF = SEARCH_SET, parent._nsuiFeatureId
-    f:SetPoint("TOPLEFT", parent, "TOPLEFT", ns.UI.CONTENT_PAD, y)
-    f:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -ns.UI.CONTENT_PAD, y)
-    f:Refresh()
-    return f, PREVIEW_H + PREVIEW_PAD
+    local avail = preview:GetWidth()
+    if avail <= 0 then avail = PREVIEW_FALLBACK_W end
+    local w = math.max(1, math.min(math.max(S.Get("xpBarWidth"), ns.XPBarMinWidth),
+        avail - PREVIEW_PAD * 2 - (beside + SIDE_GAP) * 2))
+    local h = S.Get("xpBarHeight")
+    PaintBar(b)
+    Look.Size(b, w, h)
+    b:ClearAllPoints()
+    b:SetPoint("TOP", preview, "TOP", 0, -(PREVIEW_PAD + PREVIEW_NOTE_H + PREVIEW_SLOT_H + PREVIEW_SLOT_GAP
+        + (PREVIEW_BAR_MAX - h) / 2))
+    local pct = SAMPLE_XP / SAMPLE_MAX * 100
+    Look.Segments(b, w, pct, SAMPLE_DONE, SAMPLE_OPEN, rested, SAMPLE_MAX, false)
+    Look.Texts(b, SAMPLE_LEVEL, SAMPLE_XP, SAMPLE_MAX, false, pct, rested)
+    for i, spot in ipairs(INSIDE) do Placeholder(b.inside[i], spot) end
+    Look.Fit(b, w, h)
+    for _, zone in ipairs(preview.inside) do HugText(zone, h) end
+    for _, zone in ipairs(preview.slots) do HugText(zone, PREVIEW_SLOT_H) end
 end
 
 -- Width, height and which text is in each spot back to their defaults. Where the bar sits,
@@ -1061,9 +1011,95 @@ function ns.ResetXPBarLayout()
     end)
 end
 
+local Group = ns.Shared.Settings.Group
+local SAME_COLOUR = 1 / 255
+local BAR_TEXT_HELP = "A text on the bar: click it on the preview to change it. Each text shows in one "
+    .. "place on the bar: picking one shown elsewhere moves it there."
+local SLOT_TEXT_HELP = "A text around the bar: click it on the preview to change it. Each text shows in "
+    .. "one place around it: picking one shown elsewhere moves it there. Completed Quests (both), Rested Experience, Time to Level and "
+    .. "XP per Hour are hidden at max level."
+
+local function SetColour(key, r, g, b)
+    local d = ns.XPBarDefaultColor(key)
+    if math.abs(r - d.r) <= SAME_COLOUR and math.abs(g - d.g) <= SAME_COLOUR and math.abs(b - d.b) <= SAME_COLOUR then
+        if S.Get(key) ~= nil then S.Set(key, nil) end
+    else
+        S.Set(key, { r = r, g = g, b = b })
+    end
+end
+
+local function ColourRow(key, label, help)
+    return { key = key, label = label, colour = true, help = help,
+        get = function()
+            local c = ns.XPBarColor(key)
+            return c.r, c.g, c.b, 1
+        end,
+        set = function(r, g, b) SetColour(key, r, g, b) end }
+end
+
+-- The texts are picked on the preview, so their rows are not drawn; they are still declared
+-- for the search, the changed count and the card's Reset.
+local function Hidden(row)
+    row.hidden = true
+    return row
+end
+
+local function TextRow(spot, spots, choices, help)
+    local key = spot.key
+    return { key = key, label = spot.label, choice = choices, help = help, hidden = true,
+        get = function() return S.Get(key) end,
+        set = function(which)
+            Claim(spots, key, which)
+            S.Set(key, which)
+        end }
+end
+
+local ROWS = {
+    Group("Size"),
+    { key = "xpBarWidth", label = "Width", slider = { ns.XPBarMinWidth, 1200, 10 } },
+    { key = "xpBarHeight", label = "Height", slider = { 14, 48, 1 } },
+    { label = "Reset Size & Texts", buttonText = "Reset", button = ns.ResetXPBarLayout,
+      help = "Width, height and the text in each spot back to their defaults. Where the bar sits, its "
+          .. "colours and its switches stay as they are." },
+    Group("Show"),
+    { key = "xpBarMaxLevel", label = "Show at Max Level", toggle = true,
+      help = "Keeps the bar up at max level, with your played time and session." },
+    { key = "xpBarIncomplete", label = "Incomplete Quests", toggle = true,
+      help = "The XP of quests still in progress, as a faded segment after the completed ones." },
+    { key = "xpBarResetOnReload", label = "Reset Session on Reload", toggle = true,
+      help = "Starts the session time and XP/Hour again on a /reload. Off: a /reload carries on the "
+          .. "session. A fresh login always starts a new one." },
+    Group("Colours"),
+    ColourRow("xpBarFillColor", "Fill Colour", "Your experience. Its left end is a darker shade."),
+    ColourRow("xpBarQuestColor", "Completed Quests Colour",
+        "The XP of completed quests, and their text. Incomplete quests show it faded."),
+    ColourRow("xpBarRestedColor", "Rested Colour", "Rested experience, and its text."),
+    ColourRow("xpBarBgColor", "Background Colour", "Behind the fill."),
+    { label = "Reset Colours", buttonText = "Reset Colours", button = ns.ResetXPBarColors,
+      help = "The four colours back to their defaults, which follow the theme." },
+    Hidden(Group("Text")),
+}
+for _, spot in ipairs(INSIDE) do ROWS[#ROWS + 1] = TextRow(spot, INSIDE, BAR_TEXTS, BAR_TEXT_HELP) end
+ROWS[#ROWS + 1] = Hidden(Group("Around the Bar"))
+for _, slot in ipairs(SLOTS) do ROWS[#ROWS + 1] = TextRow(slot, SLOTS, SLOT_TEXTS, SLOT_TEXT_HELP) end
+
+local function Summary(store)
+    return ("%d by %d%s"):format(math.max(store.Get("xpBarWidth"), ns.XPBarMinWidth), store.Get("xpBarHeight"),
+        store.Get("xpBarMaxLevel") and ", shown at max level" or "")
+end
+
+ns.Shared.Settings.Page("QoL/XP", S):Card({
+    id = "xpBar", name = "XP Bar", order = 10, switch = "xpBar",
+    help = "Your level, experience and percentage on one bar, with the XP of completed quests and rested "
+        .. "experience drawn past the fill. Replaces Blizzard's experience bar while it is on. Move it in "
+        .. "Unlock Mode. Ctrl + right-click the bar to reset the session time and XP/Hour.",
+    summary = Summary,
+    studio = { height = PREVIEW_H, states = STATES, new = NewPreview, paint = PaintPreview },
+    rows = ROWS,
+})
+
 hooksecurefunc(S, "Set", function(key)
     if key == "enabled" or (key:find("^xpBar") and key ~= "xpBarPos") then Apply() end
-    if preview and preview:IsVisible() and key:find("^xpBar") then preview:Refresh() end
 end)
 hooksecurefunc(ns, "Apply", Apply)
 hooksecurefunc(ns, "ShowRaidReminderAnchorConfig", function()

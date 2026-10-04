@@ -10,6 +10,8 @@
     <Script file="Data\FactionItems.lua"/>
     <Script file="Data\Quests.lua"/>
     <Script file="Data\QuestChains.lua"/>
+    <!-- The quests that reward a BiS (Tools/build_bis_quests.py), for the BiS List's Quests page -->
+    <Script file="Data\BiSQuests.lua"/>
     <Script file="Data\Dungeons\RagefireChasm.lua"/>
     <Script file="Data\Dungeons\HallOfThanes.lua"/>
     <Script file="Data\Dungeons\WailingCaverns.lua"/>
@@ -105,6 +107,7 @@
     <!-- Where it shows -->
     <Script file="UI\DungeonList.lua"/>
     <Script file="UI\FactionList.lua"/>
+    <Script file="UI\Recent.lua"/>
     <Script file="UI\Window.lua"/>
     <Script file="UI\MapPanel.lua"/>
     <Script file="UI\Popup.lua"/>

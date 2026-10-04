@@ -29,7 +29,11 @@ local function Widget(kind, log)
     function w:IsShown() return self.shown end
     function w:GetFrameLevel() return 1 end
     function w:SetTimerDuration(obj, _, dir) self.obj, self.dir = obj, dir end
-    function w:GetStatusBarTexture() return Widget("Texture", log) end
+    function w:GetStatusBarTexture()
+        self.tex = self.tex or Widget("Texture", log)
+        return self.tex
+    end
+    function w:SetVertexColor(r, g, b) self.color = { r, g, b } end
     function w:CreateTexture() return Widget("Texture", log) end
     function w:CreateFontString() return Widget("FontString", log) end
     log.frames[#log.frames + 1] = w
@@ -107,7 +111,12 @@ local function Session(settings, opts)
         C_StringUtil = { CreateNumericRuleFormatter = function()
             return { AddBreakpoint = function(self, b) self.breakpoint = b end }
         end },
-        C_Spell = { GetSpellName = function(id) return "Spell" .. id end, IsCurrentSpell = function() return false end },
+        C_Spell = {
+            GetSpellName = function(id) return (opts.names or {})[id] or ("Spell" .. tostring(id)) end,
+            IsCurrentSpell = function() return false end,
+        },
+        C_Secrets = { ShouldAurasBeSecret = function() return opts.secretAuras == true end },
+        C_UnitAuras = { GetAuraDataByIndex = function(_, i) return (opts.auras or {})[i] end },
         C_SwingTimer = {
             EnableRangeCheck = function(t, on)
                 log.range = log.range or {}; log.range[t] = on
@@ -327,6 +336,105 @@ end)
 Case("a dead target has no Target bar", function()
     local _, log = Session({ enabled = true, targetSwing = true }, { dead = true })
     assert(not log.bars[4].parent.shown)
+end)
+
+-- A paladin's seals: every rank of a seal shares its name.
+local SEAL_NAMES = { [20375] = "Seal of Command", [20915] = "Seal of Command", [20154] = "Seal of Righteousness",
+    [20271] = "Judgement", [407798] = "Seal of Martyrdom" }
+
+local function BarColor(log)
+    local c = log.bars[1].tex.color
+    return ("%.2f %.2f %.2f"):format(c[1], c[2], c[3])
+end
+
+Case("seal colors are off by default and listen to nothing", function()
+    local _, log = Session({ enabled = true }, { class = "PALADIN", names = SEAL_NAMES })
+    local e = log.events.events
+    assert(not e.UNIT_SPELLCAST_SUCCEEDED and not e.UNIT_AURA)
+end)
+
+Case("a seal cast colors the melee bars, any rank, and a Judgement takes it away", function()
+    local _, log = Session({ enabled = true, sealColors = true }, { class = "PALADIN", names = SEAL_NAMES })
+    local e = log.events.events
+    assert(e.UNIT_SPELLCAST_SUCCEEDED and e.UNIT_AURA)
+    assert(BarColor(log) == "0.90 0.70 0.27", "main hand color at first: " .. BarColor(log))
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 20915)
+    assert(BarColor(log) == "0.75 0.35 0.95", "Seal of Command, rank 2: " .. BarColor(log))
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 20271)
+    assert(BarColor(log) == "0.90 0.70 0.27", "Judgement used it up: " .. BarColor(log))
+end)
+
+Case("a restricted spell ID changes nothing", function()
+    local _, log = Session({ enabled = true, sealColors = true }, { class = "PALADIN", names = SEAL_NAMES })
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 20154)
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", SECRET)
+    assert(BarColor(log) == "0.95 0.85 0.40", "still Righteousness: " .. BarColor(log))
+end)
+
+Case("out of combat the buffs say which seal is up, unless they are kept secret", function()
+    local auras = { { name = "Blessing of Might" }, { name = "Seal of Command" } }
+    local _, log = Session({ enabled = true, sealColors = true },
+        { class = "PALADIN", names = SEAL_NAMES, auras = auras })
+    assert(BarColor(log) == "0.75 0.35 0.95", "read at login: " .. BarColor(log))
+    local _, hidden = Session({ enabled = true, sealColors = true },
+        { class = "PALADIN", names = SEAL_NAMES, auras = auras, secretAuras = true })
+    assert(BarColor(hidden) == "0.90 0.70 0.27", "not read while secret: " .. BarColor(hidden))
+end)
+
+Case("Seal of Martyrdom has a color of its own", function()
+    local _, log = Session({ enabled = true, sealColors = true }, { class = "PALADIN", names = SEAL_NAMES })
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 407798)
+    assert(BarColor(log) == "0.90 0.40 0.70", "Martyrdom: " .. BarColor(log))
+end)
+
+Case("a seal that runs out in combat takes its color with it", function()
+    local _, log = Session({ enabled = true, sealColors = true }, { class = "PALADIN", names = SEAL_NAMES })
+    log.Fire("PLAYER_REGEN_DISABLED")
+    local cast = log.now
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 20375)
+    log.Advance(cast + 29)
+    assert(BarColor(log) == "0.75 0.35 0.95", "still up at 29s: " .. BarColor(log))
+    log.Advance(cast + 30.1)
+    assert(BarColor(log) == "0.90 0.70 0.27", "gone at 30s: " .. BarColor(log))
+end)
+
+Case("recasting a seal starts its count again, and a Judgement stops it", function()
+    local _, log = Session({ enabled = true, sealColors = true }, { class = "PALADIN", names = SEAL_NAMES })
+    log.Fire("PLAYER_REGEN_DISABLED")
+    local cast = log.now
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 20375)
+    log.now = cast + 20
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 20375)
+    log.Advance(cast + 40)
+    assert(BarColor(log) == "0.75 0.35 0.95", "recast at 20s, up at 40s: " .. BarColor(log))
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 20271)
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 20154)
+    log.Advance(cast + 50.5)
+    assert(BarColor(log) == "0.95 0.85 0.40", "the old count did not clear the new seal: " .. BarColor(log))
+end)
+
+Case("a seal buff that can be read sets how long seals last", function()
+    local auras = { { name = "Seal of Command", duration = 34 } }
+    local _, log = Session({ enabled = true, sealColors = true },
+        { class = "PALADIN", names = SEAL_NAMES, auras = auras })
+    auras[1].expirationTime = log.now + 10
+    log.Fire("UNIT_AURA", "player")
+    local read = log.now
+    log.Advance(read + 10.1)
+    assert(BarColor(log) == "0.90 0.70 0.27", "ran out when its buff said: " .. BarColor(log))
+    auras[1] = nil
+    log.Fire("PLAYER_REGEN_DISABLED")
+    local cast = log.now
+    log.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 20375)
+    log.Advance(cast + 32)
+    assert(BarColor(log) == "0.75 0.35 0.95", "34s learned from the buff: " .. BarColor(log))
+    log.Advance(cast + 34.1)
+    assert(BarColor(log) == "0.90 0.70 0.27", "gone at 34s: " .. BarColor(log))
+end)
+
+Case("seal colors on a warrior listen to nothing", function()
+    local _, log = Session({ enabled = true, sealColors = true }, { names = SEAL_NAMES })
+    assert(not log.events.events.UNIT_AURA and not log.events.events.UNIT_SPELLCAST_SUCCEEDED)
 end)
 
 print(("%d cases passed"):format(count))

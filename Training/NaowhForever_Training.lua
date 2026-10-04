@@ -3,8 +3,9 @@
 --  learn, what you can train now and what each level brings, with the trainer's prices. The
 --  spells and base prices come from NaowhForever_TrainingData.lua; the trainer window
 --  updates a price to what it actually asked, kept account-wide. This file sorts the spells
---  (ns.Training) and holds the settings page; the window is NaowhForever_TrainingWindow.lua,
---  the level-up toast and the panel beside the trainer NaowhForever_TrainingTrainer.lua.
+--  (ns.Training), keeps the talent builds saved or imported, and holds the settings page; the
+--  window is NaowhForever_TrainingWindow.lua, the level-up toast and the panel beside the
+--  trainer NaowhForever_TrainingTrainer.lua.
 --
 --  Off by default. While off it registers nothing but its login check.
 -------------------------------------------------------------------------------
@@ -12,11 +13,13 @@ local ns = _G.NaowhForever
 local UI = ns.UI
 
 local S = UI.ModuleSettings("training", { enabled = false, levelUpToast = true, trainerPanel = true,
-    showLearned = false, miniShown = false })
+    showLearned = false, miniShown = false, windowAlpha = 1 })
 ns.TrainingSettings = S
 
 local Training = {}
 ns.Training = Training
+
+local Apply   -- registers what the module listens to (At the trainer, below)
 
 local SOON = 2            -- levels ahead that count as coming soon
 Training.SOON = SOON
@@ -37,13 +40,18 @@ local function Prices()
     return Account("trainingPrices")
 end
 
--- spellID -> true for the spells this character chose not to see in the lists.
 local charKey
+local function CharKey()
+    charKey = charKey or UnitName("player") .. "-" .. GetRealmName()
+    return charKey
+end
+
+-- spellID -> true for the spells this character chose not to see in the lists.
 local function Ignored()
     local all = Account("trainingIgnored")
-    charKey = charKey or UnitName("player") .. "-" .. GetRealmName()
-    all[charKey] = all[charKey] or {}
-    return all[charKey]
+    local key = CharKey()
+    all[key] = all[key] or {}
+    return all[key]
 end
 
 local function ClassSpells()
@@ -292,6 +300,293 @@ function Training.Coins(copper)
 end
 
 -------------------------------------------------------------------------------
+--  Talent builds: Naowh's, then the ones saved or imported, kept account-wide
+-------------------------------------------------------------------------------
+local BUILD_PREFIX = "!NFB1!"
+local MAX_POINTS = 51      -- one a level, 10 to 60
+local ROW_POINTS = 5       -- points in a column for each row above a talent
+
+local function Saved(classID)
+    local all = Account("trainingBuilds")
+    all[classID] = all[classID] or {}
+    return all[classID]
+end
+
+-- A class's builds, each { name, spec, points }; saved ones have saved = true.
+function Training.Builds(classID)
+    local list = {}
+    for _, build in ipairs(ns.TrainingBuilds[classID] or {}) do list[#list + 1] = build end
+    for _, build in ipairs(Saved(classID)) do list[#list + 1] = build end
+    return list
+end
+
+-- talent node -> your rank in it, from the active talent config; nil without one.
+function Training.Ranks(talents)
+    local config = C_ClassTalents.GetActiveConfigID()
+    if not config then return nil end
+    local ranks = {}
+    for node in pairs(talents) do ranks[node] = C_Traits.GetNodeInfo(config, node).activeRank end
+    return ranks
+end
+
+-- Why these points cannot be taken in this order, or nil when they can. tree is a class's
+-- entry in ns.TrainingBuilds; the first point that breaks a rule is the one explained.
+function Training.CheckBuild(tree, points)
+    local count, spent = {}, {}
+    for i, node in ipairs(points) do
+        local talent = tree.talents[node]
+        if not talent then return "That talent is not in this class's tree." end
+        if i > MAX_POINTS then return "All " .. MAX_POINTS .. " points are spent." end
+        local rank = (count[node] or 0) + 1
+        if rank > talent[2] then return "Already at full rank." end
+        local need = talent[6]
+        if need and (count[need] or 0) < tree.talents[need][2] then
+            return "Needs " .. (C_Spell.GetSpellName(tree.talents[need][1]) or "the talent above it") .. " at full rank first."
+        end
+        local col, row = talent[4], talent[3]
+        if (spent[col] or 0) < ROW_POINTS * (row - 1) then
+            return ("Needs %d points in %s first."):format(ROW_POINTS * (row - 1), tree.specs[col])
+        end
+        count[node], spent[col] = rank, (spent[col] or 0) + 1
+    end
+end
+
+-- The column with the most points names a build's spec.
+local function MainSpec(tree, points)
+    local spent, best = {}, nil
+    for _, node in ipairs(points) do
+        local col = tree.talents[node][4]
+        spent[col] = (spent[col] or 0) + 1
+        if not best or spent[col] > spent[best] then best = col end
+    end
+    return best and tree.specs[best] or "No points yet"
+end
+
+local function Codec()
+    return LibStub("LibSerialize"), LibStub("LibDeflate")
+end
+
+-- A name as it is kept: no escape codes or line breaks, so it shows and shares as typed.
+local function BuildName(text, default)
+    local name = type(text) == "string" and text:gsub("[|\r\n]", ""):sub(1, 40) or ""
+    return name ~= "" and name or default
+end
+
+function Training.ExportBuild(classID, build)
+    local LS, LD = Codec()
+    return BUILD_PREFIX .. LD:EncodeForPrint(LD:CompressDeflate(LS:Serialize({
+        v = 1, class = classID, name = build.name, spec = build.spec, points = build.points,
+    })))
+end
+
+-- Parsed as data, never run: the class must have a tree here, and its points pass
+-- Training.CheckBuild.
+local function DecodeBuild(text)
+    local LS, LD = Codec()
+    local body = type(text) == "string" and text:match("^%s*" .. BUILD_PREFIX:gsub("!", "%%!") .. "(%S+)%s*$")
+    local packed = body and LD:DecodeForPrint(body)
+    local raw = packed and LD:DecompressDeflate(packed)
+    if not raw then return end
+    local ok, data = LS:Deserialize(raw)
+    if not (ok and type(data) == "table" and data.v == 1 and type(data.points) == "table") then return end
+    local tree = ns.TrainingBuilds[data.class]
+    if not tree then return end
+    local points = {}
+    for i, node in ipairs(data.points) do
+        if i > MAX_POINTS then return end
+        points[i] = node
+    end
+    if #points == 0 or Training.CheckBuild(tree, points) then return end
+    return data.class, { name = BuildName(data.name, "Imported Build"), spec = BuildName(data.spec, "Imported"),
+        points = points, saved = true }
+end
+
+-- onAdded(classID, index) once it is in, index in Training.Builds(classID).
+function Training.ImportBuild(text, onAdded)
+    local classID, build = DecodeBuild(text)
+    if not classID then
+        ns.Print("That is not a Naowh Forever talent build.")
+        return
+    end
+    ns.Confirm(("Add the %s build %s (%d points)?"):format(GetClassInfo(classID), build.name, #build.points), function()
+        local saved = Saved(classID)
+        saved[#saved + 1] = build
+        Changed()
+        ns.Print("Imported " .. build.name .. ".")
+        onAdded(classID, #(ns.TrainingBuilds[classID]) + #saved)
+    end)
+end
+
+-- Your talents as a build, row by row: the game keeps which talents you have, not the order
+-- you took them in. Returns your class and its index in Training.Builds, or nil.
+function Training.SaveMyTalents(name)
+    local _, _, classID = UnitClass("player")
+    local tree = ns.TrainingBuilds[classID]
+    local ranks = tree and Training.Ranks(tree.talents)
+    if not ranks then return end
+    local nodes = {}
+    for node in pairs(tree.talents) do nodes[#nodes + 1] = node end
+    table.sort(nodes, function(a, b)
+        local rowA, rowB = tree.talents[a][3], tree.talents[b][3]
+        if rowA ~= rowB then return rowA < rowB end
+        return a < b
+    end)
+    local points = {}
+    for _, node in ipairs(nodes) do
+        for _ = 1, math.min(ranks[node], tree.talents[node][2]) do points[#points + 1] = node end
+    end
+    if #points == 0 then
+        ns.Print("You have no talent points spent to save.")
+        return
+    end
+    local saved = Saved(classID)
+    saved[#saved + 1] = { name = BuildName(name, "My Talents"), spec = "Your talents", points = points, saved = true }
+    Changed()
+    return classID, #tree + #saved
+end
+
+-- A new saved build, empty or a copy of another. Returns its index in Training.Builds.
+function Training.NewBuild(classID, name, from)
+    local points = {}
+    for i, node in ipairs(from and from.points or {}) do points[i] = node end
+    local saved = Saved(classID)
+    saved[#saved + 1] = { name = BuildName(name, "New Build"), spec = from and from.spec or "No points yet",
+        points = points, saved = true }
+    Changed()
+    return #(ns.TrainingBuilds[classID]) + #saved
+end
+
+-- Editing a saved build: each returns why not, or nil once done.
+function Training.AddPoint(tree, build, node)
+    local points = build.points
+    points[#points + 1] = node
+    local why = Training.CheckBuild(tree, points)
+    if why then
+        points[#points] = nil
+        return why
+    end
+    build.spec = MainSpec(tree, points)
+    Changed()
+end
+
+-- Gives back node's latest point, unless a later point needs it.
+function Training.RemovePoint(tree, build, node)
+    local points = build.points
+    for i = #points, 1, -1 do
+        if points[i] == node then
+            table.remove(points, i)
+            local why = Training.CheckBuild(tree, points)
+            if why then
+                table.insert(points, i, node)
+                return "A later point needs it. " .. why
+            end
+            build.spec = MainSpec(tree, points)
+            Changed()
+            return
+        end
+    end
+    return "No points in it to give back."
+end
+
+function Training.UndoPoint(tree, build)
+    build.points[#build.points] = nil
+    build.spec = MainSpec(tree, build.points)
+    Changed()
+end
+
+function Training.ClearPoints(build)
+    wipe(build.points)
+    build.spec = "No points yet"
+    Changed()
+end
+
+-- Buys the build's points you have not taken, in its order, until the game says no (no points
+-- left, or the next talent cannot be taken now), then commits them once. Your own class only,
+-- out of combat. Returns how many points it took.
+local learning = false
+
+function Training.LearnBuild(classID, build)
+    local _, _, myClass = UnitClass("player")
+    local tree = ns.TrainingBuilds[classID]
+    local config = C_ClassTalents.GetActiveConfigID()
+    if learning or classID ~= myClass or InCombatLockdown() or not (tree and config) then return 0 end
+    local ranks, count, bought = Training.Ranks(tree.talents), {}, 0
+    -- Committing fires the talent events that start a followed build's learning again.
+    learning = true
+    for _, node in ipairs(build.points) do
+        count[node] = (count[node] or 0) + 1
+        if ranks[node] < count[node] then
+            if not C_Traits.PurchaseRank(config, node) then break end
+            bought = bought + 1
+        end
+    end
+    if bought > 0 then C_Traits.CommitConfig(config) end
+    learning = false
+    return bought
+end
+
+-- A build's lasting key: a saved build's own number, given the first time it is asked for,
+-- or a built-in build's place in the data. Names repeat, so they cannot be keys.
+local function BuildKey(classID, build)
+    if build.saved then
+        if not build.id then
+            local serial = Account("trainingBuildSerial")
+            serial.n = (serial.n or 0) + 1
+            build.id = serial.n
+        end
+        return build.id
+    end
+    for i, b in ipairs(ns.TrainingBuilds[classID] or {}) do
+        if b == build then return "naowh" .. i end
+    end
+end
+
+-------------------------------------------------------------------------------
+--  Following a build: this character's new talent points spent on it as they come
+-------------------------------------------------------------------------------
+-- The build this character follows and its class, or nil.
+function Training.Followed()
+    local followed = Account("trainingFollow")[CharKey()]
+    if not followed then return nil end
+    for _, build in ipairs(Training.Builds(followed.class)) do
+        if BuildKey(followed.class, build) == followed.key then return build, followed.class end
+    end
+end
+
+-- build nil stops following.
+function Training.Follow(classID, build)
+    Account("trainingFollow")[CharKey()] = build and { class = classID, key = BuildKey(classID, build) } or nil
+    Apply()
+    Changed()
+end
+
+function Training.LearnFollowed()
+    local build, classID = Training.Followed()
+    if not build then return end
+    local bought = Training.LearnBuild(classID, build)
+    if bought > 0 then
+        ns.Print(("Learned %d talent %s from %s."):format(bought, bought == 1 and "point" or "points", build.name))
+    end
+end
+
+-- Nobody follows a deleted build any more.
+function Training.DeleteBuild(classID, build)
+    local key = BuildKey(classID, build)
+    local follows = Account("trainingFollow")
+    for char, followed in pairs(follows) do
+        if followed.class == classID and followed.key == key then follows[char] = nil end
+    end
+    local saved = Saved(classID)
+    for i, b in ipairs(saved) do
+        if b == build then
+            table.remove(saved, i)
+            break
+        end
+    end
+    Changed()
+end
+
+-------------------------------------------------------------------------------
 --  At the trainer
 -------------------------------------------------------------------------------
 -- The trainer's list has names and required levels but no spell IDs, so a service is the
@@ -342,7 +637,7 @@ local function QueueScan()
 end
 
 local events
-local function Apply()
+function Apply()
     if not On() then
         if events then events:UnregisterAllEvents() end
         return
@@ -352,6 +647,8 @@ local function Apply()
         events:SetScript("OnEvent", function(_, event)
             if event == "TRAINER_SHOW" or event == "TRAINER_UPDATE" then
                 QueueScan()
+            elseif event == "TRAIT_TREE_CURRENCY_INFO_UPDATED" or event == "PLAYER_REGEN_ENABLED" then
+                Training.LearnFollowed()
             else
                 Changed()
             end
@@ -361,6 +658,12 @@ local function Apply()
     events:RegisterEvent("TRAINER_UPDATE")
     events:RegisterEvent("PLAYER_LEVEL_UP")
     events:RegisterEvent("LEARNED_SPELL_IN_SKILL_LINE")
+    -- Following a build: a new talent point, or the end of the fight that held one back.
+    local follow = Training.Followed() ~= nil
+    for _, event in ipairs({ "TRAIT_TREE_CURRENCY_INFO_UPDATED", "PLAYER_REGEN_ENABLED" }) do
+        if follow then events:RegisterEvent(event) else events:UnregisterEvent(event) end
+    end
+    if follow then Training.LearnFollowed() end
 end
 
 S.OnChange(function(key)
@@ -378,29 +681,120 @@ end)
 -------------------------------------------------------------------------------
 --  Settings page
 -------------------------------------------------------------------------------
-function ns.BuildTrainingSettingsPage(parent, y)
-    local W = UI.Widgets
-    local _, h
-    _, h = W:Note(parent, "What you can train now and what each level brings, with the trainer's "
-        .. "price and a road to 60. Opening your class trainer updates the prices to what it asks, "
-        .. "reputation discounts included. Open it with /nftraining, its minimap or top bar "
-        .. "button, or here.", y)
-    y = y - h
-    -- The planner opens in place of the options window, which would otherwise sit over it.
-    _, h = W:Button(parent, "Open Training Planner", y, function()
-        ns.StashOptionsWindow()
-        ns.OpenTrainingWindow()
-    end)
-    y = y - h
-
-    _, h = W:SectionHeader(parent, "ON THE WAY" .. UI.STATUS.untested, y); y = y - h
-    _, h = W:DualRow(parent, y,
-        S.Toggle("levelUpToast", "Level-Up Toast",
-            "When you level up with new spells to train, a toast says how many and what they cost, "
-            .. "with a button to open the planner. Move it in Unlock Mode.", "enabled"),
-        S.Toggle("trainerPanel", "Panel at the Trainer",
-            "Beside your class trainer, the spells you can learn now, ticked, with their total "
-            .. "and Learn All I Can Afford. Untick one to leave it.", "enabled")
-    ); y = y - h
-    return y
+-- The module card's two lines: what you can train now, then the road to 60 and your builds.
+local function CardLines()
+    local plan = Plan()
+    local headline
+    if #plan.now > 0 then
+        headline = ("%d %s to train now, %s"):format(#plan.now, #plan.now == 1 and "spell" or "spells",
+            Training.Coins(Training.Total(plan.now)))
+    elseif plan.soon[1] or plan.later[1] then
+        headline = "New spells at level " .. (plan.soon[1] or plan.later[1])[1]
+    else
+        headline = "Every spell your class trains, you know"
+    end
+    local _, _, classID = UnitClass("player")
+    local builds = #Training.Builds(classID)
+    return headline, ("%s left to pay on the road to 60. %d talent %s for your class."):format(
+        Training.Coins(Training.ToSixty(plan)), builds, builds == 1 and "build" or "builds")
 end
+
+local function CardHeadline()
+    local headline = CardLines()
+    return headline
+end
+
+local function CardDetail()
+    local _, detail = CardLines()
+    return detail
+end
+
+local function OpenPlanner()
+    ns.OpenTrainingWindow()
+end
+
+local function OnTheWaySummary(store)
+    local toast, panel = store.Get("levelUpToast"), store.Get("trainerPanel")
+    if toast and panel then return "Level-up toast and trainer panel" end
+    if toast then return "Level-up toast" end
+    if panel then return "Trainer panel" end
+    return "Nothing on the way"
+end
+
+local function WindowSummary(store)
+    return ("%d%% opacity%s"):format(math.floor((store.Get("windowAlpha") or 1) * 100 + 0.5),
+        store.Get("miniShown") and ", mini bar shown" or "")
+end
+
+local function TrainerSummary(store)
+    local glow, ranks = store.Get("trainerGlow"), store.Get("trainerRanks")
+    if glow and ranks then return "Glows new abilities, offers rank swaps" end
+    if glow then return "Glows new abilities" end
+    if ranks then return "Offers rank swaps" end
+    return "Lists what you learned"
+end
+
+local PLANNER_OFF = "Turn on the Training Planner"
+local Settings = ns.Shared and ns.Shared.Settings
+if not Settings then return end
+local page = Settings.Page("Training Planner/Settings", S)
+
+page:Window({
+    text = "Open Training Planner",
+    open = OpenPlanner,
+    headline = CardHeadline,
+    detail = CardDetail,
+})
+
+page:Card({
+    id = "onTheWay", name = "On the Way", order = 10,
+    help = "The Training Planner's help while you level: a toast when you level up with spells to train, "
+        .. "and a panel beside your class trainer.",
+    summary = OnTheWaySummary,
+    rows = {
+        { key = "levelUpToast", label = "Level-Up Toast", toggle = true, needs = On,
+          why = PLANNER_OFF,
+          help = "When you level up with new spells to train, a toast says how many and what they cost, with "
+              .. "a button to open the planner. Move it in Unlock Mode." },
+        { key = "trainerPanel", label = "Panel at the Trainer", toggle = true,
+          needs = On, why = PLANNER_OFF,
+          help = "Beside your class trainer, the spells you can learn now, ticked, with their total and Learn "
+              .. "All I Can Afford. Untick one to leave it." },
+    },
+})
+
+page:Card({
+    id = "window", name = "Window", order = 20,
+    help = "The planner's own window, and a mini bar to leave up while you level.",
+    summary = WindowSummary,
+    rows = {
+        { key = "miniShown", label = "Mini Bar", toggle = true, needs = On,
+          why = PLANNER_OFF,
+          help = "A small bar with your next trainer visit and your gold, to leave up while you level. Move it "
+              .. "by dragging." },
+        { key = "windowAlpha", label = "Window Opacity", slider = { ns.Shared.Style.OPACITY_MIN, 100, 5 }, unit = "%",
+          scale = 0.01, help = "How solid the planner's window is, in percent. Also on its title bar." },
+    },
+})
+
+page:Card({
+    id = "trainer", name = "Trainer Popup", order = 30, switch = "trainerPopup", store = ns.QoLSettings,
+    help = "After visiting a trainer, a small window lists the abilities you just learned. Abilities from a "
+        .. "tome or a quest show a moment after you learn them. Drag one from the window onto your bars.",
+    summary = TrainerSummary,
+    rows = {
+        { key = "trainerGlow", label = "Glow New Abilities", toggle = true,
+          help = "Lights up the new abilities on your action bars until you use them." },
+        { key = "trainerRanks", label = "Offer to Replace Lower Ranks", toggle = true,
+          help = "Adds a button to the popup that swaps every lower rank on your bars for the highest rank "
+              .. "you know. Keyboard and controller bars land in the same slot. Right-click a spell in the "
+              .. "popup to keep its lower ranks, for downranking. Rank swaps only happen out of combat." },
+        { label = "Check My Bars Now", buttonText = "Check Bars", always = true,
+          button = function() ns.TrainerRankCheck() end,
+          help = "Looks for lower ranks on your bars now, as after a trainer visit (also /naowh ranks). Out of "
+              .. "combat only." },
+        { label = "Forget Kept Spells", buttonText = "Forget Kept", always = true,
+          button = function() ns.TrainerForgetKept() end,
+          help = "Forgets the spells you chose to keep at lower ranks, so the popup offers to swap them again." },
+    },
+})

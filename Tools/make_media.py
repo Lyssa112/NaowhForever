@@ -427,6 +427,19 @@ def scales(x, y, size):
     return (255, 255, 255, max(stroke(size, line, 0.07)(x, y, size)[3] for line in lines))
 
 
+
+def speaker(x, y, size):
+    # A speaker, its cone opening right, and two sound waves: play a sound.
+    body = [(0.10, 0.38), (0.26, 0.38), (0.48, 0.18), (0.48, 0.82), (0.26, 0.62), (0.10, 0.62)]
+    shape = smooth(0, polygon_dist(x, y, [(px * size, py * size) for px, py in body]))
+    waves = 0.0
+    for r in (0.16, 0.30):
+        arc = [(0.50 + r * math.cos(a), 0.5 - r * math.sin(a))
+               for a in [(-0.85 + 1.7 * i / 16) for i in range(17)]]
+        waves = max(waves, stroke(size, arc, 0.08)(x, y, size)[3] / 255)
+    return (255, 255, 255, int(round(255 * max(shape, waves))))
+
+
 def write_wide_tga(path, width, height, pixel_fn, samples=4):
     # As write_tga, for a texture wider than tall, each pixel the average of samples x samples
     # points across it: a small mark drawn near its own size stays smooth, as text icons are
@@ -492,6 +505,7 @@ def infinity(x, y, width, height):
     return (255, 255, 255, int(round(255 * inner)))
 
 
+
 def elbow(x, y, width, height):
     # The rounded corner of a tree line, 1px wide: down the left edge, then a quarter circle
     # into the bottom edge, heading right. Drawn at its own size (8 by 8), so it stays a clean
@@ -547,3 +561,4 @@ write_tga(os.path.join(OUT, "scales.tga"), 64, scales)
 write_wide_tga(os.path.join(OUT, "infinity.tga"), 32, 16, infinity)
 write_wide_tga(os.path.join(OUT, "infinity_outlined.tga"), 32, 16, infinity_outlined)
 write_wide_tga(os.path.join(OUT, "elbow.tga"), 8, 8, elbow)
+write_tga(os.path.join(OUT, "speaker.tga"), 64, speaker)

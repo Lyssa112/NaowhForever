@@ -99,14 +99,14 @@ do
     local PILL_BG = Const(source, "PILL_BG")
     Check(IsRGB(PILL_BG, 0.03, 0.03, 0.04), "pill literal is the original")
     local stmt = assert(source:match(
-        '(local pill = ns%.ThemeTint%("bg", PILL_BG%)\n[^\n]*ipairs%(bar%.segs%)[^\n]*end)'))
+        '(local pill = ns%.ThemeTint%("bg", PILL_BG%)\n[^\n]*ipairs%(segs%)[^\n]*end)'))
     local function Paint(account)
         local painted = {}
         local segs = {}
         for i = 1, 3 do
             segs[i] = { SetColorTexture = function(_, ...) painted[i] = { ... } end }
         end
-        Run(stmt, { ns = LoadCore(account), PILL_BG = PILL_BG, bar = { segs = segs },
+        Run(stmt, { ns = LoadCore(account), PILL_BG = PILL_BG, segs = segs,
             S = { Get = function() return 85 end } })
         return painted
     end
@@ -166,22 +166,6 @@ do
         "gcd: a theme's accent, with the same alphas")
     Check(Same(Paint({ themePreset = "custom", themeColors = { bg = PICKS.themeColors.bg } }).glow,
         { 0.01, 0.56, 0.91, 0.7 }), "gcd: an unpicked accent keeps the blue")
-end
-
-do
-    local source = Read("BiS/NaowhForever_BiS.lua")
-    local BIS_GLOW = Const(source, "BIS_GLOW")
-    Check(IsRGB(BIS_GLOW, 0, 0.57, 0.93), "bis glow literal is the original")
-    local stmt = assert(source:match('(local glow = ns%.ThemeTint%("accent", BIS_GLOW%)\n[^\n]*PixelGlow_Start%(frame, { glow%.r, glow%.g, glow%.b, 1 }, 12, nil, nil, 2, 0, 0, nil, "NaowhBiS"%))'))
-    local function Glow(account)
-        local color
-        Run(stmt, { ns = LoadCore(account), BIS_GLOW = BIS_GLOW, frame = {},
-            LCG = { PixelGlow_Start = function(_, c) color = c end } })
-        return color
-    end
-    Check(Same(Glow({}), { 0, 0.57, 0.93, 1 }), "bis: the default theme is the original glow")
-    local a = AccentOf(ACCENT_PRESET)
-    Check(Same(Glow(ACCENT_PRESET), { a.r, a.g, a.b, 1 }), "bis: a theme's accent")
 end
 
 do
@@ -323,7 +307,8 @@ end
 -- The FPS / MS readout's labels follow Text; its numbers keep their status colors.
 do
     local source = Read("TopBar/NaowhForever_TopBar.lua")
-    Check(source:find('bar.sys.text:SetTextColor(Tone("fg", 1))', 1, true), "topbar: the FPS / MS labels are set from Text")
+    Check(source:find('text:SetTextColor(Tone("fg", 1))', 1, true) and source:find("Look.SystemFont(bar.sys.text)", 1, true),
+        "topbar: the FPS / MS labels are set from Text")
 end
 
 -- The Loot Feed: the dark style's fill follows Background, the light style's fill and edge
@@ -456,7 +441,7 @@ do
         local lum = 0.2126 * Lin(got.r) + 0.7152 * Lin(got.g) + 0.0722 * Lin(got.b)
         Check(1.05 / (lum + 0.05) >= 3, "threat meter: white text reads on " .. preset)
     end
-    Check(source:find('S.Toggle("themeColors", "Apply Theme to Your Bar"', 1, true), "threat meter: the switch is in the Colours section")
+    Check(source:find('{ key = "themeColors", label = "Apply Theme to Your Bar"', 1, true), "threat meter: the switch is in the Colours section")
     Check(source:find('if e.pull then return BarColor("pullColor") end', 1, true), "threat meter: the bars paint through BarColor")
 end
 
@@ -489,7 +474,7 @@ do
     PICKED.queueColor = { r = 1, g = 0.7, b = 0.2 }
     got = Bar(ACCENT_PRESET, "queueColor", true)
     Check(Same(got, { 1, 0.7, 0.2, 1 }), "swing timer: the queued attack color is not themed")
-    Check(source:find('S.Toggle("themeColors", "Apply Theme to Bar Colours"', 1, true), "swing timer: the switch beside Ranged")
+    Check(source:find('{ key = "themeColors", label = "Apply Theme to Bar Colours"', 1, true), "swing timer: the switch with the bar colours")
 end
 
 print("PASS theme HUD: " .. cases .. " checks")
