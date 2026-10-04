@@ -16,22 +16,12 @@ local RXP_TEXTURES = "Interface/AddOns/RXPGuides/Textures/"
 local TEXTURES = RXP_TEXTURES .. "DarkMode/"
 local WHITE = "Interface/BUTTONS/WHITE8X8"
 
--- DarkMode's frame line is almost black; RestedXP's other sets have a light one, picked to suit each Accent.
-local LAVENDER, TEAL, TAN, GREY = RXP_TEXTURES, RXP_TEXTURES .. "Green/", RXP_TEXTURES .. "GoldAssistant/",
-    RXP_TEXTURES .. "Hardcore/"
-local BORDERS = {
-    [""] = LAVENDER, midnight = LAVENDER, aubergine = LAVENDER, cottoncandy = LAVENDER,
-    slate = TEAL, forest = TEAL,
-    obsidian = TAN,
-    crimson = GREY, rosenoir = GREY,
-    custom = GREY,
-}
-
 local HIGHLIGHT_ALPHA = 0.5
 local RULE_ALPHA = 0.6
 local RULE_DROP = 3   -- quest rows are 3 apart; the rule sits at the far edge of that gap
 
 local MEDIA = "Interface\\AddOns\\NaowhForever\\Media\\"
+local FRAME = MEDIA .. "rxp_frame.tga"
 local ARROW_IMAGES = {   -- by shape, then by glow
     kite = { [false] = MEDIA .. "rxp_arrow.tga", [true] = MEDIA .. "rxp_arrow_glow.tga" },
     wide = { [false] = MEDIA .. "rxp_arrow_wide.tga", [true] = MEDIA .. "rxp_arrow_wide_glow.tga" },
@@ -271,7 +261,6 @@ local function Theme(id, displayName, source)
     local palette = ns.ThemePalette(source)
     local c = {}
     for i, token in ipairs(ns.THEME_EDITABLE) do c[token] = palette[i] end
-    local borders = (BORDERS[source] or TEXTURES) .. "rxp-borders"
     return {
         name = NAME_PREFIX .. id,
         displayName = displayName,
@@ -288,7 +277,7 @@ local function Theme(id, displayName, source)
         font = ns.RXPFontEnabled() and ns.AddonFontPath() or nil,
         texturePath = TEXTURES,
         bgTextures = { edge = WHITE, bottom = WHITE, guideName = WHITE },   -- the bars need a fill to show
-        edges = { edge = borders, guideName = borders },
+        edges = { edge = FRAME, guideName = FRAME },
     }
 end
 

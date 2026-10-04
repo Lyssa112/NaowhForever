@@ -112,10 +112,8 @@ local function NameOf(key) return "NaowhForever:" .. (key == "" and "default" or
 local RXP_OWN = { "RXP Blue", "RXP Red", "RXP Gold", "DarkMode", "RXP Green", "Custom" }
 local TEX = "Interface/AddOns/RXPGuides/Textures/"
 local WHITE = "Interface/BUTTONS/WHITE8X8"
--- Written out apart from the module, so a wrong table there cannot hide behind itself.
-local BORDER = { [""] = TEX, midnight = TEX, aubergine = TEX, cottoncandy = TEX,
-    slate = TEX .. "Green/", forest = TEX .. "Green/", obsidian = TEX .. "GoldAssistant/",
-    crimson = TEX .. "Hardcore/", rosenoir = TEX .. "Hardcore/" }
+-- Written out apart from the module, so a wrong path there cannot hide behind itself: Naowh's 1px black frame.
+local BORDER = "Interface\\AddOns\\NaowhForever\\Media\\rxp_frame.tga"
 
 -- Off by default: nothing is written, whatever else is going on.
 do
@@ -158,9 +156,8 @@ do
         Check(Same(theme.textColor, { p[4].r, p[4].g, p[4].b }), key .. ": Text")
         Check(theme.tooltip == "|cff" .. Hex(theme.mapPins), key .. ": the tooltip color is the Accent")
         Check(theme.texturePath == TEX .. "DarkMode/", key .. ": RestedXP's own DarkMode logo and icons")
-        local border = BORDER[key] .. "rxp-borders"
-        Check(theme.edges.edge == border and theme.edges.guideName == border, key .. ": the window borders of its set")
-        Check(not theme.edges.edge:find("DarkMode", 1, true), key .. ": not the near-black line of DarkMode")
+        Check(theme.edges.edge == BORDER and theme.edges.guideName == BORDER, key .. ": Naowh's 1px black window borders")
+        Check(not theme.edges.edge:find("RXPGuides", 1, true), key .. ": none of RestedXP's own frame images")
         Check(theme.bgTextures.edge == WHITE and theme.bgTextures.bottom == WHITE and theme.bgTextures.guideName == WHITE,
             key .. ": every frame, the title bar and footer too, has a fill to color")
     end
@@ -216,14 +213,13 @@ do
         and theme.author == "Naowh Forever", "registered under its own name")
     Check(Hex(theme.background) == "0e0f11" and Hex(theme.mapPins) == "0091ed" and Hex(theme.dividerColor) == "2e3136"
         and Hex(theme.textColor) == "f0f1f3", "with Naowh's default theme: NaowhUI's colors")
-    Check(theme.edges.edge == TEX .. "rxp-borders" and theme.texturePath == TEX .. "DarkMode/", "and its frame line")
+    Check(theme.edges.edge == BORDER and theme.texturePath == TEX .. "DarkMode/", "and the 1px black frame")
 
     local list
     theme, list = Current({ rxpThemes = true, themePreset = "crimson" })
     Check(Hex(theme.background) == "140a0c" and Hex(theme.bottomFrameBG) == "140a0c" and Hex(theme.mapPins) == "ef4b56"
         and Hex(theme.dividerColor) == "3d2429" and Hex(theme.textColor) == "f6eff0", "with a preset picked: that preset's colors")
-    Check(theme.edges.edge == TEX .. "Hardcore/rxp-borders" and theme.edges.guideName == TEX .. "Hardcore/rxp-borders",
-        "and the frame line of its set")
+    Check(theme.edges.edge == BORDER and theme.edges.guideName == BORDER, "and the same black frame")
     Check(Hex(list["NaowhForever:crimson"].mapPins) == "ef4b56" and Hex(list["NaowhForever:default"].mapPins) == "0091ed",
         "while the fixed themes are what they were")
 
@@ -234,7 +230,7 @@ do
         "and the Accent")
     Check(Same(theme.textColor, { 0, 0, 1 }), "and the Text")
     Check(Hex(theme.dividerColor) == "2e3136", "a color not picked is the addon's own")
-    Check(theme.edges.edge == TEX .. "Hardcore/rxp-borders", "with the neutral frame line")
+    Check(theme.edges.edge == BORDER, "with the black frame")
     Check(Hex(list["NaowhForever:default"].background) == "0e0f11" and Hex(list["NaowhForever:midnight"].background) == "0b1020",
         "and the fixed themes are untouched")
 
@@ -1159,6 +1155,30 @@ do
     Check(account.rxpThemes == nil and ns.RXPThemesEnabled() == false, "off clears it")
     account.rxpThemes = "yes"
     Check(ns.RXPThemesEnabled() == false, "only true turns it on")
+end
+
+-- The frame image: a unit of black next to RestedXP's fill, which its backdrop starts 4, 2, 2 and 4 units in.
+do
+    local f = assert(io.open("Media/rxp_frame.tga", "rb"))
+    local data = f:read("*a")
+    f:close()
+    local w, h = data:byte(13) + data:byte(14) * 256, data:byte(15) + data:byte(16) * 256
+    Check(w == 256 and h == 32 and data:byte(17) == 32, "the frame image is 256 by 32, 32 bits")
+    -- cells: left, right, top, bottom, then the corners; y runs down
+    local function A(cell, x, y) return data:byte(18 + ((h - 1 - y) * w + cell * 32 + x) * 4 + 4) end
+    local function On(cell, x, y) return A(cell, x, y) == 255 end
+    local function Off(cell, x, y) return A(cell, x, y) == 0 end
+    local function Half(cell, x, y) local a = A(cell, x, y) return a > 90 and a < 170 end
+    for y = 0, h - 1 do
+        Check(Off(0, 5, y) and Half(0, 12, y) and On(0, 13, y) and On(0, 15, y) and Off(0, 16, y), "left piece")
+        Check(Off(1, 22, y) and On(1, 23, y) and On(1, 25, y) and Half(1, 26, y) and Off(1, 27, y), "right piece")
+        Check(Off(2, 3, y) and Half(2, 5, y) and On(2, 6, y) and On(2, 8, y) and Off(2, 9, y), "top piece")
+        Check(Off(3, 15, y) and On(3, 16, y) and On(3, 18, y) and Half(3, 19, y) and Off(3, 25, y), "bottom piece")
+    end
+    Check(On(4, 14, 31) and On(4, 31, 7) and On(4, 14, 7) and Off(4, 8, 7) and Off(4, 14, 3) and Off(4, 25, 20), "top left")
+    Check(On(5, 24, 31) and On(5, 0, 7) and On(5, 24, 7) and Off(5, 29, 7) and Off(5, 24, 3) and Off(5, 10, 20), "top right")
+    Check(On(6, 14, 0) and On(6, 31, 17) and On(6, 14, 17) and Off(6, 8, 17) and Off(6, 14, 22) and Off(6, 25, 5), "bottom left")
+    Check(On(7, 24, 0) and On(7, 0, 17) and On(7, 24, 17) and Off(7, 29, 17) and Off(7, 24, 22) and Off(7, 10, 5), "bottom right")
 end
 
 print("PASS rxp themes: " .. cases .. " checks")

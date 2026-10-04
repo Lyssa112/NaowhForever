@@ -341,6 +341,33 @@ ARROW_SHADES = (158, 204, 255, 230)
 ARROW_EDGE = 24
 
 
+# RestedXP's frame image: eight 32x32 cells (left, right, top, bottom, then the corners), 28 texels of each
+# shown over 8 units, the top and bottom turned. One unit of black sits against RestedXP's fill, which starts
+# 4, 2, 2 and 4 units in; lines run on into the margin so filtering shows no seam between pieces.
+FRAME_INSET = {"left": 4, "right": 2, "top": 2, "bottom": 4}
+FRAME_SIDES = ("left", "right", "top", "bottom")
+FRAME_CORNERS = (("left", "top"), ("right", "top"), ("left", "bottom"), ("right", "bottom"))
+
+
+def rxp_frame(x, y, width, height):
+    cell = int(x // 32)
+    if cell > 7:
+        return (0, 0, 0, 0)
+    a, b = (x - 32 * cell - 2) / 3.5, (y - 2) / 3.5
+    dist = {"left": a, "right": 8 - a, "top": b, "bottom": 8 - b}
+
+    def line(side, d):
+        return FRAME_INSET[side] - 1 <= d < FRAME_INSET[side]
+
+    if cell < 4:
+        side = FRAME_SIDES[cell]
+        on = line(side, a if side in ("left", "top") else 8 - a)
+    else:
+        v, h = FRAME_CORNERS[cell - 4]
+        on = (line(v, dist[v]) and dist[h] >= FRAME_INSET[h] - 1) or (line(h, dist[h]) and dist[v] >= FRAME_INSET[v] - 1)
+    return (0, 0, 0, 255 if on else 0)
+
+
 def nav_arrow(wide, glow):
     # The waypoint arrow, point up: a kite in four facets with a dark edge and a thin line inside, grey over
     # white so a vertex color tints it. wide: base 14% wider. glow: a soft halo, with the kite drawn
@@ -551,6 +578,7 @@ write_tga(os.path.join(OUT, "rxp_arrow.tga"), 128, nav_arrow(False, False))
 write_tga(os.path.join(OUT, "rxp_arrow_glow.tga"), 128, nav_arrow(False, True))
 write_tga(os.path.join(OUT, "rxp_arrow_wide.tga"), 128, nav_arrow(True, False))
 write_tga(os.path.join(OUT, "rxp_arrow_wide_glow.tga"), 128, nav_arrow(True, True))
+write_wide_tga(os.path.join(OUT, "rxp_frame.tga"), 256, 32, rxp_frame)
 write_tga(os.path.join(OUT, "plus.tga"), 64, lambda x, y, s: max(
     stroke(64, [(0.5, 0.2), (0.5, 0.8)], 0.11)(x, y, s),
     stroke(64, [(0.2, 0.5), (0.8, 0.5)], 0.11)(x, y, s), key=lambda p: p[3]))
