@@ -16,10 +16,27 @@
   starts; it closes when you land or enter combat. Move it in Unlock Mode.
 - Flight Games (QoL > Travel, under the Flight Timer): one choice of what opens by itself when a
   flight starts, Nothing, the Quiz or the Aim Trainer (the default).
-- Settings: Add Themes to RestedXP (RESTEDXP, off by default, shown when RestedXP Guides is installed) adds NaowhUI, the eight Naowh themes and Naowh (current), which follows your own theme, to RestedXP's theme list. Reload to apply, then pick one with RestedXP Theme or in RestedXP's own Look and Feel settings; Naowh never changes it at login.
-- Settings: with the themes on, RestedXP's window follows Naowh's look: Panels-colored surfaces with a 1px black frame, a thin rule between the quest rows, the theme's color in the title bar and footer, and a cog, corner grip and thin scroll bar in Secondary Text. Its waypoint arrow takes the Accent, as a layer over RestedXP's own or as Naowh's folded kite (RestedXP Arrow, Naowh Arrow Shape, Glow, Size and Text Gap). Use Addon Font and Use Theme Text Color switch the font and the text color off, and Show Arrow Text removes the text under the arrow.
+- Scrap Marker (QoL > Loot & Items, off by default): Alt-click an item in your bags, the game's
+  or EllesmereUI's, to mark it as scrap, and again to unmark it. Marks count on every character,
+  or on this one only (New Marks), and the next vendor sells your scrap, even items the game
+  doesn't count as junk. At the Vendor can instead ask first, on a panel beside the vendor, or do
+  nothing. Scrap shows an icon on its bag slot and a line on its tooltip. Your BiS and gear sets
+  are protected, and quest items, keys and items with no sell price can't be marked.
+  - Rules, each off by default, count gear your class can't wear and old grey and white gear as
+    scrap too; the X on a rule's item keeps it.
+  - The Scrap List (Open Scrap List on its settings page, or /nf scrap): every scrap item with
+    what you carry and what it sells for, a search, an X to unmark, Account or Character on each
+    mark, drop an item on it to mark it, Clear All, and Export and Import to share a list.
+  - Bag Space puts your scrap first and shows the slots it will free, like +3.
+- Training Planner: a waypoint to your nearest class trainer, from Waypoint to nearest trainer at
+  the top of the planner, the Waypoint button on the level-up toast, or /nf trainer. With TomTom
+  loaded, it uses TomTom's arrow.
 
 ### Changed
+- Dungeon Journal: Scarlet Monastery is its four wings, each a dungeon of its own: Scarlet
+  Monastery - Graveyard (26-36), Library (29-39), Armory (32-42) and Cathedral (35-45), with its
+  bosses, loot, quests and floor of the map. Inside, the subzone you stand in says which wing
+  you are in; where it cannot tell, the Graveyard comes first.
 - QoL has a Character tab: Character Panel, Slot Marks and Naowh Score moved there from the BiS
   List's settings, and Supporter Badges from Interface. The BiS List's page keeps what is about
   your BiS.
@@ -47,6 +64,23 @@
 
 ### Fixed
 - Naowh Score: no more Lua error after seeing more than 300 players, like in a busy city.
+- Hovering items and players no longer fills BugSack with "secret value" errors on Forever: the
+  upgrade line and bag arrows wait while the game keeps your stats hidden, Naowh Score copes with
+  a player it can no longer read, and the supporter plate and ID lines stop hooking the game's
+  tooltip, which was reported breaking its own player-name colours.
+- Naowh's Forge: no more Lua error when a macro line is just a "/" with no command yet.
+- Character panel: while the game keeps your stats hidden (combat, encounters), your spec's stats
+  still show where the game allows it (primary stats, armor, healing, each school's spell damage,
+  crit, dodge, block), a dash for the rest, instead of a Lua error.
+- Stat Weights: upgrade lines and bag arrows keep working while your stats are hidden, worked out
+  against your stats from just before, until your gear or level changes.
+- Loot Feed: looting coins again while the Coins line is still up adds to it instead of throwing
+  a Lua error, and the loot after that line fades shows up again.
+- Auto-Fill Delete Confirmation: Yes can be clicked again once DELETE is filled in for you;
+  it stayed greyed out on Forever.
+- Settings: a module's window opened from /nf (Open Dungeon Journal, or the small window button
+  beside a module) brings /nf back when you close it the first time too, not only from the
+  second time on.
 
 ## 0.5.19-beta
 
