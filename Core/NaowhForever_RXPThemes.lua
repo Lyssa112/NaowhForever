@@ -18,6 +18,7 @@ local WHITE = "Interface/BUTTONS/WHITE8X8"
 
 local HIGHLIGHT_ALPHA = 0.5
 local RULE_ALPHA = 0.6
+local THUMB_ALPHA = 0.7
 local RULE_DROP = 3   -- quest rows are 3 apart; the rule sits at the far edge of that gap
 
 local MEDIA = "Interface\\AddOns\\NaowhForever\\Media\\"
@@ -269,6 +270,7 @@ local function Theme(id, displayName, source)
         bottomFrameBG = Rgba(c.panel, 1),
         bottomFrameHighlight = Rgba(c.accent, HIGHLIGHT_ALPHA),
         dividerColor = Rgba(c.line, RULE_ALPHA),   -- ours, not RestedXP's
+        scrollColor = Rgba(c.muted, THUMB_ALPHA),
         mapPins = Rgba(c.accent, 1),
         tooltip = "|cff" .. Hex(c.accent),
         -- Left out, RestedXP uses its own. AddonFontPath, not UIFontPath: that one remembers what it finds,
@@ -488,21 +490,18 @@ local function HookBars()
     PaintBars()
 end
 
--- The cog, the corner grip, the scroll arrows and the knob are images with no theme field: swapped for
--- Naowh's sharper ones and tinted.
+-- The cog and the corner grip are images with no theme field: swapped for Naowh's sharper ones and tinted. The
+-- scroll bar loses its arrows and gets a thin thumb, like Naowh's own.
 local COG = MEDIA .. "cog.tga"
 local GRIP = MEDIA .. "rxp_grip.tga"
-local CHEVRON = MEDIA .. "chevron_up.tga"
-local KNOB = MEDIA .. "circle_mask.tga"
-local ARROWS = { ScrollUpButton = false, ScrollDownButton = true }   -- turned over?
+local ARROWS = { "ScrollUpButton", "ScrollDownButton" }
 local ARROW_PARTS = { "Normal", "Highlight", "Pushed", "Disabled" }
-local ARROW_LIFT = 0.33
-local chromeTinted, gripOriginal
+local THUMB_W, THUMB_H = 8, 40
+local chromeTinted, gripOriginal, thumbSize
 
-local function Skin(texture, path, color, flip)
+local function Skin(texture, path, color)
     if type(texture) ~= "table" or type(texture.SetVertexColor) ~= "function" then return end
     if path and type(texture.SetTexture) == "function" then texture:SetTexture(path) end
-    if type(texture.SetTexCoord) == "function" then texture:SetTexCoord(0, 1, flip and 1 or 0, flip and 0 or 1) end
     local r, g, b = 1, 1, 1
     if color then r, g, b = color[1], color[2], color[3] end
     texture:SetVertexColor(r, g, b, 1)
@@ -510,6 +509,17 @@ end
 
 local function Normal(button)
     return type(button) == "table" and type(button.GetNormalTexture) == "function" and button:GetNormalTexture() or nil
+end
+
+local function PaintThumb(thumb, color)
+    if type(thumb) ~= "table" or type(thumb.SetSize) ~= "function" or type(thumb.GetSize) ~= "function" then return end
+    thumbSize = thumbSize or { thumb:GetSize() }
+    if color and type(thumb.SetColorTexture) == "function" then
+        thumb:SetColorTexture(color[1], color[2], color[3], color[4])
+        thumb:SetSize(THUMB_W, THUMB_H)
+    else
+        thumb:SetSize(thumbSize[1], thumbSize[2])
+    end
 end
 
 local function PaintChrome()
@@ -523,15 +533,13 @@ local function PaintChrome()
     Skin(Normal(Dig(frame, "Footer", "cog")), accent and COG, accent)
     Skin(grip, accent and GRIP or gripOriginal, accent)
     local bar = Dig(frame, "ScrollFrame", "ScrollBar")
-    Skin(type(bar) == "table" and type(bar.GetThumbTexture) == "function" and bar:GetThumbTexture() or nil,
-        accent and KNOB, accent)
-    local soft = accent and { accent[1] + (1 - accent[1]) * ARROW_LIFT, accent[2] + (1 - accent[2]) * ARROW_LIFT,
-        accent[3] + (1 - accent[3]) * ARROW_LIFT }
-    for name, flip in pairs(ARROWS) do
-        local button = Dig(frame, "ScrollFrame", "ScrollBar", name)
+    PaintThumb(type(bar) == "table" and type(bar.GetThumbTexture) == "function" and bar:GetThumbTexture() or nil,
+        accent and type(theme.scrollColor) == "table" and theme.scrollColor or nil)
+    for _, name in ipairs(ARROWS) do
+        local button = Dig(bar, name)
         for _, part in ipairs(ARROW_PARTS) do
-            Skin(Dig(button, part), accent and CHEVRON, part == "Disabled" and theme and theme.dividerColor or soft,
-                flip and accent ~= nil)
+            local texture = Dig(button, part)
+            if type(texture) == "table" and type(texture.SetAlpha) == "function" then texture:SetAlpha(accent and 0 or 1) end
         end
     end
 end

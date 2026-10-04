@@ -153,6 +153,7 @@ do
         Check(Same(theme.dividerColor, { p[3].r, p[3].g, p[3].b, 0.6 }), key .. ": the rule between list rows is Borders & Lines at 60%")
         Check(Same(theme.bottomFrameHighlight, { p[6].r, p[6].g, p[6].b, 0.5 }), key .. ": the Accent at half opacity")
         Check(Same(theme.mapPins, { p[6].r, p[6].g, p[6].b, 1 }), key .. ": map pins in the Accent")
+        Check(Same(theme.scrollColor, { p[5].r, p[5].g, p[5].b, 0.7 }), key .. ": the scroll thumb is Secondary Text at 70%")
         Check(Same(theme.textColor, { p[4].r, p[4].g, p[4].b }), key .. ": Text")
         Check(theme.tooltip == "|cff" .. Hex(theme.mapPins), key .. ": the tooltip color is the Accent")
         Check(theme.texturePath == TEX .. "DarkMode/", key .. ": RestedXP's own DarkMode logo and icons")
@@ -1035,15 +1036,18 @@ do
     Check(A(40, 40) == 0 and A(49, 49) == 0 and A(5, 5) == 0 and A(5, 60) == 0 and A(60, 5) == 0, "with gaps between them, and the far corner empty")
 end
 
--- The cog, the corner grip, the scroll arrows and the knob.
+-- The cog, the corner grip and the scroll bar.
 do
     local MEDIA = "Interface\\AddOns\\NaowhForever\\Media\\"
-    local function Texture(path)
-        local t = { paints = 0, path = path }
+    local function Texture(path, w, h)
+        local t = { paints = 0, path = path, size = { w or 18, h or 24 }, alpha = 1 }
         function t:SetVertexColor(r, g, b, a) self.color = { r, g, b, a }; self.paints = self.paints + 1 end
         function t:SetTexture(p) self.path = p end
         function t:GetTexture() return self.path end
-        function t:SetTexCoord(...) self.coords = { ... } end
+        function t:SetColorTexture(r, g, b, a) self.solid = { r, g, b, a } end
+        function t:SetSize(w2, h2) self.size = { w2, h2 } end
+        function t:GetSize() return self.size[1], self.size[2] end
+        function t:SetAlpha(a) self.alpha = a end
         return t
     end
     local function Button(path)
@@ -1071,51 +1075,43 @@ do
         end
     end
     local function Same3(c, r, g, b) return c and math.abs(c[1] - r) < 1e-6 and math.abs(c[2] - g) < 1e-6 and math.abs(c[3] - b) < 1e-6 and c[4] == 1 end
-    local function Coords(t, a, b, c, d) return t.coords and t.coords[1] == a and t.coords[2] == b and t.coords[3] == c and t.coords[4] == d end
-    local function Lift(v) return v + (1 - v) * 0.33 end
+    local function Faded(arrow, alpha)
+        return arrow.Normal.alpha == alpha and arrow.Highlight.alpha == alpha and arrow.Pushed.alpha == alpha and arrow.Disabled.alpha == alpha
+    end
 
     local env, window = Start({ rxpThemes = true }, "NaowhForever:crimson")
     local theme = env.RXPGuides_Themes["NaowhForever:crimson"]
-    local a, line = theme.mapPins, theme.dividerColor
+    local a, thin = theme.mapPins, theme.scrollColor
     local cog, grip = window.Footer.cog.normal, window.Footer.icon.normal
     local bar = window.ScrollFrame.ScrollBar
     local up, down, thumb = bar.ScrollUpButton, bar.ScrollDownButton, bar.thumb
     Check(Hook(env, window), "RestedXP's UpdateScrollBar is hooked")
     Check(cog.path == MEDIA .. "cog.tga" and Same3(cog.color, a[1], a[2], a[3]), "the cog: Naowh's, in the Accent")
     Check(grip.path == MEDIA .. "rxp_grip.tga" and Same3(grip.color, a[1], a[2], a[3]), "the corner grip: Naowh's, in the Accent")
-    Check(thumb.path == MEDIA .. "circle_mask.tga" and Same3(thumb.color, a[1], a[2], a[3]), "the knob: a disc in the Accent")
-    for _, arrow in ipairs({ up, down }) do
-        for _, part in ipairs({ "Normal", "Highlight", "Pushed" }) do
-            Check(arrow[part].path == MEDIA .. "chevron_up.tga" and Same3(arrow[part].color, Lift(a[1]), Lift(a[2]), Lift(a[3])),
-                "an arrow's " .. part .. ": the chevron in a lighter Accent")
-        end
-        Check(arrow.Disabled.path == MEDIA .. "chevron_up.tga" and Same3(arrow.Disabled.color, line[1], line[2], line[3]),
-            "an arrow's Disabled image: the chevron in the line color")
-    end
-    Check(Coords(up.Normal, 0, 1, 0, 1) and Coords(down.Normal, 0, 1, 1, 0) and Coords(down.Disabled, 0, 1, 1, 0),
-        "the up arrow as it is, the down arrow turned over")
-    cog.color, grip.color, up.Normal.color, thumb.color = nil, nil, nil, nil
+    Check(thumb.solid and thumb.solid[1] == thin[1] and thumb.solid[2] == thin[2] and thumb.solid[3] == thin[3] and thumb.solid[4] == 0.7
+        and thumb.size[1] == 8 and thumb.size[2] == 40, "the scroll thumb: a thin bar in Secondary Text")
+    Check(Faded(up, 0) and Faded(down, 0), "the scroll arrows are gone")
+    thumb.solid, cog.color = nil, nil
     Hook(env, window)()
-    Check(cog.color and grip.color and up.Normal.color and thumb.color, "RestedXP sets its images again: tinted again")
+    Check(thumb.solid and cog.color, "RestedXP sets its images again: painted again")
 
     env.RXP.activeTheme = { name = "DarkMode" }
     Hook(env, window)()
-    Check(Same3(cog.color, 1, 1, 1) and Same3(grip.color, 1, 1, 1) and Same3(down.Pushed.color, 1, 1, 1) and Same3(thumb.color, 1, 1, 1),
-        "a theme of RestedXP's: the images are not tinted")
-    Check(grip.path == "blizzard grabber" and Coords(down.Normal, 0, 1, 0, 1), "the grip is the game's again, the down arrow the right way up")
-    local paints = cog.paints + grip.paints + up.Normal.paints
+    Check(Same3(cog.color, 1, 1, 1) and Same3(grip.color, 1, 1, 1) and grip.path == "blizzard grabber",
+        "a theme of RestedXP's: the cog and grip are not tinted, and the grip is the game's again")
+    Check(Faded(up, 1) and Faded(down, 1) and thumb.size[1] == 18 and thumb.size[2] == 24, "the arrows are back, and the thumb is its own size")
+    local paints = cog.paints + grip.paints
     Hook(env, window)()
-    Check(cog.paints + grip.paints + up.Normal.paints == paints, "and not touched again while they are RestedXP's")
+    Check(cog.paints + grip.paints == paints and Faded(up, 1), "and not touched again while they are RestedXP's")
     env.RXP.activeTheme = env.RXPGuides_Themes["NaowhForever:midnight"]
     Hook(env, window)()
-    Check(cog.color[1] ~= 1 and thumb.color[1] ~= 1 and grip.path == MEDIA .. "rxp_grip.tga" and Coords(down.Normal, 0, 1, 1, 0),
-        "back to one of ours: Naowh's images again")
+    Check(cog.color[1] ~= 1 and Faded(down, 0) and thumb.size[1] == 8 and grip.path == MEDIA .. "rxp_grip.tga",
+        "back to one of ours: Naowh's look again")
 
     local own, ownWindow = Start({ rxpThemes = true }, nil)
     local ownBar = ownWindow.ScrollFrame.ScrollBar
-    Check(Hook(own, ownWindow) and ownWindow.Footer.cog.normal.paints == 0 and ownBar.ScrollUpButton.Normal.paints == 0
-        and ownBar.thumb.paints == 0 and ownWindow.Footer.icon.normal.path == "blizzard grabber" and ownBar.thumb.path == "rxp knob",
-        "RestedXP's own theme: hooked, and nothing touched")
+    Check(Hook(own, ownWindow) and ownWindow.Footer.cog.normal.paints == 0 and Faded(ownBar.ScrollUpButton, 1) and ownBar.thumb.solid == nil
+        and ownBar.thumb.size[1] == 18 and ownWindow.Footer.icon.normal.path == "blizzard grabber", "RestedXP's own theme: hooked, and nothing touched")
     local off, offWindow = Start({}, nil)
     Check(#off.hooked == 0 and offWindow.Footer.cog.normal.paints == 0, "off: nothing is hooked or touched")
 
@@ -1129,10 +1125,11 @@ do
     end
     Check(#Bare(nil).hooked == 0 and #Bare({}).hooked == 0, "no window, or one without the scroll bar update: nothing is hooked")
     local partial = { Footer = { cog = {}, icon = { GetNormalTexture = function() end } }, ScrollFrame = {}, UpdateScrollBar = function() end }
-    Check(#Bare(partial).hooked == 1, "buttons and arrows that are missing or bare: skipped without an error")
+    Check(#Bare(partial).hooked == 1, "buttons and a bar that are missing or bare: skipped without an error")
     local mute = Window()
     mute.Footer.cog = { GetNormalTexture = function() return {} end }
-    Check(#Bare(mute).hooked == 1, "an image that cannot be tinted: left alone")
+    mute.ScrollFrame.ScrollBar.thumb = {}
+    Check(#Bare(mute).hooked == 1, "images that cannot be changed: left alone")
 end
 
 -- The quest list rules.
