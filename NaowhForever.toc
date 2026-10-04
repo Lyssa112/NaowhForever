@@ -86,10 +86,12 @@ QoL\NaowhForever_DeathRelease.lua
 QoL\NaowhForever_StealthReminder.lua
 QoL\NaowhForever_CoTank.lua
 QoL\NaowhForever_DeleteConfirm.lua
+QoL\NaowhForever_EnchantReplace.lua
 QoL\NaowhForever_Durability.lua
 QoL\NaowhForever_TalentPoints.lua
 QoL\NaowhForever_CombatAlert.lua
 QoL\NaowhForever_QuestAutomation.lua
+QoL\NaowhForever_GroupButtons.lua
 QoL\NaowhForever_LootConfirm.lua
 QoL\NaowhForever_CursorClip.lua
 QoL\NaowhForever_CombatTimer.lua
@@ -123,10 +125,12 @@ Discovery\NaowhForever_DiscoveryMap.xml
 Discovery\NaowhForever_DiscoveryNearby.lua
 # Training Planner: the data loads first; the module reads it.
 Training\NaowhForever_TrainingData.lua
+Training\NaowhForever_TrainingBuilds.lua
 Training\NaowhForever_Training.lua
 Training\NaowhForever_TrainingWindow.lua
 Training\NaowhForever_TrainingTrainer.lua
 QoL\NaowhForever_TownData.lua
+QoL\NaowhForever_TownMailboxes.lua
 QoL\NaowhForever_TownMap.xml
 GearSets\NaowhForever_GearSets.lua
 BiS\NaowhForever_BiSData.lua
