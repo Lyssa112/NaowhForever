@@ -153,7 +153,7 @@ do
         Check(Same(theme.dividerColor, { p[3].r, p[3].g, p[3].b, 0.6 }), key .. ": the rule between list rows is Borders & Lines at 60%")
         Check(Same(theme.bottomFrameHighlight, { p[6].r, p[6].g, p[6].b, 0.5 }), key .. ": the Accent at half opacity")
         Check(Same(theme.mapPins, { p[6].r, p[6].g, p[6].b, 1 }), key .. ": map pins in the Accent")
-        Check(Same(theme.scrollColor, { p[5].r, p[5].g, p[5].b, 0.7 }), key .. ": the scroll thumb is Secondary Text at 70%")
+        Check(Same(theme.chromeColor, { p[5].r, p[5].g, p[5].b, 0.7 }), key .. ": the cog, grip and scroll thumb are Secondary Text at 70%")
         Check(Same(theme.textColor, { p[4].r, p[4].g, p[4].b }), key .. ": Text")
         Check(theme.tooltip == "|cff" .. Hex(theme.mapPins), key .. ": the tooltip color is the Accent")
         Check(theme.texturePath == TEX .. "DarkMode/", key .. ": RestedXP's own DarkMode logo and icons")
@@ -1075,19 +1075,20 @@ do
         end
     end
     local function Same3(c, r, g, b) return c and math.abs(c[1] - r) < 1e-6 and math.abs(c[2] - g) < 1e-6 and math.abs(c[3] - b) < 1e-6 and c[4] == 1 end
+    local function Same4(c, t) return c and c[1] == t[1] and c[2] == t[2] and c[3] == t[3] and c[4] == t[4] end
     local function Faded(arrow, alpha)
         return arrow.Normal.alpha == alpha and arrow.Highlight.alpha == alpha and arrow.Pushed.alpha == alpha and arrow.Disabled.alpha == alpha
     end
 
     local env, window = Start({ rxpThemes = true }, "NaowhForever:crimson")
     local theme = env.RXPGuides_Themes["NaowhForever:crimson"]
-    local a, thin = theme.mapPins, theme.scrollColor
+    local thin = theme.chromeColor
     local cog, grip = window.Footer.cog.normal, window.Footer.icon.normal
     local bar = window.ScrollFrame.ScrollBar
     local up, down, thumb = bar.ScrollUpButton, bar.ScrollDownButton, bar.thumb
     Check(Hook(env, window), "RestedXP's UpdateScrollBar is hooked")
-    Check(cog.path == MEDIA .. "cog.tga" and Same3(cog.color, a[1], a[2], a[3]), "the cog: Naowh's, in the Accent")
-    Check(grip.path == MEDIA .. "rxp_grip.tga" and Same3(grip.color, a[1], a[2], a[3]), "the corner grip: Naowh's, in the Accent")
+    Check(cog.path == MEDIA .. "cog.tga" and Same4(cog.color, thin), "the cog: Naowh's, in Secondary Text")
+    Check(grip.path == MEDIA .. "rxp_grip.tga" and Same4(grip.color, thin), "the corner grip: Naowh's, in Secondary Text")
     Check(thumb.solid and thumb.solid[1] == thin[1] and thumb.solid[2] == thin[2] and thumb.solid[3] == thin[3] and thumb.solid[4] == 0.7
         and thumb.size[1] == 8 and thumb.size[2] == 40, "the scroll thumb: a thin bar in Secondary Text")
     Check(Faded(up, 0) and Faded(down, 0), "the scroll arrows are gone")

@@ -18,7 +18,7 @@ local WHITE = "Interface/BUTTONS/WHITE8X8"
 
 local HIGHLIGHT_ALPHA = 0.5
 local RULE_ALPHA = 0.6
-local THUMB_ALPHA = 0.7
+local CHROME_ALPHA = 0.7
 local RULE_DROP = 3   -- quest rows are 3 apart; the rule sits at the far edge of that gap
 
 local MEDIA = "Interface\\AddOns\\NaowhForever\\Media\\"
@@ -270,7 +270,7 @@ local function Theme(id, displayName, source)
         bottomFrameBG = Rgba(c.panel, 1),
         bottomFrameHighlight = Rgba(c.accent, HIGHLIGHT_ALPHA),
         dividerColor = Rgba(c.line, RULE_ALPHA),   -- ours, not RestedXP's
-        scrollColor = Rgba(c.muted, THUMB_ALPHA),
+        chromeColor = Rgba(c.muted, CHROME_ALPHA),
         mapPins = Rgba(c.accent, 1),
         tooltip = "|cff" .. Hex(c.accent),
         -- Left out, RestedXP uses its own. AddonFontPath, not UIFontPath: that one remembers what it finds,
@@ -490,8 +490,8 @@ local function HookBars()
     PaintBars()
 end
 
--- The cog and the corner grip are images with no theme field: swapped for Naowh's sharper ones and tinted. The
--- scroll bar loses its arrows and gets a thin thumb, like Naowh's own.
+-- The cog, the corner grip and the scroll bar are images with no theme field: the cog and grip are swapped for
+-- Naowh's sharper ones, and all of it is in Secondary Text, like Naowh's own scroll bars (which have no arrows).
 local COG = MEDIA .. "cog.tga"
 local GRIP = MEDIA .. "rxp_grip.tga"
 local ARROWS = { "ScrollUpButton", "ScrollDownButton" }
@@ -502,9 +502,9 @@ local chromeTinted, gripOriginal, thumbSize
 local function Skin(texture, path, color)
     if type(texture) ~= "table" or type(texture.SetVertexColor) ~= "function" then return end
     if path and type(texture.SetTexture) == "function" then texture:SetTexture(path) end
-    local r, g, b = 1, 1, 1
-    if color then r, g, b = color[1], color[2], color[3] end
-    texture:SetVertexColor(r, g, b, 1)
+    local r, g, b, a = 1, 1, 1, 1
+    if color then r, g, b, a = color[1], color[2], color[3], color[4] or 1 end
+    texture:SetVertexColor(r, g, b, a)
 end
 
 local function Normal(button)
@@ -524,22 +524,21 @@ end
 
 local function PaintChrome()
     local theme = ActiveTheme()
-    local accent = theme and theme.mapPins
-    if not accent and not chromeTinted then return end
-    chromeTinted = accent ~= nil
+    local color = theme and type(theme.chromeColor) == "table" and theme.chromeColor or nil
+    if not color and not chromeTinted then return end
+    chromeTinted = color ~= nil
     local frame = _G.RXPFrame
     local grip = Normal(Dig(frame, "Footer", "icon"))
     if type(grip) == "table" and type(grip.GetTexture) == "function" then gripOriginal = gripOriginal or grip:GetTexture() end
-    Skin(Normal(Dig(frame, "Footer", "cog")), accent and COG, accent)
-    Skin(grip, accent and GRIP or gripOriginal, accent)
+    Skin(Normal(Dig(frame, "Footer", "cog")), color and COG, color)
+    Skin(grip, color and GRIP or gripOriginal, color)
     local bar = Dig(frame, "ScrollFrame", "ScrollBar")
-    PaintThumb(type(bar) == "table" and type(bar.GetThumbTexture) == "function" and bar:GetThumbTexture() or nil,
-        accent and type(theme.scrollColor) == "table" and theme.scrollColor or nil)
+    PaintThumb(type(bar) == "table" and type(bar.GetThumbTexture) == "function" and bar:GetThumbTexture() or nil, color)
     for _, name in ipairs(ARROWS) do
         local button = Dig(bar, name)
         for _, part in ipairs(ARROW_PARTS) do
             local texture = Dig(button, part)
-            if type(texture) == "table" and type(texture.SetAlpha) == "function" then texture:SetAlpha(accent and 0 or 1) end
+            if type(texture) == "table" and type(texture.SetAlpha) == "function" then texture:SetAlpha(color and 0 or 1) end
         end
     end
 end
