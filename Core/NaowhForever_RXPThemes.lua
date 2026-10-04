@@ -266,7 +266,7 @@ local function Theme(id, displayName, source)
         displayName = displayName,
         author = AUTHOR,
         background = Rgba(c.panel, 1),
-        bottomFrameBG = Rgba(c.bg, 1),
+        bottomFrameBG = Rgba(c.panel, 1),
         bottomFrameHighlight = Rgba(c.accent, HIGHLIGHT_ALPHA),
         dividerColor = Rgba(c.line, RULE_ALPHA),   -- ours, not RestedXP's
         mapPins = Rgba(c.accent, 1),

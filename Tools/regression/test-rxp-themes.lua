@@ -149,7 +149,7 @@ do
         Check(theme.displayName == NAMES[key] and theme.author == "Naowh Forever", key .. ": name and author")
         local p = ns.ThemePalette(key)   -- bg, panel, line, fg, muted, accent
         Check(Same(theme.background, { p[2].r, p[2].g, p[2].b, 1 }), key .. ": the window is the Panels color")
-        Check(Same(theme.bottomFrameBG, { p[1].r, p[1].g, p[1].b, 1 }), key .. ": the buttons in its bottom frame are the Background color")
+        Check(Same(theme.bottomFrameBG, { p[2].r, p[2].g, p[2].b, 1 }), key .. ": the quest panels are the Panels color too")
         Check(Same(theme.dividerColor, { p[3].r, p[3].g, p[3].b, 0.6 }), key .. ": the rule between list rows is Borders & Lines at 60%")
         Check(Same(theme.bottomFrameHighlight, { p[6].r, p[6].g, p[6].b, 0.5 }), key .. ": the Accent at half opacity")
         Check(Same(theme.mapPins, { p[6].r, p[6].g, p[6].b, 1 }), key .. ": map pins in the Accent")
@@ -167,7 +167,7 @@ do
     end
 
     local default, midnight = list["NaowhForever:default"], list["NaowhForever:midnight"]
-    Check(Hex(default.background) == "1a1c1f" and Hex(default.bottomFrameBG) == "0e0f11", "NaowhUI: Panels for the window, Background for the buttons")
+    Check(Hex(default.background) == "1a1c1f" and Hex(default.bottomFrameBG) == "1a1c1f", "NaowhUI: Panels for the window and the quest panels")
     Check(Hex(default.dividerColor) == "2e3136" and Hex(midnight.dividerColor) == "2a3550", "the rules: NaowhUI's and Midnight's Borders & Lines")
     Check(Hex(default.mapPins) == "0091ed" and default.tooltip == "|cff0091ed", "NaowhUI: the blue Accent")
     Check(Hex(default.textColor) == "f0f1f3", "NaowhUI: Text")
@@ -217,7 +217,7 @@ do
 
     local list
     theme, list = Current({ rxpThemes = true, themePreset = "crimson" })
-    Check(Hex(theme.background) == "201316" and Hex(theme.bottomFrameBG) == "140a0c" and Hex(theme.mapPins) == "ef4b56"
+    Check(Hex(theme.background) == "201316" and Hex(theme.bottomFrameBG) == "201316" and Hex(theme.mapPins) == "ef4b56"
         and Hex(theme.dividerColor) == "3d2429" and Hex(theme.textColor) == "f6eff0", "with a preset picked: that preset's colors")
     Check(theme.edges.edge == BORDER and theme.edges.guideName == BORDER, "and the same black frame")
     Check(Hex(list["NaowhForever:crimson"].mapPins) == "ef4b56" and Hex(list["NaowhForever:default"].mapPins) == "0091ed",
@@ -225,7 +225,9 @@ do
 
     theme, list = Current({ rxpThemes = true, themePreset = "custom",
         themeColors = { bg = { r = 1, g = 0, b = 0 }, accent = { r = 0, g = 1, b = 0 }, fg = { r = 0, g = 0, b = 1 } } })
-    Check(Hex(theme.background) == "1a1c1f" and Same(theme.bottomFrameBG, { 1, 0, 0, 1 }), "with Custom colors: Panels as shipped, the Background picked")
+    Check(Hex(theme.background) == "1a1c1f" and Hex(theme.bottomFrameBG) == "1a1c1f", "with Custom colors: Panels as shipped, for both")
+    local panelTheme = Current({ rxpThemes = true, themePreset = "custom", themeColors = { panel = { r = 0, g = 1, b = 0 } } })
+    Check(Same(panelTheme.background, { 0, 1, 0, 1 }) and Same(panelTheme.bottomFrameBG, { 0, 1, 0, 1 }), "a Custom Panels pick colors both")
     Check(Same(theme.mapPins, { 0, 1, 0, 1 }) and Same(theme.bottomFrameHighlight, { 0, 1, 0, 0.5 }) and theme.tooltip == "|cff00ff00",
         "and the Accent")
     Check(Same(theme.textColor, { 0, 0, 1 }), "and the Text")
