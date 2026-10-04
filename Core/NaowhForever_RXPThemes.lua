@@ -265,7 +265,7 @@ local function Theme(id, displayName, source)
         name = NAME_PREFIX .. id,
         displayName = displayName,
         author = AUTHOR,
-        background = Rgba(c.bg, 1),
+        background = Rgba(c.panel, 1),
         bottomFrameBG = Rgba(c.bg, 1),
         bottomFrameHighlight = Rgba(c.accent, HIGHLIGHT_ALPHA),
         dividerColor = Rgba(c.line, RULE_ALPHA),   -- ours, not RestedXP's
