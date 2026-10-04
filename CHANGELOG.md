@@ -16,6 +16,8 @@
   starts; it closes when you land or enter combat. Move it in Unlock Mode.
 - Flight Games (QoL > Travel, under the Flight Timer): one choice of what opens by itself when a
   flight starts, Nothing, the Quiz or the Aim Trainer (the default).
+- Settings: a Classic theme in the Theme dropdown (COLORS): dark brown panels, parchment text and
+  an antique gold accent, in the spirit of the original WoW interface.
 
 ### Changed
 - QoL has a Character tab: Character Panel, Slot Marks and Naowh Score moved there from the BiS
