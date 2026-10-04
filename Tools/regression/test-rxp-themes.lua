@@ -1,4 +1,4 @@
--- The RestedXP themes and hooks (Core/NaowhForever_RXPThemes.lua), run against the real Core. Run with
+-- The RestedXP themes and hooks (RXPThemes/NaowhForever_RXPThemes.lua), run against the real Core. Run with
 -- Lua 5.1 from the repository root.
 local function Read(path)
     local f = assert(io.open(path, "rb"))
@@ -6,7 +6,7 @@ local function Read(path)
     return s
 end
 local coreSource = Read("Core/NaowhForever_Core.lua")
-local moduleSource = Read("Core/NaowhForever_RXPThemes.lua")
+local moduleSource = Read("RXPThemes/NaowhForever_RXPThemes.lua")
 
 local cases = 0
 local function Check(ok, label) assert(ok, label); cases = cases + 1 end

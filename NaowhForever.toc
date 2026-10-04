@@ -25,7 +25,7 @@ Core\NaowhForever_Waypoint.lua
 
 # NaowhUI, the Naowh themes and your own theme in RestedXP Guides, when Settings > RESTEDXP turns it
 # on. Needs the Core's theme palettes.
-Core\NaowhForever_RXPThemes.lua
+RXPThemes\NaowhForever_RXPThemes.lua
 
 # The widget kit: ns.UI, the shim every options page calls in place of EllesmereUI's
 # factory. Needs ns.THEME and the Core primitives.

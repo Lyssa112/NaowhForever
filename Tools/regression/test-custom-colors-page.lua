@@ -8,7 +8,7 @@ local function Read(path)
     return s
 end
 local coreSource = Read("Core/NaowhForever_Core.lua")
-local rxpSource = Read("Core/NaowhForever_RXPThemes.lua")
+local rxpSource = Read("RXPThemes/NaowhForever_RXPThemes.lua")
 local source = Read("Core/NaowhForever_Window.lua")
 local first = assert(source:find('_, h = W:SectionHeader(parent, "COLORS", y)', 1, true))
 local last = assert(source:find('_, h = W:ReloadButton(parent, y)', first, true))
