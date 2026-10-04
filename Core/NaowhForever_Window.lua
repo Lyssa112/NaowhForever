@@ -733,7 +733,7 @@ function ns.BuildSettingsPage(parent, y)
         _, h = W:Note(parent, "Reload UI to apply your color changes.", y); y = y - h
     end
 
-    -- Only with RestedXP Guides installed. The choices mean nothing without the themes, so they wait for them.
+    -- Only with RestedXP Guides installed.
     if ns.RXPThemesAvailable and ns.RXPThemesAvailable() then
         _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
         -- RestedXP reads these as it starts, so each one asks for a reload.

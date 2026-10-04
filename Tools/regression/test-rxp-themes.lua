@@ -112,7 +112,7 @@ local function NameOf(key) return "NaowhForever:" .. (key == "" and "default" or
 local RXP_OWN = { "RXP Blue", "RXP Red", "RXP Gold", "DarkMode", "RXP Green", "Custom" }
 local TEX = "Interface/AddOns/RXPGuides/Textures/"
 local WHITE = "Interface/BUTTONS/WHITE8X8"
--- Written out apart from the module, so a wrong path there cannot hide behind itself: Naowh's 1px black frame.
+-- Written out apart from the module, so a wrong path there cannot hide behind itself.
 local BORDER = "Interface\\AddOns\\NaowhForever\\Media\\rxp_frame.tga"
 
 -- Off by default: nothing is written, whatever else is going on.
@@ -243,13 +243,11 @@ do
     Check(plain.font == nil and plain.textColor == nil, "the font and the text color switches are honored here too")
 end
 
--- RestedXP Theme: RestedXP's own, the current theme, NaowhUI or a preset. The choice is RestedXP's own setting,
--- written when the player picks and not at any other time.
+-- RestedXP Theme: written to RestedXP's own setting when the player picks, and at no other time.
 do
     local CURRENT = "NaowhForever:current"
     local NAMES_IN = { CURRENT, "NaowhForever:default", "NaowhForever:crimson", "NaowhForever:slate" }
-    -- RestedXP as far as this needs it: the settings, the registered themes, and a theme reload that records
-    -- the theme it was asked to show.
+    -- RestedXP as far as this needs it: its settings, its themes, and a reload that records the theme it showed.
     local function Rxp(active, registered, live)
         local rxp = { settings = { profile = { activeTheme = active, enableThemeLiveReload = live ~= false } },
             reloads = {}, themes = {} }

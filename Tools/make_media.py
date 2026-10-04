@@ -341,9 +341,9 @@ ARROW_SHADES = (158, 204, 255, 230)
 ARROW_EDGE = 24
 
 
-# RestedXP's frame image: eight 32x32 cells (left, right, top, bottom, then the corners), 28 texels of each
-# shown over 8 units, the top and bottom turned. One unit of black sits against RestedXP's fill, which starts
-# 4, 2, 2 and 4 units in; lines run on into the margin so filtering shows no seam between pieces.
+# RestedXP's frame image: eight 32x32 cells (left, right, top, bottom, the corners), each showing 28 texels over
+# 8 units, the top and bottom turned. One unit of black sits against RestedXP's fill, which starts 4, 2, 2 and
+# 4 units in, and runs on into the margin so filtering shows no seam.
 FRAME_INSET = {"left": 4, "right": 2, "top": 2, "bottom": 4}
 FRAME_SIDES = ("left", "right", "top", "bottom")
 FRAME_CORNERS = (("left", "top"), ("right", "top"), ("left", "bottom"), ("right", "bottom"))

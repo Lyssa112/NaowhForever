@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 --  NaowhForever_RXPThemes.lua -- NaowhUI, the eight Naowh themes and the player's current theme in
---  RestedXP Guides, and hooks that color its arrow, title bar and quest list. Off unless Settings >
---  RESTEDXP turns it on.
+--  RestedXP Guides, and hooks that style its arrow, title bar, quest list and scroll bar. Off unless
+--  Settings > RESTEDXP turns it on.
 -------------------------------------------------------------------------------
 local ns = _G.NaowhForever
 
@@ -9,7 +9,7 @@ local RXP_ADDON = "RXPGuides"
 local NAME_PREFIX = "NaowhForever:"
 local AUTHOR = "Naowh Forever"
 local DEFAULT_KEY, DEFAULT_NAME = "default", "NaowhUI"
-local CURRENT_KEY, CURRENT_NAME = "current", "Naowh (current)"   -- follows the player's own theme
+local CURRENT_KEY, CURRENT_NAME = "current", "Naowh (current)"
 local RXP_DEFAULT = "Default"   -- RestedXP's name for its own theme
 
 local RXP_TEXTURES = "Interface/AddOns/RXPGuides/Textures/"
@@ -35,7 +35,7 @@ local DEFAULT_ARROW = "layer"
 local SIZE_MIN, SIZE_MAX, SIZE_STEP, DEFAULT_SIZE = 60, 200, 5, 90
 local GLOW_FILL = 0.76
 local GAP_MIN, GAP_MAX, DEFAULT_GAP = 0, 20, 4   -- extra space between Naowh's image and the distance text
--- The layer is lighter at the top and deeper at the bottom, and not full strength, so the dark arrow still shades it.
+-- The layer is lighter at the top, deeper at the bottom and not full strength, so the dark arrow still shades it.
 local TOP_TOWARD_WHITE = 0.22
 local BOTTOM_SHARE = 0.72
 local LAYER_STRENGTH = 0.9
@@ -43,7 +43,7 @@ local LAYER_STRENGTH = 0.9
 -------------------------------------------------------------------------------
 --  Settings
 -------------------------------------------------------------------------------
-local PaintArrow   -- defined below; a change applies at once
+local PaintArrow   -- defined below
 local boot         -- our frame, which also waits for the end of combat
 
 ---@return boolean
@@ -61,7 +61,6 @@ function ns.SetRXPThemes(on)
     ns.AccountSettings().rxpThemes = on and true or nil
 end
 
--- The theme RestedXP is put on: its own, the current one, NaowhUI or a preset.
 ---@return table values by id
 ---@return table order
 function ns.RXPThemeChoices()
@@ -76,6 +75,10 @@ end
 
 local function ThemeId(key)
     return key == CURRENT_KEY or key == DEFAULT_KEY or (type(key) == "string" and ns.THEME_PRESETS[key] ~= nil)
+end
+
+local function Has(object, method)
+    return type(object) == "table" and type(object[method]) == "function"
 end
 
 -- t[k1][k2]... when every step is a table, else nil.
@@ -94,7 +97,7 @@ end
 -- RestedXP's own theme reload, which scales its protected target frame: in combat it waits for the end of it.
 local function Reload()
     local rxp = _G.RXP
-    if type(rxp) ~= "table" or type(rxp.ReloadTheme) ~= "function" then return end
+    if not Has(rxp, "ReloadTheme") then return end
     if InCombatLockdown() then
         boot:RegisterEvent("PLAYER_REGEN_ENABLED")
         return
@@ -106,11 +109,10 @@ end
 ---@return boolean
 function ns.RXPThemesReady()
     local rxp = _G.RXP
-    return type(Dig(rxp, "settings", "profile")) == "table" and type(rxp.ReloadTheme) == "function"
+    return type(Dig(rxp, "settings", "profile")) == "table" and Has(rxp, "ReloadTheme")
         and type(Dig(rxp, "themes", NAME_PREFIX .. DEFAULT_KEY)) == "table"
 end
 
--- The theme RestedXP is on, as the choice that picked it: "" when it is on something else.
 ---@return string "" or a theme's id
 function ns.RXPThemeChoice()
     local name = Dig(_G.RXP, "settings", "profile", "activeTheme")
@@ -118,14 +120,13 @@ function ns.RXPThemeChoice()
     return ThemeId(key) and Dig(_G.RXP, "themes", name) and key or ""
 end
 
--- RestedXP's own choice of theme is set when the player picks, and not at any other time. "" puts it back on
--- its own, if it is on one of ours.
+-- Written only when the player picks; "" puts RestedXP back on its own theme if it is on one of ours.
 ---@param key string
 ---@return string|nil "reload" when RestedXP shows the theme only after a reload
 function ns.SetRXPThemeChoice(key)
     local rxp = _G.RXP
     local profile = Dig(rxp, "settings", "profile")
-    if type(profile) ~= "table" or type(rxp.ReloadTheme) ~= "function" then return end
+    if type(profile) ~= "table" or not Has(rxp, "ReloadTheme") then return end
     local name
     if key == "" then
         name = Ours(profile.activeTheme) and RXP_DEFAULT
@@ -269,7 +270,7 @@ local function Theme(id, displayName, source)
         background = Rgba(c.panel, 1),
         bottomFrameBG = Rgba(c.panel, 1),
         bottomFrameHighlight = Rgba(c.accent, HIGHLIGHT_ALPHA),
-        dividerColor = Rgba(c.line, RULE_ALPHA),   -- ours, not RestedXP's
+        dividerColor = Rgba(c.line, RULE_ALPHA),   -- this and chromeColor are ours, not RestedXP's
         chromeColor = Rgba(c.muted, CHROME_ALPHA),
         mapPins = Rgba(c.accent, 1),
         tooltip = "|cff" .. Hex(c.accent),
@@ -296,7 +297,7 @@ local function Register()
     for _, key in ipairs(ns.THEME_PRESET_ORDER) do Add(key, ns.THEME_PRESETS[key].name, key) end
     Add(CURRENT_KEY, CURRENT_NAME, ns.ThemePresetKey())
     local rxp = _G.RXP
-    if type(rxp) == "table" and type(rxp.activeTheme) == "table" and type(rxp.RegisterTheme) == "function" then
+    if Has(rxp, "RegisterTheme") and type(rxp.activeTheme) == "table" then
         late = true
         for _, theme in pairs(themes) do rxp:RegisterTheme(theme) end
         return
@@ -338,7 +339,7 @@ local textHidden  -- we have hidden that text
 
 local function BuildLayer(arrow)
     local texture = arrow.texture
-    if type(texture.SetRotation) ~= "function" then return nil end
+    if not Has(texture, "SetRotation") then return nil end
     local f = CreateFrame("Frame", nil, arrow)
     f:SetAllPoints()
     f:SetFrameLevel(arrow:GetFrameLevel() + 1)
@@ -368,7 +369,7 @@ end
 -- The distance text goes `down` lower than RestedXP puts it.
 local function MoveText(arrow, down)
     local text = arrow.text
-    if type(text) ~= "table" or type(text.GetPoint) ~= "function" then return end
+    if not Has(text, "GetPoint") then return end
     textHome = textHome or { text:GetPoint() }
     local point, relativeTo, relativePoint, x, y = unpack(textHome)
     text:SetPoint(point, relativeTo, relativePoint, x, y - down)
@@ -377,7 +378,7 @@ end
 -- The image over the arrow's frame, `scale` times its size around the same center, so it still turns in
 -- place; and the distance text clear of wherever the image now reaches.
 local function Fit(arrow, texture, scale)
-    if type(texture.ClearAllPoints) ~= "function" or type(arrow.GetSize) ~= "function" then return end
+    if not (Has(texture, "ClearAllPoints") and Has(arrow, "GetSize")) then return end
     local w, h = arrow:GetSize()
     local dx, dy = w * (scale - 1) / 2, h * (scale - 1) / 2
     texture:ClearAllPoints()
@@ -397,7 +398,7 @@ end
 local function HandBack(arrow, texture)
     if fitted then
         fitted = nil
-        if type(texture.SetAllPoints) == "function" then
+        if Has(texture, "SetAllPoints") then
             texture:ClearAllPoints()
             texture:SetAllPoints()
         end
@@ -413,7 +414,7 @@ end
 -- RestedXP only sets the text, never shows or hides it.
 local function PaintText(arrow, theme)
     local text = arrow.text
-    if type(text) ~= "table" or type(text.Hide) ~= "function" then return end
+    if not Has(text, "Hide") then return end
     local hide = theme ~= nil and not ns.RXPArrowTextEnabled()
     if hide and not textHidden then
         text:Hide()
@@ -452,9 +453,9 @@ end
 
 local function HookArrow()
     local arrow = _G.RXPG_ARROW
-    if not (arrow and arrow.texture and type(arrow.UpdateVisuals) == "function") then return end
+    if not (arrow and arrow.texture and Has(arrow, "UpdateVisuals")) then return end
     hooksecurefunc(arrow, "UpdateVisuals", OnRxpUpdate)
-    if type(arrow.HookScript) == "function" then   -- its Arrow Size setting resizes the frame silently
+    if Has(arrow, "HookScript") then   -- its Arrow Size setting resizes the frame silently
         arrow:HookScript("OnSizeChanged", function()
             if fitted then Fit(arrow, arrow.texture, fitted) end
         end)
@@ -477,7 +478,7 @@ local function PaintBars()
     if not hide and not barsHidden then return end
     for _, name in ipairs(BARS) do
         local banner = Banner(name)
-        if banner and type(banner.SetAlpha) == "function" then banner:SetAlpha(hide and 0 or 1) end
+        if Has(banner, "SetAlpha") then banner:SetAlpha(hide and 0 or 1) end
     end
     barsHidden = hide
 end
@@ -485,13 +486,13 @@ end
 local function HookBars()
     for _, name in ipairs(BARS) do
         local banner = Banner(name)
-        if banner and type(banner.SetTexture) == "function" then hooksecurefunc(banner, "SetTexture", PaintBars) end
+        if Has(banner, "SetTexture") then hooksecurefunc(banner, "SetTexture", PaintBars) end
     end
     PaintBars()
 end
 
--- The cog, the corner grip and the scroll bar are images with no theme field: the cog and grip are swapped for
--- Naowh's sharper ones, and all of it is in Secondary Text, like Naowh's own scroll bars (which have no arrows).
+-- The cog, the corner grip and the scroll bar have no theme field: the cog and grip are swapped for Naowh's
+-- images, and the scroll bar is a thin thumb without arrows, as in Naowh's windows. All in Secondary Text.
 local COG = MEDIA .. "cog.tga"
 local GRIP = MEDIA .. "rxp_grip.tga"
 local ARROWS = { "ScrollUpButton", "ScrollDownButton" }
@@ -500,21 +501,21 @@ local THUMB_W, THUMB_H = 8, 40
 local chromeTinted, gripOriginal, thumbSize
 
 local function Skin(texture, path, color)
-    if type(texture) ~= "table" or type(texture.SetVertexColor) ~= "function" then return end
-    if path and type(texture.SetTexture) == "function" then texture:SetTexture(path) end
+    if not Has(texture, "SetVertexColor") then return end
+    if path and Has(texture, "SetTexture") then texture:SetTexture(path) end
     local r, g, b, a = 1, 1, 1, 1
     if color then r, g, b, a = color[1], color[2], color[3], color[4] or 1 end
     texture:SetVertexColor(r, g, b, a)
 end
 
 local function Normal(button)
-    return type(button) == "table" and type(button.GetNormalTexture) == "function" and button:GetNormalTexture() or nil
+    return Has(button, "GetNormalTexture") and button:GetNormalTexture() or nil
 end
 
 local function PaintThumb(thumb, color)
-    if type(thumb) ~= "table" or type(thumb.SetSize) ~= "function" or type(thumb.GetSize) ~= "function" then return end
+    if not (Has(thumb, "SetSize") and Has(thumb, "GetSize")) then return end
     thumbSize = thumbSize or { thumb:GetSize() }
-    if color and type(thumb.SetColorTexture) == "function" then
+    if color and Has(thumb, "SetColorTexture") then
         thumb:SetColorTexture(color[1], color[2], color[3], color[4])
         thumb:SetSize(THUMB_W, THUMB_H)
     else
@@ -529,25 +530,22 @@ local function PaintChrome()
     chromeTinted = color ~= nil
     local frame = _G.RXPFrame
     local grip = Normal(Dig(frame, "Footer", "icon"))
-    if type(grip) == "table" and type(grip.GetTexture) == "function" then gripOriginal = gripOriginal or grip:GetTexture() end
+    if Has(grip, "GetTexture") then gripOriginal = gripOriginal or grip:GetTexture() end   -- RestedXP never sets it again
     Skin(Normal(Dig(frame, "Footer", "cog")), color and COG, color)
     Skin(grip, color and GRIP or gripOriginal, color)
     local bar = Dig(frame, "ScrollFrame", "ScrollBar")
-    PaintThumb(type(bar) == "table" and type(bar.GetThumbTexture) == "function" and bar:GetThumbTexture() or nil, color)
+    PaintThumb(Has(bar, "GetThumbTexture") and bar:GetThumbTexture() or nil, color)
     for _, name in ipairs(ARROWS) do
-        local button = Dig(bar, name)
         for _, part in ipairs(ARROW_PARTS) do
-            local texture = Dig(button, part)
-            if type(texture) == "table" and type(texture.SetAlpha) == "function" then texture:SetAlpha(color and 0 or 1) end
+            local texture = Dig(bar, name, part)
+            if Has(texture, "SetAlpha") then texture:SetAlpha(color and 0 or 1) end
         end
     end
 end
 
 local function HookChrome()
     local frame = _G.RXPFrame
-    if type(frame) == "table" and type(frame.UpdateScrollBar) == "function" then
-        hooksecurefunc(frame, "UpdateScrollBar", PaintChrome)
-    end
+    if Has(frame, "UpdateScrollBar") then hooksecurefunc(frame, "UpdateScrollBar", PaintChrome) end
     PaintChrome()
 end
 
@@ -566,7 +564,7 @@ local function PaintRules()
     if type(color) ~= "table" then color = nil end
     for _, row in ipairs(list) do
         local rule = rules[row]
-        if color and not rule and type(row) == "table" and type(row.CreateTexture) == "function" then
+        if color and not rule and Has(row, "CreateTexture") then
             rule = row:CreateTexture(nil, "ARTWORK")
             rule:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, -RULE_DROP)
             rule:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, -RULE_DROP)
@@ -584,7 +582,7 @@ end
 
 local function HookRules()
     local rxp = _G.RXP
-    if type(rxp) == "table" and type(rxp.SetStep) == "function" then hooksecurefunc(rxp, "SetStep", PaintRules) end
+    if Has(rxp, "SetStep") then hooksecurefunc(rxp, "SetStep", PaintRules) end
     PaintRules()
 end
 
