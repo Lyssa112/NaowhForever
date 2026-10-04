@@ -167,8 +167,9 @@
   Bottom by default.
 - Threat Meter: Apply Theme to Your Bar (Colours, off by default) colors your bar in a darker shade of your theme's Accent instead of the color picked there. The tank and pull aggro colors are unchanged.
 - Swing Timer: Apply Theme to Bar Colours (Colours, off by default) colors the main hand bar with your theme's Accent, the off hand bar with its lighter Accent and the ranged bar with a deeper shade of it, instead of the colors picked there.
-- Settings: a Classic theme in the Theme dropdown (COLORS): dark brown panels, parchment text and
-  an antique gold accent, in the spirit of the original WoW interface.
+- Settings: two Classic themes in the Theme dropdown (COLORS): dark brown panels, parchment text
+  and an antique gold accent, in the spirit of the original WoW interface. Classic Gold uses
+  Blizzard's own brighter gold, which is too light for the toggle knob to stand out on.
 
 ### Changed
 - The options window's sidebar header shows the NaowhUI Forever logo, and the search box beside it is narrower.

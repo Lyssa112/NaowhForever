@@ -42,7 +42,7 @@ ns.THEME = {
 -- and muted and accent at 3:1 against its own bg and panel (Tools/regression checks it).
 ns.THEME_EDITABLE = { "bg", "panel", "line", "fg", "muted", "accent" }
 ns.THEME_PRESET_ORDER = { "midnight", "slate", "obsidian", "aubergine", "forest", "crimson", "rosenoir",
-    "cottoncandy", "classic" }
+    "cottoncandy", "classic", "classicgold" }
 ns.THEME_PRESETS = {
     midnight = { name = "Midnight",
         bg     = { r = 0x0b / 255, g = 0x10 / 255, b = 0x20 / 255 },
@@ -107,6 +107,14 @@ ns.THEME_PRESETS = {
         fg     = { r = 0xf4 / 255, g = 0xe8 / 255, b = 0xcc / 255 },
         muted  = { r = 0xa8 / 255, g = 0x9a / 255, b = 0x7c / 255 },
         accent = { r = 0xdd / 255, g = 0xa5 / 255, b = 0x24 / 255 } },
+    -- Blizzard's own gold: white on it is 1.46:1, below the toggle knob check (waived in the test).
+    classicgold = { name = "Classic Gold",
+        bg     = { r = 0x15 / 255, g = 0x10 / 255, b = 0x0b / 255 },
+        panel  = { r = 0x22 / 255, g = 0x1a / 255, b = 0x12 / 255 },
+        line   = { r = 0x4d / 255, g = 0x3c / 255, b = 0x26 / 255 },
+        fg     = { r = 0xf4 / 255, g = 0xe8 / 255, b = 0xcc / 255 },
+        muted  = { r = 0xa8 / 255, g = 0x9a / 255, b = 0x7c / 255 },
+        accent = { r = 0xff / 255, g = 0xd1 / 255, b = 0x00 / 255 } },
 }
 
 -- A |cffRRGGBB escape from a THEME key (or an {r,g,b} table). With text it wraps it and
