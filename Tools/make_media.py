@@ -368,6 +368,11 @@ def rxp_frame(x, y, width, height):
     return (0, 0, 0, 255 if on else 0)
 
 
+def grip(x, y, size):
+    lines = [stroke(size, [(a, 0.94), (0.94, a)], 0.09) for a in (0.2, 0.46, 0.72)]
+    return max((line(x, y, size) for line in lines), key=lambda p: p[3])
+
+
 def nav_arrow(wide, glow):
     # The waypoint arrow, point up: a kite in four facets with a dark edge and a thin line inside, grey over
     # white so a vertex color tints it. wide: base 14% wider. glow: a soft halo, with the kite drawn
@@ -579,6 +584,7 @@ write_tga(os.path.join(OUT, "rxp_arrow_glow.tga"), 128, nav_arrow(False, True))
 write_tga(os.path.join(OUT, "rxp_arrow_wide.tga"), 128, nav_arrow(True, False))
 write_tga(os.path.join(OUT, "rxp_arrow_wide_glow.tga"), 128, nav_arrow(True, True))
 write_wide_tga(os.path.join(OUT, "rxp_frame.tga"), 256, 32, rxp_frame)
+write_tga(os.path.join(OUT, "rxp_grip.tga"), 64, grip)
 write_tga(os.path.join(OUT, "plus.tga"), 64, lambda x, y, s: max(
     stroke(64, [(0.5, 0.2), (0.5, 0.8)], 0.11)(x, y, s),
     stroke(64, [(0.2, 0.5), (0.8, 0.5)], 0.11)(x, y, s), key=lambda p: p[3]))

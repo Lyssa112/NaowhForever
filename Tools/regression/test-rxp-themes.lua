@@ -1024,23 +1024,36 @@ do
     Check(#Bare(mute, "NaowhForever:crimson").hooked == 1, "a banner that cannot be hidden is hooked and left alone")
 end
 
--- The cog, the corner grip and the scroll arrows.
+-- The corner grip image: three diagonal lines, the shortest in the corner.
 do
-    local function Texture()
-        local t = { paints = 0 }
+    local f = assert(io.open("Media/rxp_grip.tga", "rb"))
+    local data = f:read("*a")
+    f:close()
+    Check(data:byte(13) + data:byte(14) * 256 == 64 and data:byte(15) + data:byte(16) * 256 == 64 and data:byte(17) == 32, "the grip image is 64 by 64, 32 bits")
+    local function A(x, y) return data:byte(18 + ((63 - y) * 64 + x) * 4 + 4) end
+    Check(A(36, 36) == 255 and A(44, 44) == 255 and A(53, 53) == 255, "three lines across the diagonal")
+    Check(A(40, 40) == 0 and A(49, 49) == 0 and A(5, 5) == 0 and A(5, 60) == 0 and A(60, 5) == 0, "with gaps between them, and the far corner empty")
+end
+
+-- The cog, the corner grip, the scroll arrows and the knob.
+do
+    local MEDIA = "Interface\\AddOns\\NaowhForever\\Media\\"
+    local function Texture(path)
+        local t = { paints = 0, path = path }
         function t:SetVertexColor(r, g, b, a) self.color = { r, g, b, a }; self.paints = self.paints + 1 end
-        function t:SetDesaturated(on) self.grey = on end
-        function t:SetTexture(path) self.path = path end
+        function t:SetTexture(p) self.path = p end
+        function t:GetTexture() return self.path end
+        function t:SetTexCoord(...) self.coords = { ... } end
         return t
     end
-    local function Button()
-        local normal = Texture()
+    local function Button(path)
+        local normal = Texture(path)
         return { normal = normal, GetNormalTexture = function() return normal end }
     end
     local function Arrow() return { Normal = Texture(), Highlight = Texture(), Pushed = Texture(), Disabled = Texture() } end
     local function Window()
-        return { Footer = { cog = Button(), icon = Button() },
-            ScrollFrame = { ScrollBar = { ScrollUpButton = Arrow(), ScrollDownButton = Arrow(), thumb = Texture(),
+        return { Footer = { cog = Button("rxp cog"), icon = Button("blizzard grabber") },
+            ScrollFrame = { ScrollBar = { ScrollUpButton = Arrow(), ScrollDownButton = Arrow(), thumb = Texture("rxp knob"),
                 GetThumbTexture = function(self) return self.thumb end } },
             UpdateScrollBar = function() end }
     end
@@ -1058,43 +1071,50 @@ do
         end
     end
     local function Same3(c, r, g, b) return c and math.abs(c[1] - r) < 1e-6 and math.abs(c[2] - g) < 1e-6 and math.abs(c[3] - b) < 1e-6 and c[4] == 1 end
+    local function Coords(t, a, b, c, d) return t.coords and t.coords[1] == a and t.coords[2] == b and t.coords[3] == c and t.coords[4] == d end
     local function Lift(v) return v + (1 - v) * 0.33 end
 
     local env, window = Start({ rxpThemes = true }, "NaowhForever:crimson")
-    local a = env.RXPGuides_Themes["NaowhForever:crimson"].mapPins
+    local theme = env.RXPGuides_Themes["NaowhForever:crimson"]
+    local a, line = theme.mapPins, theme.dividerColor
     local cog, grip = window.Footer.cog.normal, window.Footer.icon.normal
-    local up, down = window.ScrollFrame.ScrollBar.ScrollUpButton, window.ScrollFrame.ScrollBar.ScrollDownButton
-    local thumb = window.ScrollFrame.ScrollBar.thumb
+    local bar = window.ScrollFrame.ScrollBar
+    local up, down, thumb = bar.ScrollUpButton, bar.ScrollDownButton, bar.thumb
     Check(Hook(env, window), "RestedXP's UpdateScrollBar is hooked")
-    Check(thumb.path == "Interface\\AddOns\\NaowhForever\\Media\\circle_mask.tga" and Same3(thumb.color, a[1], a[2], a[3]),
-        "the knob: a disc in the Accent")
-    Check(Same3(cog.color, a[1], a[2], a[3]) and cog.grey == true, "the cog: greyed, then the Accent")
-    Check(Same3(grip.color, a[1], a[2], a[3]) and grip.grey == nil, "the corner grip: the Accent")
+    Check(cog.path == MEDIA .. "cog.tga" and Same3(cog.color, a[1], a[2], a[3]), "the cog: Naowh's, in the Accent")
+    Check(grip.path == MEDIA .. "rxp_grip.tga" and Same3(grip.color, a[1], a[2], a[3]), "the corner grip: Naowh's, in the Accent")
+    Check(thumb.path == MEDIA .. "circle_mask.tga" and Same3(thumb.color, a[1], a[2], a[3]), "the knob: a disc in the Accent")
     for _, arrow in ipairs({ up, down }) do
         for _, part in ipairs({ "Normal", "Highlight", "Pushed" }) do
-            Check(Same3(arrow[part].color, Lift(a[1]), Lift(a[2]), Lift(a[3])), "an arrow's " .. part .. ": a lighter Accent")
+            Check(arrow[part].path == MEDIA .. "chevron_up.tga" and Same3(arrow[part].color, Lift(a[1]), Lift(a[2]), Lift(a[3])),
+                "an arrow's " .. part .. ": the chevron in a lighter Accent")
         end
-        Check(arrow.Disabled.paints == 0, "an arrow's Disabled image is left as it is")
+        Check(arrow.Disabled.path == MEDIA .. "chevron_up.tga" and Same3(arrow.Disabled.color, line[1], line[2], line[3]),
+            "an arrow's Disabled image: the chevron in the line color")
     end
-    cog.color, grip.color, up.Normal.color = nil, nil, nil
+    Check(Coords(up.Normal, 0, 1, 0, 1) and Coords(down.Normal, 0, 1, 1, 0) and Coords(down.Disabled, 0, 1, 1, 0),
+        "the up arrow as it is, the down arrow turned over")
+    cog.color, grip.color, up.Normal.color, thumb.color = nil, nil, nil, nil
     Hook(env, window)()
-    Check(cog.color and grip.color and up.Normal.color, "RestedXP sets its images again: tinted again")
+    Check(cog.color and grip.color and up.Normal.color and thumb.color, "RestedXP sets its images again: tinted again")
 
     env.RXP.activeTheme = { name = "DarkMode" }
     Hook(env, window)()
-    Check(Same3(cog.color, 1, 1, 1) and cog.grey == false and Same3(grip.color, 1, 1, 1) and Same3(down.Pushed.color, 1, 1, 1)
-        and Same3(thumb.color, 1, 1, 1),
-        "a theme of RestedXP's: its images are back as they were")
+    Check(Same3(cog.color, 1, 1, 1) and Same3(grip.color, 1, 1, 1) and Same3(down.Pushed.color, 1, 1, 1) and Same3(thumb.color, 1, 1, 1),
+        "a theme of RestedXP's: the images are not tinted")
+    Check(grip.path == "blizzard grabber" and Coords(down.Normal, 0, 1, 0, 1), "the grip is the game's again, the down arrow the right way up")
     local paints = cog.paints + grip.paints + up.Normal.paints
     Hook(env, window)()
     Check(cog.paints + grip.paints + up.Normal.paints == paints, "and not touched again while they are RestedXP's")
     env.RXP.activeTheme = env.RXPGuides_Themes["NaowhForever:midnight"]
     Hook(env, window)()
-    Check(cog.grey == true and cog.color[1] ~= 1 and thumb.color[1] ~= 1, "back to one of ours: tinted again")
+    Check(cog.color[1] ~= 1 and thumb.color[1] ~= 1 and grip.path == MEDIA .. "rxp_grip.tga" and Coords(down.Normal, 0, 1, 1, 0),
+        "back to one of ours: Naowh's images again")
 
     local own, ownWindow = Start({ rxpThemes = true }, nil)
-    Check(Hook(own, ownWindow) and ownWindow.Footer.cog.normal.paints == 0 and ownWindow.ScrollFrame.ScrollBar.ScrollUpButton.Normal.paints == 0
-        and ownWindow.ScrollFrame.ScrollBar.thumb.paints == 0 and ownWindow.ScrollFrame.ScrollBar.thumb.path == nil,
+    local ownBar = ownWindow.ScrollFrame.ScrollBar
+    Check(Hook(own, ownWindow) and ownWindow.Footer.cog.normal.paints == 0 and ownBar.ScrollUpButton.Normal.paints == 0
+        and ownBar.thumb.paints == 0 and ownWindow.Footer.icon.normal.path == "blizzard grabber" and ownBar.thumb.path == "rxp knob",
         "RestedXP's own theme: hooked, and nothing touched")
     local off, offWindow = Start({}, nil)
     Check(#off.hooked == 0 and offWindow.Footer.cog.normal.paints == 0, "off: nothing is hooked or touched")

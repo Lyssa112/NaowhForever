@@ -488,17 +488,21 @@ local function HookBars()
     PaintBars()
 end
 
--- The cog, the corner grip, the scroll arrows and the knob are images with no theme field: tinted, the cog greyed
--- first, and the knob (near black in RestedXP's) drawn as a disc.
+-- The cog, the corner grip, the scroll arrows and the knob are images with no theme field: swapped for
+-- Naowh's sharper ones and tinted.
+local COG = MEDIA .. "cog.tga"
+local GRIP = MEDIA .. "rxp_grip.tga"
+local CHEVRON = MEDIA .. "chevron_up.tga"
 local KNOB = MEDIA .. "circle_mask.tga"
-local ARROWS = { "ScrollUpButton", "ScrollDownButton" }
-local ARROW_PARTS = { "Normal", "Highlight", "Pushed" }
+local ARROWS = { ScrollUpButton = false, ScrollDownButton = true }   -- turned over?
+local ARROW_PARTS = { "Normal", "Highlight", "Pushed", "Disabled" }
 local ARROW_LIFT = 0.33
-local chromeTinted
+local chromeTinted, gripOriginal
 
-local function Tint(texture, color, grey)
+local function Skin(texture, path, color, flip)
     if type(texture) ~= "table" or type(texture.SetVertexColor) ~= "function" then return end
-    if grey and type(texture.SetDesaturated) == "function" then texture:SetDesaturated(color ~= nil) end
+    if path and type(texture.SetTexture) == "function" then texture:SetTexture(path) end
+    if type(texture.SetTexCoord) == "function" then texture:SetTexCoord(0, 1, flip and 1 or 0, flip and 0 or 1) end
     local r, g, b = 1, 1, 1
     if color then r, g, b = color[1], color[2], color[3] end
     texture:SetVertexColor(r, g, b, 1)
@@ -514,17 +518,21 @@ local function PaintChrome()
     if not accent and not chromeTinted then return end
     chromeTinted = accent ~= nil
     local frame = _G.RXPFrame
-    Tint(Normal(Dig(frame, "Footer", "cog")), accent, true)
-    Tint(Normal(Dig(frame, "Footer", "icon")), accent)
+    local grip = Normal(Dig(frame, "Footer", "icon"))
+    if type(grip) == "table" and type(grip.GetTexture) == "function" then gripOriginal = gripOriginal or grip:GetTexture() end
+    Skin(Normal(Dig(frame, "Footer", "cog")), accent and COG, accent)
+    Skin(grip, accent and GRIP or gripOriginal, accent)
     local bar = Dig(frame, "ScrollFrame", "ScrollBar")
-    local thumb = type(bar) == "table" and type(bar.GetThumbTexture) == "function" and bar:GetThumbTexture() or nil
-    if accent and type(thumb) == "table" and type(thumb.SetTexture) == "function" then thumb:SetTexture(KNOB) end
-    Tint(thumb, accent)
+    Skin(type(bar) == "table" and type(bar.GetThumbTexture) == "function" and bar:GetThumbTexture() or nil,
+        accent and KNOB, accent)
     local soft = accent and { accent[1] + (1 - accent[1]) * ARROW_LIFT, accent[2] + (1 - accent[2]) * ARROW_LIFT,
         accent[3] + (1 - accent[3]) * ARROW_LIFT }
-    for _, name in ipairs(ARROWS) do
+    for name, flip in pairs(ARROWS) do
         local button = Dig(frame, "ScrollFrame", "ScrollBar", name)
-        for _, part in ipairs(ARROW_PARTS) do Tint(Dig(button, part), soft) end
+        for _, part in ipairs(ARROW_PARTS) do
+            Skin(Dig(button, part), accent and CHEVRON, part == "Disabled" and theme and theme.dividerColor or soft,
+                flip and accent ~= nil)
+        end
     end
 end
 
