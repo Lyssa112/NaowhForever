@@ -10,6 +10,7 @@ local NAME_PREFIX = "NaowhForever:"
 local AUTHOR = "Naowh Forever"
 local DEFAULT_KEY, DEFAULT_NAME = "default", "NaowhUI"
 local CURRENT_KEY, CURRENT_NAME = "current", "Naowh (current)"   -- follows the player's own theme
+local RXP_DEFAULT = "Default"   -- RestedXP's name for its own theme
 
 local RXP_TEXTURES = "Interface/AddOns/RXPGuides/Textures/"
 local TEXTURES = RXP_TEXTURES .. "DarkMode/"
@@ -51,8 +52,8 @@ local LAYER_STRENGTH = 0.9
 -------------------------------------------------------------------------------
 --  Settings
 -------------------------------------------------------------------------------
-local PaintArrow, ApplyTheme   -- defined below; a change applies at once
-local boot                     -- our frame, which also waits for the end of combat
+local PaintArrow   -- defined below; a change applies at once
+local boot         -- our frame, which also waits for the end of combat
 
 ---@return boolean
 function ns.RXPThemesAvailable()
@@ -69,7 +70,7 @@ function ns.SetRXPThemes(on)
     ns.AccountSettings().rxpThemes = on and true or nil
 end
 
--- The theme RestedXP is put on: none (RestedXP keeps whichever it is on), the current one, NaowhUI or a preset.
+-- The theme RestedXP is put on: its own, the current one, NaowhUI or a preset.
 ---@return table values by id
 ---@return table order
 function ns.RXPThemeChoices()
@@ -86,16 +87,64 @@ local function ThemeId(key)
     return key == CURRENT_KEY or key == DEFAULT_KEY or (type(key) == "string" and ns.THEME_PRESETS[key] ~= nil)
 end
 
----@return string "" or a theme's id
-function ns.RXPThemeChoice()
-    local key = ns.AccountSettings().rxpTheme
-    return ThemeId(key) and key or ""
+-- t[k1][k2]... when every step is a table, else nil.
+local function Dig(t, ...)
+    for i = 1, select("#", ...) do
+        if type(t) ~= "table" then return nil end
+        t = t[select(i, ...)]
+    end
+    return t
 end
 
+local function Ours(name)
+    return type(name) == "string" and name:find(NAME_PREFIX, 1, true) == 1
+end
+
+-- RestedXP's own theme reload, which scales its protected target frame: in combat it waits for the end of it.
+local function Reload()
+    local rxp = _G.RXP
+    if type(rxp) ~= "table" or type(rxp.ReloadTheme) ~= "function" then return end
+    if InCombatLockdown() then
+        boot:RegisterEvent("PLAYER_REGEN_ENABLED")
+        return
+    end
+    rxp:ReloadTheme()
+end
+
+-- Our themes are in RestedXP's list, which they are after the reload that follows turning them on.
+---@return boolean
+function ns.RXPThemesReady()
+    local rxp = _G.RXP
+    return type(Dig(rxp, "settings", "profile")) == "table" and type(rxp.ReloadTheme) == "function"
+        and type(Dig(rxp, "themes", NAME_PREFIX .. DEFAULT_KEY)) == "table"
+end
+
+-- The theme RestedXP is on, as the choice that picked it: "" when it is on something else.
+---@return string "" or a theme's id
+function ns.RXPThemeChoice()
+    local name = Dig(_G.RXP, "settings", "profile", "activeTheme")
+    local key = Ours(name) and name:sub(#NAME_PREFIX + 1)
+    return ThemeId(key) and Dig(_G.RXP, "themes", name) and key or ""
+end
+
+-- RestedXP's own choice of theme is set when the player picks, and not at any other time. "" puts it back on
+-- its own, if it is on one of ours.
 ---@param key string
+---@return string|nil "reload" when RestedXP shows the theme only after a reload
 function ns.SetRXPThemeChoice(key)
-    ns.AccountSettings().rxpTheme = ThemeId(key) and key or nil
-    ApplyTheme()
+    local rxp = _G.RXP
+    local profile = Dig(rxp, "settings", "profile")
+    if type(profile) ~= "table" or type(rxp.ReloadTheme) ~= "function" then return end
+    local name
+    if key == "" then
+        name = Ours(profile.activeTheme) and RXP_DEFAULT
+    elseif ThemeId(key) and Dig(rxp, "themes", NAME_PREFIX .. key) then
+        name = NAME_PREFIX .. key
+    end
+    if not name or profile.activeTheme == name then return end
+    profile.activeTheme = name
+    if not profile.enableThemeLiveReload then return "reload" end
+    Reload()
 end
 
 -- On unless saved as false.
@@ -243,19 +292,37 @@ local function Theme(id, displayName, source)
     }
 end
 
+local late   -- RestedXP was up before us
+
+-- RestedXP imports the global list as it starts. If it is up already, the themes go in through its own call.
 local function Register()
+    local themes = {}
+    local function Add(id, displayName, source)
+        local theme = Theme(id, displayName, source)
+        themes[theme.name] = theme
+    end
+    Add(DEFAULT_KEY, DEFAULT_NAME, "")
+    for _, key in ipairs(ns.THEME_PRESET_ORDER) do Add(key, ns.THEME_PRESETS[key].name, key) end
+    Add(CURRENT_KEY, CURRENT_NAME, ns.ThemePresetKey())
+    local rxp = _G.RXP
+    if type(rxp) == "table" and type(rxp.activeTheme) == "table" and type(rxp.RegisterTheme) == "function" then
+        late = true
+        for _, theme in pairs(themes) do rxp:RegisterTheme(theme) end
+        return
+    end
     local list = _G.RXPGuides_Themes
     if type(list) ~= "table" then
         list = {}
         _G.RXPGuides_Themes = list
     end
-    local function Add(id, displayName, source)
-        local theme = Theme(id, displayName, source)
-        list[theme.name] = theme
-    end
-    Add(DEFAULT_KEY, DEFAULT_NAME, "")
-    for _, key in ipairs(ns.THEME_PRESET_ORDER) do Add(key, ns.THEME_PRESETS[key].name, key) end
-    Add(CURRENT_KEY, CURRENT_NAME, ns.ThemePresetKey())
+    for name, theme in pairs(themes) do list[name] = theme end
+end
+
+-- RestedXP started before the themes were in, so it fell back from a theme of ours that it was saved on.
+local function Resume()
+    local rxp = _G.RXP
+    local saved = Dig(rxp, "themes", Dig(rxp, "settings", "profile", "activeTheme"))
+    if type(saved) == "table" and Ours(saved.name) and saved ~= rxp.activeTheme then Reload() end
 end
 
 -------------------------------------------------------------------------------
@@ -268,39 +335,6 @@ local function ActiveTheme()
             and theme.name:find(NAME_PREFIX, 1, true) == 1 then
         return theme
     end
-end
-
--- t[k1][k2]... when every step is a table, else nil.
-local function Dig(t, ...)
-    for i = 1, select("#", ...) do
-        if type(t) ~= "table" then return nil end
-        t = t[select(i, ...)]
-    end
-    return t
-end
-
--- RestedXP on the theme picked in Settings, through its own theme reload (which only runs with its live
--- reload setting on, so that is on for the call). The reload scales its protected target frame, so
--- in combat it waits for the end of it.
-function ApplyTheme()
-    local rxp = _G.RXP
-    local profile = Dig(rxp, "settings", "profile")
-    local key = ns.RXPThemeChoice()
-    local name = NAME_PREFIX .. key
-    if key == "" or type(profile) ~= "table" or type(rxp.ReloadTheme) ~= "function" or not Dig(rxp, "themes", name)
-            or profile.activeTheme == name then
-        return
-    end
-    if InCombatLockdown() then
-        boot:RegisterEvent("PLAYER_REGEN_ENABLED")
-        return
-    end
-    profile.activeTheme = name
-    local live = profile.enableThemeLiveReload
-    profile.enableThemeLiveReload = true
-    local ok, err = pcall(rxp.ReloadTheme, rxp)
-    profile.enableThemeLiveReload = live
-    if not ok then error(err, 0) end
 end
 
 -- The arrow
@@ -502,8 +536,7 @@ local function HookRules()
     PaintRules()
 end
 
--- Themes go in while our addon loads, before RestedXP (which loads after it) imports them; the hooks
--- need RestedXP's frames, so they wait for PLAYER_LOGIN.
+-- Themes go in while our addon loads; the hooks need RestedXP's frames, so they wait for PLAYER_LOGIN.
 boot = CreateFrame("Frame")
 boot:RegisterEvent("ADDON_LOADED")
 boot:SetScript("OnEvent", function(self, event, name)
@@ -516,10 +549,10 @@ boot:SetScript("OnEvent", function(self, event, name)
         end
     elseif event == "PLAYER_REGEN_ENABLED" then
         self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-        ApplyTheme()
+        Reload()
     else
         self:UnregisterAllEvents()
-        ApplyTheme()
+        if late then Resume() end
         HookArrow()
         HookBars()
         HookRules()

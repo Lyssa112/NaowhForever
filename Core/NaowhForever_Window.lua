@@ -738,7 +738,7 @@ function ns.BuildSettingsPage(parent, y)
         _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
         -- RestedXP reads these as it starts, so each one asks for a reload.
         local function Switch(text, tooltip, get, set)
-            return { type = "toggle", text = text, tooltip = tooltip .. "|n|nTakes effect after a /reload.",
+            return { type = "toggle", text = text, tooltip = tooltip,
                 getValue = get,
                 setValue = function(v)
                     set(v)
@@ -746,30 +746,29 @@ function ns.BuildSettingsPage(parent, y)
                     UI:RefreshPage(true)
                 end }
         end
-        local themesSwitch = Switch("Add Themes to RestedXP",
-            "Adds NaowhUI, the eight Naowh themes and Naowh (current), which follows the theme you picked "
-            .. "above, to RestedXP Guides' theme list, in their colors and your Addon Font, with RestedXP's "
-            .. "own frames, and colors its waypoint arrow in the theme's Accent. Pick one in RestedXP's "
-            .. "Look and Feel settings.",
+        local themesSwitch = Switch("Add Themes to RestedXP", "Adds the Naowh themes to RestedXP's theme list.",
             ns.RXPThemesEnabled, ns.SetRXPThemes)
-        local choices, choiceOrder = ns.RXPThemeChoices()
-        _, h = W:DualRow(parent, y, themesSwitch,
-            ns.RXPThemesEnabled() and { type = "dropdown", text = "RestedXP Theme", values = choices, order = choiceOrder,
-              tooltip = "The theme RestedXP is put on at every login. RestedXP (default) keeps whichever theme "
-              .. "RestedXP is set to. Current Theme follows the theme or Custom colors you pick here.",
-              getValue = ns.RXPThemeChoice,
-              setValue = function(v) ns.SetRXPThemeChoice(v) end } or { type = "label", text = "" }
-        ); y = y - h
+        local themeChoice = { type = "label", text = "" }
+        if ns.RXPThemesEnabled() then
+            local choices, choiceOrder = ns.RXPThemeChoices()
+            themeChoice = ns.RXPThemesReady() and { type = "dropdown", text = "RestedXP Theme", values = choices,
+                order = choiceOrder, tooltip = "The theme RestedXP uses: its own, or one of the Naowh themes.",
+                getValue = ns.RXPThemeChoice,
+                setValue = function(v)
+                    if ns.SetRXPThemeChoice(v) == "reload" then
+                        rxpPending = true
+                        UI:RefreshPage(true)
+                    end
+                end } or { type = "label", text = "Reload UI to pick a theme." }
+        end
+        _, h = W:DualRow(parent, y, themesSwitch, themeChoice); y = y - h
         if ns.RXPThemesEnabled() then
             local image = ns.RXPArrowStyle() == "image"
             _, h = W:DualRow(parent, y,
                 { type = "dropdown", text = "RestedXP Arrow",
                   values = { layer = "Colored layer", image = "Naowh arrow", off = "RestedXP's own" },
                   order = { "layer", "image", "off" },
-                  tooltip = "How RestedXP's waypoint arrow looks while one of the Naowh themes is picked "
-                  .. "in RestedXP. Colored layer: the theme's Accent over RestedXP's own arrow. Naowh "
-                  .. "arrow: Naowh's own arrow image in the Accent, in place of RestedXP's. "
-                  .. "RestedXP's own: its arrow as it is.",
+                  tooltip = "How RestedXP's waypoint arrow is drawn with a Naowh theme.",
                   getValue = ns.RXPArrowStyle,
                   setValue = function(v)
                       ns.SetRXPArrowStyle(v)
@@ -778,8 +777,7 @@ function ns.BuildSettingsPage(parent, y)
                 image and { type = "dropdown", text = "Naowh Arrow Shape",
                   values = { kite = "Kite", wide = "Wide kite" },
                   order = { "kite", "wide" },
-                  tooltip = "The shape of Naowh's arrow in RestedXP: the kite, or the same kite with its "
-                  .. "base 14% wider.",
+                  tooltip = "The shape of Naowh's arrow.",
                   getValue = ns.RXPArrowShape,
                   setValue = function(v) ns.SetRXPArrowShape(v) end } or { type = "label", text = "" }
             ); y = y - h
@@ -787,12 +785,11 @@ function ns.BuildSettingsPage(parent, y)
                 local sizeMin, sizeMax, sizeStep = ns.RXPArrowSizeRange()
                 _, h = W:DualRow(parent, y,
                     { type = "toggle", text = "Naowh Arrow Glow",
-                      tooltip = "A soft glow in the theme's Accent around Naowh's arrow in RestedXP.",
+                      tooltip = "A soft glow around Naowh's arrow.",
                       getValue = ns.RXPArrowGlow,
                       setValue = function(v) ns.SetRXPArrowGlow(v) end },
                     { type = "slider", text = "Naowh Arrow Size", min = sizeMin, max = sizeMax, step = sizeStep,
-                      tooltip = "How big Naowh's arrow is, as a percent of the arrow RestedXP draws. RestedXP's "
-                      .. "own Arrow Size setting still applies on top.",
+                      tooltip = "How big Naowh's arrow is.",
                       getValue = ns.RXPArrowSize,
                       setValue = function(v) ns.SetRXPArrowSize(v) end }
                 ); y = y - h
@@ -800,22 +797,17 @@ function ns.BuildSettingsPage(parent, y)
             local gapMin, gapMax = ns.RXPArrowGapRange()
             _, h = W:DualRow(parent, y,
                 { type = "toggle", text = "Show Arrow Text",
-                  tooltip = "The step and distance text under RestedXP's waypoint arrow, with any arrow style. "
-                  .. "Off removes it.",
+                  tooltip = "The step and distance text under RestedXP's waypoint arrow.",
                   getValue = ns.RXPArrowTextEnabled,
                   setValue = function(v) ns.SetRXPArrowText(v) end },
                 image and { type = "slider", text = "Naowh Arrow Text Gap", min = gapMin, max = gapMax, step = 1,
-                  tooltip = "Extra space, in pixels, between Naowh's arrow and the text under it.",
+                  tooltip = "The space between Naowh's arrow and the text under it.",
                   getValue = ns.RXPArrowGap,
                   setValue = function(v) ns.SetRXPArrowGap(v) end } or { type = "label", text = "" }
             ); y = y - h
             _, h = W:DualRow(parent, y,
-                Switch("Use Addon Font",
-                    "Draws RestedXP's guide text, title bar and arrow text in the Addon Font from FONT "
-                    .. "above. Off keeps RestedXP's own font.",
-                    ns.RXPFontEnabled, ns.SetRXPFont),
-                Switch("Use Theme Text Color",
-                    "Draws RestedXP's text in the theme's Text color. Off keeps RestedXP's own white.",
+                Switch("Use Addon Font", "RestedXP's text uses your Addon Font.", ns.RXPFontEnabled, ns.SetRXPFont),
+                Switch("Use Theme Text Color", "RestedXP's text uses the theme's Text color.",
                     ns.RXPTextColorEnabled, ns.SetRXPTextColor)
             ); y = y - h
         end
