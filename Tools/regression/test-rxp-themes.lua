@@ -1022,6 +1022,97 @@ do
     Check(#Bare(mute, "NaowhForever:crimson").hooked == 1, "a banner that cannot be hidden is hooked and left alone")
 end
 
+-- The cog, the corner grip and the scroll arrows.
+do
+    local function Texture()
+        local t = { paints = 0 }
+        function t:SetVertexColor(r, g, b, a) self.color = { r, g, b, a }; self.paints = self.paints + 1 end
+        function t:SetDesaturated(on) self.grey = on end
+        function t:SetTexture(path) self.path = path end
+        return t
+    end
+    local function Button()
+        local normal = Texture()
+        return { normal = normal, GetNormalTexture = function() return normal end }
+    end
+    local function Arrow() return { Normal = Texture(), Highlight = Texture(), Pushed = Texture(), Disabled = Texture() } end
+    local function Window()
+        return { Footer = { cog = Button(), icon = Button() },
+            ScrollFrame = { ScrollBar = { ScrollUpButton = Arrow(), ScrollDownButton = Arrow(), thumb = Texture(),
+                GetThumbTexture = function(self) return self.thumb end } },
+            UpdateScrollBar = function() end }
+    end
+    local function Start(account, active, window)
+        local env, _, frames, boot = Load(account, true)
+        env.RXPFrame = window or Window()
+        Fire(frames, "NaowhForever")
+        env.RXP = { activeTheme = active and env.RXPGuides_Themes[active] or { name = "RXP Blue" } }
+        Login(boot)
+        return env, env.RXPFrame
+    end
+    local function Hook(env, window)
+        for _, h in ipairs(env.hooked) do
+            if h[1] == window and h[2] == "UpdateScrollBar" then return h[3] end
+        end
+    end
+    local function Same3(c, r, g, b) return c and math.abs(c[1] - r) < 1e-6 and math.abs(c[2] - g) < 1e-6 and math.abs(c[3] - b) < 1e-6 and c[4] == 1 end
+    local function Lift(v) return v + (1 - v) * 0.33 end
+
+    local env, window = Start({ rxpThemes = true }, "NaowhForever:crimson")
+    local a = env.RXPGuides_Themes["NaowhForever:crimson"].mapPins
+    local cog, grip = window.Footer.cog.normal, window.Footer.icon.normal
+    local up, down = window.ScrollFrame.ScrollBar.ScrollUpButton, window.ScrollFrame.ScrollBar.ScrollDownButton
+    local thumb = window.ScrollFrame.ScrollBar.thumb
+    Check(Hook(env, window), "RestedXP's UpdateScrollBar is hooked")
+    Check(thumb.path == "Interface\\AddOns\\NaowhForever\\Media\\circle_mask.tga" and Same3(thumb.color, a[1], a[2], a[3]),
+        "the knob: a disc in the Accent")
+    Check(Same3(cog.color, a[1], a[2], a[3]) and cog.grey == true, "the cog: greyed, then the Accent")
+    Check(Same3(grip.color, a[1], a[2], a[3]) and grip.grey == nil, "the corner grip: the Accent")
+    for _, arrow in ipairs({ up, down }) do
+        for _, part in ipairs({ "Normal", "Highlight", "Pushed" }) do
+            Check(Same3(arrow[part].color, Lift(a[1]), Lift(a[2]), Lift(a[3])), "an arrow's " .. part .. ": a lighter Accent")
+        end
+        Check(arrow.Disabled.paints == 0, "an arrow's Disabled image is left as it is")
+    end
+    cog.color, grip.color, up.Normal.color = nil, nil, nil
+    Hook(env, window)()
+    Check(cog.color and grip.color and up.Normal.color, "RestedXP sets its images again: tinted again")
+
+    env.RXP.activeTheme = { name = "DarkMode" }
+    Hook(env, window)()
+    Check(Same3(cog.color, 1, 1, 1) and cog.grey == false and Same3(grip.color, 1, 1, 1) and Same3(down.Pushed.color, 1, 1, 1)
+        and Same3(thumb.color, 1, 1, 1),
+        "a theme of RestedXP's: its images are back as they were")
+    local paints = cog.paints + grip.paints + up.Normal.paints
+    Hook(env, window)()
+    Check(cog.paints + grip.paints + up.Normal.paints == paints, "and not touched again while they are RestedXP's")
+    env.RXP.activeTheme = env.RXPGuides_Themes["NaowhForever:midnight"]
+    Hook(env, window)()
+    Check(cog.grey == true and cog.color[1] ~= 1 and thumb.color[1] ~= 1, "back to one of ours: tinted again")
+
+    local own, ownWindow = Start({ rxpThemes = true }, nil)
+    Check(Hook(own, ownWindow) and ownWindow.Footer.cog.normal.paints == 0 and ownWindow.ScrollFrame.ScrollBar.ScrollUpButton.Normal.paints == 0
+        and ownWindow.ScrollFrame.ScrollBar.thumb.paints == 0 and ownWindow.ScrollFrame.ScrollBar.thumb.path == nil,
+        "RestedXP's own theme: hooked, and nothing touched")
+    local off, offWindow = Start({}, nil)
+    Check(#off.hooked == 0 and offWindow.Footer.cog.normal.paints == 0, "off: nothing is hooked or touched")
+
+    local function Bare(frame)
+        local e, _, f, b = Load({ rxpThemes = true }, true)
+        e.RXPFrame = frame
+        Fire(f, "NaowhForever")
+        e.RXP = { activeTheme = e.RXPGuides_Themes["NaowhForever:crimson"] }
+        Login(b)
+        return e
+    end
+    Check(#Bare(nil).hooked == 0 and #Bare({}).hooked == 0, "no window, or one without the scroll bar update: nothing is hooked")
+    local partial = { Footer = { cog = {}, icon = { GetNormalTexture = function() end } }, ScrollFrame = {}, UpdateScrollBar = function() end }
+    Check(#Bare(partial).hooked == 1, "buttons and arrows that are missing or bare: skipped without an error")
+    local mute = Window()
+    mute.Footer.cog = { GetNormalTexture = function() return {} end }
+    Check(#Bare(mute).hooked == 1, "an image that cannot be tinted: left alone")
+end
+
 -- The quest list rules.
 do
     local function Rule(layer)

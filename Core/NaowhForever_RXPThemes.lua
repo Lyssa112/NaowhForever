@@ -488,6 +488,54 @@ local function HookBars()
     PaintBars()
 end
 
+-- The cog, the corner grip, the scroll arrows and the knob are images with no theme field: tinted, the cog greyed
+-- first, and the knob (near black in RestedXP's) drawn as a disc.
+local KNOB = MEDIA .. "circle_mask.tga"
+local ARROWS = { "ScrollUpButton", "ScrollDownButton" }
+local ARROW_PARTS = { "Normal", "Highlight", "Pushed" }
+local ARROW_LIFT = 0.33
+local chromeTinted
+
+local function Tint(texture, color, grey)
+    if type(texture) ~= "table" or type(texture.SetVertexColor) ~= "function" then return end
+    if grey and type(texture.SetDesaturated) == "function" then texture:SetDesaturated(color ~= nil) end
+    local r, g, b = 1, 1, 1
+    if color then r, g, b = color[1], color[2], color[3] end
+    texture:SetVertexColor(r, g, b, 1)
+end
+
+local function Normal(button)
+    return type(button) == "table" and type(button.GetNormalTexture) == "function" and button:GetNormalTexture() or nil
+end
+
+local function PaintChrome()
+    local theme = ActiveTheme()
+    local accent = theme and theme.mapPins
+    if not accent and not chromeTinted then return end
+    chromeTinted = accent ~= nil
+    local frame = _G.RXPFrame
+    Tint(Normal(Dig(frame, "Footer", "cog")), accent, true)
+    Tint(Normal(Dig(frame, "Footer", "icon")), accent)
+    local bar = Dig(frame, "ScrollFrame", "ScrollBar")
+    local thumb = type(bar) == "table" and type(bar.GetThumbTexture) == "function" and bar:GetThumbTexture() or nil
+    if accent and type(thumb) == "table" and type(thumb.SetTexture) == "function" then thumb:SetTexture(KNOB) end
+    Tint(thumb, accent)
+    local soft = accent and { accent[1] + (1 - accent[1]) * ARROW_LIFT, accent[2] + (1 - accent[2]) * ARROW_LIFT,
+        accent[3] + (1 - accent[3]) * ARROW_LIFT }
+    for _, name in ipairs(ARROWS) do
+        local button = Dig(frame, "ScrollFrame", "ScrollBar", name)
+        for _, part in ipairs(ARROW_PARTS) do Tint(Dig(button, part), soft) end
+    end
+end
+
+local function HookChrome()
+    local frame = _G.RXPFrame
+    if type(frame) == "table" and type(frame.UpdateScrollBar) == "function" then
+        hooksecurefunc(frame, "UpdateScrollBar", PaintChrome)
+    end
+    PaintChrome()
+end
+
 -- The quest list: a rule at the bottom of each row. Rows are made when a guide loads, which ends in
 -- SetStep, so that is watched; rules are redrawn only when the theme or the row count changes.
 local rules = setmetatable({}, { __mode = "k" })   -- row -> its rule
@@ -544,6 +592,7 @@ boot:SetScript("OnEvent", function(self, event, name)
         if late then Resume() end
         HookArrow()
         HookBars()
+        HookChrome()
         HookRules()
     end
 end)
