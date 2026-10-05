@@ -106,7 +106,7 @@ ns.THEME_PRESETS = {
         line   = { r = 0x4d / 255, g = 0x3c / 255, b = 0x26 / 255 },
         fg     = { r = 0xf4 / 255, g = 0xe8 / 255, b = 0xcc / 255 },
         muted  = { r = 0xa8 / 255, g = 0x9a / 255, b = 0x7c / 255 },
-        accent = { r = 0xdd / 255, g = 0xa5 / 255, b = 0x24 / 255 } },
+        accent = { r = 0xd6 / 255, g = 0x8e / 255, b = 0x35 / 255 } },
 }
 
 -- A |cffRRGGBB escape from a THEME key (or an {r,g,b} table). With text it wraps it and
