@@ -68,7 +68,7 @@ local S = UI.ModuleSettings("qol", {
     characterPanel = true,
     -- On by default, an exception to off by default: marks on the game's own panel, no restyle.
     characterPanelSlotMarks = true, characterPanelLevels = true, characterPanelMarks = true,
-    characterPanelEnchants = true, characterPanelScore = true, characterPanelBadge = true, characterPanelStats = "spec",
+    characterPanelEnchants = true, characterPanelScore = true, characterPanelBadge = true, characterPanelBadgeAsk = false, characterPanelStats = "spec",
     characterPanelTookOver = false, characterPanelAsked = false,
     xpBar = false, xpBarLeftText = "level", xpBarCenterText = "xp", xpBarRightText = "percent",
     xpBarTopLeft = "played", xpBarTopRight = "none", xpBarBottomLeft = "leveling",
@@ -84,6 +84,8 @@ local S = UI.ModuleSettings("qol", {
     bagSpaceProtect = true, bagSpaceFreeBelow = 0, bagSpaceHideCombat = true,
     bagSpaceOnFull = true, bagSpaceShowFree = true, bagSpaceStack = true, bagSpaceOldFirst = false,
     bagSpaceTipVendor = true, bagSpaceTipAuction = true, bagSpaceTipDelete = true, bagSpaceTipIgnore = true,
+    scrapMarker = false, scrapMarkerVendor = "sell", scrapMarkerScope = "account", scrapMarkerShow = true,
+    scrapMarkerProtect = true, scrapRuleWear = false, scrapRuleOld = false, scrapRuleLevels = 10,
     townCapitalsOnly = true, townSpiritHealers = true, townZoneLinks = true,
     townMap = true, townClass = true, townProfession = true, townFlight = true, townInn = true,
     townBank = true, townStable = false, townRepair = true, townSupplies = true,

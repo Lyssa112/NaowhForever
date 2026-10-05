@@ -21,6 +21,8 @@ it again. Be gentle with the sites: the scripts wait between requests on purpose
 | `journal_cache.json`, `wowsrc_loot.json`, `item_names.json` | Every Wowhead answer the build used; wowsrc's pages as last read; their item names to IDs. | Committed, so a rebuild (and CI) gives the same data without asking again. |
 | `build_factions.py` | Builds the Reputation and PvP tabs from `journal_factions.json` and the game's own item tables. | Rewards, standings and prices are in the client, so we read them from there, not a website. |
 | `build_quest_chains.py` | Builds each dungeon quest's chain and what you need first, from Wowhead Forever. | So the Journal can say "do this first". |
+| `build_abilities.py` | Builds `DungeonJournal/Data/Abilities.lua` (each boss's spell IDs, each name once) and `BossInfo.lua` (its level, classification, creature type and title) from its Wowhead Forever NPC page. Cached in `abilities_cache.json`; `--offline` writes what the cache has. | A boss's page shows its abilities and header. The game gives each spell's name, icon and description. |
+| `build_boss_quests.py` | Builds `DungeonJournal/Data/BossQuests.lua`: the dungeon quests whose objective on Wowhead Forever names or links a boss. Cached in `quest_objectives_cache.json`. | A boss's page lists the quests that need it. |
 | `wago.py` | Reads the game's own tables (DB2) for a Forever build from wago.tools, hotfixes included. `BUILD` is the build our data comes from. | The one source that is the game itself. |
 | `watch_build.py` | Compares a new Forever build with ours: faction rewards, kill-count encounters, new dungeons, new dungeon floor maps, new gear the Journal doesn't list yet. `--update` moves us to it. | Runs daily in CI (`.github/workflows/daily-watch.yml`), so a new build never sneaks past us. |
 
@@ -68,11 +70,11 @@ it again. Be gentle with the sites: the scripts wait between requests on purpose
 | --- | --- |
 | `regression/` | Offline Lua tests against stubs. `bash Tools/regression/run-all.sh` runs them all (set `LUA=` to your lua.exe). `load_files.lua` loads a module's real files into a test, `measure.lua` times a draw and fails on garbage, `toc_files.lua` lists what the TOC loads. |
 | `tests/` | Python tests for the tools: `python -m unittest discover -s Tools/tests`. |
-| `hooks/check-pr.sh` | PR rules: a CHANGELOG line for addon changes, TOC version untouched. |
+| `hooks/check-pr.sh` | PR rules: a changelog line in the PR description for addon changes, TOC version untouched. |
 | `hooks/check_toc.py`, `hooks/toc_files.py` | Every file the TOC loads exists, with the right letter case. |
 | `hooks/check-package.sh` | The built zip has one `NaowhForever/` folder, everything it loads, and no tooling. |
-| `hooks/daily-pull-request.sh` | The daily watch's one pull request: `add` commits what a check changed, `open` squashes them into one commit (a title saying what is in it, a short list) and opens the PR or brings the open one up to date, or an issue with a link where workflows may not open PRs. |
-| `release.py` | Release helper for `.github/workflows/release.yml`: version bump, notes, changelog. |
+| `hooks/daily-pull-request.sh` | The daily watch's one pull request: `add` commits what a check changed, `open` squashes them into one commit (a title saying what is in it, a short list) and opens the PR or brings the open one up to date, with the checks' changelog lines under `## Changelog` in its description (labelled `no changelog` when there are none), or an issue with a link where workflows may not open PRs. |
+| `release.py` | Release helper for `.github/workflows/release.yml`: version bump, notes, changelog (from the merged PRs' descriptions). |
 
 ## What CI runs
 
@@ -81,8 +83,10 @@ it again. Be gentle with the sites: the scripts wait between requests on purpose
 - **Daily** (`daily-watch.yml`), three checks, one after another on one branch, each on what
   the one before changed. Whatever they change goes in **one** pull request, as one commit (we
   squash merge): its title says what is in it (`chore(data): WoW Forever build 1.60.1.70205,
-  boss loot and BiS lists`), its description lists the changes with each check's report folded
-  away (`hooks/daily-pull-request.sh`, which keeps it up to date). A check that fails leaves out
+  boss loot and BiS lists`), its description lists the changes, their lines for players under
+  `## Changelog` (labelled `no changelog` when there are none; CHANGELOG.md is left to the
+  release), and each check's report folded away (`hooks/daily-pull-request.sh`, which keeps it
+  up to date). A check that fails leaves out
   only its own change, and the run says so. A new BiS pick CI could not find a source for (it
   may not read Wowhead) keeps the pull request a draft that says what to run on our machines.
   A change CI cannot make at all (wowsrc lists items the game's tables don't have yet) goes in
@@ -93,8 +97,8 @@ it again. Be gentle with the sites: the scripts wait between requests on purpose
     new build, the change moves our faction data to it, with a report of what changed (new
     gear the Journal doesn't list yet, new dungeon floor maps in the game's map table). The same
     change refits the Naowh Score (`fit_naowh_score.py --write`): `Formula.lua` changes when
-    the constants move enough, and the report gets a "Naowh Score" section (old against
-    new, the fit's quality, its gates). A manual run reports it too; a failed fit only says
+    the constants move enough, with a changelog line (every player's score moves), and the
+    report gets a "Naowh Score" section (old against new, the fit's quality, its gates). A manual run reports it too; a failed fit only says
     so.
   - `loot`: `wowsrc.py --check`. If wowsrc's loot pages changed (a boss gained or lost items,
     a new boss or page), it rebuilds the Journal with `--offline`.
@@ -104,5 +108,5 @@ it again. Be gentle with the sites: the scripts wait between requests on purpose
   what they can't settle (an old classic item) is listed in the PR for a run on our machines.
 - **Not in CI:** anything that reads Wowhead. Their terms don't allow scraping it from a
   server, so a full `build_journal.py` (CI only runs it `--offline`), `build_quest_chains.py`,
-  `build_bis_spots.py`, `build_enchants.py` and `build_bis_quests.py` run
-  on our machines, by hand.
+  `build_bis_spots.py`, `build_enchants.py`, `build_bis_quests.py`, `build_abilities.py`
+  and `build_boss_quests.py` run on our machines, by hand.

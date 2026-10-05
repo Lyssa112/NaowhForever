@@ -176,6 +176,17 @@ function Parts.Fraction(part, whole)
     return text
 end
 
+local coins = {}
+
+function Parts.Coins(copper)
+    local text = coins[copper]
+    if not text then
+        text = C_CurrencyInfo.GetCoinTextureString(copper)
+        coins[copper] = text
+    end
+    return text
+end
+
 -------------------------------------------------------------------------------
 --  Pieces
 -------------------------------------------------------------------------------
@@ -467,6 +478,7 @@ local function PartyChat()
     if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then return "INSTANCE_CHAT" end
     return "PARTY"
 end
+Parts.PartyChat = PartyChat
 
 -- The Trade channel's number while you are in it (in a city), else nil.
 local function TradeChannel()
@@ -486,7 +498,7 @@ end
 ---@param copyText string
 ---@param trade? boolean
 ---@param icon? number|string
-function Parts.ShareMenu(owner, title, message, copyTitle, copyText, trade, icon)
+function Parts.ShareMenu(owner, title, message, copyTitle, copyText, trade, icon, say)
     local locked = C_ChatInfo.InChatMessagingLockdown()
     local target = UnitIsPlayer("target") and not UnitIsUnit("target", "player") and UnitIsFriend("player", "target")
         and GetUnitName("target", true) or nil
@@ -497,6 +509,10 @@ function Parts.ShareMenu(owner, title, message, copyTitle, copyText, trade, icon
     local tradeChannel = trade and TradeChannel()
     MenuUtil.CreateContextMenu(owner, function(_, root)
         root:CreateTitle(title)
+        -- Say: the game lets an addon speak only inside an instance.
+        if say then
+            root:CreateButton("Say", function() Send("SAY") end):SetEnabled(not locked and IsInInstance())
+        end
         if trade then
             root:CreateButton("Trade", function() Send("CHANNEL", tradeChannel) end)
                 :SetEnabled(not locked and tradeChannel ~= nil)

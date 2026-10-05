@@ -14,7 +14,7 @@ local ns = _G.NaowhForever
 local J = ns.Journal
 
 ---@alias JournalQuestKind
----| "prereq"     # a prerequisite is not done yet (Do first)
+---| "prereq"     # a prerequisite is not done yet (Prerequisite)
 ---| "prereqLog"  # the prerequisite to do next is in your log
 ---| "low"        # prerequisites done, your level too low to pick it up
 ---| "pickup"     # you can pick it up
@@ -208,6 +208,13 @@ local function ForMe(quest, class, faction)
     return side == "B" or (side == "A" and faction == "Alliance") or (side == "H" and faction == "Horde")
 end
 
+-- For a boss's page (its quests, done ones too): whether the quest is for you.
+---@param quest JournalQuest
+function Q.ForMe(quest)
+    local _, class = UnitClass("player")
+    return ForMe(quest, class, UnitFactionGroup("player"))
+end
+
 -- Listed: for you, not handed in, and not a grey one you have not picked up. A faction's
 -- hand-in is listed grey too: its reputation is worth it at any level.
 local function Listed(quest, kind, class, faction)
@@ -229,6 +236,11 @@ local function QuestByID(id)
     end
     return byID[id]
 end
+
+-- The quest in the data by its ID, or nil.
+---@param id number
+---@return JournalQuest?
+Q.ByID = QuestByID
 
 -- The quest's whole path, first step first, and which step of it the quest is: its
 -- prerequisites, then its own chain from Wowhead's Series, each step once. The Series alone
@@ -338,7 +350,7 @@ local function PrereqLine(quest)
     local step, i, n = NextPrereq(quest)
     if not step then return end
     local state, id = StepState(step)
-    local text = ("Do first%s: %s (%d/%d)"):format(state == "active" and " (in your log)" or "", StepName(id), i, n)
+    local text = ("Requires%s: %s (%d/%d)"):format(state == "active" and " (in your log)" or "", StepName(id), i, n)
     return text, step, state, id
 end
 

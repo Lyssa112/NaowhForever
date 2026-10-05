@@ -25,6 +25,14 @@ local METHODS = {
     HookScript = function(f, script, fn) f.hooks[script] = fn end,
     GetParent = function(f) return rawget(f, "parent") end,
     SetText = function(f, text) f.text = text end,
+    -- A secret (see UnitStat below) formats as its value, as the game shows one.
+    SetFormattedText = function(f, format, ...)
+        local args = { ... }
+        for i = 1, select("#", ...) do
+            if type(args[i]) == "table" then args[i] = args[i].value end
+        end
+        f.text = format:format(unpack(args))
+    end,
     Show = function(f) f.shown = true end,
     Hide = function(f) f.shown = false end,
     SetShown = function(f, shown) f.shown = shown and true or false end,
@@ -114,7 +122,7 @@ local S = {
 -- Slot Marks is on by default; off here, to start from nothing (its own checks turn it on).
 state.values = { enabled = true, characterPanel = false, characterPanelSlotMarks = false, characterPanelLevels = true,
     characterPanelMarks = true, characterPanelEnchants = true, characterPanelScore = true,
-    characterPanelBadge = true, characterPanelStats = "spec" }
+    characterPanelBadge = true, characterPanelBadgeAsk = false, characterPanelStats = "spec" }
 
 -- Your list: the head's BiS is 101 (you wear it), the chest's 202 (you wear 200 there).
 local LIST = { slots = { [1] = 101, [5] = 202 }, extra = {} }
@@ -189,6 +197,7 @@ ns.BiS = {
 local tooltip = Frame()
 tooltip.SetText = function(self, text) self.lines = { text } end
 tooltip.AddLine = function(self, text) self.lines[#self.lines + 1] = text end
+tooltip.NumLines = function(self) return #self.lines end
 
 local env = setmetatable({
     NaowhForever = ns,
@@ -237,9 +246,21 @@ local env = setmetatable({
     CharacterLevelText = levelText,
     CharacterStatsPaneScrollBox = statsList,
     CharacterFrameRightPaneHostStoneBg = "stoneArt",
-    UnitArmor = function() return 250, 250 end,
-    UnitStat = function(_, index) return 0, STATS[index] or 0 end,
-    GetCombatRatingBonus = function() return 0 end,
+    UnitArmor = function()
+        if state.statsSecret then return { value = 250 }, { value = 250 } end
+        return 250, 250
+    end,
+    GetCombatRatingBonus = function() if state.statsSecret then return { value = 0 } end return 0 end,
+    -- While state.statsSecret, the game keeps your stats secret: a value that fails any arithmetic
+    -- or comparison, which only the calls that take a secret can show.
+    UnitStat = function(_, index)
+        if state.statsSecret then return { value = 0 }, { value = STATS[index] or 0 } end
+        return 0, STATS[index] or 0
+    end,
+    C_Secrets = { ShouldUnitStatsBeSecret = function() return state.statsSecret == true end },
+    C_StringUtil = { FloorToNearestString = function(n)
+        return tostring(math.floor(type(n) == "table" and n.value or n))
+    end },
     GetHitModifier = function() return 3 end,
     CR_HIT_MELEE = 6,
     -- What a spec weighing many stats reads (its totals' own numbers do not matter here).
@@ -332,6 +353,8 @@ check("Naowh Score off: no score in the corner", badge.shown == false)
 
 -- Your supporter badge, in the left pane's top corner.
 state.badgeTiers = ns.BADGE_TIERS
+check("no badge, Legendary Badge Preview off (the default): nothing in the corner", CP.supportBadge == nil)
+S.Set("characterPanelBadgeAsk", true)
 local support = CP.supportBadge
 check("your supporter badge in the left pane's corner", support and support.parent == character.LeftPaneHost
     and support.shown ~= false)
@@ -370,6 +393,14 @@ check("hovering the sample shows the badge's own card, as on a badged name in ch
 S.Set("characterPanelBadge", false)
 check("Supporter Badge off: no badge", support.shown == false)
 S.Set("characterPanelBadge", true)
+S.Set("characterPanelBadgeAsk", false)
+check("Legendary Badge Preview off: no grey badge", support.shown == false)
+state.badges = { ["Player-1-ME"] = "developer" }
+character.LeftPaneHost.hooks.OnShow(character.LeftPaneHost)
+check("a badge of your own shows with the preview off, looked at again as the panel opens", support.shown == true)
+state.badges = nil
+character.LeftPaneHost.hooks.OnShow(character.LeftPaneHost)
+check("and goes once you have none", support.shown == false)
 
 -- The stats: your spec's first (the default), the game's list under it; the switch at the
 -- pane's bottom.
@@ -424,6 +455,22 @@ check("one the spec does not weigh says so", tooltip.lines[2] == "Assassination 
 -- Repainted as your stats change, with no garbage.
 spec.IsVisible = function() return true end
 Measure(check)("your spec's stats repainted", 1, function() spec.scripts.OnEvent(spec) end)
+-- Reported on Forever: your stats go secret under the game's addon restrictions.
+state.statsSecret = true
+spec.scripts.OnEvent(spec, "UNIT_STATS", "player")
+check("secret stats: shown through the calls that take a secret", rows[1].total.text == "80"
+    and rows[5].total.text == "250")
+check("one we would have to add up ourselves, a dash", rows[3].name.text == "Hit %" and rows[3].total.text == "-")
+for i = 1, 6 do
+    env["GameTooltipTextLeft" .. i] = { SetFormattedText = function(_, format, value)
+        tooltip.lines[i] = format:format(value)
+    end }
+end
+rows[1].scripts.OnEnter(rows[1])
+check("and its hover card's total, written the same way", tooltip.lines[#tooltip.lines] == "You: 80")
+state.statsSecret = false
+spec.scripts.OnEvent(spec, "ADDON_RESTRICTION_STATE_CHANGED", 0, 0)
+check("and back when the restriction lifts", rows[1].total.text == "80")
 -- A spec weighing many stats: 14 rows still fit (17 each), the rest of the rows hidden.
 local For = ns.StatWeights.For
 ns.StatWeights.For = function()

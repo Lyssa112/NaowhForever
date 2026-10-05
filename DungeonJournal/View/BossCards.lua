@@ -5,9 +5,8 @@
 -------------------------------------------------------------------------------
 local ns = _G.NaowhForever
 local Tip = ns.Shared.Parts.Tip
--- WoW Forever's mark after the name of what is new in Forever, and its tooltip line.
-local ForeverInline, ForeverLine = ns.Shared.Parts.ForeverInline, ns.Shared.Parts.ForeverLine
-local CARD_DROP = ns.Shared.Parts.CARD_DROP
+-- A boss new in Forever says so in its tooltip; the mark itself stays on the dungeon.
+local ForeverLine = ns.Shared.Parts.ForeverLine
 local T = ns.THEME
 local J = ns.Journal
 
@@ -53,12 +52,15 @@ local function TipMessage(boss, tip)
 end
 
 -- Shared from the share menu (Parts.ShareMenu): cut to one message in chat, whole to copy.
+-- Also the share button beside a tip written out on a boss's page (View/BossDetails.lua).
+function J.View.Parts.ShareTip(owner, boss, tip)
+    local name = boss.name
+    J.View.Parts.ShareMenu(owner, "Share Naowh's tip", TipMessage(boss, tip),
+        "Naowh's tip: " .. name, TIP_TEXT:format(name, tip), nil, nil, true)
+end
+
 local function OpenTipMenu(button)
-    local tip = button.tip
-    if not tip then return end
-    local name = button.boss.name
-    J.View.Parts.ShareMenu(button, "Share Naowh's tip", TipMessage(button.boss, tip),
-        "Naowh's tip: " .. name, TIP_TEXT:format(name, tip))
+    if button.tip then J.View.Parts.ShareTip(button, button.boss, button.tip) end
 end
 
 local function AddTip(tip)
@@ -148,6 +150,31 @@ end
 local function KillsLeave(button)
     PaintKills(button)
     GameTooltip:Hide()
+end
+
+-- The skull and its count, on a row whose parent is the view (it reads its dungeon); placed
+-- by its caller. Also the header of a boss's page (View/BossDetails.lua).
+function J.View.Parts.KillCount(row)
+    local kills = CreateFrame("Button", nil, row)
+    kills:SetHeight(KILL_ICON + 4)
+    kills.icon = kills:CreateTexture(nil, "ARTWORK")
+    kills.icon:SetTexture(SKULL)
+    kills.icon:SetSize(KILL_ICON, KILL_ICON)
+    kills.icon:SetPoint("LEFT")
+    kills.count = ns.Font(kills, 11)
+    kills.count:SetPoint("LEFT", kills.icon, "RIGHT", KILL_GAP, 0)
+    kills:SetScript("OnEnter", KillsEnter)
+    kills:SetScript("OnLeave", KillsLeave)
+    kills:SetScript("OnClick", OpenHistory)
+    return kills
+end
+
+-- Its count for the boss ("-" where the game does not report its death), and as wide as it.
+function J.View.Parts.SetKillCount(kills, boss)
+    kills.boss, kills.kills = boss, Kills.Count(boss)
+    kills.count:SetText(Kills.Counted(boss) and kills.kills or "-")
+    PaintKills(kills)
+    kills:SetWidth(KILL_ICON + KILL_GAP + math.ceil(kills.count:GetStringWidth()))
 end
 
 -------------------------------------------------------------------------------
@@ -255,18 +282,8 @@ Kinds.boss = {
         row.stats = ns.Font(row, 11)
         row.stats:SetJustifyH("RIGHT")
         row.stats:SetWordWrap(false)
-        local kills = CreateFrame("Button", nil, row)
-        kills:SetHeight(KILL_ICON + 4)
+        local kills = J.View.Parts.KillCount(row)
         kills:SetPoint("RIGHT", row, "TOPRIGHT", 0, -(STATS_TOP + 6))
-        kills.icon = kills:CreateTexture(nil, "ARTWORK")
-        kills.icon:SetTexture(SKULL)
-        kills.icon:SetSize(KILL_ICON, KILL_ICON)
-        kills.icon:SetPoint("LEFT")
-        kills.count = ns.Font(kills, 11)
-        kills.count:SetPoint("LEFT", kills.icon, "RIGHT", KILL_GAP, 0)
-        kills:SetScript("OnEnter", KillsEnter)
-        kills:SetScript("OnLeave", KillsLeave)
-        kills:SetScript("OnClick", OpenHistory)
         row.kills = kills
         row.rule = ns.Solid(row, "ARTWORK", T.line, 0.7)
         row.rule:SetPoint("BOTTOMLEFT")
@@ -294,7 +311,7 @@ Kinds.boss = {
         row.name:SetPoint("TOPLEFT", left, -NAME_TOP)
         row.name:SetWidth(0)   -- unbounded, so it measures the whole name
         row.forever = J.IsForeverBoss(boss)
-        row.name:SetText(row.forever and boss.name .. ForeverInline(CARD_NAME_SIZE - 2, CARD_DROP) or boss.name)
+        row.name:SetText(boss.name)
         local tag = Tag(boss)
         row.rare:SetText(tag or "")
         row.rare:SetShown(tag ~= nil)
@@ -306,10 +323,7 @@ Kinds.boss = {
         row.stats:ClearAllPoints()
         local right = 0   -- what the kill count takes on the right
         if showKills then
-            kills.boss, kills.kills = boss, Kills.Count(boss)
-            kills.count:SetText(Kills.Counted(boss) and kills.kills or "-")
-            PaintKills(kills)
-            kills:SetWidth(KILL_ICON + KILL_GAP + math.ceil(kills.count:GetStringWidth()))
+            J.View.Parts.SetKillCount(kills, boss)
             row.stats:SetPoint("RIGHT", kills, "LEFT", -KILLS_GAP, 0)
             right = kills:GetWidth() + KILLS_GAP
         else
