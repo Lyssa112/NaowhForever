@@ -25,6 +25,7 @@ ns.FEATURES = {
         gossipAuto = false,
         groupButtons = false,
         combatTimer = false,
+        damageMeterSkin = false,
         cursorCooldown = false,
         globalCopy = false,
         badgeChat = true,
