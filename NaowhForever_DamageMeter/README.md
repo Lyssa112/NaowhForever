@@ -52,6 +52,11 @@ NaowhForever_DamageMeter/
 - Class Colors can be changed class by class (`classColors`, class to color), kept apart from the
   theme tokens since the game gives every class its own. A background image is a name from the shared
   media's `background` list, drawn above the window's color and below the rows, stretched or tiled.
+- Raid Mode hands the window a copy of the session with only your row in it (found by
+  `isLocalPlayer`, which is never secret), still ranked by its place in the game's order and still
+  against the group's largest bar. Where = In Combat shows the windows while you fight and for Hide
+  After seconds, checked again when that delay is out; the show or hide key overrides it until the next
+  fight.
 - The windows are plain frames, so they move and resize in combat; only Lock Window stops that. The
   sizing flag lives on the frame (`frame.sizing`), which is what the layout reads while the client
   resizes it.

@@ -16,6 +16,7 @@ local OFF_HIGHLIGHT = "Turn on Highlight Your Row"
 local OFF_ABBREVIATING = "Number Format is Game Default or Full Numbers"
 local OFF_CLASS = "Set Bar Color to Class Colors"
 local OFF_IMAGE = "Pick a Background Image"
+local OFF_COMBAT = "Set Where to In Combat"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local BAR_RANGE, SPACING_RANGE = { C.MIN_BAR, C.MAX_BAR, 1 }, { 0, C.MAX_SPACING, 1 }
@@ -28,7 +29,9 @@ local MORE_NAMES = { [2] = "Second Window", [3] = "Third Window" }
 
 local MODE = { C.MODE_LABELS, C.MODE_ORDER }
 local SESSION = { C.SESSION_LABELS, C.SESSION_ORDER }
-local SHOW = { { always = "Always", instance = "In Instances", group = "In a Group" }, { "always", "instance", "group" } }
+local SHOW = { { always = "Always", instance = "In Instances", group = "In a Group", combat = "In Combat" },
+    { "always", "instance", "group", "combat" } }
+local DELAY_RANGE = { 0, C.MAX_HIDE_DELAY, 1 }
 local BAR_COLOR = { { class = "Class Colors", accent = "Theme Accent", custom = "Custom Color" },
     { "class", "accent", "custom" } }
 local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "class" } }
@@ -40,6 +43,7 @@ local TITLE_RANGE = { C.MIN_TITLE, C.MAX_TITLE, 1 }
 local function Enabled() return DM.On() and true or false end
 local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
 local function Highlighting() return DM.On() and S.Get("highlightPlayer") == true end
+local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
 local function HasImage() return DM.On() and S.Get("backgroundImage") ~= "" end
 local function ClassBars() return DM.On() and S.Get("barColor") == "class" end
 local function Abbreviating()
@@ -215,7 +219,12 @@ page:Card({
         { key = "session", label = "Session", choice = SESSION, needs = Enabled, why = OFF,
           help = "The current fight, or everything since the last reset. Past fights are in the window's "
               .. "Session button." },
-        { key = "visibility", label = "Where", choice = SHOW, needs = Enabled, why = OFF },
+        { key = "visibility", label = "Where", choice = SHOW, needs = Enabled, why = OFF,
+          help = "In Combat shows it while you fight and a while after. A key binding shows or hides it." },
+        { key = "hideDelay", label = "Hide After", slider = DELAY_RANGE, unit = "s", needs = HidesAfterCombat,
+          why = OFF_COMBAT },
+        { key = "raidMode", label = "Raid Mode", toggle = true, needs = Enabled, why = OFF,
+          help = "Only your own row, with your rank, in place of the whole group." },
         Group("Window"),
         { key = "width", label = "Width", slider = WIDTH_RANGE, needs = Enabled, why = OFF },
         { key = "height", label = "Window Height", slider = HEIGHT_RANGE, needs = Enabled, why = OFF },

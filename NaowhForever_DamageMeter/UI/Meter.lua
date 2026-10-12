@@ -33,6 +33,7 @@ local TEXT_MORE_TIP = "Report, reset, add or close a window, and settings."
 
 local windows = {}
 local pendingUpdate, unlocked, hovered
+local lastCombatEnd, override
 local preview = false
 local updateGeneration, previewGeneration = 0, 0
 local events = CreateFrame("Frame")
@@ -64,10 +65,19 @@ local function Layout(w, session)
 end
 
 -- seconds is how long the session has run, or nil; it is shown when the title bar has room for it.
+-- Raid Mode: the session as it would be with only you in it, still ranked as you are.
+local function OwnOnly(session)
+    local rank = DM.Rank(session)
+    local sources = {}
+    if rank then sources[1] = session.combatSources[rank] end
+    return { combatSources = sources, maxAmount = session.maxAmount, totalAmount = session.totalAmount, rank = rank }
+end
+
 local function Render(w, session, available, seconds)
     local frame = w.frame
-    local shown, mode = Layout(w, session)
-    Look.Paint(frame, session, w.offset, shown, mode, available)
+    local view = S.Get("raidMode") and OwnOnly(session) or session
+    local shown, mode = Layout(w, view)
+    Look.Paint(frame, view, w.offset, shown, mode, available)
     local summary = S.Get("showSummary") == true
     frame.summary:SetShown(summary)
     if summary then
@@ -224,10 +234,16 @@ local function Build(w)
     frame:Hide(); Place(w)
 end
 
+-- Whether the visibility setting wants the windows up: a key press can override it until combat starts.
 local function ShownNow()
+    if override ~= nil then return override end
     local where = S.Get("visibility")
     if where == "group" then return IsInGroup() end
     if where == "instance" then return (IsInInstance()) end
+    if where == "combat" then
+        if InCombatLockdown() then return true end
+        return lastCombatEnd ~= nil and GetTime() - lastCombatEnd < S.Get("hideDelay")
+    end
     return true
 end
 
@@ -296,10 +312,14 @@ end
 
 local function OnEvent(_, event)
     if event == "PLAYER_REGEN_DISABLED" then
-        preview = false
+        preview, override = false, nil
     elseif event == "PLAYER_REGEN_ENABLED" then
         GameMeter(DM.On() and S.Get("hideGameMeter"))
         DM.ScanRoster()
+        lastCombatEnd = GetTime()
+        if S.Get("visibility") == "combat" then
+            C_Timer.After(S.Get("hideDelay") + UPDATE_DELAY, RequestUpdate)
+        end
     elseif event == "DAMAGE_METER_RESET" then
         ForgetFights()
     elseif event == "PLAYER_ENTERING_WORLD" or event == "GROUP_ROSTER_UPDATE" then
@@ -346,6 +366,13 @@ function ns.PreviewDamageMeter()
     preview = true
     Update()
     C_Timer.After(PREVIEW_SECONDS, function() EndPreview(generation) end)
+end
+
+function NaowhForever_ToggleDamageMeter()
+    if not DM.On() then ns.Print(TEXT_OFF) return end
+    local first = windows[1]
+    override = not (first and first.frame and first.frame:IsShown())
+    Update()
 end
 
 function NaowhForever_ResetDamageMeter()

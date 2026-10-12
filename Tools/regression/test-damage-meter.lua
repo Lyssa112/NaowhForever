@@ -199,6 +199,7 @@ local function Boot(opts)
         end,
         GetLocale = function() return s.locale or "enUS" end,
         LibStub = function() return s.lsm end,
+        GetTime = function() return s.now or 0 end,
         CLASS_SORT_ORDER = opts.classes,
         LOCALIZED_CLASS_NAMES_MALE = { MAGE = "Mage", ROGUE = "Rogue" },
         Enum = { DamageMeterType = { DamageDone = 0, Dps = 1, HealingDone = 2, Hps = 3, DamageTaken = 7,
@@ -912,6 +913,83 @@ do
         and Is(panel.note.textColor, THEME.muted) and Is(Solid(panel.background), THEME.bg))
 end
 
+-- Raid Mode: your row alone
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    s.store.Set("raidMode", true); s.Flush()
+    check("your row alone, still ranked as you are", w.rows[1].name.text == "You" and w.rows[1].rank.text == "2"
+        and w.rows[2].shown == false)
+    check("the bar still against the group's largest", w.rows[1].barMax == s.session.maxAmount
+        and w.rows[1].barValue == s.session.combatSources[2].totalAmount)
+    s.store.Set("showSummary", true); s.Flush()
+    check("the summary still reads the whole group", w.summary.text == "Current   Damage <total>   Rank 2/3")
+    s.session.combatSources[2].isLocalPlayer = false
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("not in the session: nothing to show", w.rows[1].shown == false and w.empty.shown == true)
+    s.session.combatSources[2].isLocalPlayer = true
+    s.store.Set("raidMode", false); s.Flush()
+    check("off again: the whole group", w.rows[3].shown == true and w.rows[1].rank.text == "1")
+    w.more.onClick()
+    local item = s.menu:Find("Raid Mode")
+    check("the window menu has it", item and item.kind == "check" and item.selected() == false)
+    item.set()
+    check("and sets it", s.store.Get("raidMode") == true)
+end
+
+-- In Combat: shown while you fight and a while after, and a key to show or hide it
+do
+    local s = Boot({ settings = { enabled = true, visibility = "combat", hideDelay = 8 } })
+    s.Login()
+    local w = s.Window()
+    check("hidden until combat", w.shown == false)
+    s.combat = true
+    s.Fire("PLAYER_REGEN_DISABLED"); s.Flush()
+    check("shown in combat", w.shown == true)
+    s.combat = false
+    s.now = 100
+    s.Fire("PLAYER_REGEN_ENABLED")
+    local scheduled = false
+    for _, t in ipairs(s.timers) do
+        if t.sec == 8.25 then scheduled = true end
+    end
+    check("a check is scheduled for when the delay is out", scheduled)
+    s.Flush()
+    check("shown for a while after", w.shown == true)
+    s.now = 107
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("still shown before the delay is out", w.shown == true)
+    s.now = 109
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("hidden when it is", w.shown == false)
+
+    s.env.NaowhForever_ToggleDamageMeter()
+    check("the key shows it", w.shown == true)
+    s.env.NaowhForever_ToggleDamageMeter()
+    check("and hides it", w.shown == false)
+    s.env.NaowhForever_ToggleDamageMeter()
+    s.combat = true
+    s.Fire("PLAYER_REGEN_DISABLED"); s.Flush()
+    s.env.NaowhForever_ToggleDamageMeter()
+    check("in combat the key hides it", w.shown == false)
+    s.combat = false
+    s.Fire("PLAYER_REGEN_DISABLED"); s.combat = true; s.Flush()
+    check("and the next fight clears that", w.shown == true)
+
+    local always = Boot({ settings = { enabled = true } })
+    always.Login()
+    always.env.NaowhForever_ToggleDamageMeter()
+    check("with Where on Always the key hides it", always.Window().shown == false)
+    always.env.NaowhForever_ToggleDamageMeter()
+    check("and shows it again", always.Window().shown == true)
+
+    local off = Boot()
+    off.Login()
+    off.env.NaowhForever_ToggleDamageMeter()
+    check("off: the key says so", #off.printed == 1)
+end
+
 -- bar colors by class, alternating rows, a background image
 do
     local s = Boot({ settings = { enabled = true }, media = true, classes = { "ROGUE", "MAGE" } })
@@ -1495,6 +1573,14 @@ do
     check("the rows cover the windows, the rows, the hover and the colors", #keys >= 55)
     check("one short help sentence on each card", #page.cards[1].help < 120 and #page.cards[2].help < 120
         and #page.cards[3].help < 120)
+    local delay
+    for _, r in ipairs(page.cards[1].rows) do
+        if r.key == "hideDelay" then delay = r end
+    end
+    check("Hide After needs Where on In Combat", delay and delay.needs() == false)
+    s.store.Set("visibility", "combat")
+    check("which turns it on", delay.needs() == true)
+    s.store.Set("visibility", "always")
     check("the first card's summary reads window one", page.cards[1].summary(s.store) == "Damage Done, 300 by 206")
 
     local colors = {}

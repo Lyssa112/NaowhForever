@@ -340,7 +340,7 @@ function Look.Paint(f, session, first, shown, _, available)
         row:SetValue(source.totalAmount)
         local e = own and source.isLocalPlayer == true and edge or c
         row.edge:SetColorTexture(e.r, e.g, e.b, 1)
-        row.rank:SetFormattedText(RANK_TEXT, first + i)
+        row.rank:SetFormattedText(RANK_TEXT, session.rank or first + i)
         row.icon:SetTexture(IconOf(source, classOnly))
         row.name:SetText(DM.DisplayName(source))
         PaintValues(row, source, f.cols)

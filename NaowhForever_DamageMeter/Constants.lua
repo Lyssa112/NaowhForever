@@ -36,7 +36,7 @@ ns.DamageMeter.C = {
     MIN_TITLE = 8, MAX_TITLE = 20,
     NUMBER_UNITS = { game = "Game Default", latin = "K, M, B", asian = "Ten-thousands", full = "Full Numbers" },
     NUMBER_UNITS_ORDER = { "game", "latin", "asian", "full" },
-    NUMBER_DECIMALS_MAX = 2,
+    NUMBER_DECIMALS_MAX = 2, MAX_HIDE_DELAY = 60,
     NAME_FORMATS = { full = "Full Name", first = "First Name", last = "Last Name", initials = "Initials",
         firstInitial = "First Name and Initial" },
     NAME_FORMATS_ORDER = { "full", "first", "last", "initials", "firstInitial" },
