@@ -2335,10 +2335,16 @@ do
     check("Icon Size: that size, and the name after it", row.icon.w == 12 and row.icon.h == 12
         and row.name.points[1][2] == 6 + 18 + 12 + 5)
     s.store.Set("iconSize", 30); s.Flush()
-    check("a size of its own may be taller than the row (20)", row.icon.w == 30 and row.icon.h == 30
-        and row.name.points[1][2] == 6 + 18 + 30 + 5)
+    check("a size of its own is used, and the bars are at least as tall as it", row.icon.w == 30 and row.icon.h == 30
+        and row.h == 30 and w.rows[2].h == 30 and row.name.points[1][2] == 6 + 18 + 30 + 5)
+    check("the rows are stacked by that height", w.rows[2].points[1][5] == row.points[1][5] - (30 + 2))
+    s.store.Set("barHeight", 36); s.Flush()
+    check("a taller Row Height is kept", row.h == 36 and row.icon.w == 30)
+    s.store.Set("barHeight", 20); s.store.Set("showIcons", false); s.Flush()
+    check("with no icons the bars are the Row Height", row.h == 20)
+    s.store.Set("showIcons", true)
     s.store.Set("iconSize", 100); s.Flush()
-    check("up to the most the slider has", row.icon.w == s.DM.C.MAX_ICON and row.icon.w == 40)
+    check("up to the most the slider has", row.icon.w == s.DM.C.MAX_ICON and row.icon.w == 40 and row.h == 40)
     s.store.Set("iconSize", 0)
     s.store.Set("iconGap", 10); s.Flush()
     check("Icon Gap", row.name.points[1][2] == 6 + 18 + 16 + 10)

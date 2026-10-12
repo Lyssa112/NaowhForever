@@ -142,7 +142,8 @@ NaowhForever_DamageMeter/
   its keys, so it starts as it was, and turning it off keeps them. The rest of the look (fonts, colors,
   name and number formats) is shared by every window.
 - The room in a row is settings now (Icons, and the Row card): the icon's size (zero fits the row; a size of its
-  own is used as it is, up to `MAX_ICON`, even taller than the row), side, crop and gap, the padding at the ends, the gap between columns and the edge's width.
+  own is used as it is, up to `MAX_ICON`, and the bars are at least as tall: `Look.BarHeight`), side, crop and
+  gap, the padding at the ends, the gap between columns and the edge's width.
   An icon on the right takes room from the figures (`rightInset`, which the titles over them follow),
   and the name's right end is the figures' left less that. An icon before the bar (`iconSide = "before"`)
   stands outside it, at the bar's height and touching it, whatever Icon Gap says: the row starts after it

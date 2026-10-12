@@ -63,8 +63,7 @@ end
 local function Layout(w, session, modeKey)
     local frame = w.frame
     local index = w.index
-    local bh, gap, fontSize = DM.Setting(index, "barHeight"), DM.Setting(index, "barSpacing"),
-        DM.Setting(index, "fontSize")
+    local bh, gap, fontSize = Look.BarHeight(index), DM.Setting(index, "barSpacing"), DM.Setting(index, "fontSize")
     frame:SetResizeBounds(MIN_WIDTH, math.max(C.MIN_HEIGHT, HEADER + 2 * INSET + bh), MAX_WIDTH, MAX_HEIGHT)
     local mode = DM.Mode(modeKey or Get(w, "mode"))
     local shown

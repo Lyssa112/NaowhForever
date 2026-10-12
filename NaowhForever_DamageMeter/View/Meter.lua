@@ -133,6 +133,17 @@ function Look.Invalidate(f)
     end
 end
 
+-- How tall a window's bars are: the Row Height, and at least as tall as an icon of its own size, so that a
+-- big icon is not taller than the bar it sits on.
+function Look.BarHeight(index)
+    local height = DM.Setting(index, "barHeight")
+    local icon = S.Get("iconSize")
+    if DM.Setting(index, "showIcons") == true and icon > 0 then
+        height = math.max(height, math.min(icon, C.MAX_ICON))
+    end
+    return height
+end
+
 -- How wide the fight time is at the size the settings give it.
 function Look.TimeWidth()
     local chars = TIME_CHARS + (S.Get("timeBrackets") == true and 2 or 0)

@@ -451,7 +451,8 @@ page:Card({
     summary = BarsSummary,
     rows = Join(
         Group("Bars"),
-        { key = "barHeight", label = "Row Height", slider = BAR_RANGE, needs = Enabled, why = OFF },
+        { key = "barHeight", label = "Row Height", slider = BAR_RANGE, needs = Enabled, why = OFF,
+          help = "Not less than the icon, when the icon has a size of its own." },
         { key = "barSpacing", label = "Row Spacing", slider = SPACING_RANGE, needs = Enabled, why = OFF },
         { key = "barAlpha", label = "Bar Opacity", slider = BAR_ALPHA_RANGE, unit = "%", scale = TO_FRACTION,
           needs = Enabled, why = OFF },
@@ -499,7 +500,7 @@ page:Card({
             "Icon Settings", "The icon's size, style, side and crop.", {
             { key = "iconSize", label = "Icon Size", slider = ICON_SIZE_RANGE, unit = "px", needs = Enabled,
               why = OFF, help = "Zero fits the icon to the row, as tall as the bar when it stands before it. A "
-                  .. "size of your own may be taller than the row." },
+                  .. "size of your own makes the bars at least as tall." },
             { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
             { key = "iconSide", label = "Icon Side", choice = ICON_SIDE, needs = Enabled, why = OFF,
               help = "Before the Bar puts it outside the bar, touching its left end." },
