@@ -44,13 +44,17 @@ NaowhForever_DamageMeter/
 - The game returns its sources and spells already sorted, so the window draws them in order and ranks
   by position.
 - The API calls go through `pcall`: an error reads as no data and the window says so, not a Lua error.
+- `C_DamageMeter.IsDamageMeterAvailable` (available, reason) says whether the game lets the meter run;
+  when it does not, the window shows the game's reason instead of the empty line. A client without the
+  call counts as available.
 - Updates are coalesced, 0.25 seconds after the first event of a burst, since the game fires one per
   source per update. All open windows redraw together.
 - While it is off nothing is built or listened to but the frame that waits for the login: the event frame
-  is made when it is first turned on, and the fade's OnUpdate runs only while a window is fading.
+  is made when it is first turned on, and the fade's OnUpdate runs only while a window is fading or
+  Full While Hovered has the mouse to watch.
 - The game's meter is the `damageMeterEnabled` setting. It is turned off while this one is on and put
   back as it was after, kept on the account so it survives a reload. It is left alone in combat and
-  done again when combat ends.
+  done again when combat ends. If this addon is disabled or removed, the core puts it back at login.
 - Every part of a window has its own color setting (`DM.C.COLORS`): the bars' custom color and your
   row's edge, the names, amounts, ranks, column titles, title, fight time and summary line, and the
   window, the title bar and the border. A row has no background of its own: the window's shows behind
@@ -186,7 +190,8 @@ NaowhForever_DamageMeter/
   combat. Show Overall Out of Combat sets each shown window's session setting to Overall when combat ends
   and back to Current when it begins, so the menu and the settings page say what is shown.
 - Fading is the window's alpha, stepped toward its target from a small `OnUpdate` (every tenth of a
-  second, and only while a fade is set or still moving): full in combat, while the mouse is over the
+  second, and only while it is still moving or, out of combat, Full While Hovered has a faded window
+  to watch; a change of state starts it again): full in combat, while the mouse is over the
   window (`IsMouseOver`, since a row on top of the window would take an `OnEnter` of the frame itself),
   while it is being placed and in the preview, else the Out of Combat Opacity. The spell panel is not
   the window's child, so it is not faded. Mouse Passes Through, with the window locked, turns the mouse

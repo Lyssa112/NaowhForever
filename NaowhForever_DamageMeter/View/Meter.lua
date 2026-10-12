@@ -26,7 +26,6 @@ local TITLE_X = C.TITLE_X
 local TITLE_SIZE, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 11, 10, 3, 11
 
 local TEXT_EMPTY = "No data yet"
-local TEXT_UNAVAILABLE = "The damage meter is not available"
 local TEXT_NAME_HEAD, TEXT_TOTAL, TEXT_RATE, TEXT_PERCENT_HEAD = "Name", "Total", "Per Sec", "%"
 local DIVIDED_TEXT, TEXT_YOU = "%s | %s", "You"
 local SUMMARY_GAP, TEXT_RAID, TEXT_RANK = "   ", "Raid %s", "Rank %d/%d"
@@ -801,7 +800,7 @@ local function FitColumns(pane, shown, plain)
     end
 end
 
-local function PaintPane(pane, session, first, shown, mode, available, extras)
+local function PaintPane(pane, session, first, shown, mode, unavailable, extras)
     local sources = session.combatSources
     local you, letters = S.Get("youLabel") == true, S.Get("nameMaxLetters")
     local classNames, classValues = S.Get("nameClassColor") == true, S.Get("valueClassColor") == true
@@ -811,7 +810,7 @@ local function PaintPane(pane, session, first, shown, mode, available, extras)
     local byTotal = S.Get("barScale") == "total"
     local f, showIcons = pane.f, pane.f.geo.showIcons
     local plain = true
-    pane.empty:SetText(session.emptyText or (available and TEXT_EMPTY or TEXT_UNAVAILABLE))
+    pane.empty:SetText(session.emptyText or unavailable or TEXT_EMPTY)
     pane.empty:SetShown(shown == 0)
     local pinned
     if S.Get("pinSelf") == true and shown >= 1 then
@@ -850,10 +849,10 @@ local function PaintPane(pane, session, first, shown, mode, available, extras)
     FitColumns(pane, shown, plain)
 end
 
-function Look.Paint(f, session, first, shown, mode, available, extras)
-    PaintPane(f.panes[1], session, first, shown, mode, available, extras)
+function Look.Paint(f, session, first, shown, mode, unavailable, extras)
+    PaintPane(f.panes[1], session, first, shown, mode, unavailable, extras)
 end
 
-function Look.PaintLower(f, session, first, shown, mode, available, extras)
-    PaintPane(f.panes[2], session, first, shown, mode, available, extras)
+function Look.PaintLower(f, session, first, shown, mode, unavailable, extras)
+    PaintPane(f.panes[2], session, first, shown, mode, unavailable, extras)
 end
