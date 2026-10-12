@@ -55,9 +55,21 @@ ns.DamageMeter.C = {
     RESET_ON_ORDER = { "never", "instance", "ask" },
     ICON_SIDES = { left = "Left", right = "Right" },
     ICON_SIDES_ORDER = { "left", "right" },
-    -- The look settings a second or third window may have of its own (barHeight2, barHeight3, ...).
+    -- The look settings a second or third window may have of its own (barHeight2, barHeight3, ...): first
+    -- the bars and the window, then the columns.
     OWN_LOOK_ORDER = { "barHeight", "barSpacing", "barAlpha", "growUp", "fontSize", "showIcons", "showRanks",
-        "showColumnHeaders", "showPercent", "backgroundAlpha", "headerAlpha", "showBorder", "barColor" },
+        "backgroundAlpha", "headerAlpha", "showBorder", "barColor", "showName", "showTotal", "showRate",
+        "showPercent", "showDivider", "columnOrder", "showColumnHeaders" },
+    OWN_LOOK_COLUMNS = { showName = true, showTotal = true, showRate = true, showPercent = true, showDivider = true,
+        columnOrder = true, showColumnHeaders = true },
+    -- Which way round the columns of figures go: each as the figure first and the share before, between or
+    -- after them. "auto" leads with the per-second figure in the lists that do, as the game's own meter does.
+    COLUMN_ORDERS = { auto = "As the Game Has It", ["total,rate,percent"] = "Total, Per Second, Share",
+        ["rate,total,percent"] = "Per Second, Total, Share", ["percent,total,rate"] = "Share, Total, Per Second",
+        ["percent,rate,total"] = "Share, Per Second, Total", ["total,percent,rate"] = "Total, Share, Per Second",
+        ["rate,percent,total"] = "Per Second, Share, Total" },
+    COLUMN_ORDERS_ORDER = { "auto", "total,rate,percent", "rate,total,percent", "percent,total,rate",
+        "percent,rate,total", "total,percent,rate", "rate,percent,total" },
     BAR_SCALES = { top = "Top Player", total = "List Total" },
     BAR_SCALES_ORDER = { "top", "total" },
     OWN_BAR_STYLES = { bar = "Same as Bar Color", class = "Class Color", custom = "Custom Color" },
@@ -111,7 +123,7 @@ for _, key in ipairs(ns.DamageMeter.C.OWN_LOOK_ORDER) do ns.DamageMeter.C.OWN_LO
 do
     local C = ns.DamageMeter.C
     C.LOOK_KEYS = { "barHeight", "barSpacing", "growUp", "reverseFill", "barScale", "showName", "showTotal", "showRate",
-        "showPercent", "showDivider", "showIcons", "showRanks", "highlightPlayer", "pinSelf", "barColor", "barAlpha",
+        "showPercent", "showDivider", "columnOrder", "showIcons", "showRanks", "highlightPlayer", "pinSelf", "barColor", "barAlpha",
         "backgroundAlpha", "fontSize", "font", "outline", "texture", "showBorder", "iconStyle", "showColumnHeaders",
         "numberUnits", "numberDecimals", "nameFormat", "showSummary", "summaryName", "summaryTotal", "summaryRate",
         "summaryRank", "summarySize", "shortNames", "titleSize", "timeSize", "showTime",

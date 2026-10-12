@@ -38,6 +38,7 @@ local function Region(kind, parent)
     function r:SetFrameStrata(v) self.strata = v end
     function r:SetScale(v) self.scale = v end
     function r:SetReverseFill(v) self.reverse = v end
+    function r:SetWordWrap(v) self.wrap = v end
     function r:IsMouseOver() return self.mouseOver == true end
     function r:GetAlpha() return self.alpha end
     function r:GetScale() return self.scale or 1 end
@@ -2689,12 +2690,17 @@ do
     -- the page
     local card, other = CardOf(s.page, "look2"), CardOf(s.page, "look3")
     check("a card for each, with a switch of its own", card and other and card.switch == "ownLook2"
-        and other.switch == "ownLook3" and #card.rows == 13 and #other.rows == 13)
+        and other.switch == "ownLook3" and #card.rows == 11 and #other.rows == 11)
     local got = {}
     for _, row in ipairs(card.rows) do got[#got + 1] = row.key end
     check("with the settings a window may have", table.concat(got, ",") == "barHeight2,barSpacing2,barAlpha2,growUp2,"
-        .. "fontSize2,showIcons2,showRanks2,showColumnHeaders2,showPercent2,backgroundAlpha2,headerAlpha2,showBorder2,"
-        .. "barColor2")
+        .. "fontSize2,showIcons2,showRanks2,backgroundAlpha2,headerAlpha2,showBorder2,barColor2")
+    local columns = CardOf(s.page, "columns2")
+    got = {}
+    for _, row in ipairs(columns.rows) do got[#got + 1] = row.key end
+    check("and a card for its columns, with the same switch", columns.switch == "ownLook2" and table.concat(got, ",")
+        == "showName2,showTotal2,showRate2,showPercent2,showDivider2,columnOrder2,showColumnHeaders2"
+        and CardOf(s.page, "columns3").switch == "ownLook3")
     check("their summaries", card.summary(s.store) == "Rows 20 px, text 11" and other.summary(s.store) == "Same as the first")
     s.store.Set("ownLook3", true)
     check("a third one's own", s.store.Get("barHeight3") == 20 and other.summary(s.store) == "Rows 20 px, text 11")
@@ -3638,7 +3644,8 @@ do
     check("a figure that is not plain has no share", w.rows[2].colP.text == "")
     check("the other columns move left of it, and the name makes room", w.rows[1].colB.points[1][2] == w.rows[1].colP
         and w.rows[1].colB.points[1][4] == -6 and w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 6 + 6 + 40 + 6))
-    check("the titles too", w.panes[1].headB.points[1][2] == w.panes[1].headP)
+    check("the titles too: each at the right end of its column", w.panes[1].headP.points[1][4] == -12
+        and w.panes[1].headB.points[1][4] == -(12 + 40 + 6) and w.panes[1].headA.points[1][4] == -(12 + 40 + 6 + 47 + 6))
     s.store.Set("showTotal", false); s.store.Set("showRate", false); s.Flush()
     check("alone: the name's room is the share's", w.rows[1].colP.shown == true and w.rows[1].colA.shown == false
         and w.rows[1].colB.shown == false and w.rows[1].name.points[2][2] == -(6 + 40 + 6))
@@ -3760,6 +3767,94 @@ do
     check("the rows start under the title bar, with nothing between", w.rows[1].points[1][5] == -26 - 6)
 end
 
+-- the column titles on one line as wide as their words, and the order of the columns, per window
+do
+    local s = Boot({ settings = { enabled = true, showPercent = true } })
+    s.session.totalAmount = 400
+    s.session.combatSources[1].totalAmount = 100
+    s.Login()
+    local w = s.Window()
+    local pane = w.panes[1]
+    local row = w.rows[1]
+    check("the titles take no width of their own, nor wrap, so that a long one is neither cut nor lowered",
+        pane.headA.w == 0 and pane.headB.w == 0 and pane.headP.w == 0 and pane.headA.wrap == false
+        and pane.headB.wrap == false and pane.headP.wrap == false and pane.headName.wrap == false)
+    check("nor do the figures wrap", row.colA.wrap == false and row.colB.wrap == false and row.colP.wrap == false)
+    check("the titles on one line, at the right end of their columns", pane.headA.points[1][5] == pane.headB.points[1][5]
+        and pane.headB.points[1][5] == pane.headP.points[1][5] and pane.headB.points[1][5] == pane.headName.points[1][5]
+        and pane.headP.points[1][4] == -12 and pane.headB.points[1][4] == -(12 + 40 + 6)
+        and pane.headA.points[1][4] == -(12 + 40 + 6 + 47 + 6))
+
+    check("the usual order: the total, the per-second figure, the share", s.store.Get("columnOrder") == "auto"
+        and row.colA.text == "<100>" and row.colB.text == "<a>" and row.colB.points[1][2] == row.colP
+        and row.colA.points[1][2] == row.colB)
+
+    -- the share first
+    s.store.Set("columnOrder", "percent,total,rate"); s.Flush()
+    check("the share first: the figures at the right end, the share left of them", row.colB.points[1][2] == -6
+        and row.colA.points[1][2] == row.colB and row.colP.points[1][2] == row.colA
+        and row.name.points[2][2] == -(6 + 47 + 6 + 47 + 6 + 40 + 6))
+    check("and its title", pane.headB.points[1][4] == -12 and pane.headA.points[1][4] == -(12 + 47 + 6)
+        and pane.headP.points[1][4] == -(12 + 47 + 6 + 47 + 6))
+    -- the share between
+    s.store.Set("columnOrder", "total,percent,rate"); s.Flush()
+    check("the share between: the second figure at the end, the share, the first", row.colB.points[1][2] == -6
+        and row.colP.points[1][2] == row.colB and row.colA.points[1][2] == row.colP)
+    check("and its titles", pane.headB.points[1][4] == -12 and pane.headP.points[1][4] == -(12 + 47 + 6)
+        and pane.headA.points[1][4] == -(12 + 47 + 6 + 40 + 6))
+    -- the figures the other way round
+    s.store.Set("columnOrder", "rate,total,percent"); s.Flush()
+    check("the per-second figure first", row.colA.text == "<a>" and row.colB.text == "<100>"
+        and pane.headA.text == "DPS" and pane.headB.text == "Damage")
+    s.store.Set("columnOrder", "total,rate,percent"); s.Flush()
+    check("and the total first", row.colA.text == "<100>" and row.colB.text == "<a>")
+    -- the lists that lead with the per-second figure, unless the order says
+    s.store.Set("columnOrder", "auto"); s.store.Set("mode", "dps"); s.Flush()
+    check("the DPS list leads with its own, as the game's meter does", row.colA.text == "<a>" and row.colB.text == "<100>")
+    s.store.Set("columnOrder", "total,rate,percent"); s.Flush()
+    check("unless the order says the total", row.colA.text == "<100>" and row.colB.text == "<a>")
+    s.store.Set("columnOrder", "auto"); s.store.Set("mode", "damage")
+
+    -- with one figure, and with the divider
+    s.store.Set("showRate", false); s.store.Set("columnOrder", "percent,total,rate"); s.Flush()
+    check("one figure and the share first: the share, then the figure at the end", row.colB.points[1][2] == -6
+        and row.colP.points[1][2] == row.colB and row.colA.shown == false)
+    s.store.Set("columnOrder", "total,percent,rate"); s.Flush()
+    check("the share between one figure: after it", row.colB.points[1][2] == row.colP and row.colP.points[1][2] == -6)
+    s.store.Set("showRate", true); s.store.Set("showDivider", true); s.store.Set("columnOrder", "percent,total,rate")
+    s.Flush()
+    check("the divider with the share first: the two figures as one, the share left of it", row.colB.text == "<100> | <a>"
+        and row.colB.points[1][2] == -6 and row.colP.points[1][2] == row.colB and row.colA.shown == false)
+    s.store.Set("showDivider", false); s.store.Set("columnOrder", "auto")
+
+    local order = RowOf(s.page, "columnOrder")
+    check("the order is a choice of seven, as the game has it first", order.choice[2][1] == "auto" and #order.choice[2] == 7
+        and order.choice[1]["percent,total,rate"] == "Share, Total, Per Second")
+
+    -- a window's own
+    local t = Boot({ settings = { enabled = true, window2 = true } })
+    t.session.combatSources[1].totalAmount = 100
+    t.Login()
+    local one, two = t.Window(), t.Window(2)
+    t.store.Set("ownLook2", true); t.Flush()
+    t.store.Set("columnOrder2", "rate,total,percent"); t.store.Set("showPercent2", true)
+    t.store.Set("showName2", false); t.store.Set("showColumnHeaders2", false); t.Flush()
+    check("the second window has its columns its own way", two.rows[1].colA.text == "<a>" and two.rows[1].colB.text == "<100>"
+        and two.rows[1].colP.shown == true and two.rows[1].name.shown == false and two.panes[1].headName.shown == false)
+    check("and the first as it was", one.rows[1].colA.text == "<100>" and one.rows[1].colB.text == "<a>"
+        and one.rows[1].colP.shown == false and one.rows[1].name.shown == true and one.panes[1].headName.shown == true)
+    t.store.Set("showTotal2", false); t.store.Set("showRate2", true); t.Flush()
+    check("one figure there", two.rows[1].colA.shown == false and two.rows[1].colB.text == "<a>"
+        and one.rows[1].colA.shown == true)
+    t.store.Set("showTotal2", true); t.store.Set("showRate2", false); t.Flush()
+    check("the per-second figure off there only", two.rows[1].colB.text == "<100>" and two.rows[1].colA.shown == false
+        and one.rows[1].colA.shown == true and one.rows[1].colB.text == "<a>")
+    t.store.Set("showRate2", true)
+    t.store.Set("showDivider2", true); t.store.Set("showTotal2", true); t.Flush()
+    check("a divider there only", two.rows[1].colB.text:find(" | ", 1, true) ~= nil
+        and one.rows[1].colB.text == "<a>")
+end
+
 -- a bar between the figures: one text for the total and the per-second figure
 do
     local s = Boot({ settings = { enabled = true } })
@@ -3772,8 +3867,8 @@ do
         and w.rows[1].colA.shown == false and w.rows[1].colB.shown == true)
     check("wide enough for both and the bar, and the name leaves room for it", w.rows[1].colB.w == 2 * 47 + 20
         and w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 20 + 6))
-    check("one title over it", w.panes[1].headB.text == "Damage | DPS" and w.panes[1].headA.shown == false
-        and w.panes[1].headB.w == 2 * 47 + 20)
+    check("one title over it, at the right end", w.panes[1].headB.text == "Damage | DPS"
+        and w.panes[1].headA.shown == false and w.panes[1].headB.points[1][4] == -12)
     s.store.Set("showPercent", true); s.Flush()
     check("with the share, left of it", w.rows[1].colB.points[1][2] == w.rows[1].colP)
     s.store.Set("showPercent", false)
@@ -3783,7 +3878,7 @@ do
     s.store.Set("mode", "damage")
     s.store.Set("showRate", false); s.Flush()
     check("one figure only: nothing to divide, and the column its own width again", w.rows[1].colB.text == "<A>"
-        and w.panes[1].headB.text == "Damage" and w.rows[1].colB.w == 47 and w.panes[1].headB.w == 47
+        and w.panes[1].headB.text == "Damage" and w.rows[1].colB.w == 47 and w.panes[1].headB.points[1][4] == -12
         and w.rows[1].name.points[2][2] == -(6 + 47 + 6))
     local row = RowOf(s.page, "showDivider")
     check("the setting waits for both figures, and says so", row.needs() == false
@@ -3808,9 +3903,9 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("twenty-two cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,spacing,numbers,header,"
-        .. "summary,time,text,hover,history,data,looks,barColors,textColors,windowColors,classColors,window2,look2,"
-        .. "window3,look3"
+    check("twenty-five cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,spacing,numbers,names,"
+        .. "header,summary,time,text,hover,history,data,looks,barColors,textColors,windowColors,classColors,window2,"
+        .. "look2,columns2,window3,look3,columns3"
         and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end
@@ -3869,7 +3964,8 @@ do
     check("Window, locked", CardOf(page, "window").summary(s.store) == "300 by 206, locked")
     s.store.Set("locked", false)
     check("Rows", CardOf(page, "rows").summary(s.store) == "20 px rows, 2 px apart")
-    check("Numbers and Names", CardOf(page, "numbers").summary(s.store) == "Game Default, Full Name")
+    check("Numbers and Names", CardOf(page, "numbers").summary(s.store) == "Game Default, As the Game Has It")
+    check("Names", CardOf(page, "names").summary(s.store) == "Full Name")
     check("Title Bar", CardOf(page, "header").summary(s.store) == "List Name, buttons on")
     s.store.Set("showButtons", false)
     check("Title Bar, no buttons", CardOf(page, "header").summary(s.store) == "List Name, buttons off")

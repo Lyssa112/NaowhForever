@@ -68,6 +68,7 @@ local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "cl
 local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
 local BAR_SCALE = { C.BAR_SCALES, C.BAR_SCALES_ORDER }
+local COLUMN_ORDER = { C.COLUMN_ORDERS, C.COLUMN_ORDERS_ORDER }
 local ICON_SIDE = { C.ICON_SIDES, C.ICON_SIDES_ORDER }
 local TITLE_TEXT = { C.TITLE_TEXTS, C.TITLE_TEXTS_ORDER }
 
@@ -132,7 +133,11 @@ local function RowsSummary(store)
 end
 
 local function NumbersSummary(store)
-    return ("%s, %s"):format(C.NUMBER_UNITS[store.Get("numberUnits")] or "", C.NAME_FORMATS[store.Get("nameFormat")] or "")
+    return ("%s, %s"):format(C.NUMBER_UNITS[store.Get("numberUnits")] or "", C.COLUMN_ORDERS[store.Get("columnOrder")] or "")
+end
+
+local function NamesSummary(store)
+    return C.NAME_FORMATS[store.Get("nameFormat")] or ""
 end
 
 -- The settings that leave only the title and the bars: no titles over the columns, no buttons, no rank
@@ -491,6 +496,9 @@ page:Card({
         { key = "showPercent", label = "Show Percent", toggle = true, needs = Enabled, why = OFF,
           help = "Each one's share of what the list totals, in a column of its own. The game hides the figures "
               .. "in combat, so it fills in after the fight." },
+        { key = "columnOrder", label = "Column Order", choice = COLUMN_ORDER, needs = Enabled, why = OFF,
+          help = "Which way round the figures go, and where the share stands. As the Game Has It leads with "
+              .. "the per-second figure in the DPS and HPS lists." },
         Group("Writing"),
         { key = "numberUnits", label = "Number Format", choice = NUMBER_UNITS, needs = Enabled, why = OFF,
           help = "How big numbers are written. Ten-thousands groups by ten-thousands and hundred-millions." },
@@ -500,7 +508,14 @@ page:Card({
           why = OFF },
         { key = "rateSuffix", label = "Per-Second Suffix", toggle = true, needs = Enabled, why = OFF,
           help = "Writes the per-second figure with /s after it." },
-        Group("Names"),
+    },
+})
+
+page:Card({
+    id = "names", name = "Names", order = 41,
+    help = "How a player's name is written, and how long.",
+    summary = NamesSummary,
+    rows = {
         { key = "nameFormat", label = "Name Format", choice = NAME_FORMAT, needs = Enabled, why = OFF,
           help = "How a player's name is written. In combat the game hides other players' names, so those "
               .. "are found by class and left whole when two players share one." },
@@ -776,7 +791,7 @@ page:Card({
 
 -- The rows of a window's own look: the settings of the Rows, Window and Title Bar cards that it may have
 -- of its own, under its number.
-local function OwnLookRows(index)
+local function OwnLookRows(index, columns)
     local specs = {
         barHeight = { label = "Row Height", slider = BAR_RANGE },
         barSpacing = { label = "Row Spacing", slider = SPACING_RANGE },
@@ -785,18 +800,25 @@ local function OwnLookRows(index)
         fontSize = { label = "Text Size", slider = TEXT_RANGE },
         showIcons = { label = "Icons", toggle = true },
         showRanks = { label = "Rank Numbers", toggle = true },
-        showColumnHeaders = { label = "Column Titles", toggle = true },
-        showPercent = { label = "Show Percent", toggle = true },
         backgroundAlpha = { label = "Window Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION },
         headerAlpha = { label = "Title Bar Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION },
         showBorder = { label = "Border", toggle = true },
         barColor = { label = "Bar Color", choice = BAR_COLOR },
+        showName = { label = "Show Name", toggle = true },
+        showTotal = { label = "Show Total", toggle = true },
+        showRate = { label = "Show Per Second", toggle = true },
+        showPercent = { label = "Show Percent", toggle = true },
+        showDivider = { label = "Column Divider", toggle = true },
+        columnOrder = { label = "Column Order", choice = COLUMN_ORDER },
+        showColumnHeaders = { label = "Column Titles", toggle = true },
     }
     local rows = {}
     for _, key in ipairs(C.OWN_LOOK_ORDER) do
-        local row = { key = key .. index, needs = Enabled, why = OFF }
-        for field, value in pairs(specs[key]) do row[field] = value end
-        rows[#rows + 1] = row
+        if (C.OWN_LOOK_COLUMNS[key] == true) == columns then
+            local row = { key = key .. index, needs = Enabled, why = OFF }
+            for field, value in pairs(specs[key]) do row[field] = value end
+            rows[#rows + 1] = row
+        end
     end
     return rows
 end
@@ -808,11 +830,25 @@ local function OwnLookSummary(index)
     end
 end
 
+local function OwnColumnsSummary(index)
+    return function(store)
+        if not store.Get("ownLook" .. index) then return "Same as the first" end
+        return C.COLUMN_ORDERS[store.Get("columnOrder" .. index)] or ""
+    end
+end
+
 page:Card({
     id = "look2", name = "Second Window Look", order = 131, switch = "ownLook2",
     help = "Its own row height, text size, opacities and more. Off: it looks as the first window does.",
     summary = OwnLookSummary(2),
-    rows = OwnLookRows(2),
+    rows = OwnLookRows(2, false),
+})
+
+page:Card({
+    id = "columns2", name = "Second Window Columns", order = 132, switch = "ownLook2",
+    help = "What it shows in a row and which way round. Off: as the first window does.",
+    summary = OwnColumnsSummary(2),
+    rows = OwnLookRows(2, true),
 })
 
 page:Card({
@@ -834,5 +870,13 @@ page:Card({
     id = "look3", name = "Third Window Look", order = 141, switch = "ownLook3",
     help = "Its own row height, text size, opacities and more. Off: it looks as the first window does.",
     summary = OwnLookSummary(3),
-    rows = OwnLookRows(3),
+    rows = OwnLookRows(3, false),
 })
+
+page:Card({
+    id = "columns3", name = "Third Window Columns", order = 142, switch = "ownLook3",
+    help = "What it shows in a row and which way round. Off: as the first window does.",
+    summary = OwnColumnsSummary(3),
+    rows = OwnLookRows(3, true),
+})
+

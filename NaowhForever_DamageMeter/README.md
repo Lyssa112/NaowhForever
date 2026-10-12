@@ -31,7 +31,7 @@ NaowhForever_DamageMeter/
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
-    SettingsPage.lua             its settings page: twenty-two small cards
+    SettingsPage.lua             its settings page: twenty-five small cards
   README.md                      this file
 ```
 
@@ -90,6 +90,14 @@ NaowhForever_DamageMeter/
 - Show Name hides the name of every row of a list (`row.name:SetShown`, and the Name title over it), so
   a row can be only its bar, icon and figures. A breakdown keeps the names of its spells, which are what
   its rows are about.
+- The columns of figures are three cells of a row, in one order that is a setting (Column Order, per window
+  with its own look): A the first figure, B the second (or the only one, or both with the divider), P the
+  share, which stands before them, between them or after them. They are anchored from the right end, each
+  to the left of the one after it, and the name runs to the first. The column titles are put by number at
+  the right end of their columns, take the width of their words and do not wrap, which is what keeps a
+  long one (a wide font, a big text size) from being cut short and lowered a line, as a title with a width
+  of its own and wrapping on was. The DPS and HPS lists lead with the per-second figure unless the order
+  says which way round.
 - A look is the visual settings (`DM.C.LOOK_KEYS`: not places, lists, rules or behaviour). Looks are kept
   on the account by name (`damageMeterLooks`, twelve at most), applied key by key with `DM.ApplyLook`, and
   written as one line, `NFDM1|key=value|...`, each value with its kind in front (`n` number, `b` boolean,
@@ -97,9 +105,10 @@ NaowhForever_DamageMeter/
   escaped. A text is read key by key: a key that is not a look's, or a value that is not of its kind
   (a color outside 0 to 1, a number out of range, a string for a number), is left out and the rest is
   taken. Copy to Other Windows turns the second and third windows' own looks on, from the first.
-- A second or third window may have a look of its own (`ownLook2`, `ownLook3`): thirteen of the look
+- A second or third window may have a look of its own (`ownLook2`, `ownLook3`): eighteen of the look
   settings (`DM.C.OWN_LOOK_ORDER`: row height and spacing, bar opacity and color, grow direction, text
-  size, icons, ranks, column titles, share, window and title bar opacity, border) have a copy under the
+  size, icons, ranks, window and title bar opacity, border, and the columns: name, total, per second,
+  share, divider, order and their titles; two cards each) have a copy under the
   window's number (`barHeight2`). `DM.Setting(index, key)` reads a look setting for a window, which is the
   copy when the window has its own look and the shared one otherwise, and `DM.LookKey` is the key to
   write, which the window menu's Bar Color uses. Turning a window's look on copies the shared values into

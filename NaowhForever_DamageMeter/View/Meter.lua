@@ -114,13 +114,13 @@ end
 local function NewPane(f, n)
     local pane = { f = f, n = n, rows = {}, cols = {}, columns = 0, valueWidth = 0, top = 0 }
     pane.headName = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
-    pane.headName:SetJustifyH("LEFT"); pane.headName:SetText(TEXT_NAME_HEAD)
+    pane.headName:SetJustifyH("LEFT"); pane.headName:SetWordWrap(false); pane.headName:SetText(TEXT_NAME_HEAD)
     pane.headA = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
-    pane.headA:SetJustifyH("RIGHT")
+    pane.headA:SetJustifyH("RIGHT"); pane.headA:SetWordWrap(false)
     pane.headB = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
-    pane.headB:SetJustifyH("RIGHT")
+    pane.headB:SetJustifyH("RIGHT"); pane.headB:SetWordWrap(false)
     pane.headP = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
-    pane.headP:SetJustifyH("RIGHT")
+    pane.headP:SetJustifyH("RIGHT"); pane.headP:SetWordWrap(false)
     pane.empty = ns.Font(f, EMPTY_SIZE, "OUTLINE", T.muted)
     return pane
 end
@@ -178,11 +178,11 @@ function Look.Row(pane, i)
     row.rank = ns.Font(row, RANK_SIZE, "OUTLINE", T.muted)
     row.icon = row:CreateTexture(nil, "OVERLAY")
     row.colA = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
-    row.colA:SetJustifyH("RIGHT")
+    row.colA:SetJustifyH("RIGHT"); row.colA:SetWordWrap(false)
     row.colB = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
-    row.colB:SetJustifyH("RIGHT")
+    row.colB:SetJustifyH("RIGHT"); row.colB:SetWordWrap(false)
     row.colP = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
-    row.colP:SetJustifyH("RIGHT")
+    row.colP:SetJustifyH("RIGHT"); row.colP:SetWordWrap(false)
     row.name = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
     row.name:SetJustifyH("LEFT"); row.name:SetWordWrap(false)
     pane.rows[i] = row
@@ -194,20 +194,53 @@ function Look.Capacity(h, bh, gap, top)
     return math.max(1, math.floor((h - (top or HEADER) - 2 * INSET + gap) / (bh + gap)))
 end
 
--- The kinds of value the pane's two columns show, left to right: "total", "rate" or nil. One column is
--- the right one; the DPS and HPS lists lead with the per-second figure.
+-- The kinds of value the pane's two figure columns show, left to right: "total", "rate" or nil (one
+-- column is the right one), and whether the share is shown and where. The DPS and HPS lists lead with the
+-- per-second figure, as the game's meter does, unless the order says which way round.
+local ORDERS = {
+    ["total,rate,percent"] = { rateFirst = false, percent = "last" },
+    ["rate,total,percent"] = { rateFirst = true, percent = "last" },
+    ["percent,total,rate"] = { rateFirst = false, percent = "first" },
+    ["percent,rate,total"] = { rateFirst = true, percent = "first" },
+    ["total,percent,rate"] = { rateFirst = false, percent = "middle" },
+    ["rate,percent,total"] = { rateFirst = true, percent = "middle" },
+}
+
 local function Columns(pane, mode)
-    local total, rate = S.Get("showTotal"), S.Get("showRate") and mode.rate
+    local index = pane.f.index
+    local order = ORDERS[DM.Setting(index, "columnOrder")]
+    local total, rate = DM.Setting(index, "showTotal"), DM.Setting(index, "showRate") and mode.rate
     local first, second = "total", "rate"
-    if mode.rateFirst then first, second = "rate", "total" end
+    if (order and order.rateFirst) or (not order and mode.rateFirst) then first, second = "rate", "total" end
     local a, b = first, second
     if (first == "total" and not total) or (first == "rate" and not rate) then a = nil end
     if (second == "total" and not total) or (second == "rate" and not rate) then b = nil end
     if a and not b then a, b = nil, a end
     pane.cols.a, pane.cols.b = a, b
-    pane.cols.p = DM.Setting(pane.f.index, "showPercent") == true and mode.percent ~= false
-    pane.cols.merged = a ~= nil and b ~= nil and S.Get("showDivider") == true
+    pane.cols.p = DM.Setting(index, "showPercent") == true and mode.percent ~= false
+    pane.cols.percentAt = order and order.percent or "last"
+    pane.cols.merged = a ~= nil and b ~= nil and DM.Setting(index, "showDivider") == true
     return a, b
+end
+
+-- The cells of a pane that are in use, left to right: A the first figure, B the second (or the only one,
+-- or the two together with a divider), P the share, which stands before them, between them or after them.
+local function CellsOf(pane)
+    local cells = {}
+    local a, b, p, at = pane.cols.a, pane.cols.b, pane.cols.p, pane.cols.percentAt
+    local both = a ~= nil and b ~= nil
+    if p and at == "first" then cells[#cells + 1] = "P" end
+    if a and not pane.cols.merged then cells[#cells + 1] = "A" end
+    if p and at == "middle" and both then cells[#cells + 1] = "P" end
+    if b then cells[#cells + 1] = "B" end
+    if p and (at == "last" or (at == "middle" and not both)) then cells[#cells + 1] = "P" end
+    return cells
+end
+
+local function CellWidth(g, pane, cell)
+    if cell == "P" then return g.pctWidth end
+    if cell == "B" and pane.cols.merged then return g.mergedWidth end
+    return g.colWidth
 end
 
 local function ColumnTitle(mode, kind)
@@ -244,19 +277,21 @@ local function LayRow(row, pane, i, g)
         row.icon:SetPoint("LEFT", left, 0)
         if g.showIcons then left = left + g.iconSize + g.iconGap end
     end
-    row.colP:ClearAllPoints(); row.colP:SetPoint("RIGHT", -g.rightInset, 0); row.colP:SetWidth(g.pctWidth)
-    row.colP:SetShown(pane.percent)
     row.colP:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
-    row.colB:ClearAllPoints()
-    if pane.percent then
-        row.colB:SetPoint("RIGHT", row.colP, "LEFT", -g.colGap, 0)
-    else
-        row.colB:SetPoint("RIGHT", -g.rightInset, 0)
+    row.colA:SetShown(false); row.colB:SetShown(false); row.colP:SetShown(false)
+    local after
+    for k = #pane.cells, 1, -1 do
+        local cell = row["col" .. pane.cells[k]]
+        cell:ClearAllPoints()
+        if after then
+            cell:SetPoint("RIGHT", after, "LEFT", -g.colGap, 0)
+        else
+            cell:SetPoint("RIGHT", -g.rightInset, 0)
+        end
+        cell:SetWidth(CellWidth(g, pane, pane.cells[k]))
+        cell:SetShown(true)
+        after = cell
     end
-    row.colB:SetWidth(pane.merged and g.mergedWidth or g.colWidth)
-    row.colB:SetShown(pane.columns >= 1)
-    row.colA:ClearAllPoints(); row.colA:SetPoint("RIGHT", row.colB, "LEFT", -g.colGap, 0); row.colA:SetWidth(g.colWidth)
-    row.colA:SetShown(pane.columns == 2)
     row.name:SetShown(g.showName)
     row.name:ClearAllPoints(); row.name:SetPoint("LEFT", left, 0)
     row.name:SetPoint("RIGHT", -g.rightInset - pane.valueWidth - NAME_GAP, 0)
@@ -267,26 +302,24 @@ local function LayRow(row, pane, i, g)
     Parts.HudFont(row.colP, g.font, g.valueSize, g.outline)
 end
 
--- The column titles above a pane's rows at y: Name, and a title over each value column.
+-- The column titles above a pane's rows at y: Name, and a title over each value column. A title is put
+-- by its right end, at the right end of its column, and is as wide as its words, so that a long one is
+-- not cut and sits on the line of the others.
 local function LayHeads(pane, g, y)
     local f = pane.f
     local show = g.showHead
     pane.headName:SetShown(show and g.showName)
-    pane.headA:SetShown(show and pane.columns == 2)
-    pane.headB:SetShown(show and pane.columns >= 1)
-    pane.headP:SetShown(show and pane.percent)
+    pane.headA:SetShown(false); pane.headB:SetShown(false); pane.headP:SetShown(false)
     if not show then return end
-    pane.headP:ClearAllPoints(); pane.headP:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + g.rightInset), y)
-    pane.headP:SetWidth(g.pctWidth)
-    pane.headB:ClearAllPoints()
-    if pane.percent then
-        pane.headB:SetPoint("TOPRIGHT", pane.headP, "TOPLEFT", -g.colGap, 0)
-    else
-        pane.headB:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + g.rightInset), y)
+    local edge = -(INSET + g.rightInset)
+    for k = #pane.cells, 1, -1 do
+        local cell = pane.cells[k]
+        local fs = pane["head" .. cell]
+        fs:ClearAllPoints()
+        fs:SetPoint("TOPRIGHT", f, "TOPRIGHT", edge, y)
+        fs:SetShown(true)
+        edge = edge - CellWidth(g, pane, cell) - g.colGap
     end
-    pane.headB:SetWidth(pane.merged and g.mergedWidth or g.colWidth)
-    pane.headA:ClearAllPoints(); pane.headA:SetPoint("TOPRIGHT", pane.headB, "TOPLEFT", -g.colGap, 0)
-    pane.headA:SetWidth(g.colWidth)
     pane.headName:ClearAllPoints()
     pane.headName:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + g.textPad + (g.showRanks and g.rankWidth or 0), y)
     for _, fs in ipairs({ pane.headName, pane.headA, pane.headB, pane.headP }) do
@@ -361,20 +394,15 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     local a, b = Columns(pane, mode)
     pane.capacity = capacity
     pane.merged = pane.cols.merged == true
-    pane.columns = pane.merged and 1 or (a and 1 or 0) + (b and 1 or 0)
-    pane.percent = pane.cols.p == true
-    if pane.merged then
-        pane.valueWidth = g.mergedWidth
-    else
-        pane.valueWidth = pane.columns == 0 and 0 or pane.columns * g.colWidth + (pane.columns - 1) * g.colGap
-    end
-    if pane.percent then
-        pane.valueWidth = pane.valueWidth + (pane.columns > 0 and g.colGap or 0) + g.pctWidth
+    pane.cells = CellsOf(pane)
+    pane.valueWidth = 0
+    for k, cell in ipairs(pane.cells) do
+        pane.valueWidth = pane.valueWidth + CellWidth(g, pane, cell) + (k > 1 and g.colGap or 0)
     end
     first = math.max(0, math.min(first, total - capacity))
     local shown = math.min(total - first, capacity)
-    local paneKey = key .. "|" .. pane.columns .. "|" .. tostring(pane.percent) .. "|" .. tostring(pane.merged)
-        .. "|" .. capacity .. "|" .. pane.top
+    local paneKey = key .. "|" .. table.concat(pane.cells) .. "|" .. tostring(pane.merged) .. "|" .. capacity
+        .. "|" .. pane.top
     local fresh = pane.laidKey ~= paneKey
     if fresh then
         LayHeads(pane, g, headY)
@@ -433,7 +461,7 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.w, g.bh, g.gap, g.headTop, g.fontSize = w, bh, gap, headTop, fontSize
     g.showRanks = DM.Setting(f.index, "showRanks") and not f.detail
     g.showIcons, g.showHead = DM.Setting(f.index, "showIcons"), showHead
-    g.showName = S.Get("showName") ~= false or f.detail == true
+    g.showName = DM.Setting(f.index, "showName") ~= false or f.detail == true
     g.textPad, g.iconGap, g.edgeWidth, g.colGap = S.Get("textPad"), S.Get("iconGap"), S.Get("edgeWidth"), S.Get("colGap")
     g.iconSide, g.iconCrop = S.Get("iconSide"), S.Get("iconZoom") / 100
     local iconSetting = S.Get("iconSize")
