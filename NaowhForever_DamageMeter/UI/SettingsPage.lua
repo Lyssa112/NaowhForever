@@ -505,7 +505,8 @@ page:Card({
             { key = "iconGap", label = "Icon Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
               help = "The room between the icon and the name. None before the bar." } }),
         { key = "iconSize", label = "Icon Size", slider = ICON_SIZE_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "Zero fits the icon to the row, as tall as the bar when it stands before it." },
+          help = "Zero fits the icon to the row, as tall as the bar when it stands before it. A size of "
+              .. "your own may be taller than the row." },
         Under({ key = "showRanks", label = "Rank Numbers", toggle = true, needs = Enabled, why = OFF },
             "Rank Text", "The rank's size switch, font and color.",
             Join(TextRows("Rank", "rank", "Off: the usual size."), ColorRow("rankColor"))),

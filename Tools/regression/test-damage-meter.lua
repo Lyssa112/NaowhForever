@@ -2333,8 +2333,11 @@ do
     s.store.Set("iconSize", 12); s.Flush()
     check("Icon Size: that size, and the name after it", row.icon.w == 12 and row.icon.h == 12
         and row.name.points[1][2] == 6 + 18 + 12 + 5)
+    s.store.Set("iconSize", 30); s.Flush()
+    check("a size of its own may be taller than the row (20)", row.icon.w == 30 and row.icon.h == 30
+        and row.name.points[1][2] == 6 + 18 + 30 + 5)
     s.store.Set("iconSize", 100); s.Flush()
-    check("never taller than the row", row.icon.w == 20)
+    check("up to the most the slider has", row.icon.w == s.DM.C.MAX_ICON and row.icon.w == 40)
     s.store.Set("iconSize", 0)
     s.store.Set("iconGap", 10); s.Flush()
     check("Icon Gap", row.name.points[1][2] == 6 + 18 + 16 + 10)

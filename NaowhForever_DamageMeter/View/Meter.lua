@@ -515,9 +515,10 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.showIcons, g.showHead = DM.Setting(f.index, "showIcons"), showHead
     g.textPad, g.iconGap, g.edgeWidth, g.colGap = S.Get("textPad"), S.Get("iconGap"), S.Get("edgeWidth"), S.Get("colGap")
     g.iconSide, g.iconCrop = S.Get("iconSide"), S.Get("iconZoom") / 100
-    -- An icon before the bar is the bar's height and touches it: the rows start after it.
+    -- A size of its own is used as it is, even taller than the row. Fitted, an icon before the bar is the
+    -- bar's height and touches it: the rows start after it.
     local iconSetting, before = S.Get("iconSize"), g.iconSide == "before"
-    g.iconSize = iconSetting > 0 and math.min(iconSetting, bh)
+    g.iconSize = iconSetting > 0 and math.min(iconSetting, C.MAX_ICON)
         or math.min(ICON_MAX, before and bh or bh - ICON_PAD)
     g.iconOutside = g.showIcons and before and g.iconSize or 0
     g.rightInset = g.textPad
