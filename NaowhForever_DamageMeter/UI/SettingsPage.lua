@@ -127,7 +127,7 @@ local function HoverSummary(store)
 end
 
 local function HistorySummary(store)
-    return ("%d of %d fights kept"):format(#(store.Get("history") or {}), store.Get("keepFights"))
+    return ("%d of %d fights kept"):format(#DM.History.List(), store.Get("keepFights"))
 end
 
 local function BarColorsSummary(store)

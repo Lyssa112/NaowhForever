@@ -112,7 +112,7 @@ end
 
 -- Beside the settings window when it is open and there is room, so the two do not cover each other, and
 -- else in the middle of the screen. Where the player moved it to stays.
-local function Place()
+local function PlaceWindow()
     if frame.moved then return end
     frame:ClearAllPoints()
     local options = _G[OPTIONS_NAME]
@@ -187,7 +187,7 @@ function Window.Toggle()
     else
         offset = 0
         Paint()
-        Place()
+        PlaceWindow()
         frame:Show()
     end
 end

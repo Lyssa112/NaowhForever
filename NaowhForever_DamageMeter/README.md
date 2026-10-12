@@ -75,6 +75,10 @@ NaowhForever_DamageMeter/
   word with no spaces, such as a path: it is cut short, which is why the example lives in the dialog.
 - The media's own list has a None of its own, which is left out with the plain backgrounds since the
   page's Image already has one.
+- The fights kept are on the account under the character (`damageMeterFights`, by `UnitGUID("player")`),
+  not in the profile, so a profile that is switched, reset or imported does not take them and they are
+  not in the strings a profile is shared by. A list the profile kept before is moved to the first
+  character to ask for it, once. Fights Kept, which is a setting, trims it.
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.

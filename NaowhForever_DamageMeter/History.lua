@@ -13,6 +13,8 @@ local BOSS_AGE = 90
 local History = {}
 DM.History = History
 
+local KEPT_KEY, UNKNOWN_WHO = "damageMeterFights", "unknown"
+
 local waiting, tries, started
 local boss, bossAt
 
@@ -62,13 +64,45 @@ local function Snapshot()
     return { at = time(), place = Place(), boss = name, seconds = seconds, damage = damage, healing = healing }
 end
 
+-- The fights are kept on the account under the character, not in the profile: a profile that is changed,
+-- reset or imported does not take them, and they are not in the strings it is shared by.
+local function Kept()
+    local account = ns.AccountSettings()
+    local all = account[KEPT_KEY]
+    if type(all) ~= "table" then
+        all = {}
+        account[KEPT_KEY] = all
+    end
+    return all, UnitGUID("player") or UNKNOWN_WHO
+end
+
+-- The list the profile kept before, taken by the first character to ask, once.
+local function Adopt()
+    local old = S.Raw("history")
+    if type(old) ~= "table" then return {} end
+    S.Set("history", nil)
+    return old
+end
+
+-- This character's fights, newest first.
+function History.List()
+    local all, who = Kept()
+    local list = all[who]
+    if type(list) ~= "table" then
+        list = Adopt()
+        all[who] = list
+    end
+    return list
+end
+
 local function Keep(entry)
     local list = { entry }
-    for _, old in ipairs(S.Get("history") or {}) do
+    for _, old in ipairs(History.List()) do
         if #list >= S.Get("keepFights") then break end
         list[#list + 1] = old
     end
-    S.Set("history", list)
+    local all, who = Kept()
+    all[who] = list
     if History.OnChanged then History.OnChanged() end
 end
 
@@ -96,11 +130,8 @@ function History.Arm()
     C_Timer.After(FIRST_TRY, Try)
 end
 
-function History.List()
-    return S.Get("history") or {}
-end
-
 function History.Clear()
-    S.Set("history", {})
+    local all, who = Kept()
+    all[who] = {}
     if History.OnChanged then History.OnChanged() end
 end

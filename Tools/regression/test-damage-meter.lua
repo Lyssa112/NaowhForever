@@ -216,7 +216,7 @@ local function Boot(opts)
         IsInGuild = function() return s.guild == true end,
         IsInInstance = function() return s.instance == true end,
         LE_PARTY_CATEGORY_INSTANCE = 2,
-        UnitGUID = function(unit) if unit == "player" then return "Player-1" end end,
+        UnitGUID = function(unit) if unit == "player" then return s.playerGUID or "Player-1" end end,
         UnitName = function(unit)
             if unit == "player" then return s.ownName or "You", s.ownSurname end
             local u = s.units and s.units[unit]
@@ -1153,7 +1153,7 @@ do
     end
     check("a read is scheduled for just after combat ends", scheduled)
     s.Flush(); s.Flush()
-    local list = s.store.Get("history")
+    local list = s.DM.History.List()
     local e = list[1]
     check("the fight is kept: when, where, which, how long", #list == 1 and e.at == 1700000500 and e.place == "Plains"
         and e.boss == "The Hollow King" and e.seconds == 125)
@@ -1166,29 +1166,29 @@ do
     End(s)
     s.apiResult = Fight(nil, true)
     s.Flush()
-    check("a secret total is not kept, and is read again", #s.store.Get("history") == 1 and #s.timers >= 1)
+    check("a secret total is not kept, and is read again", #s.DM.History.List() == 1 and #s.timers >= 1)
     s.apiResult = Fight(4000)
     s.Flush(); s.Flush()
-    local again = s.store.Get("history")
+    local again = s.DM.History.List()
     check("kept once it is plain, newest first, no boss from the last fight", #again == 2 and again[1].damage.total == 4000
         and again[1].boss == nil and again[2].boss == "The Hollow King")
 
     -- a length or your own figures still secret
-    local before = #s.store.Get("history")
+    local before = #s.DM.History.List()
     s.duration = SECRET_NUMBER
     s.apiResult = Fight(5000)
     End(s)
     s.Flush()
-    check("a length the game keeps back is waited for", #s.store.Get("history") == before and #s.timers >= 1)
+    check("a length the game keeps back is waited for", #s.DM.History.List() == before and #s.timers >= 1)
     s.duration = 125
     local mine = Fight(5000)
     mine.combatSources[2].totalAmount = SECRET_NUMBER
     s.apiResult = mine
     s.Flush()
-    check("as are your own figures", #s.store.Get("history") == before and #s.timers >= 1)
+    check("as are your own figures", #s.DM.History.List() == before and #s.timers >= 1)
     mine.combatSources[2].totalAmount = 5000
     s.Flush(); s.Flush()
-    check("both kept once they are plain", #s.store.Get("history") == before + 1)
+    check("both kept once they are plain", #s.DM.History.List() == before + 1)
 
     -- combat begins while it waits for plain numbers
     s.apiResult = Fight(nil, true)
@@ -1196,36 +1196,36 @@ do
     s.apiResult = Fight(5100)
     s.Fire("PLAYER_REGEN_DISABLED")
     s.Flush(); s.Flush()
-    check("a fight that begins drops the read of the last", #s.store.Get("history") == before + 1)
+    check("a fight that begins drops the read of the last", #s.DM.History.List() == before + 1)
     s.combat = false
     s.Fire("PLAYER_REGEN_ENABLED")
     s.Flush(); s.Flush()
-    check("and the one that ends is read as its own", #s.store.Get("history") == before + 2)
+    check("and the one that ends is read as its own", #s.DM.History.List() == before + 2)
 
     -- an end of combat that was never a start
     s.Fire("PLAYER_REGEN_ENABLED")
     s.Flush(); s.Flush()
-    check("an end with no start is not read", #s.store.Get("history") == before + 2)
+    check("an end with no start is not read", #s.DM.History.List() == before + 2)
 
     -- a name the game keeps back is not used
     s.now = 5000
     s.Fire("ENCOUNTER_END", 1, SECRET_TEXT)
     End(s)
     s.Flush(); s.Flush()
-    check("an encounter name that is secret is not kept as the boss", s.store.Get("history")[1].boss == nil)
+    check("an encounter name that is secret is not kept as the boss", s.DM.History.List()[1].boss == nil)
 
     -- a fight that is too short
     s.duration = 3
     End(s)
     s.Flush(); s.Flush()
-    check("a fight under five seconds is not kept", #s.store.Get("history") == 5)
+    check("a fight under five seconds is not kept", #s.DM.History.List() == 5)
     s.duration = 125
 
     -- the game never gives plain numbers: give up
     s.apiResult = Fight(nil, true)
     End(s)
     for _ = 1, 12 do s.Flush() end
-    check("it gives up after a few tries, and keeps nothing", #s.store.Get("history") == 5 and #s.timers == 0)
+    check("it gives up after a few tries, and keeps nothing", #s.DM.History.List() == 5 and #s.timers == 0)
 
     -- the next fight starts while it waits
     End(s)
@@ -1233,7 +1233,7 @@ do
     s.Flush()
     s.apiResult = Fight(7000)
     s.Flush(); s.Flush()
-    check("combat again: the earlier read is dropped", #s.store.Get("history") == 5)
+    check("combat again: the earlier read is dropped", #s.DM.History.List() == 5)
     s.combat = false
     s.apiResult = Fight(7000)
 
@@ -1244,7 +1244,7 @@ do
         End(s)
         s.Flush(); s.Flush()
     end
-    local capped = s.store.Get("history")
+    local capped = s.DM.History.List()
     check("only as many as Fights Kept, the newest", #capped == 3 and capped[1].damage.total == 8004
         and capped[3].damage.total == 8002)
 
@@ -1269,15 +1269,15 @@ do
     End(s)
     s.Flush(); s.Flush()
     check("a new fight refreshes it while it is open", win.rows[1].cells[5].text
-        == "<" .. tostring(s.store.Get("history")[1].damage.totalPerSecond) .. ">")
+        == "<" .. tostring(s.DM.History.List()[1].damage.totalPerSecond) .. ">")
     win.scripts.OnMouseWheel(win, -5)
     check("scrolling past the end stays on the list", win.rows[1].cells[1].shown == true)
     win.scripts.OnMouseWheel(win, 5)
     check("and so does scrolling above the start", win.rows[1].cells[1].shown == true)
     win.clear.onClick()
-    check("Clear asks first", #s.confirms == 1 and #s.store.Get("history") == 3)
+    check("Clear asks first", #s.confirms == 1 and #s.DM.History.List() == 3)
     s.confirms[1].yes()
-    check("then empties it, and says so", #s.store.Get("history") == 0 and win.empty.shown == true
+    check("then empties it, and says so", #s.DM.History.List() == 0 and win.empty.shown == true
         and win.rows[1].cells[1].shown == false)
 
     win.close.onClick()
@@ -1350,7 +1350,7 @@ do
     s.instance, s.instanceName = true, "The Deep Hall"
     s.Fire("PLAYER_REGEN_ENABLED")
     s.Flush(); s.Flush()
-    local e = s.store.Get("history")[1]
+    local e = s.DM.History.List()[1]
     check("a boss from minutes ago is not this fight's; the instance's name is the place", e and e.boss == nil
         and e.place == "The Deep Hall" and e.damage.own == 0 and e.damage.rank == nil)
 end
@@ -1476,6 +1476,84 @@ do
     two.more.onClick()
     s.menu:Find("Second List"):Find("Absorbs").set()
     check("its menu sets its own key", s.store.Get("lower2") == "absorbs" and s.settings.lower == nil)
+end
+
+-- the fight history is kept on the account under the character, and its window has its column titles
+do
+    local function Entry(at, place)
+        return { at = at, place = place, seconds = 30,
+            damage = { own = 600, perSecond = 20, total = 900, totalPerSecond = 30, rank = 1, count = 3 },
+            healing = { own = 0, perSecond = 0, total = 0, totalPerSecond = 0, count = 0 } }
+    end
+    local function Window(s)
+        s.DM.HistoryWindow.Toggle()
+        for _, f in ipairs(s.frames) do
+            if f.name == "NaowhForeverDamageMeterHistory" then return f end
+        end
+    end
+
+    local s = Boot({ settings = { enabled = true } })
+    s.account.damageMeterFights = { ["Player-1"] = { Entry(2000, "Elwynn Forest"), Entry(1000, "Westfall") } }
+    s.Login()
+    local win = Window(s)
+    check("the fights kept on the account are listed after a reload", win.rows[1].cells[2].text == "Elwynn Forest"
+        and win.rows[2].cells[2].text == "Westfall" and win.rows[3].cells[1].shown == false)
+
+    -- the column titles are placed, in their widths, and shown
+    local want = { "Time", "Fight", "Length", "DPS", "Raid DPS", "HPS", "Raid HPS" }
+    local widths = { 84, 150, 50, 66, 70, 66, 70 }
+    local placed = #win.titles == 7
+    local x = 8
+    for n, text in ipairs(want) do
+        local fs = win.titles[n]
+        local p = fs and fs.points[1]
+        placed = placed and fs.text == text and fs.shown == true and p and p[1] == "TOPLEFT" and p[2] == win
+            and p[3] == "TOPLEFT" and p[4] == x and p[5] == -(26 + 4) and fs.w == widths[n]
+        x = x + widths[n] + 4
+    end
+    check("the column titles sit under the title bar, over their columns", placed)
+    check("the first two to the left, the figures to the right", win.titles[1].justify == "LEFT"
+        and win.titles[2].justify == "LEFT" and win.titles[3].justify == "RIGHT" and win.titles[7].justify == "RIGHT")
+    check("and the window itself is not moved by them", #win.points == 1 and win.points[1][1] == "CENTER")
+
+    -- a fight that ends is kept there, and not in the profile
+    s.apiResult = nil
+    local before = #s.DM.History.List()
+    s.DM.History.Clear()
+    check("clearing empties this character's list", #s.DM.History.List() == 0
+        and #s.account.damageMeterFights["Player-1"] == 0)
+    check("and none of it is in the profile", s.settings.history == nil)
+
+    -- another character has its own, and the first one's are still there
+    local other = Boot({ settings = { enabled = true } })
+    other.account.damageMeterFights = { ["Player-1"] = { Entry(2000, "Elwynn Forest") } }
+    other.playerGUID = "Player-9"
+    other.Login()
+    check("another character: its own list, empty", #other.DM.History.List() == 0)
+    check("the first one's kept", #other.account.damageMeterFights["Player-1"] == 1)
+
+    -- a profile that is changed or reset does not take them
+    local kept = Boot({ settings = { enabled = true, keepFights = 7, mode = "healing" } })
+    kept.account.damageMeterFights = { ["Player-1"] = { Entry(2000, "Elwynn Forest") } }
+    kept.Login()
+    for key in pairs(kept.settings) do kept.settings[key] = nil end
+    check("the profile cleared: the fights are there", #kept.DM.History.List() == 1
+        and kept.DM.History.List()[1].place == "Elwynn Forest")
+
+    -- the list the profile kept before is taken once, by the first character to ask
+    local old = Boot({ settings = { enabled = true, history = { Entry(3000, "Duskwood"), Entry(2500, "Redridge") } } })
+    old.Login()
+    check("the profile's list moves to the account", #old.DM.History.List() == 2
+        and old.DM.History.List()[1].place == "Duskwood" and old.settings.history == nil
+        and old.account.damageMeterFights["Player-1"][2].place == "Redridge")
+    old.playerGUID = "Player-9"
+    check("and not to a second character", #old.DM.History.List() == 0)
+
+    -- the page counts this character's
+    local page = Boot({ settings = { enabled = true } })
+    page.account.damageMeterFights = { ["Player-1"] = { Entry(1, "a"), Entry(2, "b"), Entry(3, "c") } }
+    page.Login()
+    check("Fight History says how many", CardOf(page.page, "history").summary(page.store) == "3 of 30 fights kept")
 end
 
 -- settings from before are tidied once, at login
@@ -2782,9 +2860,9 @@ do
     check("Text and Bars", CardOf(page, "text").summary(s.store) == "Size 11")
     check("Hover and Report", CardOf(page, "hover").summary(s.store) == "Spells on, reports of 5 lines")
     check("Fight History", CardOf(page, "history").summary(s.store) == "0 of 30 fights kept")
-    s.store.Set("history", { {}, {} })
+    s.account.damageMeterFights = { ["Player-1"] = { {}, {} } }
     check("Fight History counts them", CardOf(page, "history").summary(s.store) == "2 of 30 fights kept")
-    s.store.Set("history", {})
+    s.account.damageMeterFights = nil
     check("Bar Colors", CardOf(page, "barColors").summary(s.store) == "Class Colors")
     check("Text Colors and Window Colors", CardOf(page, "textColors").summary(s.store) == "Theme"
         and CardOf(page, "windowColors").summary(s.store) == "Theme")

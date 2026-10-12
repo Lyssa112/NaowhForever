@@ -19,7 +19,7 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     showSummary = false, titleSize = 12, timeSize = 11,
     titleText = "list", titleX = 0, titleY = 0, timeX = 0, timeY = 0, showButtons = true,
     classColors = {}, raidMode = false, hideDelay = 8, ownBarStyle = "bar", edgeStyle = "accent",
-    history = {}, keepFights = 30,
+    keepFights = 30,
     backgroundImage = "", backgroundPath = "", imageAlpha = 1, imageTile = false, imageTileSize = 128,
     barCustomColor = false, ownBarColor = false, edgeColor = false,
     nameColor = false, valueColor = false, rankColor = false, columnColor = false, titleColor = false,
