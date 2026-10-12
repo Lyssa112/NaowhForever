@@ -695,6 +695,9 @@ end
 
 local function OnSet(key)
     if key:find("^meterPos") then return end
+    for _, w in pairs(windows) do
+        if w.frame then Look.Invalidate(w.frame) end
+    end
     local own = key:match("^ownLook(%d)$")
     if own and S.Get(key) == true then DM.CopyLook(tonumber(own)) end
     if key == "overallOutOfCombat" and S.Get("overallOutOfCombat") then ShowOverall(not InCombatLockdown()) end
@@ -725,7 +728,23 @@ hooksecurefunc(ns, "HideUnlockMode", OnLock)
 
 -- Settings from before: a background the page no longer lists is none, and a path typed when Image had no
 -- choice for it, or behind a switch, is your own picture.
+-- A text's size set before it had a switch of its own keeps working: the switch is turned on for it.
+local OWN_SIZE_KEYS = { value = "valueFontSize", rank = "rankSize", title = "titleSize", time = "timeSize",
+    summary = "summarySize" }
+
+local function TidySizes()
+    if not S.Raw then return end
+    for element, key in pairs(OWN_SIZE_KEYS) do
+        local raw = S.Raw(key)
+        if S.Raw(element .. "OwnSize") == nil and type(raw) == "number" then
+            if raw > 0 and raw ~= S.Default(key) then S.Set(element .. "OwnSize", true) end
+            if raw <= 0 then S.Set(key, nil) end
+        end
+    end
+end
+
 local function Tidy()
+    TidySizes()
     local picked = S.Get("backgroundImage")
     if C.HIDDEN_BACKGROUNDS[picked] then S.Set("backgroundImage", ""); picked = "" end
     if not S.Raw then return end

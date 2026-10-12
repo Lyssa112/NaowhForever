@@ -20,11 +20,9 @@ local OFF_IMAGE = "Pick a Background Image"
 local OFF_COMBAT = "Set Where to In Combat"
 local OFF_TILE = "Turn on Tile Image"
 local OFF_OWN = "Pick Your Own Picture in Image"
-local OFF_TIME = "Turn on Show Fight Time"
 local OFF_BOTH = "Turn on Show Total and Show Per Second"
 local OFF_FADE = "Set Out of Combat Opacity below 100%"
 local OFF_TRACK = "Turn on Bar Track"
-local OFF_SUMMARY = "Turn on Summary Line"
 local TEXT_LOOK_NAME, TEXT_LOOK_EXPORT, TEXT_LOOK_IMPORT = "Name this look", "Look", "Paste a look"
 local TEXT_LOOKS_FULL = "There is room for twelve looks. Delete one first."
 local TEXT_LOOK_NO_NAME, TEXT_LOOK_BAD = "A look needs a name.", "That is not a look."
@@ -44,7 +42,6 @@ local TITLE_RANGE = { C.MIN_TITLE, C.MAX_TITLE, 1 }
 local OFFSET_X_RANGE, OFFSET_Y_RANGE = { -C.MAX_OFFSET_X, C.MAX_OFFSET_X, 1 }, { -C.MAX_OFFSET_Y, C.MAX_OFFSET_Y, 1 }
 local KEEP_RANGE = { C.MIN_KEEP, C.MAX_KEEP, 1 }
 local TILE_RANGE = { C.MIN_TILE, C.MAX_TILE, 8 }
-local VALUE_SIZE_RANGE, RANK_SIZE_RANGE = { 0, C.MAX_FONT, 1 }, { C.MIN_FONT, C.MAX_FONT, 1 }
 local ICON_SIZE_RANGE, ICON_ZOOM_RANGE = { 0, C.MAX_ICON, 1 }, { 0, 30, 1 }
 local PANEL_LINES_RANGE, TARGET_LINES_RANGE = { 1, C.BREAKDOWN_MAX, 1 }, { 1, C.TARGET_MAX, 1 }
 local PANEL_WIDTH_RANGE, PANEL_SCALE_RANGE = { C.MIN_PANEL_WIDTH, C.MAX_PANEL_WIDTH, 5 },
@@ -86,10 +83,8 @@ local function EdgeCustom()
     return DM.On() and S.Get("highlightPlayer") == true and S.Get("edgeStyle") == "custom"
 end
 local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
-local function ShowingTime() return DM.On() and S.Get("showTime") == true end
 local function BothFigures() return DM.On() and S.Get("showTotal") == true and S.Get("showRate") == true end
 local function Tracking() return DM.On() and S.Get("barTrack") == true end
-local function Summarising() return DM.On() and S.Get("showSummary") == true end
 local function Fading() return DM.On() and S.Get("idleAlpha") < 1 end
 local function Locked() return DM.On() and S.Get("locked") == true end
 -- Custom Image is for the choice of Image that is your own picture, and a picture is there when that has a
@@ -138,11 +133,36 @@ local function RowsSummary(store)
 end
 
 local function NumbersSummary(store)
-    return ("%s, %s"):format(C.NUMBER_UNITS[store.Get("numberUnits")] or "", C.COLUMN_ORDERS[store.Get("columnOrder")] or "")
+    return C.NUMBER_UNITS[store.Get("numberUnits")] or ""
+end
+
+local function FiguresSummary(store)
+    return C.COLUMN_ORDERS[store.Get("columnOrder")] or ""
 end
 
 local function NamesSummary(store)
+    if not store.Get("showName") then return "Hidden" end
     return C.NAME_FORMATS[store.Get("nameFormat")] or ""
+end
+
+-- What a text's card says when it is closed: the size the text has, and whether its font is its own.
+local function StyleSummary(element)
+    return function(store)
+        local _, _, size = DM.Look.TextStyle(element, store.Get("fontSize"))
+        local text = ("Size %d"):format(size)
+        if store.Get(element .. "OwnFont") == true then text = text .. ", own font" end
+        return text
+    end
+end
+
+local TEXTS = { "name", "value", "rank", "title", "time", "summary", "head" }
+
+local function FontSummary(store)
+    local own = 0
+    for _, element in ipairs(TEXTS) do
+        if store.Get(element .. "OwnFont") == true then own = own + 1 end
+    end
+    return own == 0 and "All the same" or ("%d with their own"):format(own)
 end
 
 -- The settings that leave only the title and the bars: no titles over the columns, no buttons, no rank
@@ -169,6 +189,10 @@ local function DataSummary(store)
 end
 
 local function SpacingSummary(store)
+    return ("Padding %d px, columns %d px apart"):format(store.Get("textPad"), store.Get("colGap"))
+end
+
+local function IconsSummary(store)
     local size = store.Get("iconSize")
     return ("Icon %s, %s"):format(size > 0 and size .. " px" or "fitted",
         (C.ICON_SIDES[store.Get("iconSide")] or ""):lower())
@@ -200,10 +224,6 @@ local function TimeSummary(store)
     return store.Get("timeBrackets") and "On, in brackets" or "On"
 end
 
-local function TextSummary(store)
-    return ("Size %d"):format(store.Get("fontSize"))
-end
-
 local function HoverSummary(store)
     return ("Spells %s, reports of %d lines"):format(store.Get("breakdown") and "on" or "off",
         store.Get("reportLines"))
@@ -217,11 +237,11 @@ local function BarColorsSummary(store)
     return C.BAR_COLORS[store.Get("barColor")] or ""
 end
 
-local function PickedSummary(group)
+local function PickedSummary(keys)
     return function(store)
         local picked = 0
-        for _, entry in ipairs(C.COLORS) do
-            if entry.group == group and type(store.Get(entry.key)) == "table" then picked = picked + 1 end
+        for _, key in ipairs(keys) do
+            if type(store.Get(key)) == "table" then picked = picked + 1 end
         end
         return picked == 0 and "Theme" or picked .. " picked"
     end
@@ -272,14 +292,6 @@ local function ColorRow(key)
     local entry = colorEntry[key]
     return { key = key, label = entry.label, colour = true, get = PickedGet(key), set = PickedSet(key),
         needs = COLOR_NEEDS[key] or Enabled, why = COLOR_WHY[key] or OFF, help = COLOR_HELP[key] }
-end
-
-local function ColorRows(group)
-    local rows = {}
-    for _, entry in ipairs(C.COLORS) do
-        if entry.group == group then rows[#rows + 1] = ColorRow(entry.key) end
-    end
-    return rows
 end
 
 -- The classes the game has, in its own order, each with a picker for its bar color.
@@ -340,6 +352,51 @@ local function ImageChoices()
         order[#order + 1] = picked
     end
     return values, order
+end
+
+-- ---- the texts: each has a size and a font of its own, behind a switch each, and a color
+
+local OUTLINE = ns.Shared.Parts.HUD_OUTLINES
+local OFF_OWN_SIZE, OFF_OWN_FONT = "Turn on Own Size", "Turn on Own Font"
+
+local function OwnSized(element)
+    return function() return DM.On() and S.Get(element .. "OwnSize") == true end
+end
+
+local function OwnFonted(element)
+    return function() return DM.On() and S.Get(element .. "OwnFont") == true end
+end
+
+-- A text's size: a switch, and the size it gives the text.
+local function SizeRows(element, key, range, help)
+    return {
+        { key = element .. "OwnSize", label = "Own Size", toggle = true, needs = Enabled, why = OFF, help = help },
+        { key = key, label = "Size", slider = range, needs = OwnSized(element), why = OFF_OWN_SIZE },
+    }
+end
+
+-- A text's font and outline: a switch, and what it gives the text.
+local function FontRows(element)
+    return {
+        { key = element .. "OwnFont", label = "Own Font", toggle = true, needs = Enabled, why = OFF,
+          help = "Off: the font and outline of the Font and Outline card." },
+        { key = element .. "Font", label = "Font", font = true, needs = OwnFonted(element), why = OFF_OWN_FONT },
+        { key = element .. "Outline", label = "Outline", choice = OUTLINE, needs = OwnFonted(element),
+          why = OFF_OWN_FONT },
+    }
+end
+
+-- The parts of a card's rows, rows and lists of rows, as one list.
+local function Join(...)
+    local rows = {}
+    for _, part in ipairs({ ... }) do
+        if part[1] ~= nil then
+            for _, row in ipairs(part) do rows[#rows + 1] = row end
+        else
+            rows[#rows + 1] = part
+        end
+    end
+    return rows
 end
 
 local page = Settings.Page(C.PAGE, S)
@@ -432,8 +489,8 @@ page:Card({
 })
 
 page:Card({
-    id = "rows", name = "Rows", order = 30,
-    help = "How tall the rows are, and what each one shows.",
+    id = "rows", name = "Bars and Rows", order = 30,
+    help = "How tall the bars are, their texture and track, and which row is yours.",
     summary = RowsSummary,
     rows = {
         Group("Bars"),
@@ -447,10 +504,12 @@ page:Card({
           help = "Each bar grows from its right end toward the left." },
         { key = "barScale", label = "Bars Compare To", choice = BAR_SCALE, needs = Enabled, why = OFF,
           help = "Top Player: the biggest bar is full. List Total: each bar is its share of the whole list." },
-        Group("Row"),
-        { key = "showIcons", label = "Icons", toggle = true, needs = Enabled, why = OFF },
-        { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
-        { key = "showRanks", label = "Rank Numbers", toggle = true, needs = Enabled, why = OFF },
+        Group("Texture"),
+        { key = "texture", label = "Bar Texture", texture = "Naowh Gradient", needs = Enabled, why = OFF },
+        { key = "barTrack", label = "Bar Track", toggle = true, needs = Enabled, why = OFF,
+          help = "A color behind each bar, where it is not filled." },
+        ColorRow("trackColor"),
+        Group("Your Row"),
         { key = "highlightPlayer", label = "Highlight Your Row", toggle = true, needs = Enabled, why = OFF },
         { key = "pinSelf", label = "Always Show My Row", toggle = true, needs = Enabled, why = OFF,
           help = "When you are not among the rows shown, the last row is yours, with your rank." },
@@ -458,11 +517,25 @@ page:Card({
 })
 
 page:Card({
-    id = "spacing", name = "Icons and Spacing", order = 35,
-    help = "The icon's size and side, the room around the texts, and a track behind the bars.",
+    id = "spacing", name = "Spacing", order = 32,
+    help = "The room at the ends of a row and between its columns, and the strip that marks your row.",
     summary = SpacingSummary,
     rows = {
-        Group("Icon"),
+        { key = "textPad", label = "Text Padding", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "The room at the ends of a row, before the first text and after the last." },
+        { key = "colGap", label = "Column Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "The room between the columns of figures." },
+        { key = "edgeWidth", label = "Edge Width", slider = EDGE_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "The strip on the left of a row, which shows your row in your edge color." },
+    },
+})
+
+page:Card({
+    id = "icons", name = "Icons", order = 34, switch = "showIcons",
+    help = "The icon on each row: its size, side and crop. The switch shows or hides it.",
+    summary = IconsSummary,
+    rows = {
+        { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
         { key = "iconSize", label = "Icon Size", slider = ICON_SIZE_RANGE, unit = "px", needs = Enabled, why = OFF,
           help = "Zero fits the icon to the row." },
         { key = "iconSide", label = "Icon Side", choice = ICON_SIDE, needs = Enabled, why = OFF },
@@ -470,29 +543,51 @@ page:Card({
           help = "How much of the icon's edge is cut off, so the frame in it does not show." },
         { key = "iconGap", label = "Icon Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
           help = "The room between the icon and the name." },
-        Group("Room"),
-        { key = "textPad", label = "Text Padding", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "The room at the ends of a row, before the first text and after the last." },
-        { key = "colGap", label = "Column Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "The room between the columns of figures." },
-        { key = "edgeWidth", label = "Edge Width", slider = EDGE_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "The strip on the left of a row, which shows your row in your edge color." },
-        Group("Track"),
-        { key = "barTrack", label = "Bar Track", toggle = true, needs = Enabled, why = OFF,
-          help = "A color behind each bar, where it is not filled." },
-        ColorRow("trackColor"),
     },
 })
 
 page:Card({
-    id = "numbers", name = "Numbers and Names", order = 40,
-    help = "The columns of figures, how numbers are written and how names are.",
-    summary = NumbersSummary,
-    rows = {
+    id = "ranks", name = "Rank Numbers", order = 36, switch = "showRanks",
+    help = "The number before each name. The switch shows or hides it.",
+    summary = StyleSummary("rank"),
+    rows = Join(
+        Group("Text"),
+        SizeRows("rank", "rankSize", TEXT_RANGE, "Off: the usual size."),
+        FontRows("rank"),
+        ColorRow("rankColor")
+    ),
+})
+
+page:Card({
+    id = "names", name = "Names", order = 40, switch = "showName",
+    help = "The name of each row. Off, a row is its bar, icon and figures; a breakdown keeps its spell names.",
+    summary = NamesSummary,
+    rows = Join(
+        Group("Writing"),
+        { key = "nameFormat", label = "Name Format", choice = NAME_FORMAT, needs = Enabled, why = OFF,
+          help = "How a player's name is written. In combat the game hides other players' names, so those "
+              .. "are found by class and left whole when two players share one." },
+        { key = "youLabel", label = "Call Me You", toggle = true, needs = Enabled, why = OFF,
+          help = "Your own row says You in place of your name." },
+        { key = "nameMaxLetters", label = "Name Length", slider = LETTERS_RANGE, needs = Enabled, why = OFF,
+          help = "Cuts a name to this many letters, with ... after it. Zero leaves names whole." },
+        Group("Text"),
+        { key = "fontSize", label = "Name Size", slider = TEXT_RANGE, always = true, needs = Enabled, why = OFF,
+          help = "The names' size. The figures follow it unless they have a size of their own." },
+        FontRows("name"),
+        Group("Color"),
+        { key = "nameClassColor", label = "Class Colored Names", toggle = true, needs = Enabled, why = OFF,
+          help = "Each name in its class's color, in place of the Name Color." },
+        ColorRow("nameColor")
+    ),
+})
+
+page:Card({
+    id = "figures", name = "Figures", order = 42,
+    help = "The columns of figures: which there are, in what order, and their text.",
+    summary = FiguresSummary,
+    rows = Join(
         Group("Columns"),
-        { key = "showName", label = "Show Name", toggle = true, needs = Enabled, why = OFF,
-          help = "The name of each row. Off, a row is its bar, its icon and its figures. A breakdown of a "
-              .. "player keeps the names of the spells." },
         { key = "showTotal", label = "Show Total", toggle = true, needs = Enabled, why = OFF },
         { key = "showRate", label = "Show Per Second", toggle = true, needs = Enabled, why = OFF,
           help = "Damage, healing and absorbs only." },
@@ -504,7 +599,21 @@ page:Card({
         { key = "columnOrder", label = "Column Order", choice = COLUMN_ORDER, needs = Enabled, why = OFF,
           help = "Which way round the figures go, and where the share stands. As the Game Has It leads with "
               .. "the per-second figure in the DPS and HPS lists." },
-        Group("Writing"),
+        Group("Text"),
+        SizeRows("value", "valueFontSize", TEXT_RANGE, "Off: the same size as the names."),
+        FontRows("value"),
+        Group("Color"),
+        { key = "valueClassColor", label = "Class Colored Figures", toggle = true, needs = Enabled, why = OFF,
+          help = "Each amount in its class's color, in place of the Figure Color." },
+        ColorRow("valueColor")
+    ),
+})
+
+page:Card({
+    id = "numbers", name = "Number Format", order = 44,
+    help = "How big numbers, shares and per-second figures are written.",
+    summary = NumbersSummary,
+    rows = {
         { key = "numberUnits", label = "Number Format", choice = NUMBER_UNITS, needs = Enabled, why = OFF,
           help = "How big numbers are written. Ten-thousands groups by ten-thousands and hundred-millions." },
         { key = "numberDecimals", label = "Decimals", slider = DECIMALS_RANGE, needs = Abbreviating,
@@ -517,25 +626,22 @@ page:Card({
 })
 
 page:Card({
-    id = "names", name = "Names", order = 41,
-    help = "How a player's name is written, and how long.",
-    summary = NamesSummary,
-    rows = {
-        { key = "nameFormat", label = "Name Format", choice = NAME_FORMAT, needs = Enabled, why = OFF,
-          help = "How a player's name is written. In combat the game hides other players' names, so those "
-              .. "are found by class and left whole when two players share one." },
-        { key = "youLabel", label = "Call Me You", toggle = true, needs = Enabled, why = OFF,
-          help = "Your own row says You in place of your name." },
-        { key = "nameMaxLetters", label = "Name Length", slider = LETTERS_RANGE, needs = Enabled, why = OFF,
-          help = "Cuts a name to this many letters, with ... after it. Zero leaves names whole." },
-    },
+    id = "heads", name = "Column Titles", order = 46, switch = "showColumnHeaders",
+    help = "The line of titles above the rows: Name and what each column shows. The switch shows or hides it.",
+    summary = StyleSummary("head"),
+    rows = Join(
+        Group("Text"),
+        SizeRows("head", "headSize", TEXT_RANGE, "Off: the usual size."),
+        FontRows("head"),
+        ColorRow("columnColor")
+    ),
 })
 
 page:Card({
     id = "header", name = "Title Bar", order = 50,
-    help = "The title, the buttons and the lines under them. Clean Look leaves only the title and the bars.",
+    help = "The title and the bar it sits on, with its buttons.",
     summary = HeaderSummary,
-    rows = {
+    rows = Join(
         Group("Title"),
         { key = "titleText", label = "Title Shows", choice = TITLE_TEXT, needs = Enabled, why = OFF,
           help = "The list's name, the name the game gave the fight, or both. A fight with no name yet "
@@ -544,7 +650,10 @@ page:Card({
           help = "Moves the title right, or left below zero. The second list's title moves with it." },
         { key = "titleY", label = "Title Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = Enabled, why = OFF,
           help = "Moves the title up, or down below zero." },
-        { key = "titleSize", label = "Title Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
+        Group("Text"),
+        SizeRows("title", "titleSize", TITLE_RANGE, "Off: the usual size."),
+        FontRows("title"),
+        ColorRow("titleColor"),
         Group("Bar"),
         { key = "headerAlpha", label = "Title Bar Opacity", slider = BACKGROUND_RANGE, unit = "%",
           scale = TO_FRACTION, needs = Enabled, why = OFF,
@@ -552,69 +661,58 @@ page:Card({
         { key = "showButtons", label = "Show Buttons", toggle = true, needs = Enabled, why = OFF,
           help = "The session button and the ... menu at the right of the bar. Off: right-click the bar "
               .. "for the same menu." },
-        Group("Under the Bar"),
-        { key = "showColumnHeaders", label = "Column Titles", toggle = true, needs = Enabled, why = OFF,
-          help = "A line of titles above the rows: Name and what each column shows." },
-        Group("Look"),
-        { label = "Clean Look", buttonText = "Apply", needs = Enabled, why = OFF,
-          button = function() ns.Confirm(TEXT_CLEAN_ASK, ApplyCleanLook) end,
-          help = "Only the title and the bars: no column titles, buttons, rank numbers, backgrounds or "
-              .. "border, the time in brackets after the title, and a bar between the figures." },
-    },
+        ColorRow("headerColor")
+    ),
 })
 
 page:Card({
-    id = "summary", name = "Summary Line", order = 53,
-    help = "A line under the title bar, of the pieces you choose.",
+    id = "summary", name = "Summary Line", order = 53, switch = "showSummary",
+    help = "A line under the title bar: the session, its total, the raid's figure per second, and your rank.",
     summary = SummarySummary,
-    rows = {
-        { key = "showSummary", label = "Summary Line", toggle = true, needs = Enabled, why = OFF,
-          help = "Under the title bar: the session, its total, the raid's per-second figure once the fight "
-              .. "is over, and your rank." },
-        { key = "summaryName", label = "Session Name", toggle = true, needs = Summarising, why = OFF_SUMMARY },
-        { key = "summaryTotal", label = "Total", toggle = true, needs = Summarising, why = OFF_SUMMARY },
-        { key = "summaryRate", label = "Raid Per Second", toggle = true, needs = Summarising, why = OFF_SUMMARY,
+    rows = Join(
+        Group("Pieces"),
+        { key = "summaryName", label = "Session Name", toggle = true, needs = Enabled, why = OFF },
+        { key = "summaryTotal", label = "Total", toggle = true, needs = Enabled, why = OFF },
+        { key = "summaryRate", label = "Raid Per Second", toggle = true, needs = Enabled, why = OFF,
           help = "The raid's figure per second, once the fight is over." },
-        { key = "summaryRank", label = "Your Rank", toggle = true, needs = Summarising, why = OFF_SUMMARY },
-        { key = "summarySize", label = "Summary Size", slider = TEXT_RANGE, needs = Summarising, why = OFF_SUMMARY },
-    },
+        { key = "summaryRank", label = "Your Rank", toggle = true, needs = Enabled, why = OFF },
+        Group("Text"),
+        SizeRows("summary", "summarySize", TEXT_RANGE, "Off: the usual size."),
+        FontRows("summary"),
+        ColorRow("summaryColor")
+    ),
 })
 
 page:Card({
-    id = "time", name = "Fight Time", order = 55,
-    help = "How long the shown session has run, and where it sits in the title bar.",
+    id = "time", name = "Fight Time", order = 55, switch = "showTime",
+    help = "How long the shown session has run, when there is room beside the title.",
     summary = TimeSummary,
-    rows = {
-        { key = "showTime", label = "Show Fight Time", toggle = true, needs = Enabled, why = OFF,
-          help = "How long the shown session has run, when there is room beside the title." },
-        { key = "timeBrackets", label = "Time in Brackets", toggle = true, needs = ShowingTime, why = OFF_TIME,
+    rows = Join(
+        Group("Place"),
+        { key = "timeBrackets", label = "Time in Brackets", toggle = true, needs = Enabled, why = OFF,
           help = "Writes the time as (0:05)." },
-        { key = "timeByTitle", label = "Time Next to Title", toggle = true, needs = ShowingTime, why = OFF_TIME,
+        { key = "timeByTitle", label = "Time Next to Title", toggle = true, needs = Enabled, why = OFF,
           help = "Puts the time right after the title, in place of beside the buttons." },
-        { key = "timeX", label = "Time X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = ShowingTime,
-          why = OFF_TIME, help = "Moves the time right, or left below zero, from where it sits." },
-        { key = "timeY", label = "Time Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = ShowingTime,
-          why = OFF_TIME, help = "Moves the time up, or down below zero." },
-        { key = "timeSize", label = "Fight Time Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
-    },
+        { key = "timeX", label = "Time X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = Enabled,
+          why = OFF, help = "Moves the time right, or left below zero, from where it sits." },
+        { key = "timeY", label = "Time Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = Enabled,
+          why = OFF, help = "Moves the time up, or down below zero." },
+        Group("Text"),
+        SizeRows("time", "timeSize", TITLE_RANGE, "Off: the usual size."),
+        FontRows("time"),
+        ColorRow("timeColor")
+    ),
 })
 
--- The font, its outline and size, and the bars' texture, then the sizes of the figures and the ranks.
-local function TextRows()
-    local rows = Settings.Look("", { text = true, size = TEXT_RANGE, bar = "Naowh Gradient", needs = Enabled,
-        why = OFF })
-    rows[#rows + 1] = Group("Sizes")
-    rows[#rows + 1] = { key = "valueFontSize", label = "Figures Size", slider = VALUE_SIZE_RANGE, needs = Enabled,
-        why = OFF, help = "The size of the amounts. Zero is the same as the names." }
-    rows[#rows + 1] = { key = "rankSize", label = "Rank Size", slider = RANK_SIZE_RANGE, needs = Enabled, why = OFF }
-    return rows
-end
-
 page:Card({
-    id = "text", name = "Text and Bars", order = 60,
-    help = "The font, its outline and the texture of the bars.",
-    summary = TextSummary,
-    rows = TextRows(),
+    id = "text", name = "Font and Outline", order = 60,
+    help = "The font and outline every text has, unless it has its own on its own card.",
+    summary = FontSummary,
+    rows = {
+        { key = "font", label = "Font", font = true, needs = Enabled, why = OFF },
+        { key = "outline", label = "Outline", choice = OUTLINE, needs = Enabled, why = OFF,
+          help = "None, the soft shadow, a thin outline or a thick one." },
+    },
 })
 
 page:Card({
@@ -681,6 +779,11 @@ page:Card({
 -- Saving, sharing and applying looks: the buttons, then a row to apply and one to delete for each look kept.
 local function LookRows()
     local rows = {
+        Group("Clean"),
+        { label = "Clean Look", buttonText = "Apply", needs = Enabled, why = OFF,
+          button = function() ns.Confirm(TEXT_CLEAN_ASK, ApplyCleanLook) end,
+          help = "Only the title and the bars: no column titles, buttons, rank numbers, backgrounds or "
+              .. "border, the time in brackets after the title, and a bar between the figures." },
         Group("Save and Share"),
         { label = "Save This Look", buttonText = "Save", needs = Enabled, why = OFF,
           button = function()
@@ -735,7 +838,7 @@ end
 
 page:Card({
     id = "looks", name = "Looks", order = 87,
-    help = "Keep the way the meter looks under a name, copy it to the other windows, or share it as text.",
+    help = "Clean it up, keep the way the meter looks under a name, copy it to the other windows or share it.",
     summary = LooksSummary,
     rows = LookRows,
 })
@@ -761,30 +864,11 @@ page:Card({
     },
 })
 
--- The colors of the texts, after two switches that give names and figures their class's color.
-local function TextColorRows()
-    local rows = {
-        { key = "nameClassColor", label = "Class Colored Names", toggle = true, needs = Enabled, why = OFF,
-          help = "Each name in its class's color, in place of the Names color." },
-        { key = "valueClassColor", label = "Class Colored Figures", toggle = true, needs = Enabled, why = OFF,
-          help = "Each amount in its class's color, in place of the Amounts color." },
-    }
-    for _, row in ipairs(ColorRows("Text")) do rows[#rows + 1] = row end
-    return rows
-end
-
-page:Card({
-    id = "textColors", name = "Text Colors", order = 100,
-    help = "A color for each text. Until you pick one, it follows your theme.",
-    summary = PickedSummary("Text"),
-    rows = TextColorRows(),
-})
-
 page:Card({
     id = "windowColors", name = "Window Colors", order = 110,
-    help = "The window, its title bar and its border. Until you pick one, it follows your theme.",
-    summary = PickedSummary("Window"),
-    rows = ColorRows("Window"),
+    help = "The window's background and its border. Until you pick one, it follows your theme.",
+    summary = PickedSummary({ "windowColor", "borderColor" }),
+    rows = { ColorRow("windowColor"), ColorRow("borderColor") },
 })
 
 page:Card({
@@ -817,7 +901,7 @@ local function OwnLookRows(index, columns)
         barSpacing = { label = "Row Spacing", slider = SPACING_RANGE },
         barAlpha = { label = "Bar Opacity", slider = BAR_ALPHA_RANGE, unit = "%", scale = TO_FRACTION },
         growUp = { label = "Grow Upward", toggle = true },
-        fontSize = { label = "Text Size", slider = TEXT_RANGE },
+        fontSize = { label = "Name Size", slider = TEXT_RANGE },
         showIcons = { label = "Icons", toggle = true },
         showRanks = { label = "Rank Numbers", toggle = true },
         backgroundAlpha = { label = "Window Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION },

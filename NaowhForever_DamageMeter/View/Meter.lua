@@ -104,10 +104,39 @@ function Look.EdgeColor(source)
     return T.accent
 end
 
+-- The size a text has when it has none of its own (the names' and the figures' follow the window's), and
+-- the key of the size it can have of its own.
+local DEFAULT_SIZES = { rank = 10, title = 12, time = 11, summary = 11, head = 10 }
+local OWN_SIZES = { value = "valueFontSize", rank = "rankSize", title = "titleSize", time = "timeSize",
+    summary = "summarySize", head = "headSize" }
+
+-- The font, outline and size of one of the texts (name, value, rank, title, time, summary, head): its
+-- own when the settings give it its own, else the window's. nameSize is the names' size.
+function Look.TextStyle(element, nameSize)
+    local font, outline = S.Get("font"), S.Get("outline")
+    if S.Get(element .. "OwnFont") == true then font, outline = S.Get(element .. "Font"), S.Get(element .. "Outline") end
+    local size = DEFAULT_SIZES[element] or nameSize
+    if OWN_SIZES[element] and S.Get(element .. "OwnSize") == true then
+        local own = S.Get(OWN_SIZES[element])
+        if type(own) == "number" and own > 0 then size = own end
+    end
+    return font, outline, size
+end
+
+-- Throws away what the layout kept, so that the next paint does all of it again.
+function Look.Invalidate(f)
+    f.laidKey = nil
+    for _, pane in ipairs(f.panes) do
+        pane.laidKey = nil
+        for _, row in ipairs(pane.rows) do row.laidKey = nil end
+    end
+end
+
 -- How wide the fight time is at the size the settings give it.
 function Look.TimeWidth()
     local chars = TIME_CHARS + (S.Get("timeBrackets") == true and 2 or 0)
-    return math.ceil(chars * CHAR_W * S.Get("timeSize"))
+    local _, _, size = Look.TextStyle("time", S.Get("fontSize"))
+    return math.ceil(chars * CHAR_W * size)
 end
 
 -- A pane is a list of rows with its column titles. A window has one, and a second below it on request.
@@ -295,11 +324,11 @@ local function LayRow(row, pane, i, g)
     row.name:SetShown(g.showName)
     row.name:ClearAllPoints(); row.name:SetPoint("LEFT", left, 0)
     row.name:SetPoint("RIGHT", -g.rightInset - pane.valueWidth - NAME_GAP, 0)
-    Parts.HudFont(row.rank, g.font, g.rankSize, g.outline)
-    Parts.HudFont(row.name, g.font, g.fontSize, g.outline)
-    Parts.HudFont(row.colA, g.font, g.valueSize, g.outline)
-    Parts.HudFont(row.colB, g.font, g.valueSize, g.outline)
-    Parts.HudFont(row.colP, g.font, g.valueSize, g.outline)
+    Parts.HudFont(row.rank, g.rankFont, g.rankSize, g.rankOutline)
+    Parts.HudFont(row.name, g.nameFont, g.fontSize, g.nameOutline)
+    Parts.HudFont(row.colA, g.valueFont, g.valueSize, g.valueOutline)
+    Parts.HudFont(row.colB, g.valueFont, g.valueSize, g.valueOutline)
+    Parts.HudFont(row.colP, g.valueFont, g.valueSize, g.valueOutline)
 end
 
 -- The column titles above a pane's rows at y: Name, and a title over each value column. A title is put
@@ -323,7 +352,7 @@ local function LayHeads(pane, g, y)
     pane.headName:ClearAllPoints()
     pane.headName:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + g.textPad + (g.showRanks and g.rankWidth or 0), y)
     for _, fs in ipairs({ pane.headName, pane.headA, pane.headB, pane.headP }) do
-        Parts.HudFont(fs, g.font, HEAD_SIZE, g.outline)
+        Parts.HudFont(fs, g.headFont, g.headSize, g.headOutline)
         fs:SetTextColor(f.columnColor.r, f.columnColor.g, f.columnColor.b)
     end
 end
@@ -333,10 +362,10 @@ local function LayFrame(f, g)
     f.summary:ClearAllPoints()
     f.summary:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + g.textPad, -HEADER - HEAD_PAD)
     f.summary:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + g.textPad), -HEADER - HEAD_PAD)
-    Parts.HudFont(f.summary, g.font, g.summarySize, g.outline)
-    Parts.HudFont(f.title, g.font, g.titleSize, g.outline)
-    Parts.HudFont(f.lowerTitle, g.font, g.titleSize, g.outline)
-    Parts.HudFont(f.time, g.font, g.timeSize, g.outline)
+    Parts.HudFont(f.summary, g.summaryFont, g.summarySize, g.summaryOutline)
+    Parts.HudFont(f.title, g.titleFont, g.titleSize, g.titleOutline)
+    Parts.HudFont(f.lowerTitle, g.titleFont, g.titleSize, g.titleOutline)
+    Parts.HudFont(f.time, g.timeFont, g.timeSize, g.timeOutline)
     f.time:SetWidth(Look.TimeWidth())
     f.lowerTitle:ClearAllPoints()
     f.lowerTitle:SetPoint("LEFT", TITLE_X + g.titleX, g.titleY); f.lowerTitle:SetPoint("RIGHT", -TITLE_X, g.titleY)
@@ -470,26 +499,25 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     if g.showIcons and g.iconSide == "right" then g.rightInset = g.textPad + g.iconSize + g.iconGap end
     g.barTrack = S.Get("barTrack") == true
     f.trackColor = Look.Color("trackColor")
-    local valueSize = S.Get("valueFontSize")
-    g.valueSize = valueSize > 0 and valueSize or fontSize
-    g.rankSize = S.Get("rankSize")
+    for _, element in ipairs({ "name", "value", "rank", "title", "time", "summary", "head" }) do
+        g[element .. "Font"], g[element .. "Outline"], g[element .. "Size"] = Look.TextStyle(element, fontSize)
+    end
+    g.fontSize = fontSize
     g.rankWidth = math.ceil(RANK_W * g.rankSize / RANK_SIZE)
     g.colWidth = math.floor(chars * CHAR_W * g.valueSize)
     g.pctWidth = math.floor(PERCENT_CHARS * CHAR_W * g.valueSize)
     g.mergedWidth = 2 * g.colWidth + math.floor(DIVIDER_CHARS * CHAR_W * g.valueSize)
-    g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
-    g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
+    g.texture = S.Get("texture")
     g.titleX, g.titleY = S.Get("titleX"), S.Get("titleY")
     g.growUp, g.reverseFill = DM.Setting(f.index, "growUp") == true, S.Get("reverseFill") == true
-    g.summarySize = S.Get("summarySize")
     g.image, g.path, g.tile = S.Get("backgroundImage"), S.Get("backgroundPath"), S.Get("imageTile") == true
     g.tileSize = math.max(C.MIN_TILE, S.Get("imageTileSize"))
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), tostring(g.showName), g.summarySize, g.valueSize, g.rankSize, g.textPad, g.iconGap, g.edgeWidth,
+        headTop, g.titleSize, g.timeSize, g.headSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), tostring(g.showName), g.summarySize, g.valueSize, g.rankSize, g.textPad, g.iconGap, g.edgeWidth,
         g.colGap, g.iconSide, g.iconCrop, g.iconSize, tostring(g.barTrack), f.trackColor.r, f.trackColor.g,
-        f.trackColor.b, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
+        f.trackColor.b, g.colWidth, g.texture, name.r, name.g,
         name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
     g.key = key
     if f.laidKey ~= key then LayFrame(f, g) end

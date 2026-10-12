@@ -31,7 +31,7 @@ NaowhForever_DamageMeter/
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
-    SettingsPage.lua             its settings page: twenty-five small cards
+    SettingsPage.lua             its settings page: a small card for each kind of text and part
   README.md                      this file
 ```
 
@@ -90,6 +90,12 @@ NaowhForever_DamageMeter/
 - Show Name hides the name of every row of a list (`row.name:SetShown`, and the Name title over it), so
   a row can be only its bar, icon and figures. A breakdown keeps the names of its spells, which are what
   its rows are about.
+- The settings page has a card for each part and each text, and what shows or hides a part is the switch of
+  its card (`switch = "showRanks"`, `showName`, `showIcons`, `showColumnHeaders`, `showSummary`, `showTime`),
+  which turns the card's rows off with it. The names, figures, rank, column titles, title, fight time and
+  summary line each have a card with their own size, font and outline behind a switch each, and their color;
+  Font and Outline holds the window's. Clean Look is on the Looks card, with the other ways to set the look
+  at once.
 - The spell panel's pool is as many rows as the settings can ask for (`BREAKDOWN_MAX`, `TARGET_MAX`) and
   it shows as many as Spells Shown and Enemies Shown say, at Panel Width, Scale and Opacity, on the side
   Panel Side says or else the one the window leaves room on. Enemies Shown also sets how many enemies a
@@ -118,7 +124,7 @@ NaowhForever_DamageMeter/
   write, which the window menu's Bar Color uses. Turning a window's look on copies the shared values into
   its keys, so it starts as it was, and turning it off keeps them. The rest of the look (fonts, colors,
   name and number formats) is shared by every window.
-- The room in a row is settings now (Icons and Spacing): the icon's size (zero fits the row, never taller
+- The room in a row is settings now (Icons, and Spacing): the icon's size (zero fits the row, never taller
   than it), side, crop and gap, the padding at the ends, the gap between columns and the edge's width.
   An icon on the right takes room from the figures (`rightInset`, which the titles over them follow),
   and the name's right end is the figures' left less that. Bar Track is a texture under the status bar,
@@ -127,10 +133,15 @@ NaowhForever_DamageMeter/
   `ClassColor` the bars use, so a class picked for its bar is the class's text color too; spell and enemy
   rows (they have a `label`) keep the theme's. Call Me You and Name Length are done in the view, not in
   `DM.DisplayName`, so reports keep real names; a name is cut by letters (UTF-8 aware) and only when it
-  is a plain text. Figures Size is the amounts' font size (zero follows the names') and sizes their
-  columns, Rank Size the rank's and its room. A share is written by `DM.PercentText` (decimals from the
-  settings) and a per-second figure takes `DM.RateSuffix()`, through `SetFormattedText` so a secret
-  amount still goes in as it is.
+  is a plain text. A share is written by `DM.PercentText` (decimals from the settings) and a per-second
+  figure takes `DM.RateSuffix()`, through `SetFormattedText` so a secret amount still goes in as it is.
+- Each text (name, figures, rank, title, time, summary, column titles) has a font, an outline and a size of
+  its own, each behind its own switch (`<text>OwnFont`, `<text>OwnSize`); with the switch off it follows
+  the window's font and outline and its usual size, with it on it takes `<text>Font`, `<text>Outline` and
+  its size key. `Look.TextStyle` answers for one text and `Look.Layout` collects them all into the geometry,
+  so the figures' columns and the time's room are sized by their own text. Every setting change throws the
+  layout's memory away (`Look.Invalidate`), so a font or a size is applied at once, with no reload. A size
+  set before the switches existed turns its switch on at login.
 - Always Show My Row: when your row (found by `isLocalPlayer`, never secret) is outside the rows shown
   (above them after scrolling, or below), the last row shown is yours, with your rank, so the list
   still scrolls through the others. It is the same source table, so hovering and clicking it work.
