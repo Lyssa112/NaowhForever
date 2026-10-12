@@ -16,9 +16,7 @@ DM.History = History
 local waiting, tries, started
 local boss, bossAt
 
-local function Plain(value)
-    return type(value) == "number" and not DM.IsSecret(value)
-end
+local Plain = DM.Plain
 
 function History.OnEncounterEnd(name)
     if type(name) == "string" and not DM.IsSecret(name) then boss, bossAt = name, GetTime() end
@@ -40,12 +38,12 @@ end
 -- One list's figures for you and for the raid, or nil while any of them is still secret.
 local function Figures(list, seconds)
     local session = DM.Session(list, "current")
-    if not Plain(session.totalAmount) then return nil end
+    if not Plain(session.totalAmount, "number") then return nil end
     local rank, count = DM.Rank(session)
     local mine = rank and session.combatSources[rank]
     local own, perSecond = 0, 0
     if mine then
-        if not (Plain(mine.totalAmount) and Plain(mine.amountPerSecond)) then return nil end
+        if not (Plain(mine.totalAmount, "number") and Plain(mine.amountPerSecond, "number")) then return nil end
         own, perSecond = mine.totalAmount, mine.amountPerSecond
     end
     return { own = own, perSecond = perSecond, total = session.totalAmount,
@@ -55,7 +53,7 @@ end
 -- The fight as it stands, or nil when it is not readable yet, or false when it is not worth keeping.
 local function Snapshot()
     local seconds = DM.Duration("current")
-    if not Plain(seconds) then return nil end
+    if not Plain(seconds, "number") then return nil end
     if seconds < MIN_SECONDS then return false end
     local damage, healing = Figures("damage", seconds), Figures("healing", seconds)
     if not (damage and healing) then return nil end

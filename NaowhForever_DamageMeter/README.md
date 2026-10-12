@@ -17,6 +17,7 @@ NaowhForever_DamageMeter/
   Data/
     Samples.lua                  the sample group the preview and Unlock Mode show (DM.SAMPLE)
   Source.lua                     reading the game's sessions, fights and spells (DM.Session, DM.Fights, DM.SourceSpells)
+  Numbers.lua                    how a number is written, and the sums over plain numbers (DM.Format, DM.Clock, DM.Percent)
   Names.lua                      a player's name as written: first, last, initials (DM.DisplayName, DM.ScanRoster)
   Report.lua                     the lines a report sends, and where it can go (DM.Report, DM.Channels)
   History.lua                    a summary of each fight, kept when it ends (DM.History)
@@ -58,13 +59,14 @@ NaowhForever_DamageMeter/
   (`DM.Sample`), so the preview and Unlock Mode show your bar and edge as they will be.
 - Class Colors can be changed class by class (`classColors`, class to color), kept apart from the
   theme tokens since the game gives every class its own. A background image is a name from the shared
-  media's `background` list, or a path typed in Custom Image once Use Your Own Picture is on; only one is
-  used, so the other is greyed on the page. It is drawn above the window's color and below the rows,
-  stretched or tiled. Tiling is worked out in `LayImage` from the window's size and a Tile Size setting,
-  with a repeating wrap, since a picture's own size is not known to the add-on and the engine's own tile
-  flags need the picture to be a power of two. The game's plain backgrounds (Solid, Blizzard Tooltip, Out
-  of Control, Low Health) are left out of the list and read as none; at login a pick of one is cleared,
-  and a path typed before there was a switch turns it on. An info card on the page, opened by a button in
+  media's `background` list, or the path typed in Custom Image when Image is Your Own Picture
+  (`DM.C.OWN_PICTURE`, a choice of the same list); Custom Image is greyed until that is picked. It is
+  drawn above the window's color and below the rows, stretched or tiled. Tiling is worked out in
+  `LayImage` from the window's size and a Tile Size setting, with a repeating wrap, since a picture's own
+  size is not known to the add-on and the engine's own tile flags need the picture to be a power of two.
+  The game's plain backgrounds (Solid, Blizzard Tooltip, Out of Control, Low Health) are left out of the
+  list and read as none. At login (`Tidy`) a pick of one is cleared, and a path typed before Image had a
+  choice for it, or behind the switch there once was, is made that choice. An info card on the page, opened by a button in
   the Window card, says how to add a picture: a .png, .tga or .blp in a folder of the player's own under
   `AddOns`, and its path with the extension. A .png loads on this client as it does for other add-ons
   here; a .jpg is not known to. The tooltip is a fixed-width card, so a help text must not hold a long

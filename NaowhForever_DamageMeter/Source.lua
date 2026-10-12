@@ -1,5 +1,5 @@
 -- Source.lua: reads the game's damage meter data. Amounts and names are secret in combat, so nothing here
--- compares or adds them without asking IsSecret first; they go straight to the bars and texts.
+-- compares or adds them without asking Plain first; they go straight to the bars and texts.
 local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
@@ -10,48 +10,13 @@ local EMPTY = { combatSources = {}, maxAmount = 0, totalAmount = 0 }
 function DM.IsSecret(value)
     return issecretvalue ~= nil and issecretvalue(value) == true
 end
-local IsSecret = DM.IsSecret
 
--- The client's own abbreviation takes a secret number and returns a string made from it, and so does
--- AbbreviateNumbers with a config of breakpoints, which is how the other formats are made.
-local function Game(n)
-    if AbbreviateLargeNumbers then return AbbreviateLargeNumbers(n) end
-    return tostring(n)
+-- Whether value is of the kind and readable.
+function DM.Plain(value, kind)
+    return type(value) == kind and not DM.IsSecret(value)
 end
 
-local PLAIN_TIER = { breakpoint = 1, abbreviation = "", significandDivisor = 1, fractionDivisor = 1,
-    abbreviationIsGlobal = false }
-
-local function Tier(base, glyph, decimals)
-    local d = 10 ^ decimals
-    return { breakpoint = base, abbreviation = glyph, significandDivisor = base / d, fractionDivisor = d,
-        abbreviationIsGlobal = false }
-end
-
-local function Tiers(units, decimals)
-    if units == "latin" then
-        return { Tier(1e9, "B", decimals), Tier(1e6, "M", decimals), Tier(1e3, "K", decimals), PLAIN_TIER }
-    elseif units == "asian" then
-        local g = C.ASIAN_GLYPHS[GetLocale and GetLocale()] or C.ASIAN_GLYPHS.zhCN
-        return { Tier(1e8, g[3], decimals), Tier(1e4, g[2], decimals), Tier(1e3, g[1], decimals), PLAIN_TIER }
-    end
-    return { PLAIN_TIER }
-end
-
-local formatKey, formatOptions
-
--- A number as the settings write it. n may be secret, and the answer is a string made from it.
-function DM.Format(n)
-    local units = DM.Settings.Get("numberUnits")
-    if units == "game" or not (AbbreviateNumbers and CreateAbbreviateConfig) then return Game(n) end
-    local decimals = DM.Settings.Get("numberDecimals")
-    local key = units .. decimals .. (GetLocale and GetLocale() or "")
-    if key ~= formatKey then
-        formatOptions = { config = CreateAbbreviateConfig(Tiers(units, decimals)) }
-        formatKey = key
-    end
-    return AbbreviateNumbers(n, formatOptions)
-end
+local IsSecret, Plain = DM.IsSecret, DM.Plain
 
 function DM.Mode(key)
     return C.MODE_BY_KEY[key] or C.MODE_BY_KEY[C.DEFAULT_MODE]
@@ -69,21 +34,32 @@ local function ListType(modeKey)
     return Enum.DamageMeterType[DM.Mode(modeKey).type]
 end
 
--- fightID names one of the game's past fights; without it the session is the current or the overall one.
-function DM.Session(modeKey, sessionKey, fightID)
-    if not DM.Available() then return EMPTY end
+-- The game's session for a list type: a past fight by its id, else the current or the overall one. Nil
+-- when the game gives nothing usable.
+local function FetchSession(kind, sessionKey, fightID)
     local ok, session
     if fightID ~= nil then
-        ok, session = pcall(C_DamageMeter.GetCombatSessionFromID, fightID, ListType(modeKey))
+        ok, session = pcall(C_DamageMeter.GetCombatSessionFromID, fightID, kind)
     else
-        ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, SessionType(sessionKey), ListType(modeKey))
+        ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, SessionType(sessionKey), kind)
     end
     if ok and type(session) == "table" and type(session.combatSources) == "table" then return session end
-    return EMPTY
 end
 
-local function Plain(value, kind)
-    return type(value) == kind and not IsSecret(value)
+-- One source's data with its spells, by guid (and an enemy's creature id). Nil when it cannot be read.
+local function FetchSource(kind, sessionKey, fightID, guid, creatureID)
+    local ok, data
+    if fightID ~= nil then
+        ok, data = pcall(C_DamageMeter.GetCombatSessionSourceFromID, fightID, kind, guid, creatureID)
+    else
+        ok, data = pcall(C_DamageMeter.GetCombatSessionSourceFromType, SessionType(sessionKey), kind, guid, creatureID)
+    end
+    if ok and type(data) == "table" and type(data.combatSpells) == "table" then return data end
+end
+
+function DM.Session(modeKey, sessionKey, fightID)
+    if not DM.Available() then return EMPTY end
+    return FetchSession(ListType(modeKey), sessionKey, fightID) or EMPTY
 end
 
 local function Newest(a, b)
@@ -127,6 +103,41 @@ function DM.SessionName(sessionKey, fightID)
     return "Fight " .. fightID
 end
 
+-- Seconds the shown session has run, as a plain number, or nil when the game keeps it back.
+function DM.Duration(sessionKey, fightID)
+    if not DM.Available() then return nil end
+    if fightID ~= nil then
+        for _, fight in ipairs(DM.Fights()) do
+            if fight.id == fightID then return fight.seconds end
+        end
+        return nil
+    end
+    local ok, seconds = pcall(C_DamageMeter.GetSessionDurationSeconds, SessionType(sessionKey))
+    if ok and Plain(seconds, "number") then return seconds end
+    return nil
+end
+
+-- Where the local player stands in a session's sources, and how many there are: the game sorts them.
+function DM.Rank(session)
+    local sources = session.combatSources
+    for i = 1, #sources do
+        if sources[i].isLocalPlayer == true then return i, #sources end
+    end
+    return nil, #sources
+end
+
+-- The spells behind one row, as the game's { combatSpells, maxAmount, totalAmount }, or nil. In combat the
+-- game takes a plain guid only: your own row's, or a row whose guid is readable.
+function DM.SourceSpells(modeKey, sessionKey, fightID, source)
+    if not DM.Available() or DM.Mode(modeKey).spells == false then return nil end
+    local guid
+    if source.isLocalPlayer == true then guid = UnitGUID("player") else guid = source.sourceGUID end
+    if IsSecret(guid) or guid == nil then return nil end
+    local data = FetchSource(ListType(modeKey), sessionKey, fightID, guid)
+    if data and #data.combatSpells > 0 then return data end
+    return nil
+end
+
 local targetsCache = {}
 
 -- Forgets the targets read, when the game's data has changed.
@@ -136,17 +147,11 @@ end
 
 -- What one enemy took from the player of that name: the enemy's list is by attacker and spell, so the
 -- player's spells are added up. Plain numbers only, so after combat.
-local function Share(sessionKey, fightID, kind, enemy, name)
+local function Share(kind, sessionKey, fightID, enemy, name)
     local guid = enemy.sourceGUID
     if IsSecret(guid) then return 0 end
-    local ok, data
-    if fightID ~= nil then
-        ok, data = pcall(C_DamageMeter.GetCombatSessionSourceFromID, fightID, kind, guid, enemy.sourceCreatureID)
-    else
-        ok, data = pcall(C_DamageMeter.GetCombatSessionSourceFromType, SessionType(sessionKey), kind, guid,
-            enemy.sourceCreatureID)
-    end
-    if not (ok and type(data) == "table" and type(data.combatSpells) == "table") then return 0 end
+    local data = FetchSource(kind, sessionKey, fightID, guid, enemy.sourceCreatureID)
+    if not data then return 0 end
     local total = 0
     for _, spell in ipairs(data.combatSpells) do
         local details = spell.combatSpellDetails
@@ -170,86 +175,16 @@ function DM.Targets(sessionKey, fightID, name)
     local key = tostring(fightID or sessionKey) .. "|" .. name
     local cached = targetsCache[key]
     if cached ~= nil then return cached or nil end
-    local ok, session
-    if fightID ~= nil then
-        ok, session = pcall(C_DamageMeter.GetCombatSessionFromID, fightID, kind)
-    else
-        ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, SessionType(sessionKey), kind)
-    end
     local list = {}
-    if ok and type(session) == "table" and type(session.combatSources) == "table" then
-        for _, enemy in ipairs(session.combatSources) do
-            local total = Share(sessionKey, fightID, kind, enemy, name)
-            if total > 0 then list[#list + 1] = { name = enemy.name, total = total } end
-        end
+    local session = FetchSession(kind, sessionKey, fightID)
+    for _, enemy in ipairs(session and session.combatSources or {}) do
+        local total = Share(kind, sessionKey, fightID, enemy, name)
+        if total > 0 then list[#list + 1] = { name = enemy.name, total = total } end
     end
     table.sort(list, Biggest)
     if #list == 0 then list = nil end
     targetsCache[key] = list or false
     return list
-end
-
--- Seconds the shown session has run, as a plain number, or nil when the game keeps it back.
-function DM.Duration(sessionKey, fightID)
-    if not DM.Available() then return nil end
-    if fightID ~= nil then
-        for _, fight in ipairs(DM.Fights()) do
-            if fight.id == fightID then return fight.seconds end
-        end
-        return nil
-    end
-    local ok, seconds = pcall(C_DamageMeter.GetSessionDurationSeconds, SessionType(sessionKey))
-    if ok and Plain(seconds, "number") then return seconds end
-    return nil
-end
-
--- m:ss, or h:mm:ss from an hour.
-function DM.Clock(seconds)
-    seconds = math.floor(seconds)
-    if seconds >= 3600 then
-        return ("%d:%02d:%02d"):format(math.floor(seconds / 3600), math.floor(seconds % 3600 / 60), seconds % 60)
-    end
-    return ("%d:%02d"):format(math.floor(seconds / 60), seconds % 60)
-end
-
--- The spells behind one row, as the game's { combatSpells, maxAmount, totalAmount }, or nil. In combat the
--- game takes a plain guid only: your own row's, or a row whose guid is readable.
-function DM.SourceSpells(modeKey, sessionKey, fightID, source)
-    if not DM.Available() or DM.Mode(modeKey).spells == false then return nil end
-    local guid
-    if source.isLocalPlayer == true then guid = UnitGUID("player") else guid = source.sourceGUID end
-    if IsSecret(guid) or guid == nil then return nil end
-    local ok, data
-    if fightID ~= nil then
-        ok, data = pcall(C_DamageMeter.GetCombatSessionSourceFromID, fightID, ListType(modeKey), guid)
-    else
-        ok, data = pcall(C_DamageMeter.GetCombatSessionSourceFromType, SessionType(sessionKey), ListType(modeKey), guid)
-    end
-    if ok and type(data) == "table" and type(data.combatSpells) == "table" and #data.combatSpells > 0 then
-        return data
-    end
-    return nil
-end
-
--- A total over a length of time, or nil when either is secret or there is no time.
-function DM.PerSecond(total, seconds)
-    if not (Plain(total, "number") and Plain(seconds, "number")) or seconds <= 0 then return nil end
-    return total / seconds
-end
-
--- Where the local player stands in a session's sources, and how many there are: the game sorts them.
-function DM.Rank(session)
-    local sources = session.combatSources
-    for i = 1, #sources do
-        if sources[i].isLocalPlayer == true then return i, #sources end
-    end
-    return nil, #sources
-end
-
--- A share of a total, as a percentage, or nil when either is secret or there is no total.
-function DM.Percent(amount, total)
-    if not (Plain(amount, "number") and Plain(total, "number")) or total <= 0 then return nil end
-    return amount / total * 100
 end
 
 function DM.Reset()

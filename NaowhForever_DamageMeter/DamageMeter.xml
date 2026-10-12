@@ -4,6 +4,7 @@
     <Script file="Constants.lua"/>
     <Script file="Data\Samples.lua"/>
     <Script file="Source.lua"/>
+    <Script file="Numbers.lua"/>
     <Script file="Names.lua"/>
     <Script file="Report.lua"/>
     <Script file="History.lua"/>

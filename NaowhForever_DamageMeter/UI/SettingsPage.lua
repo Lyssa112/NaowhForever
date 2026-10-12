@@ -19,8 +19,7 @@ local OFF_CLASS = "Set Bar Color to Class Colors"
 local OFF_IMAGE = "Pick a Background Image"
 local OFF_COMBAT = "Set Where to In Combat"
 local OFF_TILE = "Turn on Tile Image"
-local OFF_OWN = "Turn on Use Your Own Picture"
-local OFF_LISTED = "Use Your Own Picture is on"
+local OFF_OWN = "Pick Your Own Picture in Image"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local BAR_RANGE, SPACING_RANGE = { C.MIN_BAR, C.MAX_BAR, 1 }, { 0, C.MAX_SPACING, 1 }
@@ -61,14 +60,14 @@ local function EdgeCustom()
     return DM.On() and S.Get("highlightPlayer") == true and S.Get("edgeStyle") == "custom"
 end
 local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
--- A picture from the shared media is picked, or your own is on: only one of them is used at a time.
-local function OwnPicture() return S.Get("customImage") == true end
-local function ListedPicture() return DM.On() and not OwnPicture() end
+-- Custom Image is for the choice of Image that is your own picture, and a picture is there when that has a
+-- path or another choice is a picture.
+local function OwnPicture() return S.Get("backgroundImage") == C.OWN_PICTURE end
 local function PicturePath() return DM.On() and OwnPicture() end
 local function HasImage()
     if not DM.On() then return false end
-    if OwnPicture() then return S.Get("backgroundPath") ~= "" end
     local picked = S.Get("backgroundImage")
+    if picked == C.OWN_PICTURE then return S.Get("backgroundPath") ~= "" end
     return picked ~= "" and not C.HIDDEN_BACKGROUNDS[picked]
 end
 local function TilesImage() return HasImage() and S.Get("imageTile") == true end
@@ -238,10 +237,10 @@ local function ClassRows()
     return rows
 end
 
--- The backgrounds the shared media offers, by name, without the game's plain ones. One picked before
--- they were left out reads as None.
+-- None, your own picture, and the backgrounds the shared media offers by name without the game's plain
+-- ones. One picked before they were left out reads as None.
 local function ImageChoices()
-    local values, order = { [""] = "None" }, { "" }
+    local values, order = { [""] = "None", [C.OWN_PICTURE] = "Your Own Picture" }, { "", C.OWN_PICTURE }
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     if LSM then
         for _, name in ipairs(LSM:List("background")) do
@@ -311,12 +310,10 @@ page:Card({
           scale = TO_FRACTION, needs = Enabled, why = OFF },
         { key = "showBorder", label = "Border", toggle = true, needs = Enabled, why = OFF },
         Group("Picture"),
-        { key = "customImage", label = "Use Your Own Picture", toggle = true, needs = Enabled, why = OFF,
-          help = "Show a picture you added, by its path, in place of one from the list. Only one is used." },
-        { key = "backgroundImage", label = "Image", choice = ImageChoices, needs = ListedPicture, why = OFF_LISTED,
-          help = "A picture from a shared media add-on." },
+        { key = "backgroundImage", label = "Image", choice = ImageChoices, needs = Enabled, why = OFF,
+          help = "None, your own picture, or one from a shared media add-on." },
         { key = "backgroundPath", label = "Custom Image", text = true, wide = true, needs = PicturePath,
-          why = OFF_OWN, help = "The path of the picture you added." },
+          why = OFF_OWN, help = "The path of your own picture. Used when Image is Your Own Picture." },
         { label = "Adding a Picture", buttonText = "Show How", needs = Enabled, why = OFF,
           button = function() OpenHowTo() end,
           help = "Opens Add Your Own Image, below this card." },
@@ -341,10 +338,10 @@ page:Info({
             .. "such as MyBackgrounds, and put the file in it, for instance MyBackgrounds\\panel.png. A folder "
             .. "of your own is not touched when add-ons are updated. Restart the game once so it finds "
             .. "the file." },
-        { title = "What to do in the settings", text = "In the Window card, under Picture, turn on Use Your Own "
-            .. "Picture and write the path from Interface in Custom Image, with backslashes and with the "
-            .. "file's extension: Interface\\AddOns\\MyBackgrounds\\panel.png. While it is on, Image is "
-            .. "not used. Turn it off to go back to Image." },
+        { title = "What to do in the settings", text = "In the Window card, under Picture, pick Your Own Picture "
+            .. "in Image, and write the path from Interface in Custom Image, with backslashes and with the "
+            .. "file's extension: Interface\\AddOns\\MyBackgrounds\\panel.png. Pick None or another "
+            .. "picture in Image to go back." },
         { title = "If it is a green square", text = "The game did not find the file. Check the folder name, "
             .. "the spelling and the extension, and that the game was restarted after the file was added." },
         { title = "Or a media add-on", text = "An add-on that adds pictures to the shared media, such as a "

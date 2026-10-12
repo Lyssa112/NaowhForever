@@ -307,7 +307,7 @@ local function Boot(opts)
     }
     env._G = env
     env.UIParent.w = 1000
-    local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Names.lua", "Report.lua",
+    local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Numbers.lua", "Names.lua", "Report.lua",
         "History.lua", "View/Meter.lua", "View/Breakdown.lua", "UI/History.lua", "UI/Menus.lua", "UI/Meter.lua",
         "UI/SettingsPage.lua" }
     for _, file in ipairs(files) do
@@ -1302,19 +1302,32 @@ end
 
 -- settings from before are tidied once, at login
 do
-    local s = Boot({ settings = { enabled = true, backgroundPath = "Interface\\x", backgroundImage = "Solid" } })
+    local s = Boot({ settings = { enabled = true, backgroundImage = "Solid" } })
     s.Login()
-    check("a path typed before there was a switch turns it on", s.store.Get("customImage") == true)
     check("a background the page no longer lists is none", s.store.Get("backgroundImage") == "")
-    local chosen = Boot({ settings = { enabled = true, backgroundPath = "Interface\\x", customImage = false } })
-    chosen.Login()
-    check("a switch left off on purpose stays off", chosen.store.Get("customImage") == false)
+    local both = Boot({ settings = { enabled = true, backgroundImage = "Solid", backgroundPath = "Interface\\x" } })
+    both.Login()
+    check("one it no longer lists beside a typed path is your own picture", both.store.Get("backgroundImage") == "@own")
+    local typed =Boot({ settings = { enabled = true, backgroundPath = "Interface\\x" } })
+    typed.Login()
+    check("a path typed with Image on None is your own picture", typed.store.Get("backgroundImage") == "@own")
+    local switched = Boot({ settings = { enabled = true, backgroundPath = "Interface\\x", customImage = true } })
+    switched.Login()
+    check("the switch there was for it becomes the choice", switched.store.Get("backgroundImage") == "@own"
+        and switched.settings.customImage == false)
+    local off = Boot({ settings = { enabled = true, backgroundPath = "Interface\\x", customImage = false } })
+    off.Login()
+    check("a switch left off on purpose leaves it alone", off.store.Get("backgroundImage") == "")
+    local named = Boot({ settings = { enabled = true, backgroundPath = "Interface\\x", backgroundImage = "Marble" } })
+    named.Login()
+    check("a picture picked by name is not taken over by a path", named.store.Get("backgroundImage") == "Marble")
     local plain = Boot({ settings = { enabled = true, backgroundImage = "Marble" } })
     plain.Login()
-    check("nothing to tidy: nothing changed", plain.settings.customImage == nil and plain.store.Get("backgroundImage") == "Marble")
-    local listed = Boot({ settings = { enabled = true } })
-    listed.Login()
-    check("and nothing set that was not", listed.settings.customImage == nil and listed.settings.backgroundImage == nil)
+    check("nothing to tidy: nothing changed", plain.settings.customImage == nil
+        and plain.store.Get("backgroundImage") == "Marble")
+    local none = Boot({ settings = { enabled = true } })
+    none.Login()
+    check("and nothing set that was not", none.settings.customImage == nil and none.settings.backgroundImage == nil)
 end
 
 -- Raid Mode: your row alone
@@ -1482,15 +1495,16 @@ do
 
     local mine = "Interface\\AddOns\\MyBackgrounds\\panel"
     s.store.Set("backgroundPath", mine); s.Flush()
-    check("a path typed does nothing until Use Your Own Picture is on", w.image.shown == false)
-    s.store.Set("customImage", true); s.Flush()
-    check("on: that picture", w.image.shown == true and w.image.texture == mine)
-    s.store.Set("backgroundImage", "Marble"); s.Flush()
-    check("and the one picked by name is not used", w.image.texture == mine)
+    check("a path typed does nothing until Image is Your Own Picture", w.image.shown == false)
+    s.store.Set("backgroundImage", "@own"); s.Flush()
+    check("picked: that picture", w.image.shown == true and w.image.texture == mine)
     s.store.Set("backgroundPath", ""); s.Flush()
-    check("an empty path: no picture, not the one picked by name", w.image.shown == false)
-    s.store.Set("customImage", false); s.Flush()
-    check("off: the one picked by name again", w.image.texture == "Media\\Marble")
+    check("an empty path: no picture", w.image.shown == false)
+    s.store.Set("backgroundImage", "Marble"); s.Flush()
+    check("another choice: the one picked by name, and the path is not used", w.image.texture == "Media\\Marble")
+    s.store.Set("backgroundPath", mine); s.Flush()
+    check("with a path typed all the same", w.image.texture == "Media\\Marble")
+    s.store.Set("backgroundPath", "")
     s.store.Set("backgroundImage", "")
     s.Flush()
 
@@ -1539,30 +1553,32 @@ do
 
     local choices = RowOf(page, "backgroundImage").choice
     local values, order = choices()
-    check("the image choices: None, then the media's, without the plain ones", values[""] == "None"
-        and order[1] == "" and order[2] == "Marble" and order[3] == "Dots" and #order == 3 and values.Solid == nil
+    check("the image choices: None, your own, then the media's, without the plain ones", values[""] == "None"
+        and values["@own"] == "Your Own Picture" and order[1] == "" and order[2] == "@own" and order[3] == "Marble"
+        and order[4] == "Dots" and #order == 4 and values.Solid == nil
         and values["Blizzard Tooltip"] == nil and values["Blizzard Out of Control"] == nil
         and values["Blizzard Low Health"] == nil)
     s.store.Set("backgroundImage", "Solid")
     values, order = choices()
     check("one picked before they were left out reads as None, and is not offered", values.Solid == "None"
-        and #order == 3 and RowOf(page, "imageAlpha").needs() == false)
+        and #order == 4 and RowOf(page, "imageAlpha").needs() == false)
     s.store.Set("backgroundImage", "")
     local custom = RowOf(page, "backgroundPath")
     check("a text row for a path, wide", custom and custom.text == true and custom.wide == true
         and custom.label == "Custom Image")
-    local own, listed = RowOf(page, "customImage"), RowOf(page, "backgroundImage")
-    check("a switch for your own picture, off", own and own.toggle == true and own.label == "Use Your Own Picture"
-        and s.store.Get("customImage") == false)
-    check("off: Image is on and Custom Image greyed", listed.needs() == true and custom.needs() == false)
-    s.store.Set("customImage", true)
-    check("on: Image is greyed and Custom Image is on", listed.needs() == false and custom.needs() == true)
-    check("each says why", listed.why == "Use Your Own Picture is on" and custom.why == "Turn on Use Your Own Picture")
+    local listed = RowOf(page, "backgroundImage")
+    check("Image is always on, and Custom Image waits for Your Own Picture", listed.needs() == true
+        and custom.needs() == false and custom.why == "Pick Your Own Picture in Image")
+    s.store.Set("backgroundImage", "@own")
+    check("picked: Custom Image is on", custom.needs() == true)
     check("and the image rows wait for a path", RowOf(page, "imageAlpha").needs() == false)
     s.store.Set("backgroundPath", "Interface" .. string.char(92) .. "x")
     check("an image once a path is typed", RowOf(page, "imageAlpha").needs() == true
         and RowOf(page, "imageTile").needs() == true)
-    s.store.Set("backgroundPath", ""); s.store.Set("customImage", false)
+    s.store.Set("backgroundImage", "Marble")
+    check("another choice: Custom Image greyed, and the picture is the one named", custom.needs() == false
+        and RowOf(page, "imageAlpha").needs() == true)
+    s.store.Set("backgroundPath", ""); s.store.Set("backgroundImage", "")
     local howTo, hostCard
     for _, card in ipairs(page.cards) do
         for _, row in ipairs(card.rows) do
@@ -1587,11 +1603,11 @@ do
         and all:find("Custom Image", 1, true) ~= nil and all:find("powers of two", 1, true) ~= nil)
     check("it says a .jpg is not read, and what a green square means", all:find(".jpg", 1, true) ~= nil
         and all:find("green square", 1, true) ~= nil)
-    check("and to turn the switch on", all:find("Use Your Own Picture", 1, true) ~= nil)
+    check("and to pick Your Own Picture in Image", all:find("pick Your Own Picture", 1, true) ~= nil)
     check("and the extension is part of the path", all:find("panel.png", 1, true) ~= nil)
     s.store.Set("backgroundImage", "Lost")
     values, order = choices()
-    check("a name that is not there stays chosen, marked", values.Lost == "Lost (unavailable)" and order[4] == "Lost")
+    check("a name that is not there stays chosen, marked", values.Lost == "Lost (unavailable)" and order[5] == "Lost")
     s.store.Set("backgroundImage", "")
 end
 

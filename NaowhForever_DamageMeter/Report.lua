@@ -4,7 +4,7 @@ local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
 local S = DM.Settings
-local Format = DM.Format
+local Format, Plain = DM.Format, DM.Plain
 
 local TEXT_COMBAT = "Reports are sent outside combat."
 local TEXT_EMPTY = "There is nothing to report yet."
@@ -33,10 +33,6 @@ function DM.Channels()
         if channel.can() then list[#list + 1] = channel end
     end
     return list
-end
-
-local function Plain(value, kind)
-    return type(value) == kind and not DM.IsSecret(value)
 end
 
 -- The header, then one line per source up to count; a source with a secret name or amount is left out.

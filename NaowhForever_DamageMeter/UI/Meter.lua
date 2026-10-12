@@ -448,11 +448,17 @@ hooksecurefunc(ns, "Apply", Apply)
 hooksecurefunc(ns, "ShowUnlockMode", OnUnlock)
 hooksecurefunc(ns, "HideUnlockMode", OnLock)
 
--- Settings from before: a background the page no longer lists is none, and a path typed before there was a
--- switch is your own picture.
+-- Settings from before: a background the page no longer lists is none, and a path typed when Image had no
+-- choice for it, or behind a switch, is your own picture.
 local function Tidy()
-    if C.HIDDEN_BACKGROUNDS[S.Get("backgroundImage")] then S.Set("backgroundImage", "") end
-    if S.Raw and S.Raw("customImage") == nil and S.Get("backgroundPath") ~= "" then S.Set("customImage", true) end
+    local picked = S.Get("backgroundImage")
+    if C.HIDDEN_BACKGROUNDS[picked] then S.Set("backgroundImage", ""); picked = "" end
+    if not S.Raw then return end
+    local switch = S.Raw("customImage")
+    if switch == true or (switch == nil and picked == "" and S.Get("backgroundPath") ~= "") then
+        S.Set("backgroundImage", C.OWN_PICTURE)
+        S.Set("customImage", false)
+    end
 end
 
 local boot = CreateFrame("Frame")
