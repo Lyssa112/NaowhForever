@@ -38,6 +38,8 @@ local function Region(kind, parent)
     function r:SetFrameStrata(v) self.strata = v end
     function r:SetScale(v) self.scale = v end
     function r:SetReverseFill(v) self.reverse = v end
+    function r:IsMouseOver() return self.mouseOver == true end
+    function r:GetAlpha() return self.alpha end
     function r:GetScale() return self.scale or 1 end
     function r:EnableMouse(v) self.mouse = v end
     function r:SetToplevel(v) self.toplevel = v end
@@ -2043,6 +2045,108 @@ do
     check("and it can be added again", s.menu:Find("Add Window") ~= nil)
 end
 
+-- fading out of combat, full with the mouse over, and the mouse passing through a locked window
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    local function Fader()
+        for _, f in ipairs(s.frames) do
+            if f.scripts.OnUpdate then return f end
+        end
+    end
+    local function Tick(n)
+        local f = Fader()
+        for _ = 1, n or 1 do
+            if f and f.scripts.OnUpdate then f.scripts.OnUpdate(f, 0.2) end
+        end
+    end
+    check("not faded by default", w.alpha == 1 and s.store.Get("idleAlpha") == 1)
+    Tick(3)
+    check("and nothing is watching once it is full", Fader() == nil)
+
+    s.store.Set("idleAlpha", 0.3); s.Flush()
+    Tick(1)
+    check("Out of Combat Opacity: it fades toward that, a step at a time", w.alpha < 1 and w.alpha > 0.3)
+    Tick(30)
+    check("and gets there", math.abs(w.alpha - 0.3) < 1e-9)
+    w.mouseOver = true
+    Tick(30)
+    check("full with the mouse over it", w.alpha == 1)
+    w.mouseOver = false
+    Tick(30)
+    check("and back when it leaves", math.abs(w.alpha - 0.3) < 1e-9)
+    s.store.Set("hoverFull", false); s.Flush()
+    w.mouseOver = true
+    Tick(30)
+    check("with Full While Hovered off: the mouse is not looked at", math.abs(w.alpha - 0.3) < 1e-9)
+    w.mouseOver = false
+    s.combat = true
+    s.Fire("PLAYER_REGEN_DISABLED"); s.Flush()
+    Tick(30)
+    check("in combat: full", w.alpha == 1)
+    s.combat = false
+    s.Fire("PLAYER_REGEN_ENABLED"); s.Flush()
+    Tick(30)
+    check("and faded again after", math.abs(w.alpha - 0.3) < 1e-9)
+    s.ns.ShowUnlockMode(); s.Flush()
+    Tick(30)
+    check("while it is being placed: full", w.alpha == 1)
+    s.ns.HideUnlockMode(); s.Flush()
+    Tick(30)
+    check("and then faded", math.abs(w.alpha - 0.3) < 1e-9)
+    s.ns.PreviewDamageMeter()
+    Tick(30)
+    check("while the preview is up: full", w.alpha == 1)
+    s.Flush()
+    Tick(30)
+    check("and faded after it", math.abs(w.alpha - 0.3) < 1e-9)
+    local before = w.alpha
+    local f = Fader()
+    s.store.Set("idleAlpha", 0.8)
+    f.scripts.OnUpdate(f, 0.01)
+    check("a tick shorter than the interval does nothing", w.alpha == before)
+    s.store.Set("idleAlpha", 0.3)
+    s.store.Set("idleAlpha", 1); s.Flush()
+    Tick(30)
+    check("Out of Combat Opacity at 100%: back to full", w.alpha == 1)
+
+    local row = RowOf(s.page, "hoverFull")
+    local idle = RowOf(s.page, "idleAlpha")
+    check("Full While Hovered waits for a fade, and says so", row.needs() == false
+        and row.why == "Set Out of Combat Opacity below 100%" and idle.needs() == true)
+    s.store.Set("idleAlpha", 0.5)
+    check("and is on with one", row.needs() == true)
+    s.store.Set("idleAlpha", 1)
+
+    -- the mouse
+    local through = RowOf(s.page, "clickThrough")
+    check("the mouse is taken by default", w.rows[1].mouse == true and w.header.mouse == true
+        and w.grip.shown == true and w.passes == false)
+    check("Mouse Passes Through waits for Lock Window", through.needs() == false and through.why == "Turn on Lock Window")
+    s.store.Set("clickThrough", true); s.Flush()
+    check("on its own, while it is not locked, nothing changes", w.rows[1].mouse == true and w.passes == false)
+    s.store.Set("locked", true); s.Flush()
+    check("locked: the rows, the bar and the corner let the mouse through", w.rows[1].mouse == false
+        and w.rows[2].mouse == false and w.header.mouse == false and w.grip.shown == false and w.passes == true
+        and through.needs() == true)
+    table.insert(s.session.combatSources, Source("Cara", "HUNTER", "C", "c", false, "Player-3"))
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a row made later lets it through too", w.rows[3] ~= nil and w.rows[3].mouse == false)
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("an open breakdown does not take it either", w.title.text:find(" - ", 1, true) ~= nil and w.mouse == false)
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    s.ns.ShowUnlockMode(); s.Flush()
+    check("while it is being placed it takes the mouse again", w.rows[1].mouse == true and w.header.mouse == true)
+    s.ns.HideUnlockMode(); s.Flush()
+    s.store.Set("locked", false); s.Flush()
+    check("unlocked: it takes the mouse", w.rows[1].mouse == true and w.header.mouse == true and w.grip.shown == true)
+    check("the card says what it does", CardOf(s.page, "fade").summary(s.store) == "No fade")
+    s.store.Set("idleAlpha", 0.4); s.store.Set("locked", true)
+    check("with a fade and the mouse let through", CardOf(s.page, "fade").summary(s.store)
+        == "40% out of combat, mouse passes through")
+end
+
 -- bars: grown upward, filled from the right, and compared to the list's total
 do
     local s = Boot({ settings = { enabled = true } })
@@ -2974,7 +3078,7 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("fifteen cards, in their order", table.concat(ids, ",") == "lists,window,rows,numbers,header,time,text,"
+    check("sixteen cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,numbers,header,time,text,"
         .. "hover,history,barColors,textColors,windowColors,classColors,window2,window3" and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end

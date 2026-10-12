@@ -26,6 +26,7 @@ local GAME_CVAR_SAVED = "damageMeterGameWas"
 local DATA_EVENTS = { "DAMAGE_METER_COMBAT_SESSION_UPDATED", "DAMAGE_METER_CURRENT_SESSION_UPDATED",
     "DAMAGE_METER_RESET" }
 local STATE_EVENTS = { "PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE" }
+local FADE_EVERY, FADE_STEP, FADE_SNAP = 0.1, 0.35, 0.02
 
 local TEXT_OFF = "Enable the Damage Meter first."
 local TEXT_IN_COMBAT = "Preview is available outside combat."
@@ -40,6 +41,8 @@ local lastCombatEnd, override
 local preview = false
 local updateGeneration, previewGeneration = 0, 0
 local events = CreateFrame("Frame")
+local fader = CreateFrame("Frame")
+local fadeElapsed = 0
 local Update
 
 local function Get(w, base)
@@ -118,6 +121,11 @@ local function PaintTitleBar(frame, mode, seconds, fightName, text)
     clock:SetShown(shown)
 end
 
+-- Whether the mouse passes through the window: it is locked and the setting says so.
+local function PassesMouse()
+    return S.Get("clickThrough") == true and S.Get("locked") == true and not unlocked
+end
+
 -- Where the source of an open breakdown is in a list now: your own row, or the one with its guid.
 local function SourceNow(list, detail)
     for _, source in ipairs(list.combatSources) do
@@ -156,7 +164,7 @@ local function Render(w, session, available, seconds, lowerSession, fightName)
     local raid = S.Get("raidMode")
     local detail = w.detail ~= nil and not w.sample and S.Get("breakdown") == true
     frame.detail = detail
-    frame:EnableMouse(detail)
+    frame:EnableMouse(detail and not PassesMouse())
     local view, modeKey, title, listSession = raid and OwnOnly(session) or session, nil, nil, session
     if detail then view, modeKey, title, listSession = DetailView(w, session, lowerSession, seconds) end
     local lowerKey = detail and "" or Get(w, "lower")
@@ -432,6 +440,56 @@ local function HideAll()
     OnRowLeave()
 end
 
+-- How opaque a window should be now: full in combat, with the mouse over it (when set), and while it is
+-- being placed or previewed; else the opacity set for out of combat.
+local function TargetAlpha(w)
+    local idle = S.Get("idleAlpha")
+    if idle >= 1 or unlocked or preview or InCombatLockdown() then return 1 end
+    if S.Get("hoverFull") and w.frame:IsMouseOver() then return 1 end
+    return idle
+end
+
+-- Moves every shown window a step toward its opacity; true while any is still on its way.
+local function StepFade()
+    local moving = false
+    for index = 1, DM.MAX_WINDOWS do
+        local w = windows[index]
+        if w and w.frame and w.frame:IsShown() then
+            local target, now = TargetAlpha(w), w.frame:GetAlpha()
+            if now ~= target then
+                local nextAlpha = now + (target - now) * FADE_STEP
+                if math.abs(target - nextAlpha) < FADE_SNAP then nextAlpha = target end
+                w.frame:SetAlpha(nextAlpha)
+                moving = true
+            end
+        end
+    end
+    return moving
+end
+
+local function OnFadeTick(_, elapsed)
+    fadeElapsed = fadeElapsed + elapsed
+    if fadeElapsed < FADE_EVERY then return end
+    fadeElapsed = 0
+    if not StepFade() and S.Get("idleAlpha") >= 1 then fader:SetScript("OnUpdate", nil) end
+end
+
+-- Watches the mouse and the combat while the windows may be faded.
+local function StartFade()
+    fader:SetScript("OnUpdate", OnFadeTick)
+end
+
+-- The window takes the mouse, or lets it through.
+local function ApplyMouse(w)
+    local frame, through = w.frame, PassesMouse()
+    frame.header:EnableMouse(not through)
+    frame.grip:SetShown(not unlocked and not through)
+    for _, pane in ipairs(frame.panes) do
+        for _, row in ipairs(pane.rows) do row:EnableMouse(not through) end
+    end
+    frame.passes = through
+end
+
 -- The window's own scale. A change keeps its corner where it is: the saved place is in the window's own
 -- units, so it is converted to the new scale and put back.
 local function ApplyScale(w)
@@ -462,6 +520,8 @@ local function Draw(w, asSample)
             name)
     end
     w.frame:Show()
+    ApplyMouse(w)
+    StartFade()
 end
 
 function Update()

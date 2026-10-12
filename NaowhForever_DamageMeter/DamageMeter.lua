@@ -8,7 +8,7 @@ local TITLE, MAX_WINDOWS = "Damage Meter", 3
 -- The first window keeps the plain keys; the others add their number: mode2, session3, meterPos2.
 local S = ns.UI.ModuleSettings("damageMeter", {
     enabled = F.enabled,
-    visibility = "always", locked = false,
+    visibility = "always", locked = false, idleAlpha = 1, hoverFull = true, clickThrough = false,
     barHeight = 20, barSpacing = 2, growUp = false, reverseFill = false, barScale = "top",
     showTotal = true, showRate = true, showPercent = false, showDivider = false, showIcons = true, showRanks = true, highlightPlayer = true,
     barColor = "class", barAlpha = 0.85, backgroundAlpha = 0.9,

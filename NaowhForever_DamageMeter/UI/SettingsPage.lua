@@ -22,6 +22,8 @@ local OFF_TILE = "Turn on Tile Image"
 local OFF_OWN = "Pick Your Own Picture in Image"
 local OFF_TIME = "Turn on Show Fight Time"
 local OFF_BOTH = "Turn on Show Total and Show Per Second"
+local OFF_FADE = "Set Out of Combat Opacity below 100%"
+local OFF_LOCKED = "Turn on Lock Window"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local SCALE_RANGE = { C.MIN_SCALE, C.MAX_SCALE, 5 }
@@ -68,6 +70,8 @@ end
 local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
 local function ShowingTime() return DM.On() and S.Get("showTime") == true end
 local function BothFigures() return DM.On() and S.Get("showTotal") == true and S.Get("showRate") == true end
+local function Fading() return DM.On() and S.Get("idleAlpha") < 1 end
+local function Locked() return DM.On() and S.Get("locked") == true end
 -- Custom Image is for the choice of Image that is your own picture, and a picture is there when that has a
 -- path or another choice is a picture.
 local function OwnPicture() return S.Get("backgroundImage") == C.OWN_PICTURE end
@@ -132,6 +136,13 @@ end
 local function HeaderSummary(store)
     return ("%s, buttons %s"):format(C.TITLE_TEXTS[store.Get("titleText")] or "",
         store.Get("showButtons") and "on" or "off")
+end
+
+local function FadeSummary(store)
+    local idle = store.Get("idleAlpha")
+    local text = idle < 1 and ("%d%% out of combat"):format(math.floor(idle * 100 + 0.5)) or "No fade"
+    if store.Get("clickThrough") and store.Get("locked") then text = text .. ", mouse passes through" end
+    return text
 end
 
 local function TimeSummary(store)
@@ -343,6 +354,22 @@ page:Card({
           help = "Repeats the picture in place of stretching it, for patterns." },
         { key = "imageTileSize", label = "Tile Size", slider = TILE_RANGE, unit = "px", needs = TilesImage,
           why = OFF_TILE, help = "How wide each repeat is, in pixels." },
+    },
+})
+
+page:Card({
+    id = "fade", name = "Fade and Mouse", order = 22,
+    help = "How see-through the window is out of combat, and whether the mouse goes through it.",
+    summary = FadeSummary,
+    rows = {
+        { key = "idleAlpha", label = "Out of Combat Opacity", slider = BACKGROUND_RANGE, unit = "%",
+          scale = TO_FRACTION, needs = Enabled, why = OFF,
+          help = "How opaque the whole window is when you are not in combat. In combat it is full." },
+        { key = "hoverFull", label = "Full While Hovered", toggle = true, needs = Fading, why = OFF_FADE,
+          help = "The window is fully opaque while the mouse is over it." },
+        { key = "clickThrough", label = "Mouse Passes Through", toggle = true, needs = Locked, why = OFF_LOCKED,
+          help = "While the window is locked, clicks and the mouse go through it to the game. The spell "
+              .. "panel and clicking a name do not work then." },
     },
 })
 

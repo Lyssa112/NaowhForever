@@ -30,7 +30,7 @@ NaowhForever_DamageMeter/
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
-    SettingsPage.lua             its settings page: fifteen small cards
+    SettingsPage.lua             its settings page: sixteen small cards
   README.md                      this file
 ```
 
@@ -82,6 +82,12 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- Fading is the window's alpha, stepped toward its target from a small `OnUpdate` (every tenth of a
+  second, and only while a fade is set or still moving): full in combat, while the mouse is over the
+  window (`IsMouseOver`, since a row on top of the window would take an `OnEnter` of the frame itself),
+  while it is being placed and in the preview, else the Out of Combat Opacity. The spell panel is not
+  the window's child, so it is not faded. Mouse Passes Through, with the window locked, turns the mouse
+  off on the title bar, the rows, the corner and the window itself, so hover and clicks do not work.
 - Grow Upward puts row i in the slot `capacity - i` of its pane's room (the first row at the bottom of
   it), so each pane of a window with a second list fills from its own bottom. Fill From the Right is the
   status bar's `SetReverseFill`. Bars Compare To is the second argument of `SetMinMaxValues`: the list's
