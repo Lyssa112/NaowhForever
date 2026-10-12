@@ -19,7 +19,7 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     showSummary = false, titleSize = 12, timeSize = 11,
     classColors = {}, raidMode = false, hideDelay = 8,
     backgroundImage = "", imageAlpha = 1, imageTile = false,
-    barCustomColor = false, edgeColor = false,
+    barCustomColor = false, ownBarColor = false, edgeColor = false,
     nameColor = false, valueColor = false, rankColor = false, columnColor = false, titleColor = false,
     timeColor = false, summaryColor = false,
     windowColor = false, headerColor = false, borderColor = false,

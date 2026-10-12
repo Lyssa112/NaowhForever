@@ -11,7 +11,7 @@ local TEXT_SESSION = "Session"
 local TEXT_FIGHTS, TEXT_NO_FIGHTS = "Past Fights", "No Past Fights Yet"
 local TEXT_REPORT, TEXT_RESET, TEXT_RESET_ASK = "Report To", "Reset Data", "Reset the damage meter data?"
 local TEXT_ADD, TEXT_CLOSE, TEXT_LOCK, TEXT_SETTINGS = "Add Window", "Close Window", "Lock Window", "Settings"
-local TEXT_RAID = "Raid Mode"
+local TEXT_RAID, TEXT_BAR_COLOR = "Raid Mode", "Bar Color"
 
 local Menus = {}
 DM.Menus = Menus
@@ -69,6 +69,11 @@ function Menus.Window(w, owner)
         local free = FirstClosed()
         if free then root:CreateButton(TEXT_ADD, function() S.Set(Key("window", free), true) end) end
         if w.index > 1 then root:CreateButton(TEXT_CLOSE, function() S.Set(Key("window", w.index), false) end) end
+        local bars = root:CreateButton(TEXT_BAR_COLOR)
+        for _, key in ipairs(C.BAR_COLORS_ORDER) do
+            bars:CreateRadio(C.BAR_COLORS[key], function() return S.Get("barColor") == key end,
+                function() S.Set("barColor", key) end)
+        end
         root:CreateCheckbox(TEXT_RAID, function() return S.Get("raidMode") == true end,
             function() S.Set("raidMode", not S.Get("raidMode")) end)
         root:CreateCheckbox(TEXT_LOCK, function() return S.Get("locked") == true end,

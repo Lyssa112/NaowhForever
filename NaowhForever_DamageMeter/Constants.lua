@@ -37,6 +37,8 @@ ns.DamageMeter.C = {
     NUMBER_UNITS = { game = "Game Default", latin = "K, M, B", asian = "Ten-thousands", full = "Full Numbers" },
     NUMBER_UNITS_ORDER = { "game", "latin", "asian", "full" },
     NUMBER_DECIMALS_MAX = 2, MAX_HIDE_DELAY = 60,
+    BAR_COLORS = { class = "Class Colors", accent = "Theme Accent", custom = "Custom Color" },
+    BAR_COLORS_ORDER = { "class", "accent", "custom" },
     NAME_FORMATS = { full = "Full Name", first = "First Name", last = "Last Name", initials = "Initials",
         firstInitial = "First Name and Initial" },
     NAME_FORMATS_ORDER = { "full", "first", "last", "initials", "firstInitial" },

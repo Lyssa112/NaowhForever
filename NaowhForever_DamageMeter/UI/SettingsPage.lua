@@ -32,8 +32,7 @@ local SESSION = { C.SESSION_LABELS, C.SESSION_ORDER }
 local SHOW = { { always = "Always", instance = "In Instances", group = "In a Group", combat = "In Combat" },
     { "always", "instance", "group", "combat" } }
 local DELAY_RANGE = { 0, C.MAX_HIDE_DELAY, 1 }
-local BAR_COLOR = { { class = "Class Colors", accent = "Theme Accent", custom = "Custom Color" },
-    { "class", "accent", "custom" } }
+local BAR_COLOR = { C.BAR_COLORS, C.BAR_COLORS_ORDER }
 local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "class" } }
 local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
@@ -45,6 +44,12 @@ local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
 local function Highlighting() return DM.On() and S.Get("highlightPlayer") == true end
 local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
 local function HasImage() return DM.On() and S.Get("backgroundImage") ~= "" end
+-- Your own bar: the color picked for it, or what the settings would give your class.
+local function OwnBarGet()
+    local c = DM.Look.BarColor({ isLocalPlayer = true, classFilename = select(2, UnitClass("player")) })
+    return c.r, c.g, c.b, 1
+end
+
 local function ClassBars() return DM.On() and S.Get("barColor") == "class" end
 local function Abbreviating()
     local units = S.Get("numberUnits")
@@ -186,6 +191,9 @@ local function ColorRows()
         { key = "barColor", label = "Bar Color", choice = BAR_COLOR, needs = Enabled, why = OFF,
           help = "Class Colors: each player's class. Theme Accent: every bar in your theme's Accent. Custom "
               .. "Color: every bar in the one you pick." },
+        { key = "ownBarColor", label = "Your Bar Color", colour = true, get = OwnBarGet, set = PickedSet("ownBarColor"),
+          needs = Enabled, why = OFF, help = "A color for your own bar alone, whichever Bar Color is chosen. "
+              .. "Reset it to follow Bar Color." },
     }
     local group = "Bars"
     for _, entry in ipairs(C.COLORS) do

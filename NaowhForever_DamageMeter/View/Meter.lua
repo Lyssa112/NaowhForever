@@ -74,8 +74,13 @@ function Look.Color(key)
     return T[tokenOf[key]]
 end
 
--- A source's bar color: its class, the theme's Accent for everyone, or the one picked.
+-- A source's bar color: yours if you picked one, else its class, the theme's Accent for everyone, or the
+-- one picked for everyone.
 function Look.BarColor(source)
+    if source.isLocalPlayer == true then
+        local own = S.Get("ownBarColor")
+        if type(own) == "table" then return own end
+    end
     local choice = S.Get("barColor")
     if choice == "accent" then return T.accent end
     if choice == "custom" then return Look.Color("barCustomColor") end

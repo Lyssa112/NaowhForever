@@ -932,6 +932,15 @@ do
     s.store.Set("raidMode", false); s.Flush()
     check("off again: the whole group", w.rows[3].shown == true and w.rows[1].rank.text == "1")
     w.more.onClick()
+    local bars = s.menu:Find("Bar Color")
+    check("the window menu changes the bar color: three choices, the current one marked", bars and #bars.items == 3
+        and bars.items[1].text == "Class Colors" and bars.items[1].selected() == true
+        and bars.items[2].selected() == false)
+    bars.items[2].set()
+    check("and sets it", s.store.Get("barColor") == "accent")
+    bars.items[3].set()
+    check("custom too", s.store.Get("barColor") == "custom" and bars.items[3].selected() == true)
+    s.store.Set("barColor", "class")
     local item = s.menu:Find("Raid Mode")
     check("the window menu has it", item and item.kind == "check" and item.selected() == false)
     item.set()
@@ -1008,6 +1017,16 @@ do
     s.store.Set("barColor", "class"); s.store.Set("classColors", {}); s.Flush()
     check("none picked: the game's colors", Is(Bar(row), CLASS.MAGE))
 
+    local MINE = { r = 0.9, g = 0.2, b = 0.7 }
+    s.store.Set("ownBarColor", MINE); s.Flush()
+    check("Your Bar Color: your bar alone", Is(Bar(own), MINE) and Is(Bar(row), CLASS.MAGE) and Is(Bar(third), CLASS.MAGE))
+    s.store.Set("barColor", "accent"); s.Flush()
+    check("whichever Bar Color is chosen", Is(Bar(own), MINE) and Is(Bar(row), THEME.accent))
+    s.store.Set("barColor", "custom"); s.Flush()
+    check("custom too", Is(Bar(own), MINE))
+    s.store.Set("barColor", "class"); s.store.Set("ownBarColor", false); s.Flush()
+    check("not picked: your bar follows Bar Color", Is(Bar(own), CLASS.ROGUE))
+
     check("no image by default", w.image.shown == false)
     s.store.Set("backgroundImage", "Marble"); s.Flush()
     check("a background from the shared media, stretched", w.image.shown == true and w.image.texture == "Media\\Marble"
@@ -1044,6 +1063,26 @@ do
     s.store.Set("barColor", "accent")
     check("and are off without it", classRows[1].needs() == false)
     s.store.Set("barColor", "class")
+
+    local mine
+    for _, r2 in ipairs(rows) do
+        if r2.key == "ownBarColor" then mine = r2 end
+    end
+    check("a Your Bar Color row, a color picker", mine and mine.colour == true and mine.label == "Your Bar Color")
+    s.store.Set("classColors", {})
+    local mr, mg, mb = mine.get()
+    check("it shows what your bar is now, your class's color", mr == CLASS.ROGUE.r and mg == CLASS.ROGUE.g
+        and mb == CLASS.ROGUE.b)
+    s.store.Set("barColor", "accent")
+    mr = mine.get()
+    check("and follows Bar Color", mr == THEME.accent.r)
+    s.store.Set("barColor", "class")
+    mine.set(0.1, 0.2, 0.3)
+    local stored = s.store.Get("ownBarColor")
+    check("picking stores it", type(stored) == "table" and stored.r == 0.1 and stored.g == 0.2 and stored.b == 0.3)
+    mr, mg = mine.get()
+    check("and it shows it", mr == 0.1 and mg == 0.2)
+    s.store.Set("ownBarColor", false)
 
     local choices
     for _, r2 in ipairs(page.cards[1].rows) do
