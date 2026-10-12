@@ -28,7 +28,8 @@ NaowhForever_DamageMeter/
     History.lua                  the kept fights in a window of their own (DM.HistoryWindow)
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
-    SettingsPage.lua             its settings page: fourteen small cards and one that explains images
+    ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
+    SettingsPage.lua             its settings page: fourteen small cards
   README.md                      this file
 ```
 
@@ -66,11 +67,16 @@ NaowhForever_DamageMeter/
   size is not known to the add-on and the engine's own tile flags need the picture to be a power of two.
   The game's plain backgrounds (Solid, Blizzard Tooltip, Out of Control, Low Health) are left out of the
   list and read as none. At login (`Tidy`) a pick of one is cleared, and a path typed before Image had a
-  choice for it, or behind the switch there once was, is made that choice. An info card on the page, opened by a button in
+  choice for it, or behind the switch there once was, is made that choice. A dialog, opened by a button in
   the Window card, says how to add a picture: a .png, .tga or .blp in a folder of the player's own under
   `AddOns`, and its path with the extension. A .png loads on this client as it does for other add-ons
   here; a .jpg is not known to. The tooltip is a fixed-width card, so a help text must not hold a long
-  word with no spaces, such as a path: it is cut short, which is why the example lives on the info card.
+  word with no spaces, such as a path: it is cut short, which is why the example lives in the dialog.
+- The media's own list has a None of its own, which is left out with the plain backgrounds since the
+  page's Image already has one.
+- The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
+  beside it when there is room, so the two do not cover each other. A window the player has moved stays
+  where it was put.
 - The windows are plain frames, so they move and resize in combat; only Lock Window stops that. The
   sizing flag lives on the frame (`frame.sizing`), which is what the layout reads while the client
   resizes it.

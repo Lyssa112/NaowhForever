@@ -34,6 +34,9 @@ local function Region(kind, parent)
     function r:GetText() return self.text end
     function r:SetFormattedText(fmt, ...) self.text = fmt:format(...) end
     -- the width the text takes, held to the width the region was given
+    function r:GetStringHeight() return 14 end
+    function r:SetFrameStrata(v) self.strata = v end
+    function r:SetToplevel(v) self.toplevel = v end
     function r:GetStringWidth()
         local natural = self.stringWidth or 40
         if self.w > 0 then return math.min(natural, self.w) end
@@ -120,7 +123,7 @@ local function Boot(opts)
     local s = { settings = opts.settings or {}, calls = {}, idCalls = {}, spellCalls = {}, spellIdCalls = {},
         durationCalls = {}, duration = 125, enemyCalls = {}, enemyIdCalls = {},
         cvars = { damageMeterEnabled = opts.gameMeter or "1" }, timers = {}, printed = {}, frames = {}, buttons = {},
-        confirms = {}, hooks = {}, account = {}, sent = {}, movers = {}, names = { [101] = "Fireball", [102] = "Pyroblast" } }
+        confirms = {}, modals = {}, shells = {}, hooks = {}, account = {}, sent = {}, movers = {}, names = { [101] = "Fireball", [102] = "Pyroblast" } }
     local defaults
     local store = {}
     function store.Get(k)
@@ -141,7 +144,19 @@ local function Boot(opts)
         UI = {
             ModuleSettings = function(_, d) defaults = d; return store end,
             TexturePath = function(name, fallback) return name ~= "" and name or fallback end,
-            RefreshPage = function() s.refreshed = (s.refreshed or 0) + 1 end,
+            KeepFont = function(panel, key, size, outline, color)
+                panel.kept = panel.kept or {}
+                local fs = panel.kept[key] or Region("FontString", panel)
+                panel.kept[key] = fs
+                return fs
+            end,
+            KeepButton = function(panel, key, text, w, h, onClick)
+                panel.kept = panel.kept or {}
+                local b = panel.kept[key] or Region("Button", panel)
+                b.label, b.onClick = text, onClick
+                panel.kept[key] = b
+                return b
+            end,
             AttachMover = function(frame, label, onSave, page, card)
                 local m = Region("Mover", frame)
                 s.mover = m
@@ -153,18 +168,10 @@ local function Boot(opts)
             Style = { ICON_CROP = 0.08, ALPHA_RANGE = { 0, 100, 5 }, OPACITY_STEP = 5, PERCENT_SCALE = 0.01 },
             Parts = { HudFont = function(fs, font, size) fs.fontSize = size; fs.font = font end },
             Settings = { Group = function(name) return { group = name } end, Look = function(_, o) return { look = o } end,
-                CardOf = function(uid)
-                    local id = uid:match(":([^:]+)$")
-                    for _, info in ipairs(s.page and s.page.infos or {}) do
-                        if info.id == id then return info end
-                    end
-                end,
-                SetOpen = function(card, on) card.opened = on end,
                 Page = function(_, st)
                     local page = { store = st, cards = {} }
                     function page:Window(def) self.window = def; return self end
                     function page:Card(def) self.cards[#self.cards + 1] = def; s.page = self; return self end
-                    function page:Info(def) self.infos = self.infos or {}; self.infos[#self.infos + 1] = def; return self end
                     return page
                 end },
         },
@@ -182,6 +189,18 @@ local function Boot(opts)
         SetButtonText = function(b, text) b.label = text end,
         Tooltip = Noop, AllowOffscreen = Noop,
         Confirm = function(text, yes) s.confirms[#s.confirms + 1] = { text = text, yes = yes } end,
+        MakeModal = function(w, h, key)
+            local shell = s.shells[key]
+            if not shell then
+                local dimmer = Region("Frame")
+                dimmer.shown = false
+                shell = { key = key, dimmer = dimmer, panel = Region("Frame", dimmer) }
+                s.shells[key] = shell
+                s.modals[#s.modals + 1] = shell
+            end
+            shell.panel.w, shell.panel.h = w, h
+            return shell.dimmer, shell.panel
+        end,
         Print = function(t) s.printed[#s.printed + 1] = t end,
         OpenOptionsWindow = function(name) s.opened = name end,
         AccountSettings = function() return s.account end,
@@ -315,7 +334,7 @@ local function Boot(opts)
     env.UIParent.w = 1000
     local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Numbers.lua", "Names.lua", "Report.lua",
         "History.lua", "View/Meter.lua", "View/Breakdown.lua", "UI/History.lua", "UI/Menus.lua", "UI/Meter.lua",
-        "UI/SettingsPage.lua" }
+        "UI/ImageHelp.lua", "UI/SettingsPage.lua" }
     for _, file in ipairs(files) do
         local chunk = assert(loadfile("NaowhForever_DamageMeter/" .. file))
         setfenv(chunk, env)
@@ -324,10 +343,10 @@ local function Boot(opts)
     s.ns, s.store, s.env = ns, store, env
     if opts.media then
         local all = { Marble = true, Dots = true, Solid = true, ["Blizzard Tooltip"] = true,
-            ["Blizzard Out of Control"] = true, ["Blizzard Low Health"] = true }
+            ["Blizzard Out of Control"] = true, ["Blizzard Low Health"] = true, None = true }
         s.lsm = { List = function(_, kind)
                 return kind == "background" and { "Marble", "Dots", "Solid", "Blizzard Tooltip",
-                    "Blizzard Out of Control", "Blizzard Low Health" } or {}
+                    "Blizzard Out of Control", "Blizzard Low Health", "None" } or {}
             end,
             Fetch = function(_, kind, name)
                 if kind == "background" and all[name] then return "Media\\" .. name end
@@ -1255,6 +1274,46 @@ do
     s.DM.HistoryWindow.Toggle()
     check("and it opens again", win.shown == true)
 
+    -- in front of the settings window, and beside it when there is room
+    check("above the settings window, not under it", win.strata == "FULLSCREEN" and win.toplevel == true)
+    check("with nothing to avoid: in the middle", win.points[1][1] == "CENTER" and #win.points == 1)
+    win.close.onClick()
+    local optionsFrame = Region("Frame")
+    optionsFrame.GetLeft = function() return 100 end
+    optionsFrame.GetRight = function() return 300 end
+    s.env.NaowhForeverOptions = optionsFrame
+    s.DM.HistoryWindow.Toggle()
+    check("the settings window open with room at its right: beside it", win.points[1][1] == "TOPLEFT"
+        and win.points[1][2] == optionsFrame and win.points[1][3] == "TOPRIGHT" and win.points[1][4] == 8)
+    win.close.onClick()
+    optionsFrame.GetLeft = function() return 700 end
+    optionsFrame.GetRight = function() return 900 end
+    s.DM.HistoryWindow.Toggle()
+    check("no room at the right, room at the left: there", win.points[1][1] == "TOPRIGHT"
+        and win.points[1][2] == optionsFrame and win.points[1][3] == "TOPLEFT" and win.points[1][4] == -8)
+    win.close.onClick()
+    optionsFrame.GetLeft = function() return 100 end
+    optionsFrame.GetRight = function() return 900 end
+    s.DM.HistoryWindow.Toggle()
+    check("room nowhere: in the middle, and in front", win.points[1][1] == "CENTER" and win.strata == "FULLSCREEN")
+    win.close.onClick()
+    optionsFrame.GetLeft = function() return 100 end
+    optionsFrame.GetRight = function() return 400 end
+    s.DM.HistoryWindow.Toggle()
+    check("a gap of its own is wanted too: with none, not beside it", win.points[1][1] == "CENTER")
+    win.close.onClick()
+    optionsFrame:Hide()
+    optionsFrame.GetLeft = function() return 100 end
+    optionsFrame.GetRight = function() return 300 end
+    s.DM.HistoryWindow.Toggle()
+    check("the settings window shut: in the middle again", win.points[1][1] == "CENTER")
+    win.header.scripts.OnDragStop(win.header)
+    win.close.onClick()
+    optionsFrame:Show()
+    s.DM.HistoryWindow.Toggle()
+    check("where the player put it stays", win.points[1][1] == "CENTER" and win.moved == true)
+    s.env.NaowhForeverOptions = nil
+
     -- from the menu
     s.Window().more.onClick()
     s.menu:Find("Fight History").onClick()
@@ -1418,6 +1477,9 @@ do
     local s = Boot({ settings = { enabled = true, backgroundImage = "Solid" } })
     s.Login()
     check("a background the page no longer lists is none", s.store.Get("backgroundImage") == "")
+    local called = Boot({ settings = { enabled = true, backgroundImage = "None" } })
+    called.Login()
+    check("so is the media's None, by name", called.store.Get("backgroundImage") == "")
     local both = Boot({ settings = { enabled = true, backgroundImage = "Solid", backgroundPath = "Interface\\x" } })
     both.Login()
     check("one it no longer lists beside a typed path is your own picture", both.store.Get("backgroundImage") == "@own")
@@ -1671,6 +1733,10 @@ do
         and order[4] == "Dots" and #order == 4 and values.Solid == nil
         and values["Blizzard Tooltip"] == nil and values["Blizzard Out of Control"] == nil
         and values["Blizzard Low Health"] == nil)
+    check("the media's own None is not listed again", values.None == nil and #order == 4)
+    s.store.Set("backgroundImage", "None")
+    values, order = choices()
+    check("one saved as the media's None reads as None, listed once", values.None == "None" and #order == 4)
     s.store.Set("backgroundImage", "Solid")
     values, order = choices()
     check("one picked before they were left out reads as None, and is not offered", values.Solid == "None"
@@ -1700,15 +1766,15 @@ do
     end
     check("a button for how to add a picture, inside the Window card", howTo and hostCard.id == "window"
         and howTo.buttonText == "Show How")
-    local infoCard = page.infos[1]
-    check("the card of its own is shut", infoCard.opened == nil)
+    check("no card of its own for it", page.infos == nil)
     howTo.button()
-    check("the button opens it, and draws the page again", infoCard.opened == true and s.refreshed == 1)
-    local info = page.infos and page.infos[1]
-    check("a card that says how to add a picture", info and info.id == "images" and info.name == "Add Your Own Image"
-        and #info.lines == 5)
+    local modal = s.modals[1]
+    check("the button opens a dialog", modal and modal.key == "damageMeterImages" and modal.dimmer.shown == true)
+    local kept = modal.panel.kept
+    check("headed, five parts, and a button to close it", kept.head.text == "Add Your Own Image"
+        and kept.title1 and kept.text5 and kept.title5 and kept.title6 == nil and kept.close.label == "Close")
     local text = {}
-    for _, line in ipairs(info.lines) do text[#text + 1] = line.title .. " " .. line.text end
+    for i = 1, 5 do text[#text + 1] = kept["title" .. i].text .. " " .. kept["text" .. i].text end
     local all = table.concat(text, " ")
     check("it names the file kinds, the folder, the restart and the box", all:find(".png", 1, true) ~= nil
         and all:find(".tga", 1, true) ~= nil and all:find(".blp", 1, true) ~= nil
@@ -1718,6 +1784,17 @@ do
         and all:find("green square", 1, true) ~= nil)
     check("and to pick Your Own Picture in Image", all:find("pick Your Own Picture", 1, true) ~= nil)
     check("and the extension is part of the path", all:find("panel.png", 1, true) ~= nil)
+    local function Below(fs, above, gap)
+        local p = fs.points[1]
+        return p[1] == "TOPLEFT" and p[2] == above and p[3] == "BOTTOMLEFT" and p[4] == 0 and p[5] == -gap
+    end
+    check("each part is below the one before, with a gap, in its own width", Below(kept.title1, kept.head, 12)
+        and Below(kept.text1, kept.title1, 2) and Below(kept.title2, kept.text1, 10) and kept.text1.w == 448)
+    check("tall enough for all of it", modal.panel.h > 5 * 14 * 2)
+    kept.close.onClick()
+    check("Close hides it", modal.dimmer.shown == false)
+    howTo.button()
+    check("and it opens again, as the one dialog", #s.modals == 1 and modal.dimmer.shown == true)
     s.store.Set("backgroundImage", "Lost")
     values, order = choices()
     check("a name that is not there stays chosen, marked", values.Lost == "Lost (unavailable)" and order[5] == "Lost")

@@ -42,9 +42,10 @@ ns.DamageMeter.C = {
     NUMBER_DECIMALS_MAX = 2, MAX_HIDE_DELAY = 60, MIN_KEEP = 5, MAX_KEEP = 100, MIN_TILE = 16, MAX_TILE = 512,
     -- The choice of Image that stands for the picture typed in Custom Image.
     OWN_PICTURE = "@own",
-    -- Pictures the shared media lists that are not backgrounds worth putting behind a meter.
+    -- Pictures the shared media lists that are not backgrounds worth putting behind a meter, and its own
+    -- None, which the page already has.
     HIDDEN_BACKGROUNDS = { ["Solid"] = true, ["Blizzard Tooltip"] = true, ["Blizzard Out of Control"] = true,
-        ["Blizzard Low Health"] = true },
+        ["Blizzard Low Health"] = true, ["None"] = true },
     BAR_COLORS = { class = "Class Colors", accent = "Theme Accent", custom = "Custom Color" },
     BAR_COLORS_ORDER = { "class", "accent", "custom" },
     OWN_BAR_STYLES = { bar = "Same as Bar Color", class = "Class Color", custom = "Custom Color" },

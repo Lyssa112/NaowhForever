@@ -100,13 +100,6 @@ local function ListsSummary(store)
     return ("%s, %s"):format(text, (C.SESSION_LABELS[store.Get("session")] or C.SESSION_LABELS.current):lower())
 end
 
--- Opens the how-to card, under the cards, and draws the page again so it shows.
-local function OpenHowTo()
-    local card = Settings.CardOf(C.PAGE .. ":images")
-    if card then Settings.SetOpen(card, true) end
-    if ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
-end
-
 local function WindowSummary(store)
     local text = ("%d by %d"):format(store.Get("width"), store.Get("height"))
     if store.Get("locked") then text = text .. ", locked" end
@@ -320,37 +313,14 @@ page:Card({
         { key = "backgroundPath", label = "Custom Image", text = true, wide = true, needs = PicturePath,
           why = OFF_OWN, help = "The path of your own picture. Used when Image is Your Own Picture." },
         { label = "Adding a Picture", buttonText = "Show How", needs = Enabled, why = OFF,
-          button = function() OpenHowTo() end,
-          help = "Opens Add Your Own Image, below this card." },
+          button = function() DM.ShowImageHelp() end,
+          help = "A window that says where to put a picture and what to type." },
         { key = "imageAlpha", label = "Image Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION,
           needs = HasImage, why = OFF_IMAGE },
         { key = "imageTile", label = "Tile Image", toggle = true, needs = HasImage, why = OFF_IMAGE,
           help = "Repeats the picture in place of stretching it, for patterns." },
         { key = "imageTileSize", label = "Tile Size", slider = TILE_RANGE, unit = "px", needs = TilesImage,
           why = OFF_TILE, help = "How wide each repeat is, in pixels." },
-    },
-})
-
-page:Info({
-    id = "images", name = "Add Your Own Image", order = 25,
-    summary = "Where to put a picture, and what to type",
-    lines = {
-        { title = "The picture", text = "A .png, .tga or .blp file. Make its width and height powers of two, "
-            .. "such as 128, 256, 512 or 1024, to be safe; a small one, 128 or 256, is good for a pattern that "
-            .. "is repeated with Tile Image, and Tile Size says how wide each repeat is. A .jpg is most "
-            .. "likely not read by the game: open it and save it as a .png first." },
-        { title = "Where it goes", text = "In the game's Interface\\AddOns folder make a folder of your own, "
-            .. "such as MyBackgrounds, and put the file in it, for instance MyBackgrounds\\panel.png. A folder "
-            .. "of your own is not touched when add-ons are updated. Restart the game once so it finds "
-            .. "the file." },
-        { title = "What to do in the settings", text = "In the Window card, under Picture, pick Your Own Picture "
-            .. "in Image, and write the path from Interface in Custom Image, with backslashes and with the "
-            .. "file's extension: Interface\\AddOns\\MyBackgrounds\\panel.png. Pick None or another "
-            .. "picture in Image to go back." },
-        { title = "If it is a green square", text = "The game did not find the file. Check the folder name, "
-            .. "the spelling and the extension, and that the game was restarted after the file was added." },
-        { title = "Or a media add-on", text = "An add-on that adds pictures to the shared media, such as a "
-            .. "SharedMedia pack, lists them under Image. The game's plain ones, Solid among them, are left out." },
     },
 })
 

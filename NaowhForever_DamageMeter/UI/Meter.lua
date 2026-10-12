@@ -86,7 +86,8 @@ end
 -- Puts the title and the fight time in the bar where the settings say. The buttons hold its right end and
 -- the two share the rest: the time goes when both do not fit, and a long title is cut to what is there.
 local function PaintTitleBar(frame, mode, seconds, fightName)
-    local title, time, header = frame.title, frame.time, frame.header
+    local title, header = frame.title, frame.header
+    local clock = frame.time
     title:SetWidth(0)
     title:SetText(TitleText(mode, fightName))
     local textWidth, timeWidth = math.ceil(title:GetStringWidth()), Look.TimeWidth()
@@ -108,16 +109,16 @@ local function PaintTitleBar(frame, mode, seconds, fightName)
     title:ClearAllPoints()
     title:SetPoint("LEFT", header, "LEFT", x, 0)
     title:SetWidth(drawn)
-    time:ClearAllPoints()
+    clock:ClearAllPoints()
     if place == "title" then
-        time:SetPoint("LEFT", title, "RIGHT", BUTTON_GAP, 0); time:SetJustifyH("LEFT")
+        clock:SetPoint("LEFT", title, "RIGHT", BUTTON_GAP, 0); clock:SetJustifyH("LEFT")
     elseif place == "left" then
-        time:SetPoint("LEFT", header, "LEFT", low, 0); time:SetJustifyH("LEFT")
+        clock:SetPoint("LEFT", header, "LEFT", low, 0); clock:SetJustifyH("LEFT")
     else
-        time:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP, 0); time:SetJustifyH("RIGHT")
+        clock:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP, 0); clock:SetJustifyH("RIGHT")
     end
-    time:SetText(shown and DM.Clock(seconds) or "")
-    time:SetShown(shown)
+    clock:SetText(shown and DM.Clock(seconds) or "")
+    clock:SetShown(shown)
     local left = math.max(0, x - TITLE_X)
     frame.modeButton:ClearAllPoints()
     frame.modeButton:SetPoint("TOPLEFT", header, "TOPLEFT", left, 0)

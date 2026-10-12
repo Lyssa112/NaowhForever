@@ -9,6 +9,8 @@ local S = DM.Settings
 local C, Look, Format, History = DM.C, DM.Look, DM.Format, DM.History
 
 local FRAME_NAME = "NaowhForeverDamageMeterHistory"
+local OPTIONS_NAME = "NaowhForeverOptions"
+local SIDE_GAP = 8
 local HEADER, TITLE_SIZE, TEXT_SIZE, PAD, GAP = C.HEADER, 12, 11, 8, 4
 local ROW_H, VISIBLE, HEAD_H = 18, 12, 18
 local BUTTON_H, CLOSE_W, CLEAR_W, BUTTON_GAP = 18, 22, 52, 4
@@ -108,11 +110,31 @@ local function Paint()
     end
 end
 
+-- Beside the settings window when it is open and there is room, so the two do not cover each other, and
+-- else in the middle of the screen. Where the player moved it to stays.
+local function Place()
+    if frame.moved then return end
+    frame:ClearAllPoints()
+    local options = _G[OPTIONS_NAME]
+    if options and options:IsShown() and options:GetLeft() then
+        local ratio = options:GetEffectiveScale() / UIParent:GetEffectiveScale()
+        local left, right = options:GetLeft() * ratio, options:GetRight() * ratio
+        if UIParent:GetWidth() - right >= WIDTH + SIDE_GAP then
+            frame:SetPoint("TOPLEFT", options, "TOPRIGHT", SIDE_GAP, 0)
+            return
+        elseif left >= WIDTH + SIDE_GAP then
+            frame:SetPoint("TOPRIGHT", options, "TOPLEFT", -SIDE_GAP, 0)
+            return
+        end
+    end
+    frame:SetPoint("CENTER")
+end
+
 local function Build()
     frame = CreateFrame("Frame", FRAME_NAME, UIParent)
     frame:SetSize(WIDTH, HEIGHT)
-    frame:SetPoint("CENTER")
-    frame:SetFrameStrata("DIALOG")
+    frame:SetFrameStrata("FULLSCREEN")
+    frame:SetToplevel(true)
     frame:SetMovable(true); frame:SetClampedToScreen(true); frame:EnableMouseWheel(true)
     frame.rows, frame.titles = {}, {}
     frame.background = ns.Solid(frame, "BACKGROUND", T.bg, 1)
@@ -122,7 +144,7 @@ local function Build()
     frame.header:SetPoint("TOPLEFT"); frame.header:SetPoint("TOPRIGHT"); frame.header:SetHeight(HEADER)
     frame.header:EnableMouse(true); frame.header:RegisterForDrag("LeftButton")
     frame.header:SetScript("OnDragStart", function() frame:StartMoving() end)
-    frame.header:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
+    frame.header:SetScript("OnDragStop", function() frame:StopMovingOrSizing(); frame.moved = true end)
     frame.headerBackground = ns.Solid(frame.header, "BACKGROUND", T.panel, 1)
     frame.headerBackground:SetAllPoints()
     frame.title = ns.Font(frame.header, TITLE_SIZE, "OUTLINE", T.fg)
@@ -165,6 +187,7 @@ function Window.Toggle()
     else
         offset = 0
         Paint()
+        Place()
         frame:Show()
     end
 end

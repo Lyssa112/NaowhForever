@@ -13,5 +13,6 @@
     <Script file="UI\History.lua"/>
     <Script file="UI\Menus.lua"/>
     <Script file="UI\Meter.lua"/>
+    <Script file="UI\ImageHelp.lua"/>
     <Script file="UI\SettingsPage.lua"/>
 </Ui>
