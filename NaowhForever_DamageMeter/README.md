@@ -31,7 +31,7 @@ NaowhForever_DamageMeter/
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
-    SettingsPage.lua             its settings page: twenty-one small cards
+    SettingsPage.lua             its settings page: twenty-two small cards
   README.md                      this file
 ```
 
@@ -83,6 +83,10 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- The summary line is made of up to four pieces (the session's name, its total, the raid's per-second
+  figure, your rank), each a setting, joined by `SetFormattedText`; Summary Size is its font size. Short
+  List Names (`DM.ModeLabel`) swaps a list's label for its short one in the title, the second list's
+  strip and the spell panel, and leaves the menus and the reports with the full names.
 - Show Name hides the name of every row of a list (`row.name:SetShown`, and the Name title over it), so
   a row can be only its bar, icon and figures. A breakdown keeps the names of its spells, which are what
   its rows are about.

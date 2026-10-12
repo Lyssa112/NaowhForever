@@ -300,7 +300,7 @@ local function LayFrame(f, g)
     f.summary:ClearAllPoints()
     f.summary:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + g.textPad, -HEADER - HEAD_PAD)
     f.summary:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + g.textPad), -HEADER - HEAD_PAD)
-    Parts.HudFont(f.summary, g.font, SUMMARY_SIZE, g.outline)
+    Parts.HudFont(f.summary, g.font, g.summarySize, g.outline)
     Parts.HudFont(f.title, g.font, g.titleSize, g.outline)
     Parts.HudFont(f.lowerTitle, g.font, g.titleSize, g.outline)
     Parts.HudFont(f.time, g.font, g.timeSize, g.outline)
@@ -453,12 +453,13 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
     g.titleX, g.titleY = S.Get("titleX"), S.Get("titleY")
     g.growUp, g.reverseFill = DM.Setting(f.index, "growUp") == true, S.Get("reverseFill") == true
+    g.summarySize = S.Get("summarySize")
     g.image, g.path, g.tile = S.Get("backgroundImage"), S.Get("backgroundPath"), S.Get("imageTile") == true
     g.tileSize = math.max(C.MIN_TILE, S.Get("imageTileSize"))
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), tostring(g.showName), g.valueSize, g.rankSize, g.textPad, g.iconGap, g.edgeWidth,
+        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), tostring(g.showName), g.summarySize, g.valueSize, g.rankSize, g.textPad, g.iconGap, g.edgeWidth,
         g.colGap, g.iconSide, g.iconCrop, g.iconSize, tostring(g.barTrack), f.trackColor.r, f.trackColor.g,
         f.trackColor.b, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
         name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
@@ -480,7 +481,7 @@ function Look.LayoutLower(f, total, first, mode)
     strip:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -g.lowerTop)
     strip:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -g.lowerTop)
     strip:Show()
-    f.lowerTitle:SetText(mode.label)
+    f.lowerTitle:SetText(DM.ModeLabel(mode))
     pane.top = g.lowerTop + LOWER_STRIP + (g.showHead and COLUMN_HEAD or 0)
     return LayPane(pane, mode, total, first, g.n2, g, g.key, -g.lowerTop - LOWER_STRIP - HEAD_PAD)
 end
@@ -535,22 +536,29 @@ local function PaintValues(row, source, cols, session)
     end
 end
 
--- The line under the title bar: the session's name, its total, the raid's per-second figure once both
--- are plain numbers, and where you stand. The total is secret in combat and goes in as a string.
+-- The line under the title bar, from the pieces the settings keep: the session's name, its total, the
+-- raid's per-second figure once both are plain numbers, and where you stand. The total is secret in
+-- combat and goes in as a string.
 function Look.PaintSummary(f, session, mode, name, seconds)
-    local format, args = "%s", { name }
-    format = format .. SUMMARY_GAP .. (mode.total or TEXT_TOTAL) .. " %s"
-    args[#args + 1] = Format(session.totalAmount)
-    local rate = mode.rate and DM.PerSecond(session.totalAmount, seconds)
+    local parts, args = {}, {}
+    if S.Get("summaryName") ~= false then
+        parts[#parts + 1] = "%s"
+        args[#args + 1] = name
+    end
+    if S.Get("summaryTotal") ~= false then
+        parts[#parts + 1] = (mode.total or TEXT_TOTAL) .. " %s"
+        args[#args + 1] = Format(session.totalAmount)
+    end
+    local rate = S.Get("summaryRate") ~= false and mode.rate and DM.PerSecond(session.totalAmount, seconds)
     if rate then
-        format = format .. SUMMARY_GAP .. TEXT_RAID:format(mode.perSecond or TEXT_RATE) .. " %s"
+        parts[#parts + 1] = TEXT_RAID:format(mode.perSecond or TEXT_RATE) .. " %s"
         args[#args + 1] = Format(rate)
     end
     local rank, count = DM.Rank(session)
-    if rank then
-        format = format .. SUMMARY_GAP .. TEXT_RANK:format(rank, count)
+    if rank and S.Get("summaryRank") ~= false then
+        parts[#parts + 1] = TEXT_RANK:format(rank, count)
     end
-    f.summary:SetFormattedText(format, unpack(args))
+    f.summary:SetFormattedText(table.concat(parts, SUMMARY_GAP), unpack(args))
 end
 
 -- A line that heads a section, such as Targets: its words, and no bar or figures.

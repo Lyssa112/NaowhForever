@@ -22,6 +22,12 @@ function DM.Mode(key)
     return C.MODE_BY_KEY[key] or C.MODE_BY_KEY[C.DEFAULT_MODE]
 end
 
+-- What a window calls a list: its name, or the short one when the settings say so.
+function DM.ModeLabel(mode)
+    if mode.short and DM.Settings.Get("shortNames") == true then return mode.short end
+    return mode.label
+end
+
 function DM.Available()
     return C_DamageMeter ~= nil and Enum.DamageMeterType ~= nil and Enum.DamageMeterSessionType ~= nil
 end

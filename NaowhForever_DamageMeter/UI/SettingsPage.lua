@@ -24,6 +24,7 @@ local OFF_TIME = "Turn on Show Fight Time"
 local OFF_BOTH = "Turn on Show Total and Show Per Second"
 local OFF_FADE = "Set Out of Combat Opacity below 100%"
 local OFF_TRACK = "Turn on Bar Track"
+local OFF_SUMMARY = "Turn on Summary Line"
 local TEXT_LOOK_NAME, TEXT_LOOK_EXPORT, TEXT_LOOK_IMPORT = "Name this look", "Look", "Paste a look"
 local TEXT_LOOKS_FULL = "There is room for twelve looks. Delete one first."
 local TEXT_LOOK_NO_NAME, TEXT_LOOK_BAD = "A look needs a name.", "That is not a look."
@@ -82,6 +83,7 @@ local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "com
 local function ShowingTime() return DM.On() and S.Get("showTime") == true end
 local function BothFigures() return DM.On() and S.Get("showTotal") == true and S.Get("showRate") == true end
 local function Tracking() return DM.On() and S.Get("barTrack") == true end
+local function Summarising() return DM.On() and S.Get("showSummary") == true end
 local function Fading() return DM.On() and S.Get("idleAlpha") < 1 end
 local function Locked() return DM.On() and S.Get("locked") == true end
 -- Custom Image is for the choice of Image that is your own picture, and a picture is there when that has a
@@ -165,6 +167,15 @@ end
 local function LooksSummary()
     local count = #DM.LookNames()
     return count == 0 and "None kept" or ("%d kept"):format(count)
+end
+
+local function SummarySummary(store)
+    if not store.Get("showSummary") then return "Off" end
+    local pieces = 0
+    for _, key in ipairs({ "summaryName", "summaryTotal", "summaryRate", "summaryRank" }) do
+        if store.Get(key) then pieces = pieces + 1 end
+    end
+    return ("%d of 4 pieces"):format(pieces)
 end
 
 local function FadeSummary(store)
@@ -340,6 +351,9 @@ page:Card({
         { key = "session", label = "Session", choice = SESSION, needs = Enabled, why = OFF,
           help = "The current fight, or everything since the last reset. Past fights are in the window's "
               .. "Session button or its ... menu." },
+        { key = "shortNames", label = "Short List Names", toggle = true, needs = Enabled, why = OFF,
+          help = "Damage in place of Damage Done, Healing in place of Healing Done, in the title and the "
+              .. "spell panel. The menus and the reports keep the full names." },
         Group("Showing"),
         { key = "hideGameMeter", label = "Replace the Game's Meter", toggle = true, needs = Enabled, why = OFF,
           help = "Turns the game's own damage meter off while this one is on." },
@@ -521,14 +535,28 @@ page:Card({
         Group("Under the Bar"),
         { key = "showColumnHeaders", label = "Column Titles", toggle = true, needs = Enabled, why = OFF,
           help = "A line of titles above the rows: Name and what each column shows." },
-        { key = "showSummary", label = "Summary Line", toggle = true, needs = Enabled, why = OFF,
-          help = "Under the title bar: the session, its total, the raid's per-second figure once the fight "
-              .. "is over, and your rank." },
         Group("Look"),
         { label = "Clean Look", buttonText = "Apply", needs = Enabled, why = OFF,
           button = function() ns.Confirm(TEXT_CLEAN_ASK, ApplyCleanLook) end,
           help = "Only the title and the bars: no column titles, buttons, rank numbers, backgrounds or "
               .. "border, the time in brackets after the title, and a bar between the figures." },
+    },
+})
+
+page:Card({
+    id = "summary", name = "Summary Line", order = 53,
+    help = "A line under the title bar, of the pieces you choose.",
+    summary = SummarySummary,
+    rows = {
+        { key = "showSummary", label = "Summary Line", toggle = true, needs = Enabled, why = OFF,
+          help = "Under the title bar: the session, its total, the raid's per-second figure once the fight "
+              .. "is over, and your rank." },
+        { key = "summaryName", label = "Session Name", toggle = true, needs = Summarising, why = OFF_SUMMARY },
+        { key = "summaryTotal", label = "Total", toggle = true, needs = Summarising, why = OFF_SUMMARY },
+        { key = "summaryRate", label = "Raid Per Second", toggle = true, needs = Summarising, why = OFF_SUMMARY,
+          help = "The raid's figure per second, once the fight is over." },
+        { key = "summaryRank", label = "Your Rank", toggle = true, needs = Summarising, why = OFF_SUMMARY },
+        { key = "summarySize", label = "Summary Size", slider = TEXT_RANGE, needs = Summarising, why = OFF_SUMMARY },
     },
 })
 

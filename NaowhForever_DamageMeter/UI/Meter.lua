@@ -85,9 +85,10 @@ end
 -- The title's words: the list's name, the fight's, or both when there is a fight's name to give.
 local function TitleText(mode, fightName)
     local says = S.Get("titleText")
-    if says == "list" or not fightName then return mode.label end
+    local label = DM.ModeLabel(mode)
+    if says == "list" or not fightName then return label end
     if says == "fight" then return fightName end
-    return mode.label .. TITLE_JOIN .. fightName
+    return label .. TITLE_JOIN .. fightName
 end
 
 -- Puts the title and the fight time in the bar. The title starts at the left and the time sits by the
@@ -158,7 +159,8 @@ local function DetailView(w, session, lowerSession, seconds)
     local view = DM.SpellSession(data, source, { rate = mode.rate, seconds = seconds, targets = targets,
         inCombat = inCombat })
     local name = DM.DisplayName(source)
-    local title = DM.Plain(name, "string") and name .. TITLE_JOIN .. mode.label or mode.label
+    local label = DM.ModeLabel(mode)
+    local title = DM.Plain(name, "string") and name .. TITLE_JOIN .. label or label
     return view, mode.key, title, list or session
 end
 
@@ -303,7 +305,7 @@ local function ShowBreakdown(w, row)
     end
     local x = w.frame:GetCenter()
     Breakdown.Show(row, source, data, { toRight = x ~= nil and x < UIParent:GetWidth() / 2, inCombat = inCombat,
-        targets = targets, seconds = seconds, rate = mode.rate, label = mode.label, index = w.index })
+        targets = targets, seconds = seconds, rate = mode.rate, label = DM.ModeLabel(mode), index = w.index })
 end
 
 local function OnRowEnter(w, row)

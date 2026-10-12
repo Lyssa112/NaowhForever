@@ -3333,6 +3333,74 @@ do
         == "Ask When Entering an Instance, overall out of combat")
 end
 
+-- the summary line's pieces and size, and the short names of the lists
+do
+    local s = Boot({ settings = { enabled = true, showSummary = true } })
+    s.duration = 100
+    s.session.totalAmount = 500
+    s.Login()
+    local w = s.Window()
+    check("the whole line by default: the session, the total, the raid's per second, the rank",
+        w.summary.text == "Current   Damage <500>   Raid DPS <5>   Rank 2/3" and w.summary.fontSize == 11)
+    s.store.Set("summaryName", false); s.Flush()
+    check("without the session's name", w.summary.text == "Damage <500>   Raid DPS <5>   Rank 2/3")
+    s.store.Set("summaryTotal", false); s.Flush()
+    check("without the total", w.summary.text == "Raid DPS <5>   Rank 2/3")
+    s.store.Set("summaryRate", false); s.Flush()
+    check("without the raid's figure", w.summary.text == "Rank 2/3")
+    s.store.Set("summaryRank", false); s.Flush()
+    check("with none: nothing written", w.summary.text == "")
+    for _, key in ipairs({ "summaryName", "summaryTotal", "summaryRate", "summaryRank" }) do s.store.Set(key, true) end
+    s.store.Set("summaryRate", false); s.store.Set("summaryRank", false); s.Flush()
+    check("a name and a total", w.summary.text == "Current   Damage <500>")
+    s.store.Set("summaryRate", true); s.store.Set("summaryRank", true)
+    s.store.Set("summarySize", 15); s.Flush()
+    check("Summary Size", w.summary.fontSize == 15)
+    s.store.Set("summarySize", 11)
+
+    local on = RowOf(s.page, "showSummary")
+    local _, card = RowOf(s.page, "summaryName")
+    check("a card of its own, whose pieces wait for the line", card.id == "summary" and on.needs() == true
+        and RowOf(s.page, "summaryRank").needs() == true)
+    s.store.Set("showSummary", false)
+    local waits = true
+    for _, key in ipairs({ "summaryName", "summaryTotal", "summaryRate", "summaryRank", "summarySize" }) do
+        waits = waits and RowOf(s.page, key).needs() == false and RowOf(s.page, key).why == "Turn on Summary Line"
+    end
+    check("and say so", waits)
+    check("its summary", card.summary(s.store) == "Off")
+    s.store.Set("showSummary", true); s.store.Set("summaryRate", false)
+    check("with the pieces counted", card.summary(s.store) == "3 of 4 pieces")
+
+    -- short names
+    check("the full name by default", w.title.text == "Damage Done")
+    s.store.Set("shortNames", true); s.Flush()
+    check("Short List Names: in the title", w.title.text == "Damage")
+    s.store.Set("lower", "healing"); s.Flush()
+    check("and the second list's", w.lowerTitle.text == "Healing")
+    s.store.Set("lower", ""); s.store.Set("titleText", "both")
+    s.fights = { { sessionID = 3, name = "Fyrakk", durationSeconds = 61 } }
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("with a fight's name", w.title.text == "Damage - Fyrakk")
+    s.store.Set("titleText", "list")
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("in a breakdown", w.title.text == "You - Damage")
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    s.Hover(w, 2)
+    check("in the spell panel", s.Panel().subtitle.text == "Damage (1:40)")
+    w.rows[2].scripts.OnLeave(w.rows[2])
+    w.more.onClick()
+    check("the menus keep the full names", s.menu:Find("List"):Find("Damage Done") ~= nil)
+    s.store.Set("mode", "dps"); s.Flush()
+    check("DPS is DPS", w.title.text == "DPS")
+    local C = s.DM.C
+    local all = true
+    for _, key in ipairs(C.MODE_ORDER) do all = all and C.MODE_BY_KEY[key].short ~= nil end
+    check("every list has a short name", all)
+    local short = RowOf(s.page, "shortNames")
+    check("a toggle on the Lists card", short and short.toggle == true)
+end
+
 -- a click on a name opens its spells in the window, with the enemies it hurt, and a click closes them
 do
     local function Enemy(name, guid) return { name = name, sourceGUID = guid, sourceCreatureID = 100 } end
@@ -3740,8 +3808,9 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("twenty-one cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,spacing,numbers,header,"
-        .. "time,text,hover,history,data,looks,barColors,textColors,windowColors,classColors,window2,look2,window3,look3"
+    check("twenty-two cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,spacing,numbers,header,"
+        .. "summary,time,text,hover,history,data,looks,barColors,textColors,windowColors,classColors,window2,look2,"
+        .. "window3,look3"
         and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end
