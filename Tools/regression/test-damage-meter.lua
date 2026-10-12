@@ -138,7 +138,12 @@ local function Boot(opts)
         if v == nil then v = defaults[k] end
         return v
     end
-    function store.Set(k, v) s.settings[k] = v end
+    local listeners = {}
+    function store.OnChange(fn) listeners[#listeners + 1] = fn end
+    function store.Set(k, v)
+        s.settings[k] = v
+        for _, fn in ipairs(listeners) do fn(k, v) end
+    end
     function store.DB() return s.settings end
     function store.Raw(k) return s.settings[k] end
     function store.Default(k) return defaults[k] end
@@ -2678,6 +2683,44 @@ do
         and s.settings.meterPos == place and s.settings.meterPos2 == place)
     check("the looks kept stay", s.account.damageMeterLooks[1].name == "Kept")
     check("the window shows it, and the page is drawn again", w.rows[1].h == 20 and (s.refreshed or 0) > before)
+end
+
+-- an icon and a font are not changed on screen until a reload: the options say so once one is changed
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local page = s.page
+    local function Card(id) return CardOf(page, id) end
+    local size, owner = RowOf(page, "iconSize"), RowOf(page, "showIcons")
+    check("nothing is said before a change", size.note(size) == nil and owner.note() == nil
+        and Card("row").note() == nil and Card("window").note() == nil)
+    s.store.Set("iconSize", 30)
+    check("an icon setting changed: its row, the row of its cog and its card say a reload is needed",
+        size.note(size) == "Needs a /reload" and owner.note() == "Needs a /reload"
+        and Card("row").note() == "Needs a /reload")
+    check("another row and another card do not", RowOf(page, "iconGap").note(RowOf(page, "iconGap")) == nil
+        and RowOf(page, "barHeight").note == nil and Card("window").note() == nil and Card("figures").note() == nil
+        and Card("header").note() == nil)
+    s.store.Set("font", "Fonts\\x.ttf"); s.store.Set("outline", "THICKOUTLINE")
+    check("the window's font and outline", RowOf(page, "font").note(RowOf(page, "font")) == "Needs a /reload"
+        and RowOf(page, "outline").note(RowOf(page, "outline")) == "Needs a /reload"
+        and Card("window").note() == "Needs a /reload")
+    s.store.Set("nameFont", "Fonts\\x.ttf")
+    check("a text's own font: its row, the row of its cog (Name Settings) and its card",
+        RowOf(page, "nameFont").note(RowOf(page, "nameFont")) == "Needs a /reload"
+        and RowOf(page, "nameColor").note() == "Needs a /reload")
+    check("and the figures', and the title bar's, have their own", Card("figures").note() == nil
+        and Card("header").note() == nil)
+    s.store.Set("valueOwnFont", true)
+    check("the Figures card says it for the figures' font", Card("figures").note() == "Needs a /reload"
+        and Card("header").note() == nil)
+    s.store.Set("summaryFont", "x")
+    check("and the Title Bar card for the summary line's", Card("header").note() == "Needs a /reload")
+    check("the row of the summary line's cog too", RowOf(page, "showSummary").note() == "Needs a /reload"
+        and RowOf(page, "showColumnHeaders").note() == nil and RowOf(page, "titleColor").note() == nil)
+    s.store.Set("rankSize", 14)
+    check("a size is applied at once, and says nothing", RowOf(page, "rankSize").note == nil
+        and RowOf(page, "showRanks").note() == nil)
 end
 
 -- a name is always shown: there is no setting to take it out of a row

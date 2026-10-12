@@ -104,6 +104,11 @@ NaowhForever_DamageMeter/
   name); the others are the text's toggle. A card folded with its cog open takes the cog's panel
   with it (`Draw:Card` in the shared page). The window's own font and outline are on the Window card; Clean
   Look is on the Looks card.
+- An icon and a font are not changed on screen until the game is reloaded, so once one of their settings has
+  been changed since the game loaded (`S.OnChange`, kept in `pending`), its row says "Needs a /reload", and so
+  do the row that owns its cog and its card (`note`), until the reload. The keys are the icon's (`showIcons`
+  and the icon rows) and each text's font, own-font switch and outline, and the window's font and outline;
+  a size is applied at once and says nothing.
 - Reset All Settings (Fights and Data card, asks first) clears every key of the module's settings but
   `enabled` and the windows' places (`meterPos*`), so each setting reads its default again. The looks kept
   by name and the fights kept are on the account, not in the settings, and stay.

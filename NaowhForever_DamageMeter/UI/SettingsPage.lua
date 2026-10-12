@@ -297,9 +297,66 @@ local function ImageChoices()
     return values, order
 end
 
+-- ---- what needs a reload to show
+
+-- An icon and a font are not changed on screen until the game is reloaded. Once one is changed, the row (and
+-- the row that owns its cog, and its card) says so, until the reload.
+local TEXT_RELOAD = "Needs a /reload"
+local ICON_KEYS = { "showIcons", "iconStyle", "iconSize", "iconSide", "iconZoom", "iconGap" }
+
+local function FontKeys(...)
+    local keys = {}
+    for _, element in ipairs({ ... }) do
+        keys[#keys + 1] = element .. "OwnFont"
+        keys[#keys + 1] = element .. "Font"
+        keys[#keys + 1] = element .. "Outline"
+    end
+    return keys
+end
+
+local function Concat(...)
+    local keys = {}
+    for _, list in ipairs({ ... }) do
+        for _, key in ipairs(list) do keys[#keys + 1] = key end
+    end
+    return keys
+end
+
+local CARD_RELOAD = {
+    window = { "font", "outline" },
+    row = Concat(ICON_KEYS, FontKeys("rank", "name")),
+    figures = FontKeys("value"),
+    header = FontKeys("title", "time", "head", "summary"),
+}
+local RELOAD = {}
+for _, keys in pairs(CARD_RELOAD) do
+    for _, key in ipairs(keys) do RELOAD[key] = true end
+end
+
+-- The keys of them that have been changed since the game was loaded.
+local pending = {}
+if S.OnChange then
+    S.OnChange(function(key)
+        if RELOAD[key] then pending[key] = true end
+    end)
+end
+
+local function ReloadNote(row)
+    return pending[row.key] and TEXT_RELOAD or nil
+end
+
+local function ReloadOf(keys)
+    return function()
+        for _, key in ipairs(keys) do
+            if pending[key] then return TEXT_RELOAD end
+        end
+    end
+end
+
 -- ---- building blocks
 
--- The parts of a card's rows, rows and lists of rows, as one list.
+-- The parts of a card's rows, rows and lists of rows, as one list. A row of a setting that needs a reload
+-- says so once it has been changed.
 local function Join(...)
     local rows = {}
     for _, part in ipairs({ ... }) do
@@ -309,13 +366,23 @@ local function Join(...)
             rows[#rows + 1] = part
         end
     end
+    for _, row in ipairs(rows) do
+        if row.key and RELOAD[row.key] and not row.note then row.note = ReloadNote end
+    end
     return rows
 end
 
--- A row with a cog, and the rows behind it: they are left off the page and shown in the cog's panel.
+-- A row with a cog, and the rows behind it: they are left off the page and shown in the cog's panel. The
+-- row says a reload is needed when a row behind its cog does.
 local function Under(owner, title, tip, rows)
+    local behind = rows[1] ~= nil and rows or { rows }
     owner.cog = { title = title, tip = tip }
-    for _, row in ipairs(rows[1] ~= nil and rows or { rows }) do row.under = owner.label end
+    for _, row in ipairs(behind) do row.under = owner.label end
+    owner.note = owner.note or function()
+        for _, row in ipairs(behind) do
+            if row.key and pending[row.key] then return TEXT_RELOAD end
+        end
+    end
     return Join(owner, rows)
 end
 
@@ -398,6 +465,7 @@ page:Card({
     id = "window", name = "Window", order = 20,
     help = "Its size, background, picture and fade, and the font every text has unless it has its own.",
     summary = WindowSummary,
+    note = ReloadOf(CARD_RELOAD.window),
     rows = Join(
         Group("Size"),
         { key = "width", label = "Width", slider = WIDTH_RANGE, needs = Enabled, why = OFF },
@@ -495,6 +563,7 @@ page:Card({
     id = "row", name = "Row", order = 40,
     help = "What each row has before its figures: icon, rank and name, each with its settings behind its cog.",
     summary = RowSummary,
+    note = ReloadOf(CARD_RELOAD.row),
     rows = Join(
         Under({ key = "showIcons", label = "Icons", toggle = true, needs = Enabled, why = OFF },
             "Icon Settings", "The icon's size, style, side and crop.", {
@@ -545,6 +614,7 @@ page:Card({
     id = "figures", name = "Figures", order = 50,
     help = "The columns of figures, in what order, and how numbers, shares and per-second figures are written.",
     summary = FiguresSummary,
+    note = ReloadOf(CARD_RELOAD.figures),
     rows = Join(
         Group("Columns"),
         { key = "showTotal", label = "Show Total", toggle = true, needs = Enabled, why = OFF },
@@ -583,6 +653,7 @@ page:Card({
     id = "header", name = "Title Bar", order = 60,
     help = "The title, the fight time and the buttons, and the column titles and summary line under the bar.",
     summary = HeaderSummary,
+    note = ReloadOf(CARD_RELOAD.header),
     rows = Join(
         Group("Title"),
         { key = "titleText", label = "Title Shows", choice = TITLE_TEXT, needs = Enabled, why = OFF,
