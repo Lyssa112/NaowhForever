@@ -1,4 +1,4 @@
--- Menus.lua: a window's menus: its list, its session, and the rest. They keep no state of their own; w is the
+-- Menus.lua: a window's menus: its session and the rest. They keep no state of their own; w is the
 -- window (index, offset, fight) and every choice goes to the settings or to the window's own fields.
 local ns = _G.NaowhForever
 
@@ -22,40 +22,41 @@ local function Chosen(w, base, value)
     return function() return w.fight == nil and S.Get(Key(base, w.index)) == value end
 end
 
--- The first list, or with pane 2 the list under it, which can also be none.
-function Menus.List(w, owner, pane)
-    local lower = pane == 2
+-- The lists as radios in menu: the first list's, or with lower the one under it, which can also be none.
+local function ListChoices(menu, w, lower)
     local setting = Key(lower and "lower" or "mode", w.index)
     local function Choose(key)
         if lower then w.offset2 = 0 else w.offset = 0 end
         S.Set(setting, key)
     end
-    MenuUtil.CreateContextMenu(owner, function(_, root)
-        root:CreateTitle(lower and TEXT_LOWER or TEXT_LIST)
-        if lower then
-            root:CreateRadio(TEXT_NONE, function() return S.Get(setting) == "" end, function() Choose("") end)
-        end
-        for _, key in ipairs(C.MODE_ORDER) do
-            root:CreateRadio(C.MODE_LABELS[key], function() return S.Get(setting) == key end,
-                function() Choose(key) end)
-        end
-    end)
+    if lower then
+        menu:CreateRadio(TEXT_NONE, function() return S.Get(setting) == "" end, function() Choose("") end)
+    end
+    for _, key in ipairs(C.MODE_ORDER) do
+        menu:CreateRadio(C.MODE_LABELS[key], function() return S.Get(setting) == key end,
+            function() Choose(key) end)
+    end
+end
+
+-- The sessions and the past fights the game still holds, as radios in menu.
+local function SessionChoices(menu, w)
+    for _, key in ipairs(C.SESSION_ORDER) do
+        menu:CreateRadio(C.SESSION_LABELS[key], Chosen(w, "session", key),
+            function() w.fight, w.offset = nil, 0; S.Set(Key("session", w.index), key); DM.Refresh() end)
+    end
+    local fights = DM.Fights()
+    menu:CreateDivider()
+    menu:CreateTitle(#fights > 0 and TEXT_FIGHTS or TEXT_NO_FIGHTS)
+    for _, fight in ipairs(fights) do
+        menu:CreateRadio(DM.FightLabel(fight), function() return w.fight == fight.id end,
+            function() w.fight, w.offset = fight.id, 0; DM.Refresh() end)
+    end
 end
 
 function Menus.Session(w, owner)
     MenuUtil.CreateContextMenu(owner, function(_, root)
         root:CreateTitle(TEXT_SESSION)
-        for _, key in ipairs(C.SESSION_ORDER) do
-            root:CreateRadio(C.SESSION_LABELS[key], Chosen(w, "session", key),
-                function() w.fight, w.offset = nil, 0; S.Set(Key("session", w.index), key); DM.Refresh() end)
-        end
-        local fights = DM.Fights()
-        root:CreateDivider()
-        root:CreateTitle(#fights > 0 and TEXT_FIGHTS or TEXT_NO_FIGHTS)
-        for _, fight in ipairs(fights) do
-            root:CreateRadio(DM.FightLabel(fight), function() return w.fight == fight.id end,
-                function() w.fight, w.offset = fight.id, 0; DM.Refresh() end)
-        end
+        SessionChoices(root, w)
     end)
 end
 
@@ -79,6 +80,10 @@ end
 function Menus.Window(w, owner)
     MenuUtil.CreateContextMenu(owner, function(_, root)
         root:CreateTitle(DM.WindowName(w.index))
+        ListChoices(root:CreateButton(TEXT_LIST), w, false)
+        SessionChoices(root:CreateButton(TEXT_SESSION), w)
+        ListChoices(root:CreateButton(TEXT_LOWER), w, true)
+        root:CreateDivider()
         local report = root:CreateButton(TEXT_REPORT)
         for _, channel in ipairs(DM.Channels()) do
             report:CreateButton(channel.label, function() Report(w, channel.key) end)
@@ -90,13 +95,6 @@ function Menus.Window(w, owner)
         local free = FirstClosed()
         if free then root:CreateButton(TEXT_ADD, function() S.Set(Key("window", free), true) end) end
         if w.index > 1 then root:CreateButton(TEXT_CLOSE, function() S.Set(Key("window", w.index), false) end) end
-        local lower = root:CreateButton(TEXT_LOWER)
-        lower:CreateRadio(TEXT_NONE, function() return S.Get(Key("lower", w.index)) == "" end,
-            function() w.offset2 = 0; S.Set(Key("lower", w.index), "") end)
-        for _, key in ipairs(C.MODE_ORDER) do
-            lower:CreateRadio(C.MODE_LABELS[key], function() return S.Get(Key("lower", w.index)) == key end,
-                function() w.offset2 = 0; S.Set(Key("lower", w.index), key) end)
-        end
         local bars = root:CreateButton(TEXT_BAR_COLOR)
         for _, key in ipairs(C.BAR_COLORS_ORDER) do
             bars:CreateRadio(C.BAR_COLORS[key], function() return S.Get("barColor") == key end,

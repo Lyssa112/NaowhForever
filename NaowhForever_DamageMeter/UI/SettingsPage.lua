@@ -269,12 +269,12 @@ page:Card({
     summary = ListsSummary,
     rows = {
         { key = "mode", label = "Show", choice = MODE, needs = Enabled, why = OFF,
-          help = "Click the title in the window to choose a list." },
+          help = "Also in the window's ... menu, under List." },
         { key = "lower", label = "Second List", choice = LOWER, needs = Enabled, why = OFF,
           help = "Another list under the first, in the same window, like damage above healing." },
         { key = "session", label = "Session", choice = SESSION, needs = Enabled, why = OFF,
           help = "The current fight, or everything since the last reset. Past fights are in the window's "
-              .. "Session button." },
+              .. "Session button or its ... menu." },
         Group("Showing"),
         { key = "hideGameMeter", label = "Replace the Game's Meter", toggle = true, needs = Enabled, why = OFF,
           help = "Turns the game's own damage meter off while this one is on." },
@@ -384,6 +384,10 @@ page:Card({
         { key = "timeY", label = "Time Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = ShowingTime,
           why = OFF_TIME, help = "Moves the time up, or down below zero." },
         { key = "timeSize", label = "Fight Time Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
+        Group("Buttons"),
+        { key = "showButtons", label = "Show Buttons", toggle = true, needs = Enabled, why = OFF,
+          help = "The session button and the ... menu at the right of the bar. Off: right-click the bar "
+              .. "for the same menu." },
         Group("Under the Bar"),
         { key = "showSummary", label = "Summary Line", toggle = true, needs = Enabled, why = OFF,
           help = "Under the title bar: the session, its total, the raid's per-second figure once the fight "

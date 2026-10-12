@@ -36,6 +36,7 @@ local function Region(kind, parent)
     -- the width the text takes, held to the width the region was given
     function r:GetStringHeight() return 14 end
     function r:SetFrameStrata(v) self.strata = v end
+    function r:EnableMouse(v) self.mouse = v end
     function r:SetToplevel(v) self.toplevel = v end
     function r:GetStringWidth()
         local natural = self.stringWidth or 40
@@ -301,6 +302,13 @@ local function Boot(opts)
                 return s.spells
             end,
             ResetAllCombatSessions = function() s.resets = (s.resets or 0) + 1 end,
+        },
+        GameTooltip = {
+            SetOwner = function(_, owner, anchor) s.tip = { owner = owner, anchor = anchor, shown = false } end,
+            SetSpellByID = function(_, id) s.tip.spell = id end,
+            Show = function() s.tip.shown = true end,
+            Hide = function() if s.tip then s.tip.shown = false end end,
+            GetOwner = function() return s.tip and s.tip.shown and s.tip.owner or nil end,
         },
         C_Spell = {
             GetSpellName = function(id) return s.names[id] end,
@@ -630,7 +638,8 @@ do
     check("by default the list's name, at the left, with the time by the buttons", w.title.text == "Damage Done"
         and w.title.points[1][1] == "LEFT" and At(w.title) == 8 and w.title.w == 40
         and w.time.points[1][2] == w.session and w.time.points[1][4] == -4 and w.time.justify == "RIGHT")
-    check("and the list button over the title", w.modeButton.points[1][4] == 0 and w.modeButton.w == 56)
+    check("the title is only text, so it drags the window: no button over it", w.modeButton == nil
+        and w.lowerButton == nil)
 
     s.store.Set("titleText", "fight"); s.Flush()
     check("Title Shows the fight: its name", w.title.text == "Fyrakk")
@@ -669,9 +678,8 @@ do
     -- the bar is 300 wide: the buttons take 98, so the title has 8 to 202, and the time is beside the buttons
     s.store.Set("titleX", 50); s.Flush()
     check("X Offset moves the title right", At(w.title) == 58 and w.title.points[1][5] == 0)
-    check("and the list button with it", w.modeButton.points[1][4] == 50)
     s.store.Set("titleX", -6); s.Flush()
-    check("or left, the list button stopping at the bar's edge", At(w.title) == 2 and w.modeButton.points[1][4] == 0)
+    check("or left", At(w.title) == 2)
     s.store.Set("titleX", 0); s.store.Set("titleY", 5); s.Flush()
     check("Y Offset moves it up", w.title.points[1][5] == 5 and At(w.title) == 8)
     s.store.Set("titleY", -5); s.Flush()
@@ -699,7 +707,6 @@ do
     w.title.stringWidth = 500
     s.store.Set("width", 300); s.Flush()
     check("a long title is cut to the room, and the time gives way", w.title.w == 194 and w.time.shown == false)
-    check("and the list button is as wide", w.modeButton.w == 194 + 16)
     w.title.stringWidth = nil
     s.store.Set("lower", "healing"); s.store.Set("titleX", 30); s.store.Set("titleY", 4); s.Flush()
     check("the second title moves with the first, across its strip", w.lowerTitle.points[1][1] == "LEFT"
@@ -1369,7 +1376,7 @@ do
         and w.rows2[1].points[1][5] == -(160 + 20 + 16) - 6)
     check("every row knows its list", w.rows[1].modeKey == "damage" and w.rows2[1].modeKey == "healing"
         and w.rows[1].pane == 1 and w.rows2[1].pane == 2)
-    check("the title strip names the list, and its button is there", w.lowerButton.shown == true)
+    check("the title strip names the list", w.lowerTitle.text == "Healing Done" and w.lowerBar.shown == true)
     check("the strip is the title bar's color", w.lowerBackground.solid[1] == THEME.panel.r)
     check("an empty list says so under its own titles", w.empty.points[1][5] == -(42 + 6)
         and w.panes[2].empty.points[1][5] == -(196 + 6))
@@ -1394,7 +1401,7 @@ do
 
     s.store.Set("lower", ""); s.Flush()
     check("none: the strip, its titles and its rows go", w.lowerBar.shown == false and w.rows2[1].shown == false
-        and w.panes[2].headB.shown == false and w.lowerButton.shown == false)
+        and w.panes[2].headB.shown == false)
     check("and the first list has the room again", w.rows[1].shown == true and w.panes[1].rows[6] == nil)
     s.store.Set("height", 400); s.Flush()
     check("room for more rows in a taller window", w.rows[3].shown == true)
@@ -1430,33 +1437,28 @@ do
     check("a reset puts both back at the top", w.rows[1].name.text == "Aldrin" and w.rows2[1].name.text == "Mira")
 
     w.rows[1].scripts.OnMouseWheel(w.rows[1], -1)
-    w.modeButton.scripts.OnClick(w.modeButton)
-    s.menu:Find("Healing Done").set()
+    w.more.onClick()
+    s.menu:Find("List"):Find("Healing Done").set()
     s.Flush()
     check("choosing another first list starts it at the top", w.rows[1].name.text == "Mira")
     w.rows2[1].scripts.OnMouseWheel(w.rows2[1], -1)
-    w.lowerButton.scripts.OnClick(w.lowerButton)
-    s.menu:Find("Absorbs").set()
+    w.more.onClick()
+    s.menu:Find("Second List"):Find("Absorbs").set()
     s.Flush()
     check("and so does another second list", w.rows2[1].name.text == "Aldrin")
     s.store.Set("mode", "damage"); s.store.Set("lower", "healing"); s.Flush()
-    w.lowerButton.scripts.OnClick(w.lowerButton)
-    local menu = s.menu
-    check("the strip opens the second list's menu: None, then the lists", menu.owner == w.lowerButton
-        and menu.items[1].text == "Second List" and menu:Find("None") ~= nil and menu:Find("None").selected() == false
-        and menu:Find("Healing Done").selected() == true and #menu.items == 12)
-    menu:Find("Deaths").set()
-    check("choosing one sets it", s.store.Get("lower") == "deaths")
-    menu:Find("None").set()
-    s.Flush()
-    check("None turns it off", s.store.Get("lower") == "" and w.lowerBar.shown == false)
-
     w.more.onClick()
     local sub = s.menu:Find("Second List")
-    check("the window menu has it too, None first", sub and sub.items[1].text == "None" and sub.items[1].selected() == true
-        and #sub.items == 11)
+    check("the ... menu has the second list's: None, then the lists", sub.items[1].text == "None"
+        and sub:Find("None").selected() == false and sub:Find("Healing Done").selected() == true and #sub.items == 11)
+    sub:Find("Deaths").set()
+    check("choosing one sets it", s.store.Get("lower") == "deaths")
+    sub:Find("None").set()
+    s.Flush()
+    check("None turns it off", s.store.Get("lower") == "" and w.lowerBar.shown == false)
+    check("and None is the one chosen", sub.items[1].selected() == true)
     sub.items[3].set()
-    check("and sets it", s.store.Get("lower") == "dps")
+    check("the third choice is the second list", s.store.Get("lower") == "dps")
 
     local page = s.page
     local row = RowOf(page, "lower")
@@ -1471,8 +1473,8 @@ do
     local one, two = s.Window(), s.Window(2)
     check("a window's second list is its own", two.lowerBar.shown == true and one.lowerBar.shown == false
         and two.lowerTitle.text == "Damage Taken")
-    two.lowerButton.scripts.OnClick(two.lowerButton)
-    s.menu:Find("Absorbs").set()
+    two.more.onClick()
+    s.menu:Find("Second List"):Find("Absorbs").set()
     check("its menu sets its own key", s.store.Get("lower2") == "absorbs" and s.settings.lower == nil)
 end
 
@@ -1854,11 +1856,19 @@ do
     s.fights = { { sessionID = 3, name = "Boss", durationSeconds = 125 }, { sessionID = 4 } }
     s.Login()
     local w = s.Window()
-    w.modeButton.scripts.OnClick(w.modeButton)
-    local list = s.menu
-    check("the title opens the list menu on itself", list.owner == w.modeButton and list.items[1].text == "List")
-    check("with the ten lists, the current one chosen", #list.items == 11 and list:Find("Damage Done").selected() == true
-        and list:Find("Healing Done").selected() == false)
+    w.more.onClick()
+    local list = s.menu:Find("List")
+    check("the ... menu has the list menu: the ten lists, the current one chosen", list and #list.items == 10
+        and list:Find("Damage Done").selected() == true and list:Find("Healing Done").selected() == false)
+    local inside = s.menu:Find("Session")
+    check("and the session menu, with the past fights in it", inside and inside:Find("Current").selected() == true
+        and inside:Find("Past Fights") ~= nil and inside:Find("Boss (2:05)") ~= nil)
+    inside:Find("Boss (2:05)").set()
+    s.Flush()
+    check("a fight chosen there is the window's", w.session.label == "Fight")
+    inside:Find("Current").set()
+    s.Flush()
+    check("and Current takes it back", w.session.label == "Current")
     list:Find("Healing Done").set()
     check("choosing one sets it", s.store.Get("mode") == "healing")
     s.Flush()
@@ -1966,8 +1976,8 @@ do
     s.store.Set("mode2", "healing")
     s.Flush()
     check("a change to one leaves the other", two.title.text == "Healing Done" and one.title.text == "Damage Done")
-    two.modeButton.scripts.OnClick(two.modeButton)
-    s.menu:Find("Absorbs").set()
+    two.more.onClick()
+    s.menu:Find("List"):Find("Absorbs").set()
     check("a window's list menu sets its own list", s.store.Get("mode2") == "absorbs" and s.settings.mode == nil)
     two.header.scripts.OnDragStart(two.header)
     two.header.scripts.OnDragStop(two.header)
@@ -2207,8 +2217,8 @@ do
     check("the spells, in the game's order, with their names", panel.rows[1].name.text == "Fireball"
         and panel.rows[2].name.text == "Pyroblast" and panel.rows[3].name.text == "Unknown")
     check("each a bar out of the largest", panel.rows[2].barMax == 600 and panel.rows[2].barValue == 300)
-    check("amount and share when both are plain", panel.rows[1].value.text == "<600>  60.0%"
-        and panel.rows[3].value.text == "<100>  10.0%")
+    check("amount, per second and share when they are plain", panel.rows[1].value.text == "<600>  <4.8>  60.0%"
+        and panel.rows[3].value.text == "<100>  <0.8>  10.0%")
     check("and the spell's icon", panel.rows[1].icon.texture == 1101 and panel.rows[1].icon.shown == true)
     check("only as many rows as spells, and no note", panel.rows[4].shown == false and panel.note.shown == false
         and panel.h == 24 + 3 * 20 - 2 + 6)
@@ -2231,7 +2241,7 @@ do
 
     s.spells.totalAmount = SECRET_NUMBER
     s.Hover(w, 2)
-    check("a secret total: amounts, no share", panel.rows[1].value.text == "<600>")
+    check("a secret total: amount and per second, no share", panel.rows[1].value.text == "<600>  <4.8>")
     s.spells.totalAmount = 1000
     s.noTexture = true
     s.Hover(w, 2)
@@ -2389,7 +2399,8 @@ do
     s.spells.combatSpells = { Spell(101, 50) }
     s.spells.maxAmount, s.spells.totalAmount = 50, 100
     s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
-    check("an update redraws the hovered row's spells", panel.rows[1].value.text == "<50>  50.0%" and panel.rows[2].shown == false)
+    check("an update redraws the hovered row's spells", panel.rows[1].value.text == "<50>  <0.4>  50.0%"
+        and panel.rows[2].shown == false)
     s.group = false
     s.Fire("GROUP_ROSTER_UPDATE"); s.Flush()
     check("the window hiding takes the panel with it", w.shown == false and panel.shown == false)
@@ -2399,6 +2410,144 @@ do
     sample.ns.ShowUnlockMode()
     sample.Hover(sample.Window(), 1)
     check("the sample has no spells to show", sample.Panel() == nil or sample.Panel().shown == false)
+end
+
+-- a click on a row keeps its spells up, and each spell shows its tooltip
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    w.centerX = 100
+    local spells = s.spells
+    local row = w.rows[2]
+    row.scripts.OnMouseUp(row, "LeftButton")
+    local panel = s.Panel()
+    check("a click shows the spells", panel and panel.shown == true and panel.title.text == "You")
+    check("as a panel to use: the mouse on it and its spells, and a close button", panel.mouse == true
+        and panel.close.shown == true and panel.rows[1].mouse == true)
+    check("the list and the length of the session beside the name", panel.subtitle.text == "Damage Done (2:05)")
+    row.scripts.OnLeave(row)
+    check("leaving the row keeps it", panel.shown == true)
+    s.Hover(w, 1)
+    check("another row hovered does not change it", panel.title.text == "You")
+    w.rows[1].scripts.OnLeave(w.rows[1])
+    check("and leaving that one does not take it down", panel.shown == true)
+
+    panel.rows[1].scripts.OnEnter(panel.rows[1])
+    check("a spell: the game's tooltip for it, at the side away from the window", s.tip.shown == true
+        and s.tip.spell == 101 and s.tip.owner == panel.rows[1] and s.tip.anchor == "ANCHOR_RIGHT")
+    panel.rows[1].scripts.OnLeave(panel.rows[1])
+    check("taken down when the mouse leaves", s.tip.shown == false)
+    w.centerX = 900
+    s.Hover(w, 2)
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    panel.rows[1].scripts.OnEnter(panel.rows[1])
+    check("and on the other side for a window on the right", s.tip.anchor == "ANCHOR_LEFT")
+    panel.rows[1].scripts.OnLeave(panel.rows[1])
+    spells.combatSpells[1].spellID = SECRET_NUMBER
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    panel.rows[1].scripts.OnEnter(panel.rows[1])
+    check("a spell id the game keeps back is not asked for", s.tip.shown == false)
+    spells.combatSpells[1].spellID = 101
+    s.names[101] = nil
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    panel.rows[1].scripts.OnEnter(panel.rows[1])
+    check("nor one the game has no spell for", s.tip.shown == false)
+    s.names[101] = "Fireball"
+    local owner = Region("Frame")
+    owner.isSpellRow = nil
+    s.tip = { owner = owner, shown = true }
+
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("an update keeps it, and keeps the tooltip of another thing", panel.shown == true and s.tip.shown == true)
+    s.tip = nil
+
+    -- it follows the player, not the position
+    local sources = s.session.combatSources
+    sources[1], sources[2] = sources[2], sources[1]
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("the player moved up: the panel is on that row", panel.shown == true and panel.title.text == "You"
+        and panel.points[1][2] == w.rows[1])
+    sources[1], sources[2] = sources[2], sources[1]
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("and back", panel.points[1][2] == w.rows[2])
+
+    row.scripts.OnMouseUp(row, "LeftButton")
+    check("the same row again lets it go: the hover panel, nothing to use", panel.shown == true
+        and panel.mouse == false and panel.close.shown == false)
+    row.scripts.OnLeave(row)
+    check("and the mouse leaving takes it down", panel.shown == false)
+
+    row.scripts.OnMouseUp(row, "LeftButton")
+    panel.close.onClick()
+    check("the X lets it go", panel.shown == false)
+    row.scripts.OnMouseUp(row, "LeftButton")
+    row.scripts.OnMouseUp(row, "RightButton")
+    check("so does a right click", panel.shown == false)
+    row.scripts.OnLeave(row)
+
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    check("another player's row too", panel.shown == true and panel.title.text == "Aldrin")
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("and a click on another row moves it there", panel.title.text == "You" and panel.mouse == true)
+    table.remove(sources, 2)
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a player who is not listed any more: it goes", panel.shown == false)
+    table.insert(sources, 2, Source("You", "ROGUE", "G2", "g2", true))
+
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    s.store.Set("enabled", false)
+    check("the meter off takes it with it", panel.shown == false)
+    s.store.Set("enabled", true); s.Flush()
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("and it does not come back", panel.shown == false)
+
+    s.store.Set("breakdown", false)
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("Spell Breakdown off: a click shows nothing", panel.shown == false)
+    s.store.Set("breakdown", true)
+    s.store.Set("mode", "interrupts"); s.Flush()
+    s.Hover(w, 2)
+    check("a list with no per-second figure: the amount and the share", panel.rows[1].value.text == "<600>  60.0%")
+    w.rows[2].scripts.OnLeave(w.rows[2])
+    s.store.Set("mode", "deaths"); s.Flush()
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("Deaths has no spells to keep", panel.shown == false)
+    s.store.Set("mode", "damage"); s.Flush()
+    s.ns.PreviewDamageMeter()
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("the sample has none either", panel.shown == false)
+end
+
+-- the title bar: the buttons, and the menu on a right click
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    check("the buttons are there by default", w.session.shown == true and w.more.shown == true
+        and w.time.points[1][2] == w.session)
+    s.menu = nil
+    w.header.scripts.OnMouseUp(w.header, "LeftButton")
+    check("a left click on the bar opens nothing", s.menu == nil)
+    w.header.scripts.OnMouseUp(w.header, "RightButton")
+    check("a right click opens the window menu on it", s.menu and s.menu.owner == w.header
+        and s.menu:Find("List") ~= nil and s.menu:Find("Session") ~= nil and s.menu:Find("Report To") ~= nil)
+    s.store.Set("width", 170); s.Flush()
+    check("a narrow window: the buttons leave no room for the time", w.time.shown == false)
+    s.store.Set("showButtons", false); s.Flush()
+    check("Show Buttons off: the session button and ... go", w.session.shown == false and w.more.shown == false)
+    check("the time sits at the bar's own end, with the room the buttons had", w.time.shown == true
+        and w.time.points[1][2] == w.header and w.time.points[1][1] == "RIGHT" and w.time.points[1][4] == -6)
+    s.menu = nil
+    w.header.scripts.OnMouseUp(w.header, "RightButton")
+    check("and the menu is still on a right click", s.menu and s.menu:Find("Session") ~= nil)
+    s.store.Set("timeX", -10); s.Flush()
+    check("the time's offset still moves it", w.time.points[1][4] == -16)
+    s.store.Set("showButtons", true); s.store.Set("timeX", 0); s.Flush()
+    check("on again: they are back", w.session.shown == true and w.more.shown == true and w.time.shown == false)
+    local row = RowOf(s.page, "showButtons")
+    check("a toggle on the Title Bar card", row and row.toggle == true and row.label == "Show Buttons"
+        and CardOf(s.page, "header") ~= nil and s.store.Get("showButtons") == true)
 end
 
 -- the page

@@ -13,8 +13,10 @@ local MIN_WIDTH, MAX_WIDTH, MAX_HEIGHT = C.MIN_WIDTH, C.MAX_WIDTH, C.MAX_HEIGHT
 local BUTTON_H, MORE_W, SESSION_W, BUTTON_GAP, BUTTON_RIGHT = 18, 22, 62, 4, -6
 local TITLE_X = C.TITLE_X
 local TITLE_JOIN = " - "
--- What the buttons take of the title bar's right end, from the edge to the session button's left.
+-- What the buttons take of the title bar's right end, from the edge to the session button's left; with no
+-- buttons, only the margin.
 local BAR_BUTTONS = BUTTON_GAP + SESSION_W + BUTTON_GAP + MORE_W - BUTTON_RIGHT
+local BAR_MARGIN = -BUTTON_RIGHT
 local GRIP_SIZE, GRIP_INSET, GRIP_LEVEL, GRIP_LOCKED_ALPHA = 20, 2, 20, 0.4
 local HOME_X, HOME_Y = -24, 210
 local FRAME_NAME = "NaowhForeverDamageMeter"
@@ -29,18 +31,16 @@ local TEXT_OFF = "Enable the Damage Meter first."
 local TEXT_IN_COMBAT = "Preview is available outside combat."
 local TEXT_RESET_DONE = "Damage meter data reset."
 local TEXT_FIGHT = "Fight"
-local TEXT_LIST_TIP = "Choose what the window lists."
-local TEXT_LOWER_TIP = "Choose the list under the first, or none."
 local TEXT_SESSION_TIP = "The current fight, everything since the last reset, or a past fight."
-local TEXT_MORE_TIP = "Report, reset, add or close a window, and settings."
+local TEXT_MORE_TIP = "The list and the session, report, reset, add or close a window, and settings."
 
 local windows = {}
-local pendingUpdate, unlocked, hovered
+local pendingUpdate, unlocked, hovered, pinned
 local lastCombatEnd, override
 local preview = false
 local updateGeneration, previewGeneration = 0, 0
 local events = CreateFrame("Frame")
-local Update
+local Update, Unpin
 
 local function Get(w, base)
     return S.Get(Key(base, w.index))
@@ -89,10 +89,13 @@ end
 local function PaintTitleBar(frame, mode, seconds, fightName)
     local title, header = frame.title, frame.header
     local clock = frame.time
+    local buttons = S.Get("showButtons") ~= false
+    frame.session:SetShown(buttons)
+    frame.more:SetShown(buttons)
     title:SetWidth(0)
     title:SetText(TitleText(mode, fightName))
     local textWidth, timeWidth = math.ceil(title:GetStringWidth()), Look.TimeWidth()
-    local room = frame:GetWidth() - BAR_BUTTONS - TITLE_X
+    local room = frame:GetWidth() - (buttons and BAR_BUTTONS or BAR_MARGIN) - TITLE_X
     local shown = seconds ~= nil and S.Get("showTime") == true and textWidth + BUTTON_GAP + timeWidth <= room
     local drawn = math.min(textWidth, room)
     local x = TITLE_X + S.Get("titleX")
@@ -100,14 +103,13 @@ local function PaintTitleBar(frame, mode, seconds, fightName)
     title:SetPoint("LEFT", header, "LEFT", x, S.Get("titleY"))
     title:SetWidth(drawn)
     clock:ClearAllPoints()
-    clock:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP + S.Get("timeX"), S.Get("timeY"))
+    if buttons then
+        clock:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP + S.Get("timeX"), S.Get("timeY"))
+    else
+        clock:SetPoint("RIGHT", header, "RIGHT", BUTTON_RIGHT + S.Get("timeX"), S.Get("timeY"))
+    end
     clock:SetText(shown and DM.Clock(seconds) or "")
     clock:SetShown(shown)
-    local left = math.max(0, x - TITLE_X)
-    frame.modeButton:ClearAllPoints()
-    frame.modeButton:SetPoint("TOPLEFT", header, "TOPLEFT", left, 0)
-    frame.modeButton:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", left, 0)
-    frame.modeButton:SetWidth(drawn + 2 * TITLE_X)
 end
 
 -- seconds is how long the session has run, or nil; fightName is what the game calls the fight, or nil.
@@ -128,7 +130,6 @@ local function Render(w, session, available, seconds, lowerSession, fightName)
     else
         Look.HideLower(frame)
     end
-    frame.lowerButton:SetShown(frame.lowerOn)
     local summary = S.Get("showSummary") == true
     frame.summary:SetShown(summary)
     if summary then
@@ -200,32 +201,83 @@ local function OnWheel(w, delta, row)
     Update()
 end
 
--- The spells behind the hovered row; the panel says why when there are none.
+-- The spells behind a row; the panel says why when there are none. Out of combat it adds each spell's
+-- per-second figure, and the enemies a player hurt.
 local function ShowBreakdown(w, row)
     local mode = DM.Mode(row.modeKey or Get(w, "mode"))
     if not S.Get("breakdown") or w.sample or row.source == nil or mode.spells == false then
         Breakdown.Hide()
         return
     end
-    local data = DM.SourceSpells(mode.key, Get(w, "session"), w.fight, row.source)
+    local session, fight = Get(w, "session"), w.fight
+    local data = DM.SourceSpells(mode.key, session, fight, row.source)
     local inCombat = InCombatLockdown()
     local targets, seconds
-    if mode.targets and not inCombat then
-        targets = DM.Targets(Get(w, "session"), w.fight, row.source.name)
-        seconds = DM.Duration(Get(w, "session"), w.fight)
+    if not inCombat then
+        seconds = DM.Duration(session, fight)
+        if mode.targets then targets = DM.Targets(session, fight, row.source.name) end
     end
     local x = w.frame:GetCenter()
-    Breakdown.Show(row, row.source, data, x ~= nil and x < UIParent:GetWidth() / 2, inCombat, targets, seconds)
+    Breakdown.Show(row, row.source, data, { toRight = x ~= nil and x < UIParent:GetWidth() / 2,
+        inCombat = inCombat, targets = targets, seconds = seconds, rate = mode.rate, label = mode.label,
+        pinned = pinned ~= nil, onClose = Unpin })
+end
+
+-- The row a clicked source is on now: your own, one by its guid, or the very row when neither is plain.
+local function PinnedRow()
+    for _, row in ipairs(pinned.w.frame.panes[pinned.pane].rows) do
+        local source = row.source
+        if row:IsShown() and source ~= nil then
+            if pinned.who.row then
+                if row == pinned.who.row then return row end
+            elseif pinned.who.me then
+                if source.isLocalPlayer == true then return row end
+            elseif DM.Plain(source.sourceGUID, "string") and source.sourceGUID == pinned.who.guid then
+                return row
+            end
+        end
+    end
+end
+
+local function WhoIs(row)
+    local source = row.source
+    if source.isLocalPlayer == true then return { me = true } end
+    if DM.Plain(source.sourceGUID, "string") then return { guid = source.sourceGUID } end
+    return { row = row }
 end
 
 local function OnRowEnter(w, row)
+    if pinned then return end
     hovered = { w = w, row = row }
     ShowBreakdown(w, row)
 end
 
 local function OnRowLeave()
     hovered = nil
+    if not pinned then Breakdown.Hide() end
+end
+
+function Unpin()
+    pinned = nil
     Breakdown.Hide()
+end
+
+-- A click keeps a row's spells up, where each shows its tooltip; the same row again, the panel's X or a
+-- right click lets them go.
+local function OnRowClick(w, row, button)
+    if button == "RightButton" then
+        if pinned then Unpin() end
+        return
+    end
+    if button ~= "LeftButton" or not S.Get("breakdown") or w.sample or row.source == nil then return end
+    local again = pinned ~= nil and pinned.w == w and PinnedRow() == row
+    if pinned then Unpin() end
+    if again then
+        OnRowEnter(w, row)
+        return
+    end
+    pinned = { w = w, pane = row.pane or 1, who = WhoIs(row) }
+    ShowBreakdown(w, row)
 end
 
 local function NewButtons(w)
@@ -237,15 +289,6 @@ local function NewButtons(w)
     frame.session = ns.Button(header, "", SESSION_W, BUTTON_H, function() Menus.Session(w, frame.session) end)
     frame.session:SetPoint("RIGHT", frame.more, "LEFT", -BUTTON_GAP, 0)
     ns.Tooltip(frame.session, "Session", TEXT_SESSION_TIP)
-    frame.modeButton = CreateFrame("Button", nil, header)
-    frame.modeButton:SetScript("OnClick", function() Menus.List(w, frame.modeButton) end)
-    ns.Tooltip(frame.modeButton, "List", TEXT_LIST_TIP)
-    frame.lowerButton = CreateFrame("Button", nil, frame)
-    frame.lowerButton:SetPoint("TOPLEFT", frame.lowerBar, "TOPLEFT")
-    frame.lowerButton:SetPoint("BOTTOMRIGHT", frame.lowerBar, "BOTTOMRIGHT")
-    frame.lowerButton:SetScript("OnClick", function() Menus.List(w, frame.lowerButton, 2) end)
-    frame.lowerButton:Hide()
-    ns.Tooltip(frame.lowerButton, "Second List", TEXT_LOWER_TIP)
 end
 
 local function NewGrip(w)
@@ -281,6 +324,9 @@ local function Build(w)
     frame.header:EnableMouse(true); frame.header:RegisterForDrag("LeftButton")
     frame.header:SetScript("OnDragStart", function() OnDragStart(w) end)
     frame.header:SetScript("OnDragStop", function() OnDragStop(w) end)
+    frame.header:SetScript("OnMouseUp", function(_, button)
+        if button == "RightButton" then Menus.Window(w, frame.header) end
+    end)
     NewGrip(w)
     frame:SetScript("OnSizeChanged", function() if frame.sizing then Update() end end)
     ns.AllowOffscreen(frame)
@@ -289,6 +335,7 @@ local function Build(w)
     frame:SetScript("OnMouseWheel", function(_, delta) OnWheel(w, delta) end)
     frame.onWheel = function(delta, row) OnWheel(w, delta, row) end
     frame.onRowEnter = function(row) OnRowEnter(w, row) end
+    frame.onRowClick = function(row, button) OnRowClick(w, row, button) end
     frame.onRowLeave = OnRowLeave
     frame.mover = AttachMover(frame, index, function(pos) S.Set(Key("meterPos", index), pos) end)
     frame:Hide(); Place(w)
@@ -329,6 +376,7 @@ local function HideAll()
     for _, w in pairs(windows) do
         if w.frame then w.frame:Hide() end
     end
+    pinned = nil
     OnRowLeave()
 end
 
@@ -359,7 +407,14 @@ function Update()
             if visible and DM.WindowOn(index) then Draw(w, sample) else w.frame:Hide() end
         end
     end
-    if hovered and hovered.w.frame:IsShown() then ShowBreakdown(hovered.w, hovered.row) else OnRowLeave() end
+    if pinned then
+        local row = pinned.w.frame:IsShown() and PinnedRow()
+        if row then ShowBreakdown(pinned.w, row) else Unpin() end
+    elseif hovered and hovered.w.frame:IsShown() then
+        ShowBreakdown(hovered.w, hovered.row)
+    else
+        OnRowLeave()
+    end
 end
 
 local function RequestUpdate()
