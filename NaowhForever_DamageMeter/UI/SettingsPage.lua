@@ -466,6 +466,9 @@ page:Card({
     summary = NumbersSummary,
     rows = {
         Group("Columns"),
+        { key = "showName", label = "Show Name", toggle = true, needs = Enabled, why = OFF,
+          help = "The name of each row. Off, a row is its bar, its icon and its figures. A breakdown of a "
+              .. "player keeps the names of the spells." },
         { key = "showTotal", label = "Show Total", toggle = true, needs = Enabled, why = OFF },
         { key = "showRate", label = "Show Per Second", toggle = true, needs = Enabled, why = OFF,
           help = "Damage, healing and absorbs only." },

@@ -257,6 +257,7 @@ local function LayRow(row, pane, i, g)
     row.colB:SetShown(pane.columns >= 1)
     row.colA:ClearAllPoints(); row.colA:SetPoint("RIGHT", row.colB, "LEFT", -g.colGap, 0); row.colA:SetWidth(g.colWidth)
     row.colA:SetShown(pane.columns == 2)
+    row.name:SetShown(g.showName)
     row.name:ClearAllPoints(); row.name:SetPoint("LEFT", left, 0)
     row.name:SetPoint("RIGHT", -g.rightInset - pane.valueWidth - NAME_GAP, 0)
     Parts.HudFont(row.rank, g.font, g.rankSize, g.outline)
@@ -270,7 +271,7 @@ end
 local function LayHeads(pane, g, y)
     local f = pane.f
     local show = g.showHead
-    pane.headName:SetShown(show)
+    pane.headName:SetShown(show and g.showName)
     pane.headA:SetShown(show and pane.columns == 2)
     pane.headB:SetShown(show and pane.columns >= 1)
     pane.headP:SetShown(show and pane.percent)
@@ -432,6 +433,7 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.w, g.bh, g.gap, g.headTop, g.fontSize = w, bh, gap, headTop, fontSize
     g.showRanks = DM.Setting(f.index, "showRanks") and not f.detail
     g.showIcons, g.showHead = DM.Setting(f.index, "showIcons"), showHead
+    g.showName = S.Get("showName") ~= false or f.detail == true
     g.textPad, g.iconGap, g.edgeWidth, g.colGap = S.Get("textPad"), S.Get("iconGap"), S.Get("edgeWidth"), S.Get("colGap")
     g.iconSide, g.iconCrop = S.Get("iconSide"), S.Get("iconZoom") / 100
     local iconSetting = S.Get("iconSize")
@@ -456,7 +458,7 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), g.valueSize, g.rankSize, g.textPad, g.iconGap, g.edgeWidth,
+        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), tostring(g.showName), g.valueSize, g.rankSize, g.textPad, g.iconGap, g.edgeWidth,
         g.colGap, g.iconSide, g.iconCrop, g.iconSize, tostring(g.barTrack), f.trackColor.r, f.trackColor.g,
         f.trackColor.b, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
         name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")

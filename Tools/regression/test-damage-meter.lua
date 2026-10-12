@@ -2444,6 +2444,37 @@ do
         and scale.choice[1].top == "Top Player" and scale.choice[1].total == "List Total")
 end
 
+-- the name can go too: a row is its bar, its icon and its figures
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    check("the name is shown by default", w.rows[1].name.shown == true and w.panes[1].headName.shown == true
+        and s.store.Get("showName") == true)
+    s.store.Set("showName", false); s.Flush()
+    check("Show Name off: no name, and no title over it", w.rows[1].name.shown == false and w.rows[2].name.shown == false
+        and w.panes[1].headName.shown == false)
+    check("the icon and the figures stay, with their titles", w.rows[1].icon.shown == true and w.rows[1].colA.shown == true
+        and w.rows[1].colB.shown == true and w.panes[1].headA.shown == true and w.panes[1].headB.shown == true)
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("a breakdown keeps the names of the spells", w.rows[1].name.shown == true and w.rows[1].name.text == "Fireball")
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    check("and the list has none again", w.rows[1].name.shown == false and w.panes[1].headName.shown == false)
+    s.store.Set("showTotal", false); s.store.Set("showRate", false); s.store.Set("showIcons", false); s.Flush()
+    check("with everything off, the bar alone", w.rows[1].shown == true and w.rows[1].name.shown == false
+        and w.rows[1].colA.shown == false and w.rows[1].colB.shown == false and w.rows[1].icon.shown == false)
+    s.store.Set("showName", true); s.Flush()
+    check("on again", w.rows[1].name.shown == true)
+    local row, card = RowOf(s.page, "showName")
+    check("on the Numbers and Names card, first among the columns", row and row.toggle == true and card.id == "numbers"
+        and card.rows[2] == row and #card.rows <= 15)
+    local inLook = false
+    for _, key in ipairs(s.DM.C.LOOK_KEYS) do
+        if key == "showName" then inLook = true end
+    end
+    check("and part of a look", inLook)
+end
+
 -- looks: kept by name on the account, applied, copied to the other windows, and written as text
 do
     local s = Boot({ settings = { enabled = true, window2 = true } })

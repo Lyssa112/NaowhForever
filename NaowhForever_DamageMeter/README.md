@@ -83,6 +83,9 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- Show Name hides the name of every row of a list (`row.name:SetShown`, and the Name title over it), so
+  a row can be only its bar, icon and figures. A breakdown keeps the names of its spells, which are what
+  its rows are about.
 - A look is the visual settings (`DM.C.LOOK_KEYS`: not places, lists, rules or behaviour). Looks are kept
   on the account by name (`damageMeterLooks`, twelve at most), applied key by key with `DM.ApplyLook`, and
   written as one line, `NFDM1|key=value|...`, each value with its kind in front (`n` number, `b` boolean,

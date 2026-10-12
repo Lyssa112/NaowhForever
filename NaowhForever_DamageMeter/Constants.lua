@@ -110,7 +110,7 @@ for _, key in ipairs(ns.DamageMeter.C.OWN_LOOK_ORDER) do ns.DamageMeter.C.OWN_LO
 -- lists, when it shows or how it behaves. The colors follow.
 do
     local C = ns.DamageMeter.C
-    C.LOOK_KEYS = { "barHeight", "barSpacing", "growUp", "reverseFill", "barScale", "showTotal", "showRate",
+    C.LOOK_KEYS = { "barHeight", "barSpacing", "growUp", "reverseFill", "barScale", "showName", "showTotal", "showRate",
         "showPercent", "showDivider", "showIcons", "showRanks", "highlightPlayer", "pinSelf", "barColor", "barAlpha",
         "backgroundAlpha", "fontSize", "font", "outline", "texture", "showBorder", "iconStyle", "showColumnHeaders",
         "numberUnits", "numberDecimals", "nameFormat", "showSummary", "titleSize", "timeSize", "showTime",
