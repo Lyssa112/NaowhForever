@@ -6,8 +6,10 @@
     <Script file="Source.lua"/>
     <Script file="Names.lua"/>
     <Script file="Report.lua"/>
+    <Script file="History.lua"/>
     <Script file="View\Meter.lua"/>
     <Script file="View\Breakdown.lua"/>
+    <Script file="UI\History.lua"/>
     <Script file="UI\Menus.lua"/>
     <Script file="UI\Meter.lua"/>
     <Script file="UI\SettingsPage.lua"/>

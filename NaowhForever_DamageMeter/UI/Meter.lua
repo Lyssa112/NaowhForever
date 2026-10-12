@@ -310,10 +310,14 @@ local function ForgetFights()
     for _, w in pairs(windows) do w.fight, w.offset = nil, 0 end
 end
 
-local function OnEvent(_, event)
+local function OnEvent(_, event, ...)
     if event == "PLAYER_REGEN_DISABLED" then
         preview, override = false, nil
+        DM.History.OnCombatStart()
+    elseif event == "ENCOUNTER_END" then
+        DM.History.OnEncounterEnd((select(2, ...)))
     elseif event == "PLAYER_REGEN_ENABLED" then
+        DM.History.Arm()
         GameMeter(DM.On() and S.Get("hideGameMeter"))
         DM.ScanRoster()
         lastCombatEnd = GetTime()
@@ -333,6 +337,7 @@ local function Listen()
     for _, event in ipairs(STATE_EVENTS) do events:RegisterEvent(event) end
     events:RegisterEvent("PLAYER_REGEN_DISABLED")
     events:RegisterEvent("PLAYER_REGEN_ENABLED")
+    pcall(events.RegisterEvent, events, "ENCOUNTER_END")
 end
 
 local function Apply()

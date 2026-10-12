@@ -38,6 +38,7 @@ local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
 local DECIMALS_RANGE = { 0, C.NUMBER_DECIMALS_MAX, 1 }
 local TITLE_RANGE = { C.MIN_TITLE, C.MAX_TITLE, 1 }
+local KEEP_RANGE = { C.MIN_KEEP, C.MAX_KEEP, 1 }
 
 local function Enabled() return DM.On() and true or false end
 local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
@@ -284,6 +285,14 @@ page:Card({
               .. "show spells." },
         { key = "reportLines", label = "Report Lines", slider = REPORT_RANGE, needs = Enabled, why = OFF,
           help = "How many rows Report To sends, out of combat only. Reset has a key binding under Naowh Forever." },
+        Group("History"),
+        { key = "keepFights", label = "Fights Kept", slider = KEEP_RANGE, needs = Enabled, why = OFF,
+          help = "A summary of each fight is kept when it ends, with your figures and the raid's." },
+        { label = "Fight History", buttonText = "Open", needs = Enabled, why = OFF,
+          button = function() DM.HistoryWindow.Toggle() end,
+          help = "The fights kept: when, which, how long, and the per-second figures." },
+        { label = "Clear Fight History", buttonText = "Clear", needs = Enabled, why = OFF,
+          button = function() DM.HistoryWindow.AskClear() end },
         Group("Preview"),
         { label = "Show It on Screen", buttonText = "Preview", needs = Enabled, why = OFF,
           button = function() ns.PreviewDamageMeter() end,

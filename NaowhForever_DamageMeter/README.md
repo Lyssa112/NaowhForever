@@ -19,10 +19,12 @@ NaowhForever_DamageMeter/
   Source.lua                     reading the game's sessions, fights and spells (DM.Session, DM.Fights, DM.SourceSpells)
   Names.lua                      a player's name as written: first, last, initials (DM.DisplayName, DM.ScanRoster)
   Report.lua                     the lines a report sends, and where it can go (DM.Report, DM.Channels)
+  History.lua                    a summary of each fight, kept when it ends (DM.History)
   View/
     Meter.lua                    a window's look and layout (DM.Look)
     Breakdown.lua                the spells panel beside a hovered row (DM.Breakdown)
   UI/
+    History.lua                  the kept fights in a window of their own (DM.HistoryWindow)
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     SettingsPage.lua             its settings page, declared as cards
@@ -55,6 +57,11 @@ NaowhForever_DamageMeter/
 - Class Colors can be changed class by class (`classColors`, class to color), kept apart from the
   theme tokens since the game gives every class its own. A background image is a name from the shared
   media's `background` list, drawn above the window's color and below the rows, stretched or tiled.
+- A fight is kept when combat ends, as plain numbers only: the game's amounts stay secret for a moment
+  after the fight, so the session is read again every couple of seconds, a few times, and only a
+  fight whose total, length and your own figures are all plain is kept. A fight under five seconds is
+  not. The boss comes from `ENCOUNTER_END` while it is recent, the place from the instance or the
+  zone. The kept fights are the module's own setting, so they outlive a reload, not the game's sessions.
 - Raid Mode hands the window a copy of the session with only your row in it (found by
   `isLocalPlayer`, which is never secret), still ranked by its place in the game's order and still
   against the group's largest bar. Where = In Combat shows the windows while you fight and for Hide

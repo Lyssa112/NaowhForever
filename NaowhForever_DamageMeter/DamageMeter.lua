@@ -18,6 +18,7 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     showColumnHeaders = true, numberUnits = "game", numberDecimals = 1, nameFormat = "full",
     showSummary = false, titleSize = 12, timeSize = 11,
     classColors = {}, raidMode = false, hideDelay = 8,
+    history = {}, keepFights = 30,
     backgroundImage = "", imageAlpha = 1, imageTile = false,
     barCustomColor = false, ownBarColor = false, edgeColor = false,
     nameColor = false, valueColor = false, rankColor = false, columnColor = false, titleColor = false,

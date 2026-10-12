@@ -200,6 +200,11 @@ local function Boot(opts)
         GetLocale = function() return s.locale or "enUS" end,
         LibStub = function() return s.lsm end,
         GetTime = function() return s.now or 0 end,
+        time = function() return s.clock or 1700000000 end,
+        date = os.date,
+        GetInstanceInfo = function() return s.instanceName end,
+        GetZoneText = function() return s.zone or "Plains" end,
+        Screenshot = function() s.shots = (s.shots or 0) + 1 end,
         CLASS_SORT_ORDER = opts.classes,
         LOCALIZED_CLASS_NAMES_MALE = { MAGE = "Mage", ROGUE = "Rogue" },
         Enum = { DamageMeterType = { DamageDone = 0, Dps = 1, HealingDone = 2, Hps = 3, DamageTaken = 7,
@@ -268,8 +273,8 @@ local function Boot(opts)
     env._G = env
     env.UIParent.w = 1000
     local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Names.lua", "Report.lua",
-        "View/Meter.lua",
-        "View/Breakdown.lua", "UI/Menus.lua", "UI/Meter.lua", "UI/SettingsPage.lua" }
+        "History.lua", "View/Meter.lua", "View/Breakdown.lua", "UI/History.lua", "UI/Menus.lua", "UI/Meter.lua",
+        "UI/SettingsPage.lua" }
     for _, file in ipairs(files) do
         local chunk = assert(loadfile("NaowhForever_DamageMeter/" .. file))
         setfenv(chunk, env)
@@ -294,9 +299,9 @@ local function Boot(opts)
     end
     function s.Window(i) return Named(i and i > 1 and "NaowhForeverDamageMeter" .. i or "NaowhForeverDamageMeter") end
     function s.Panel() return Named("NaowhForeverDamageMeterBreakdown") end
-    function s.Fire(event)
+    function s.Fire(event, ...)
         for _, f in ipairs(s.frames) do
-            if f.events[event] and f.scripts.OnEvent then f.scripts.OnEvent(f, event) end
+            if f.events[event] and f.scripts.OnEvent then f.scripts.OnEvent(f, event, ...) end
         end
     end
     function s.Flush()
@@ -911,6 +916,199 @@ do
     s.Hover(w, 2)
     check("without picks the panel follows the theme", Is(panel.title.textColor, THEME.fg)
         and Is(panel.note.textColor, THEME.muted) and Is(Solid(panel.background), THEME.bg))
+end
+
+-- fight history: a summary kept when a fight ends, once its numbers are plain
+do
+    local function Fight(total, secret)
+        return { combatSources = {
+            { name = "Aldrin", classFilename = "MAGE", totalAmount = 3000, amountPerSecond = 24 },
+            { name = "You", classFilename = "ROGUE", isLocalPlayer = true, totalAmount = 5000, amountPerSecond = 40 },
+        }, maxAmount = 5000, totalAmount = secret and SECRET_NUMBER or total or 9000 }
+    end
+    local function End(s)
+        s.combat = true
+        s.Fire("PLAYER_REGEN_DISABLED"); s.Flush()
+        s.combat = false
+        s.Fire("PLAYER_REGEN_ENABLED")
+    end
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    s.duration = 125
+    s.apiResult = Fight()
+    s.now, s.clock = 1000, 1700000500
+    s.zone = "Plains"
+    s.combat = true
+    s.Fire("PLAYER_REGEN_DISABLED"); s.Flush()
+    s.Fire("ENCOUNTER_END", 77, "The Hollow King")
+    s.combat = false
+    s.Fire("PLAYER_REGEN_ENABLED")
+    local scheduled = false
+    for _, t in ipairs(s.timers) do
+        if t.sec == 1.5 then scheduled = true end
+    end
+    check("a read is scheduled for just after combat ends", scheduled)
+    s.Flush(); s.Flush()
+    local list = s.store.Get("history")
+    local e = list[1]
+    check("the fight is kept: when, where, which, how long", #list == 1 and e.at == 1700000500 and e.place == "Plains"
+        and e.boss == "The Hollow King" and e.seconds == 125)
+    check("with your figures and the raid's, damage then healing", e.damage.own == 5000 and e.damage.perSecond == 40
+        and e.damage.total == 9000 and e.damage.totalPerSecond == 72 and e.damage.rank == 2 and e.damage.count == 2
+        and e.healing.own == 5000)
+
+    -- not plain yet: read again until it is
+    s.now = 2000
+    End(s)
+    s.apiResult = Fight(nil, true)
+    s.Flush()
+    check("a secret total is not kept, and is read again", #s.store.Get("history") == 1 and #s.timers >= 1)
+    s.apiResult = Fight(4000)
+    s.Flush(); s.Flush()
+    local again = s.store.Get("history")
+    check("kept once it is plain, newest first, no boss from the last fight", #again == 2 and again[1].damage.total == 4000
+        and again[1].boss == nil and again[2].boss == "The Hollow King")
+
+    -- a length or your own figures still secret
+    local before = #s.store.Get("history")
+    s.duration = SECRET_NUMBER
+    s.apiResult = Fight(5000)
+    End(s)
+    s.Flush()
+    check("a length the game keeps back is waited for", #s.store.Get("history") == before and #s.timers >= 1)
+    s.duration = 125
+    local mine = Fight(5000)
+    mine.combatSources[2].totalAmount = SECRET_NUMBER
+    s.apiResult = mine
+    s.Flush()
+    check("as are your own figures", #s.store.Get("history") == before and #s.timers >= 1)
+    mine.combatSources[2].totalAmount = 5000
+    s.Flush(); s.Flush()
+    check("both kept once they are plain", #s.store.Get("history") == before + 1)
+
+    -- combat begins while it waits for plain numbers
+    s.apiResult = Fight(nil, true)
+    End(s)
+    s.apiResult = Fight(5100)
+    s.Fire("PLAYER_REGEN_DISABLED")
+    s.Flush(); s.Flush()
+    check("a fight that begins drops the read of the last", #s.store.Get("history") == before + 1)
+    s.combat = false
+    s.Fire("PLAYER_REGEN_ENABLED")
+    s.Flush(); s.Flush()
+    check("and the one that ends is read as its own", #s.store.Get("history") == before + 2)
+
+    -- an end of combat that was never a start
+    s.Fire("PLAYER_REGEN_ENABLED")
+    s.Flush(); s.Flush()
+    check("an end with no start is not read", #s.store.Get("history") == before + 2)
+
+    -- a name the game keeps back is not used
+    s.now = 5000
+    s.Fire("ENCOUNTER_END", 1, SECRET_TEXT)
+    End(s)
+    s.Flush(); s.Flush()
+    check("an encounter name that is secret is not kept as the boss", s.store.Get("history")[1].boss == nil)
+
+    -- a fight that is too short
+    s.duration = 3
+    End(s)
+    s.Flush(); s.Flush()
+    check("a fight under five seconds is not kept", #s.store.Get("history") == 5)
+    s.duration = 125
+
+    -- the game never gives plain numbers: give up
+    s.apiResult = Fight(nil, true)
+    End(s)
+    for _ = 1, 12 do s.Flush() end
+    check("it gives up after a few tries, and keeps nothing", #s.store.Get("history") == 5 and #s.timers == 0)
+
+    -- the next fight starts while it waits
+    End(s)
+    s.combat = true
+    s.Flush()
+    s.apiResult = Fight(7000)
+    s.Flush(); s.Flush()
+    check("combat again: the earlier read is dropped", #s.store.Get("history") == 5)
+    s.combat = false
+    s.apiResult = Fight(7000)
+
+    -- the list is capped
+    s.store.Set("keepFights", 3)
+    for i = 1, 4 do
+        s.apiResult = Fight(8000 + i)
+        End(s)
+        s.Flush(); s.Flush()
+    end
+    local capped = s.store.Get("history")
+    check("only as many as Fights Kept, the newest", #capped == 3 and capped[1].damage.total == 8004
+        and capped[3].damage.total == 8002)
+
+    -- the window
+    local win
+    for _, f in ipairs(s.frames) do
+        if f.name == "NaowhForeverDamageMeterHistory" then win = f end
+    end
+    check("not built before it is opened", win == nil)
+    s.DM.HistoryWindow.Toggle()
+    for _, f in ipairs(s.frames) do
+        if f.name == "NaowhForeverDamageMeterHistory" then win = f end
+    end
+    check("opened", win and win.shown == true and win.title.text == "Fight History")
+    check("with a line per fight: when, which, how long, the figures", win.rows[1].cells[1].text
+        == os.date("%m/%d %H:%M", capped[1].at) and win.rows[1].cells[2].text == "Plains"
+        and win.rows[1].cells[3].text == "2:05" and win.rows[1].cells[4].text == "<40>"
+        and win.rows[1].cells[5].text == "<" .. tostring(capped[1].damage.totalPerSecond) .. ">"
+        and win.rows[3].cells[1].shown == true and win.rows[4].cells[1].shown == false)
+    check("and the empty line is hidden", win.empty.shown == false)
+    s.apiResult = Fight(9999)
+    End(s)
+    s.Flush(); s.Flush()
+    check("a new fight refreshes it while it is open", win.rows[1].cells[5].text
+        == "<" .. tostring(s.store.Get("history")[1].damage.totalPerSecond) .. ">")
+    win.scripts.OnMouseWheel(win, -5)
+    check("scrolling past the end stays on the list", win.rows[1].cells[1].shown == true)
+    win.scripts.OnMouseWheel(win, 5)
+    check("and so does scrolling above the start", win.rows[1].cells[1].shown == true)
+    win.clear.onClick()
+    check("Clear asks first", #s.confirms == 1 and #s.store.Get("history") == 3)
+    s.confirms[1].yes()
+    check("then empties it, and says so", #s.store.Get("history") == 0 and win.empty.shown == true
+        and win.rows[1].cells[1].shown == false)
+
+    win.close.onClick()
+    check("Close hides it", win.shown == false)
+    s.DM.HistoryWindow.Toggle()
+    check("and it opens again", win.shown == true)
+
+    -- from the menu
+    s.Window().more.onClick()
+    s.menu:Find("Fight History").onClick()
+    check("the window menu toggles it", win.shown == false)
+    s.menu:Find("Take Screenshot").onClick()
+    check("a screenshot is taken a moment later, with the menu gone", s.shots == nil)
+    s.Flush()
+    check("then", s.shots == 1)
+end
+
+-- the boss name is only used while it is recent, and the place is the instance's inside one
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    s.duration = 90
+    s.apiResult = { combatSources = {}, maxAmount = 0, totalAmount = 100 }
+    s.combat = true
+    s.Fire("PLAYER_REGEN_DISABLED"); s.Flush()
+    s.now = 100
+    s.Fire("ENCOUNTER_END", 1, "Old Boss")
+    s.now = 400
+    s.combat = false
+    s.instance, s.instanceName = true, "The Deep Hall"
+    s.Fire("PLAYER_REGEN_ENABLED")
+    s.Flush(); s.Flush()
+    local e = s.store.Get("history")[1]
+    check("a boss from minutes ago is not this fight's; the instance's name is the place", e and e.boss == nil
+        and e.place == "The Deep Hall" and e.damage.own == 0 and e.damage.rank == nil)
 end
 
 -- Raid Mode: your row alone

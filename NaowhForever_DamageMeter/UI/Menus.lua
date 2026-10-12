@@ -12,6 +12,8 @@ local TEXT_FIGHTS, TEXT_NO_FIGHTS = "Past Fights", "No Past Fights Yet"
 local TEXT_REPORT, TEXT_RESET, TEXT_RESET_ASK = "Report To", "Reset Data", "Reset the damage meter data?"
 local TEXT_ADD, TEXT_CLOSE, TEXT_LOCK, TEXT_SETTINGS = "Add Window", "Close Window", "Lock Window", "Settings"
 local TEXT_RAID, TEXT_BAR_COLOR = "Raid Mode", "Bar Color"
+local TEXT_HISTORY, TEXT_SHOT = "Fight History", "Take Screenshot"
+local SHOT_DELAY = 0.3
 
 local Menus = {}
 DM.Menus = Menus
@@ -47,6 +49,13 @@ function Menus.Session(w, owner)
     end)
 end
 
+-- A little later, so the menu has closed and is not in the picture.
+local function TakeScreenshot()
+    C_Timer.After(SHOT_DELAY, function()
+        if Screenshot then pcall(Screenshot) end
+    end)
+end
+
 local function FirstClosed()
     for i = 2, DM.MAX_WINDOWS do
         if not DM.WindowOn(i) then return i end
@@ -64,6 +73,8 @@ function Menus.Window(w, owner)
         for _, channel in ipairs(DM.Channels()) do
             report:CreateButton(channel.label, function() Report(w, channel.key) end)
         end
+        root:CreateButton(TEXT_HISTORY, function() DM.HistoryWindow.Toggle() end)
+        root:CreateButton(TEXT_SHOT, TakeScreenshot)
         root:CreateButton(TEXT_RESET, function() ns.Confirm(TEXT_RESET_ASK, DM.Reset) end)
         root:CreateDivider()
         local free = FirstClosed()
