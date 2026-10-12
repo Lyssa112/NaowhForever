@@ -36,6 +36,8 @@ local function Region(kind, parent)
     -- the width the text takes, held to the width the region was given
     function r:GetStringHeight() return 14 end
     function r:SetFrameStrata(v) self.strata = v end
+    function r:SetScale(v) self.scale = v end
+    function r:GetScale() return self.scale or 1 end
     function r:EnableMouse(v) self.mouse = v end
     function r:SetToplevel(v) self.toplevel = v end
     function r:GetStringWidth()
@@ -56,7 +58,7 @@ local function Region(kind, parent)
     function r:CreateTexture() return Region("Texture", self) end
     function r:GetLeft() return 100 end
     function r:GetTop() return 300 end
-    function r:GetEffectiveScale() return 1 end
+    function r:GetEffectiveScale() return self.scale or 1 end
     function r:StartMoving() self.dragging = true end
     function r:StartSizing(point) self.sizingFrom = point end
     function r:StopMovingOrSizing() self.dragging, self.sizingFrom = false, nil end
@@ -2040,6 +2042,40 @@ do
     check("and it can be added again", s.menu:Find("Add Window") ~= nil)
 end
 
+-- each window has its own scale, and a change keeps its corner where it was
+do
+    local s = Boot({ settings = { enabled = true, window2 = true,
+        meterPos = { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -24, y = 210 } } })
+    s.env.UIParent.h = 1000
+    s.Login()
+    local one, two = s.Window(), s.Window(2)
+    check("a window is full size by default", one.scale == 1 and two.scale == 1 and s.store.Get("scale") == 1)
+    s.store.Set("scale", 1.5); s.Flush()
+    check("Scale makes it that large, the other not", one.scale == 1.5 and two.scale == 1)
+    local pos = s.store.Get("meterPos")
+    check("its place is in its own units, converted so the corner stays", pos.point == "BOTTOMRIGHT"
+        and math.abs(pos.x - (-16)) < 1e-9 and math.abs(pos.y - 140) < 1e-9)
+    check("and put back that way", one.points[1][1] == "BOTTOMRIGHT" and math.abs(one.points[1][4] - (-16)) < 1e-9)
+    s.store.Set("scale2", 0.5); s.Flush()
+    check("the second has its own", two.scale == 0.5 and one.scale == 1.5)
+    one.header.scripts.OnDragStart(one.header)
+    one.header.scripts.OnDragStop(one.header)
+    local saved = s.store.Get("meterPos")
+    check("a drag is saved in the window's units: its left, and its top from the screen's top, over the scale",
+        saved.point == "TOPLEFT" and saved.x == 100 and math.abs(saved.y - (300 - 1000 / 1.5)) < 1e-9)
+    s.store.Set("scale", 1); s.Flush()
+    saved = s.store.Get("meterPos")
+    check("back to full size: converted back", one.scale == 1 and math.abs(saved.x - 150) < 1e-9
+        and math.abs(saved.y - 1.5 * (300 - 1000 / 1.5)) < 1e-9)
+    local row = RowOf(s.page, "scale")
+    check("Scale on the Window card, from half to double, in steps of five percent", row and row.slider[1] == 50
+        and row.slider[2] == 200 and row.slider[3] == 5 and row.unit == "%" and row.scale == 0.01)
+    check("and on the other windows' cards", RowOf(s.page, "scale2") ~= nil and RowOf(s.page, "scale3") ~= nil)
+    local width = RowOf(s.page, "width")
+    local height = RowOf(s.page, "height")
+    check("windows may be as wide and tall as a thousand", width.slider[2] == 1000 and height.slider[2] == 1000)
+end
+
 -- more windows: each with its own list, session, size and place
 do
     local s = Boot({ settings = { enabled = true, window2 = true, mode2 = "taken", session2 = "overall", width2 = 240,
@@ -3042,7 +3078,7 @@ do
         local got = {}
         for _, row in ipairs(card.rows) do got[#got + 1] = row.key end
         check("window" .. n .. ": its own list, second list, session and size", table.concat(got, ",")
-            == ("mode%d,lower%d,session%d,width%d,height%d"):format(n, n, n, n, n))
+            == ("mode%d,lower%d,session%d,width%d,height%d,scale%d"):format(n, n, n, n, n, n))
     end
     s.store.Set("mode2", "healing")
     check("a second window reads its own list and size", CardOf(page, "window2").summary(s.store)

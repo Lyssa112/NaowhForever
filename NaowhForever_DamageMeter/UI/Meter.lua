@@ -193,10 +193,11 @@ local function Place(w)
     end
 end
 
+-- Where the window stands is saved in its own units, which are the screen's divided by its scale.
 local function SavePosition(w)
     local frame = w.frame
-    local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
-    local x, y = frame:GetLeft() * scale, frame:GetTop() * scale - UIParent:GetHeight()
+    local ratio = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    local x, y = frame:GetLeft(), frame:GetTop() - UIParent:GetHeight() / ratio
     frame:ClearAllPoints(); frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
     S.Set(Key("meterPos", w.index), { point = "TOPLEFT", relPoint = "TOPLEFT", x = x, y = y })
 end
@@ -389,6 +390,7 @@ local function Build(w)
     frame.onRowClick = function(row, button) OnRowClick(w, row, button) end
     frame.onRowLeave = OnRowLeave
     frame.mover = AttachMover(frame, index, function(pos) S.Set(Key("meterPos", index), pos) end)
+    frame:SetScale(Get(w, "scale"))
     frame:Hide(); Place(w)
 end
 
@@ -430,7 +432,23 @@ local function HideAll()
     OnRowLeave()
 end
 
+-- The window's own scale. A change keeps its corner where it is: the saved place is in the window's own
+-- units, so it is converted to the new scale and put back.
+local function ApplyScale(w)
+    local frame, scale = w.frame, Get(w, "scale")
+    local old = frame:GetScale()
+    if old == scale then return end
+    frame:SetScale(scale)
+    local pos = Get(w, "meterPos")
+    if type(pos) == "table" and type(pos.x) == "number" and type(pos.y) == "number" then
+        S.Set(Key("meterPos", w.index), { point = pos.point, relPoint = pos.relPoint, x = pos.x * old / scale,
+            y = pos.y * old / scale })
+        Place(w)
+    end
+end
+
 local function Draw(w, asSample)
+    ApplyScale(w)
     w.sample = asSample
     local lowerKey = Get(w, "lower")
     if asSample then

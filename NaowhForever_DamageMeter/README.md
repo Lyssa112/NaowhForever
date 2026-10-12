@@ -82,6 +82,10 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- A window has a scale of its own (`scale`, `scale2`, `scale3`), the frame's `SetScale`. Its saved place is
+  in its own units, which are the screen's divided by the scale, so a change converts the saved place and
+  puts the window back with its corner where it was, and a drag saves the place the same way. The size
+  limits are generous (up to 1000 by 1000) since the scale can be used for the rest.
 - The windows are plain frames, so they move and resize in combat; only Lock Window stops that. The
   sizing flag lives on the frame (`frame.sizing`), which is what the layout reads while the client
   resizes it.

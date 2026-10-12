@@ -29,7 +29,7 @@ end
 
 ns.DamageMeter.C = {
     PAGE = "Damage Meter/Settings",
-    MIN_WIDTH = 170, MIN_HEIGHT = 70, MAX_WIDTH = 600, MAX_HEIGHT = 700,
+    MIN_WIDTH = 170, MIN_HEIGHT = 70, MAX_WIDTH = 1000, MAX_HEIGHT = 1000, MIN_SCALE = 50, MAX_SCALE = 200,
     MIN_BAR = 12, MAX_BAR = 40, MAX_SPACING = 12, MIN_FONT = 8, MAX_FONT = 20,
     INSET = 6, HEADER = 26, TITLE_X = 8,
     ROUND = 0.5,

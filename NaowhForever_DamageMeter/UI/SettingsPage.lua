@@ -24,6 +24,7 @@ local OFF_TIME = "Turn on Show Fight Time"
 local OFF_BOTH = "Turn on Show Total and Show Per Second"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
+local SCALE_RANGE = { C.MIN_SCALE, C.MAX_SCALE, 5 }
 local BAR_RANGE, SPACING_RANGE = { C.MIN_BAR, C.MAX_BAR, 1 }, { 0, C.MAX_SPACING, 1 }
 local TEXT_RANGE = { C.MIN_FONT, C.MAX_FONT, 1 }
 local BACKGROUND_RANGE, BAR_ALPHA_RANGE = Style.ALPHA_RANGE, { 10, 100, Style.OPACITY_STEP }
@@ -319,6 +320,8 @@ page:Card({
         Group("Size"),
         { key = "width", label = "Width", slider = WIDTH_RANGE, needs = Enabled, why = OFF },
         { key = "height", label = "Height", slider = HEIGHT_RANGE, needs = Enabled, why = OFF },
+        { key = "scale", label = "Scale", slider = SCALE_RANGE, unit = "%", scale = TO_FRACTION, needs = Enabled,
+          why = OFF, help = "Makes the whole window larger or smaller, text and all." },
         { key = "locked", label = "Lock Window", toggle = true, needs = Enabled, why = OFF,
           help = "Off: drag the title bar to move it and the corner to resize it, in combat too." },
         Group("Background"),
@@ -529,6 +532,8 @@ page:Card({
         { key = "session2", label = "Session", choice = SESSION, needs = Enabled, why = OFF },
         { key = "width2", label = "Width", slider = WIDTH_RANGE, needs = Enabled, why = OFF },
         { key = "height2", label = "Height", slider = HEIGHT_RANGE, needs = Enabled, why = OFF },
+        { key = "scale2", label = "Scale", slider = SCALE_RANGE, unit = "%", scale = TO_FRACTION, needs = Enabled,
+          why = OFF },
     },
 })
 
@@ -542,5 +547,7 @@ page:Card({
         { key = "session3", label = "Session", choice = SESSION, needs = Enabled, why = OFF },
         { key = "width3", label = "Width", slider = WIDTH_RANGE, needs = Enabled, why = OFF },
         { key = "height3", label = "Height", slider = HEIGHT_RANGE, needs = Enabled, why = OFF },
+        { key = "scale3", label = "Scale", slider = SCALE_RANGE, unit = "%", scale = TO_FRACTION, needs = Enabled,
+          why = OFF },
     },
 })

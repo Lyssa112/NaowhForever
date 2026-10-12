@@ -26,11 +26,11 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     nameColor = false, valueColor = false, rankColor = false, columnColor = false, titleColor = false,
     timeColor = false, summaryColor = false,
     windowColor = false, headerColor = false, borderColor = false,
-    mode = "damage", session = "current", width = 300, height = 206, lower = "",
+    mode = "damage", session = "current", width = 300, height = 206, lower = "", scale = 1,
     meterPos = { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -24, y = 210 },
-    window2 = false, mode2 = "healing", session2 = "current", width2 = 300, height2 = 206, lower2 = "",
+    window2 = false, mode2 = "healing", session2 = "current", width2 = 300, height2 = 206, lower2 = "", scale2 = 1,
     meterPos2 = { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -24, y = 420 },
-    window3 = false, mode3 = "taken", session3 = "current", width3 = 300, height3 = 206, lower3 = "",
+    window3 = false, mode3 = "taken", session3 = "current", width3 = 300, height3 = 206, lower3 = "", scale3 = 1,
     meterPos3 = { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -24, y = 630 },
 })
 ns.DamageMeterSettings = S
