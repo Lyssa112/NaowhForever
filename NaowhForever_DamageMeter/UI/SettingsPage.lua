@@ -23,6 +23,7 @@ local OFF_OWN = "Pick Your Own Picture in Image"
 local OFF_TIME = "Turn on Show Fight Time"
 local OFF_BOTH = "Turn on Show Total and Show Per Second"
 local OFF_FADE = "Set Out of Combat Opacity below 100%"
+local OFF_TRACK = "Turn on Bar Track"
 local OFF_LOCKED = "Turn on Lock Window"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
@@ -39,6 +40,8 @@ local OFFSET_X_RANGE, OFFSET_Y_RANGE = { -C.MAX_OFFSET_X, C.MAX_OFFSET_X, 1 }, {
 local KEEP_RANGE = { C.MIN_KEEP, C.MAX_KEEP, 1 }
 local TILE_RANGE = { C.MIN_TILE, C.MAX_TILE, 8 }
 local VALUE_SIZE_RANGE, RANK_SIZE_RANGE = { 0, C.MAX_FONT, 1 }, { C.MIN_FONT, C.MAX_FONT, 1 }
+local ICON_SIZE_RANGE, ICON_ZOOM_RANGE = { 0, C.MAX_ICON, 1 }, { 0, 30, 1 }
+local PAD_RANGE, EDGE_RANGE = { 0, C.MAX_PAD, 1 }, { 0, 8, 1 }
 local LETTERS_RANGE, PERCENT_DECIMALS_RANGE = { 0, C.MAX_NAME_LETTERS, 1 }, { 0, C.MAX_PERCENT_DECIMALS, 1 }
 
 local MODE = { C.MODE_LABELS, C.MODE_ORDER }
@@ -60,6 +63,7 @@ local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "cl
 local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
 local BAR_SCALE = { C.BAR_SCALES, C.BAR_SCALES_ORDER }
+local ICON_SIDE = { C.ICON_SIDES, C.ICON_SIDES_ORDER }
 local TITLE_TEXT = { C.TITLE_TEXTS, C.TITLE_TEXTS_ORDER }
 
 local function Enabled() return DM.On() and true or false end
@@ -73,6 +77,7 @@ end
 local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
 local function ShowingTime() return DM.On() and S.Get("showTime") == true end
 local function BothFigures() return DM.On() and S.Get("showTotal") == true and S.Get("showRate") == true end
+local function Tracking() return DM.On() and S.Get("barTrack") == true end
 local function Fading() return DM.On() and S.Get("idleAlpha") < 1 end
 local function Locked() return DM.On() and S.Get("locked") == true end
 -- Custom Image is for the choice of Image that is your own picture, and a picture is there when that has a
@@ -147,6 +152,12 @@ local function DataSummary(store)
     return text
 end
 
+local function SpacingSummary(store)
+    local size = store.Get("iconSize")
+    return ("Icon %s, %s"):format(size > 0 and size .. " px" or "fitted",
+        (C.ICON_SIDES[store.Get("iconSide")] or ""):lower())
+end
+
 local function FadeSummary(store)
     local idle = store.Get("idleAlpha")
     local text = idle < 1 and ("%d%% out of combat"):format(math.floor(idle * 100 + 0.5)) or "No fade"
@@ -213,12 +224,15 @@ local function PickedSet(key)
     return function(r, g, b) S.Set(key, { r = r, g = g, b = b }) end
 end
 
-local COLOR_NEEDS = { barCustomColor = CustomBars, ownBarColor = OwnCustom, edgeColor = EdgeCustom }
-local COLOR_WHY = { barCustomColor = OFF_CUSTOM_BARS, ownBarColor = OFF_OWN_CUSTOM, edgeColor = OFF_EDGE_CUSTOM }
+local COLOR_NEEDS = { barCustomColor = CustomBars, ownBarColor = OwnCustom, edgeColor = EdgeCustom,
+    trackColor = Tracking }
+local COLOR_WHY = { barCustomColor = OFF_CUSTOM_BARS, ownBarColor = OFF_OWN_CUSTOM, edgeColor = OFF_EDGE_CUSTOM,
+    trackColor = OFF_TRACK }
 local COLOR_HELP = {
     barCustomColor = "The bars' color when Bar Color is Custom Color.",
     ownBarColor = "The color of your own bar when Your Bar is Custom Color.",
     edgeColor = "The strip on the left of your row when Your Row Edge is Custom Color.",
+    trackColor = "The color behind each bar, where it is not filled.",
 }
 
 local colorEntry = {}
@@ -407,6 +421,33 @@ page:Card({
         { key = "highlightPlayer", label = "Highlight Your Row", toggle = true, needs = Enabled, why = OFF },
         { key = "pinSelf", label = "Always Show My Row", toggle = true, needs = Enabled, why = OFF,
           help = "When you are not among the rows shown, the last row is yours, with your rank." },
+    },
+})
+
+page:Card({
+    id = "spacing", name = "Icons and Spacing", order = 35,
+    help = "The icon's size and side, the room around the texts, and a track behind the bars.",
+    summary = SpacingSummary,
+    rows = {
+        Group("Icon"),
+        { key = "iconSize", label = "Icon Size", slider = ICON_SIZE_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "Zero fits the icon to the row." },
+        { key = "iconSide", label = "Icon Side", choice = ICON_SIDE, needs = Enabled, why = OFF },
+        { key = "iconZoom", label = "Icon Crop", slider = ICON_ZOOM_RANGE, unit = "%", needs = Enabled, why = OFF,
+          help = "How much of the icon's edge is cut off, so the frame in it does not show." },
+        { key = "iconGap", label = "Icon Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "The room between the icon and the name." },
+        Group("Room"),
+        { key = "textPad", label = "Text Padding", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "The room at the ends of a row, before the first text and after the last." },
+        { key = "colGap", label = "Column Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "The room between the columns of figures." },
+        { key = "edgeWidth", label = "Edge Width", slider = EDGE_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "The strip on the left of a row, which shows your row in your edge color." },
+        Group("Track"),
+        { key = "barTrack", label = "Bar Track", toggle = true, needs = Enabled, why = OFF,
+          help = "A color behind each bar, where it is not filled." },
+        ColorRow("trackColor"),
     },
 })
 

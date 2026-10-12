@@ -12,10 +12,10 @@ local FALLBACK = { r = 0.6, g = 0.6, b = 0.6 }
 local GRADIENT_TEX = ns.MEDIA .. "NaowhGradient.tga"
 local CLASS_ICON = "Interface\\Icons\\ClassIcon_"
 local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
-local ICON_CROP, ICON_MAX, ICON_PAD, ICON_GAP = ns.Shared.Style.ICON_CROP, 28, 4, 5
-local INSET, HEADER, COLUMN_HEAD, COL_GAP = C.INSET, C.HEADER, C.COLUMN_HEAD, C.COL_GAP
+local ICON_MAX, ICON_PAD = 28, 4
+local INSET, HEADER, COLUMN_HEAD = C.INSET, C.HEADER, C.COLUMN_HEAD
 local SUMMARY_H, TIME_CHARS, LOWER_STRIP, LOWER_GAP = C.SUMMARY_H, 7, C.LOWER_STRIP, C.LOWER_GAP
-local TEXT_PAD, NAME_GAP, EDGE_W = 6, 6, 2
+local NAME_GAP, TRACK_ALPHA = 6, 0.6
 local RANK_W, RANK_SIZE = 18, 10
 local COL_CHARS, COL_CHARS_FULL, CHAR_W = 7, 10, 0.62
 local PERCENT_CHARS, DIVIDER_CHARS = 6, 3
@@ -170,11 +170,13 @@ function Look.Row(pane, i)
     row:SetScript("OnLeave", function() if f.onRowLeave then f.onRowLeave() end end)
     row:SetScript("OnMouseWheel", function(self, delta) if f.onWheel then f.onWheel(delta, self) end end)
     row:SetScript("OnMouseUp", function(self, button) if f.onRowClick then f.onRowClick(self, button) end end)
+    row.track = row:CreateTexture(nil, "BACKGROUND")
+    row.track:SetAllPoints()
+    row.track:Hide()
     row.edge = row:CreateTexture(nil, "OVERLAY")
-    row.edge:SetPoint("TOPLEFT"); row.edge:SetPoint("BOTTOMLEFT"); row.edge:SetWidth(EDGE_W)
+    row.edge:SetPoint("TOPLEFT"); row.edge:SetPoint("BOTTOMLEFT")
     row.rank = ns.Font(row, RANK_SIZE, "OUTLINE", T.muted)
     row.icon = row:CreateTexture(nil, "OVERLAY")
-    row.icon:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
     row.colA = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
     row.colA:SetJustifyH("RIGHT")
     row.colB = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
@@ -222,7 +224,9 @@ local function LayRow(row, pane, i, g)
     row:SetSize(g.w - 2 * INSET, g.bh)
     row:SetReverseFill(g.reverseFill)
     row:SetStatusBarTexture(UI.TexturePath(g.texture, GRADIENT_TEX))
-    local left = TEXT_PAD
+    row.edge:SetWidth(g.edgeWidth)
+    row.track:SetColorTexture(f.trackColor.r, f.trackColor.g, f.trackColor.b, TRACK_ALPHA)
+    local left = g.textPad
     row.rank:ClearAllPoints(); row.rank:SetPoint("LEFT", left, 0); row.rank:SetWidth(g.rankWidth)
     row.rank:SetShown(g.showRanks)
     row.rank:SetTextColor(f.rankColor.r, f.rankColor.g, f.rankColor.b)
@@ -230,25 +234,31 @@ local function LayRow(row, pane, i, g)
     row.colA:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
     row.colB:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
     if g.showRanks then left = left + g.rankWidth end
-    local iconSize = math.min(ICON_MAX, g.bh - ICON_PAD)
-    row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", left, 0); row.icon:SetSize(iconSize, iconSize)
+    row.icon:ClearAllPoints()
+    row.icon:SetSize(g.iconSize, g.iconSize)
+    row.icon:SetTexCoord(g.iconCrop, 1 - g.iconCrop, g.iconCrop, 1 - g.iconCrop)
     row.icon:SetShown(g.showIcons)
-    if g.showIcons then left = left + iconSize + ICON_GAP end
-    row.colP:ClearAllPoints(); row.colP:SetPoint("RIGHT", -TEXT_PAD, 0); row.colP:SetWidth(g.pctWidth)
+    if g.iconSide == "right" then
+        row.icon:SetPoint("RIGHT", -g.textPad, 0)
+    else
+        row.icon:SetPoint("LEFT", left, 0)
+        if g.showIcons then left = left + g.iconSize + g.iconGap end
+    end
+    row.colP:ClearAllPoints(); row.colP:SetPoint("RIGHT", -g.rightInset, 0); row.colP:SetWidth(g.pctWidth)
     row.colP:SetShown(pane.percent)
     row.colP:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
     row.colB:ClearAllPoints()
     if pane.percent then
-        row.colB:SetPoint("RIGHT", row.colP, "LEFT", -COL_GAP, 0)
+        row.colB:SetPoint("RIGHT", row.colP, "LEFT", -g.colGap, 0)
     else
-        row.colB:SetPoint("RIGHT", -TEXT_PAD, 0)
+        row.colB:SetPoint("RIGHT", -g.rightInset, 0)
     end
     row.colB:SetWidth(pane.merged and g.mergedWidth or g.colWidth)
     row.colB:SetShown(pane.columns >= 1)
-    row.colA:ClearAllPoints(); row.colA:SetPoint("RIGHT", row.colB, "LEFT", -COL_GAP, 0); row.colA:SetWidth(g.colWidth)
+    row.colA:ClearAllPoints(); row.colA:SetPoint("RIGHT", row.colB, "LEFT", -g.colGap, 0); row.colA:SetWidth(g.colWidth)
     row.colA:SetShown(pane.columns == 2)
     row.name:ClearAllPoints(); row.name:SetPoint("LEFT", left, 0)
-    row.name:SetPoint("RIGHT", -TEXT_PAD - pane.valueWidth - NAME_GAP, 0)
+    row.name:SetPoint("RIGHT", -g.rightInset - pane.valueWidth - NAME_GAP, 0)
     Parts.HudFont(row.rank, g.font, g.rankSize, g.outline)
     Parts.HudFont(row.name, g.font, g.fontSize, g.outline)
     Parts.HudFont(row.colA, g.font, g.valueSize, g.outline)
@@ -265,19 +275,19 @@ local function LayHeads(pane, g, y)
     pane.headB:SetShown(show and pane.columns >= 1)
     pane.headP:SetShown(show and pane.percent)
     if not show then return end
-    pane.headP:ClearAllPoints(); pane.headP:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + TEXT_PAD), y)
+    pane.headP:ClearAllPoints(); pane.headP:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + g.rightInset), y)
     pane.headP:SetWidth(g.pctWidth)
     pane.headB:ClearAllPoints()
     if pane.percent then
-        pane.headB:SetPoint("TOPRIGHT", pane.headP, "TOPLEFT", -COL_GAP, 0)
+        pane.headB:SetPoint("TOPRIGHT", pane.headP, "TOPLEFT", -g.colGap, 0)
     else
-        pane.headB:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + TEXT_PAD), y)
+        pane.headB:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + g.rightInset), y)
     end
     pane.headB:SetWidth(pane.merged and g.mergedWidth or g.colWidth)
-    pane.headA:ClearAllPoints(); pane.headA:SetPoint("TOPRIGHT", pane.headB, "TOPLEFT", -COL_GAP, 0)
+    pane.headA:ClearAllPoints(); pane.headA:SetPoint("TOPRIGHT", pane.headB, "TOPLEFT", -g.colGap, 0)
     pane.headA:SetWidth(g.colWidth)
     pane.headName:ClearAllPoints()
-    pane.headName:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + TEXT_PAD + (g.showRanks and g.rankWidth or 0), y)
+    pane.headName:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + g.textPad + (g.showRanks and g.rankWidth or 0), y)
     for _, fs in ipairs({ pane.headName, pane.headA, pane.headB, pane.headP }) do
         Parts.HudFont(fs, g.font, HEAD_SIZE, g.outline)
         fs:SetTextColor(f.columnColor.r, f.columnColor.g, f.columnColor.b)
@@ -287,8 +297,8 @@ end
 -- The parts of the window outside the panes: the summary line, the title and the time, the image.
 local function LayFrame(f, g)
     f.summary:ClearAllPoints()
-    f.summary:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + TEXT_PAD, -HEADER - HEAD_PAD)
-    f.summary:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + TEXT_PAD), -HEADER - HEAD_PAD)
+    f.summary:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + g.textPad, -HEADER - HEAD_PAD)
+    f.summary:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + g.textPad), -HEADER - HEAD_PAD)
     Parts.HudFont(f.summary, g.font, SUMMARY_SIZE, g.outline)
     Parts.HudFont(f.title, g.font, g.titleSize, g.outline)
     Parts.HudFont(f.lowerTitle, g.font, g.titleSize, g.outline)
@@ -355,10 +365,10 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     if pane.merged then
         pane.valueWidth = g.mergedWidth
     else
-        pane.valueWidth = pane.columns == 0 and 0 or pane.columns * g.colWidth + (pane.columns - 1) * COL_GAP
+        pane.valueWidth = pane.columns == 0 and 0 or pane.columns * g.colWidth + (pane.columns - 1) * g.colGap
     end
     if pane.percent then
-        pane.valueWidth = pane.valueWidth + (pane.columns > 0 and COL_GAP or 0) + g.pctWidth
+        pane.valueWidth = pane.valueWidth + (pane.columns > 0 and g.colGap or 0) + g.pctWidth
     end
     first = math.max(0, math.min(first, total - capacity))
     local shown = math.min(total - first, capacity)
@@ -421,6 +431,14 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     f.geo = g
     g.w, g.bh, g.gap, g.headTop, g.fontSize = w, bh, gap, headTop, fontSize
     g.showRanks, g.showIcons, g.showHead = S.Get("showRanks") and not f.detail, S.Get("showIcons"), showHead
+    g.textPad, g.iconGap, g.edgeWidth, g.colGap = S.Get("textPad"), S.Get("iconGap"), S.Get("edgeWidth"), S.Get("colGap")
+    g.iconSide, g.iconCrop = S.Get("iconSide"), S.Get("iconZoom") / 100
+    local iconSetting = S.Get("iconSize")
+    g.iconSize = iconSetting > 0 and math.min(iconSetting, bh) or math.min(ICON_MAX, bh - ICON_PAD)
+    g.rightInset = g.textPad
+    if g.showIcons and g.iconSide == "right" then g.rightInset = g.textPad + g.iconSize + g.iconGap end
+    g.barTrack = S.Get("barTrack") == true
+    f.trackColor = Look.Color("trackColor")
     local valueSize = S.Get("valueFontSize")
     g.valueSize = valueSize > 0 and valueSize or fontSize
     g.rankSize = S.Get("rankSize")
@@ -437,7 +455,9 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), g.valueSize, g.rankSize, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
+        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), g.valueSize, g.rankSize, g.textPad, g.iconGap, g.edgeWidth,
+        g.colGap, g.iconSide, g.iconCrop, g.iconSize, tostring(g.barTrack), f.trackColor.r, f.trackColor.g,
+        f.trackColor.b, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
         name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
     g.key = key
     if f.laidKey ~= key then LayFrame(f, g) end
@@ -535,6 +555,7 @@ local function PaintHeading(row, source, f)
     row:SetMinMaxValues(0, 1)
     row:SetValue(0)
     row.edge:SetColorTexture(0, 0, 0, 0)
+    row.track:Hide()
     row.rank:SetText("")
     row.icon:Hide()
     row.name:SetText(source.label)
@@ -593,6 +614,7 @@ local function PaintPane(pane, session, first, shown, mode, available)
             row:SetValue(source.totalAmount)
             local e = own and source.isLocalPlayer == true and Look.EdgeColor(source) or c
             row.edge:SetColorTexture(e.r, e.g, e.b, 1)
+            row.track:SetShown(f.geo.barTrack)
             row.rank:SetFormattedText(RANK_TEXT, session.rank or index)
             row.icon:SetTexture(IconOf(source, classOnly))
             row.icon:SetShown(showIcons and source.noIcon ~= true)

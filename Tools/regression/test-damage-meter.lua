@@ -2147,6 +2147,94 @@ do
         == "40% out of combat, mouse passes through")
 end
 
+-- the icon's size, side and crop, the room around the texts, the edge and a track behind the bars
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    local row = w.rows[1]
+    check("as it was by default: the icon fits the row, and the texts start after it", row.icon.w == 16
+        and row.icon.points[1][1] == "LEFT" and row.icon.points[1][2] == 6 + 18 and row.name.points[1][2] == 6 + 18 + 16 + 5
+        and row.edge.w == 2 and row.icon.texCoord[1] == 0.08 and row.track.shown == false)
+    s.store.Set("iconSize", 12); s.Flush()
+    check("Icon Size: that size, and the name after it", row.icon.w == 12 and row.icon.h == 12
+        and row.name.points[1][2] == 6 + 18 + 12 + 5)
+    s.store.Set("iconSize", 100); s.Flush()
+    check("never taller than the row", row.icon.w == 20)
+    s.store.Set("iconSize", 0)
+    s.store.Set("iconGap", 10); s.Flush()
+    check("Icon Gap", row.name.points[1][2] == 6 + 18 + 16 + 10)
+    s.store.Set("iconGap", 5)
+    s.store.Set("iconZoom", 0); s.Flush()
+    check("Icon Crop none: the whole icon", row.icon.texCoord[1] == 0 and row.icon.texCoord[2] == 1)
+    s.store.Set("iconZoom", 20); s.Flush()
+    check("and more", row.icon.texCoord[1] == 0.2 and row.icon.texCoord[2] == 0.8)
+    s.store.Set("iconZoom", 8)
+
+    s.store.Set("iconSide", "right"); s.Flush()
+    check("Icon Side right: at the end of the row, the name from the start", row.icon.points[1][1] == "RIGHT"
+        and row.icon.points[1][2] == -6 and row.name.points[1][2] == 6 + 18)
+    check("and the figures before it", row.colB.points[1][2] == -(6 + 16 + 5)
+        and row.name.points[2][2] == -(6 + 16 + 5 + 2 * 47 + 6 + 6))
+    check("and the titles over them", w.panes[1].headB.points[1][4] == -(6 + 6 + 16 + 5))
+    s.store.Set("showPercent", true); s.Flush()
+    check("and the share, with the figures before it", row.colP.points[1][2] == -(6 + 16 + 5)
+        and row.colB.points[1][2] == row.colP)
+    s.store.Set("showPercent", false); s.Flush()
+    s.store.Set("showIcons", false); s.Flush()
+    check("with no icons, nothing is left for one", row.colB.points[1][2] == -6)
+    s.store.Set("showIcons", true); s.store.Set("iconSide", "left"); s.Flush()
+
+    s.store.Set("textPad", 12); s.Flush()
+    check("Text Padding: at both ends", row.rank.points[1][2] == 12 and row.colB.points[1][2] == -12
+        and row.name.points[1][2] == 12 + 18 + 16 + 5)
+    s.store.Set("textPad", 6)
+    s.store.Set("colGap", 14); s.Flush()
+    check("Column Gap", row.colA.points[1][2] == row.colB and row.colA.points[1][4] == -14
+        and row.name.points[2][2] == -(6 + 2 * 47 + 14 + 6))
+    s.store.Set("colGap", 6)
+    s.store.Set("edgeWidth", 5); s.Flush()
+    check("Edge Width", row.edge.w == 5)
+    s.store.Set("edgeWidth", 2)
+
+    s.store.Set("barTrack", true); s.Flush()
+    check("Bar Track: a color behind the bar, in the theme's panel color", row.track.shown == true
+        and row.track.solid[1] == THEME.panel.r and row.track.solid[4] == 0.6)
+    s.store.Set("trackColor", { r = 0.5, g = 0.25, b = 0.75 }); s.Flush()
+    check("or the one picked", row.track.solid[1] == 0.5 and row.track.solid[3] == 0.75)
+    s.store.Set("trackColor", false)
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("a spell of a breakdown has it too", w.rows[1].track.shown == true)
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    s.store.Set("barTrack", false); s.Flush()
+    check("off", row.track.shown == false)
+
+    -- a heading takes the row of a bar that had a track
+    local t = Boot({ settings = { enabled = true, barTrack = true } })
+    t.duration = 120
+    t.session.combatSources = { Source("A", "MAGE", "a", "a", false, "P-1"), Source("You", "ROGUE", "y", "y", true, "Player-1"),
+        Source("C", "MAGE", "c", "c", false, "P-3"), Source("D", "MAGE", "d", "d", false, "P-4"),
+        Source("E", "MAGE", "e", "e", false, "P-5") }
+    t.byType = { [10] = { combatSources = { { name = "Mob", sourceGUID = "E-1", sourceCreatureID = 1 } } } }
+    t.enemyData = { ["E-1"] = { combatSpells = { { totalAmount = 50, combatSpellDetails = { unitName = "You" } } } } }
+    t.Login()
+    local tw = t.Window()
+    check("the list's rows have the track", tw.rows[4].track.shown == true)
+    tw.rows[2].scripts.OnMouseUp(tw.rows[2], "LeftButton")
+    check("the heading that takes the row of one has none, the enemy under it has", tw.rows[4].name.text == "Targets"
+        and tw.rows[4].track.shown == false and tw.rows[5].name.text == "Mob" and tw.rows[5].track.shown == true)
+
+    local colorRow = RowOf(s.page, "trackColor")
+    check("the color waits for the track, and says so", colorRow.needs() == false
+        and colorRow.why == "Turn on Bar Track" and RowOf(s.page, "barTrack").needs() == true)
+    local _, card = RowOf(s.page, "iconSize")
+    check("all on the Icons and Spacing card", card.id == "spacing" and #card.rows <= 15
+        and RowOf(s.page, "iconSide").choice[2][2] == "right" and RowOf(s.page, "edgeWidth") ~= nil)
+    check("its summary", CardOf(s.page, "spacing").summary(s.store) == "Icon fitted, left")
+    s.store.Set("iconSize", 14); s.store.Set("iconSide", "right")
+    check("and with them set", CardOf(s.page, "spacing").summary(s.store) == "Icon 14 px, right")
+end
+
 -- class colored names and figures, sizes of their own, and how names and numbers are written
 do
     local s = Boot({ settings = { enabled = true } })
@@ -3389,8 +3477,8 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("seventeen cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,numbers,header,time,"
-        .. "text,hover,history,data,barColors,textColors,windowColors,classColors,window2,window3"
+    check("eighteen cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,spacing,numbers,header,"
+        .. "time,text,hover,history,data,barColors,textColors,windowColors,classColors,window2,window3"
         and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end

@@ -30,7 +30,7 @@ NaowhForever_DamageMeter/
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
-    SettingsPage.lua             its settings page: seventeen small cards
+    SettingsPage.lua             its settings page: eighteen small cards
   README.md                      this file
 ```
 
@@ -82,6 +82,11 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- The room in a row is settings now (Icons and Spacing): the icon's size (zero fits the row, never taller
+  than it), side, crop and gap, the padding at the ends, the gap between columns and the edge's width.
+  An icon on the right takes room from the figures (`rightInset`, which the titles over them follow),
+  and the name's right end is the figures' left less that. Bar Track is a texture under the status bar,
+  in the Bar Track color at a fixed opacity.
 - Class Colored Names and Figures use the row's `classFilename` (never secret) through the same
   `ClassColor` the bars use, so a class picked for its bar is the class's text color too; spell and enemy
   rows (they have a `label`) keep the theme's. Call Me You and Name Length are done in the view, not in
