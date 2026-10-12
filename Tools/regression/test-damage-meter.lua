@@ -2328,7 +2328,21 @@ do
     s.store.Set("showPercent", false); s.Flush()
     s.store.Set("showIcons", false); s.Flush()
     check("with no icons, nothing is left for one", row.colB.points[1][2] == -6)
+    s.store.Set("showIcons", true); s.store.Set("iconSide", "before"); s.Flush()
+    check("Icon Side before the bar: the row starts after the icon, which stands before it, as tall as the bar",
+        row.icon.w == 20 and row.points[1][4] == 6 + 20 + 5 and row.w == 300 - 12 - (20 + 5)
+        and row.icon.points[1][1] == "RIGHT" and row.icon.points[1][2] == row and row.icon.points[1][3] == "LEFT"
+        and row.icon.points[1][4] == -5)
+    check("the name starts at the row's start, after the rank, and the figures end it as before",
+        row.name.points[1][2] == 6 + 18 and row.colB.points[1][2] == -6)
+    check("and the title over the name starts there too", w.panes[1].headName.points[1][4] == 6 + 20 + 5 + 6 + 18)
+    s.store.Set("iconSize", 12); s.Flush()
+    check("a size of its own is the room taken", row.icon.w == 12 and row.points[1][4] == 6 + 12 + 5)
+    s.store.Set("iconSize", 0); s.store.Set("showIcons", false); s.Flush()
+    check("with no icons, nothing is left for one", row.points[1][4] == 6 and row.w == 300 - 12
+        and w.panes[1].headName.points[1][4] == 6 + 6 + 18)
     s.store.Set("showIcons", true); s.store.Set("iconSide", "left"); s.Flush()
+    check("and inside the bar a little less than the bar", row.icon.w == 16 and row.points[1][4] == 6)
 
     s.store.Set("textPad", 12); s.Flush()
     check("Text Padding: at both ends", row.rank.points[1][2] == 12 and row.colB.points[1][2] == -12
@@ -2381,6 +2395,10 @@ do
     check("its summary", CardOf(s.page, "icons").summary(s.store) == "Icon fitted, left")
     s.store.Set("iconSize", 14); s.store.Set("iconSide", "right")
     check("and with them set", CardOf(s.page, "icons").summary(s.store) == "Icon 14 px, right")
+    s.store.Set("iconSide", "before")
+    check("before the bar", CardOf(s.page, "icons").summary(s.store) == "Icon 14 px, before the bar"
+        and RowOf(s.page, "iconSide").choice[2][3] == "before"
+        and RowOf(s.page, "iconSide").choice[1].before == "Before the Bar")
     check("the spacing says its padding", CardOf(s.page, "spacing").summary(s.store)
         == "Padding 6 px, columns 6 px apart")
 end

@@ -57,8 +57,8 @@ ns.DamageMeter.C = {
     BAR_COLORS_ORDER = { "class", "accent", "custom" },
     RESET_ON = { never = "Never", instance = "Entering an Instance", ask = "Ask When Entering an Instance" },
     RESET_ON_ORDER = { "never", "instance", "ask" },
-    ICON_SIDES = { left = "Left", right = "Right" },
-    ICON_SIDES_ORDER = { "left", "right" },
+    ICON_SIDES = { left = "Left", right = "Right", before = "Before the Bar" },
+    ICON_SIDES_ORDER = { "left", "right", "before" },
     -- The look settings a second or third window may have of its own (barHeight2, barHeight3, ...): first
     -- the bars and the window, then the columns.
     OWN_LOOK_ORDER = { "barHeight", "barSpacing", "barAlpha", "growUp", "fontSize", "showIcons", "showRanks",

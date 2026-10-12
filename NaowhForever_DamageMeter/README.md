@@ -130,7 +130,9 @@ NaowhForever_DamageMeter/
 - The room in a row is settings now (Icons, and Spacing): the icon's size (zero fits the row, never taller
   than it), side, crop and gap, the padding at the ends, the gap between columns and the edge's width.
   An icon on the right takes room from the figures (`rightInset`, which the titles over them follow),
-  and the name's right end is the figures' left less that. Bar Track is a texture under the status bar,
+  and the name's right end is the figures' left less that. An icon before the bar (`iconSide = "before"`)
+  stands outside it, at the bar's height: the row starts after it and its gap (`g.iconOutside`), and the
+  icon is anchored to the row's left end. Bar Track is a texture under the status bar,
   in the Bar Track color at a fixed opacity.
 - Class Colored Names and Figures use the row's `classFilename` (never secret) through the same
   `ClassColor` the bars use, so a class picked for its bar is the class's text color too; spell and enemy

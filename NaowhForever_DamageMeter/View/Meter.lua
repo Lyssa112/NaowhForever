@@ -306,8 +306,8 @@ local function LayRow(row, pane, i, g)
     row:ClearAllPoints()
     local slot = i - 1
     if g.growUp then slot = pane.capacity - i end
-    row:SetPoint("TOPLEFT", f, "TOPLEFT", INSET, -pane.top - INSET - slot * (g.bh + g.gap))
-    row:SetSize(g.w - 2 * INSET, g.bh)
+    row:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + g.iconOutside, -pane.top - INSET - slot * (g.bh + g.gap))
+    row:SetSize(g.w - 2 * INSET - g.iconOutside, g.bh)
     row:SetReverseFill(g.reverseFill)
     row:SetStatusBarTexture(UI.TexturePath(g.texture, GRADIENT_TEX))
     row.edge:SetWidth(g.edgeWidth)
@@ -326,6 +326,8 @@ local function LayRow(row, pane, i, g)
     row.icon:SetShown(g.showIcons)
     if g.iconSide == "right" then
         row.icon:SetPoint("RIGHT", -g.textPad, 0)
+    elseif g.iconSide == "before" then
+        row.icon:SetPoint("RIGHT", row, "LEFT", -g.iconGap, 0)
     else
         row.icon:SetPoint("LEFT", left, 0)
         if g.showIcons then left = left + g.iconSize + g.iconGap end
@@ -372,7 +374,8 @@ local function LayHeads(pane, g, y)
         edge = edge - CellWidth(g, pane, cell) - g.colGap
     end
     pane.headName:ClearAllPoints()
-    pane.headName:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + g.textPad + (g.showRanks and g.rankWidth or 0), y)
+    pane.headName:SetPoint("TOPLEFT", f, "TOPLEFT",
+        INSET + g.iconOutside + g.textPad + (g.showRanks and g.rankWidth or 0), y)
     for _, fs in ipairs({ pane.headName, pane.headA, pane.headB, pane.headP }) do
         Parts.HudFont(fs, g.headFont, g.headSize, g.headOutline)
         fs:SetTextColor(f.columnColor.r, f.columnColor.g, f.columnColor.b)
@@ -512,8 +515,11 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.showIcons, g.showHead = DM.Setting(f.index, "showIcons"), showHead
     g.textPad, g.iconGap, g.edgeWidth, g.colGap = S.Get("textPad"), S.Get("iconGap"), S.Get("edgeWidth"), S.Get("colGap")
     g.iconSide, g.iconCrop = S.Get("iconSide"), S.Get("iconZoom") / 100
-    local iconSetting = S.Get("iconSize")
-    g.iconSize = iconSetting > 0 and math.min(iconSetting, bh) or math.min(ICON_MAX, bh - ICON_PAD)
+    -- An icon before the bar is the bar's height, and the rows start after it and its gap.
+    local iconSetting, before = S.Get("iconSize"), g.iconSide == "before"
+    g.iconSize = iconSetting > 0 and math.min(iconSetting, bh)
+        or math.min(ICON_MAX, before and bh or bh - ICON_PAD)
+    g.iconOutside = g.showIcons and before and g.iconSize + g.iconGap or 0
     g.rightInset = g.textPad
     if g.showIcons and g.iconSide == "right" then g.rightInset = g.textPad + g.iconSize + g.iconGap end
     g.barTrack = S.Get("barTrack") == true
