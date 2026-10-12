@@ -87,7 +87,7 @@ function DM.Fights()
         end
     end
     table.sort(fights, Newest)
-    for i = #fights, C.FIGHTS_MAX + 1, -1 do fights[i] = nil end
+    for i = #fights, DM.Settings.Get("fightsShown") + 1, -1 do fights[i] = nil end
     return fights
 end
 

@@ -43,7 +43,7 @@ function DM.SpellSession(data, source, view)
     local targets = view.targets
     if targets and #targets > 0 then
         rows[#rows + 1] = { isHeader = true, label = TEXT_TARGETS }
-        for i = 1, math.min(C.TARGET_LINES, #targets) do
+        for i = 1, math.min(DM.Settings.Get("targetLines"), #targets) do
             local target = targets[i]
             rows[#rows + 1] = { isTarget = true, label = target.name, totalAmount = target.total,
                 maxAmount = targets[1].total, color = C.ENEMY_COLOR, noIcon = true, noPercent = true,

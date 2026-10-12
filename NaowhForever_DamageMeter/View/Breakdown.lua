@@ -9,7 +9,7 @@ local S = DM.Settings
 local C, Look, Format = DM.C, DM.Look, DM.Format
 local CROP = ns.Shared.Style.ICON_CROP
 
-local WIDTH, ROW_H, GAP, PAD, HEADER_H, NOTE_H = 300, 18, 2, 6, 24, 22
+local ROW_H, GAP, PAD, HEADER_H, NOTE_H = 18, 2, 6, 24, 22
 local SECTION_GAP, SECTION_H = 6, 16
 local TEXT_SIZE, TITLE_SIZE, ICON_PAD, VALUE_W = 11, 12, 2, 140
 local SIDE_GAP = 6
@@ -33,7 +33,7 @@ local panel
 local function NewRow(pool, i, withIcon)
     local row = CreateFrame("StatusBar", nil, panel)
     row:SetMinMaxValues(0, 1)
-    row:SetSize(WIDTH - 2 * PAD, ROW_H)
+    row:SetSize(C.MAX_PANEL_WIDTH - 2 * PAD, ROW_H)
     row.value = ns.Font(row, TEXT_SIZE, "OUTLINE", T.fg)
     row.value:SetPoint("RIGHT", -PAD, 0); row.value:SetWidth(VALUE_W); row.value:SetJustifyH("RIGHT")
     row.name = ns.Font(row, TEXT_SIZE, "OUTLINE", T.fg)
@@ -73,8 +73,8 @@ local function Build()
     panel.note:SetPoint("TOPLEFT", PAD, -HEADER_H)
     panel.targetsTitle = ns.Font(panel, TEXT_SIZE, "OUTLINE", T.muted)
     panel.targetsTitle:SetText(TEXT_TARGETS)
-    for i = 1, C.BREAKDOWN_LINES do NewRow(panel.rows, i, true) end
-    for i = 1, C.TARGET_LINES do NewRow(panel.targetRows, i, false) end
+    for i = 1, C.BREAKDOWN_MAX do NewRow(panel.rows, i, true) end
+    for i = 1, C.TARGET_MAX do NewRow(panel.targetRows, i, false) end
     panel:Hide()
 end
 
@@ -152,7 +152,10 @@ local function PaintTarget(row, target, largest, seconds, alpha)
     row:Show()
 end
 
+-- Beside the window: on the side the settings say, or the one the screen has room on (toRight).
 local function Place(owner, toRight)
+    local side = S.Get("panelSide")
+    if side == "left" then toRight = false elseif side == "right" then toRight = true end
     panel:ClearAllPoints()
     if toRight then
         panel:SetPoint("TOPLEFT", owner, "TOPRIGHT", SIDE_GAP, 0)
@@ -168,14 +171,19 @@ end
 function Breakdown.Show(row, source, data, view)
     if not panel then Build() end
     Style()
+    local width, maxLines, maxTargets = S.Get("panelWidth"), S.Get("panelLines"), S.Get("targetLines")
+    panel:SetScale(S.Get("panelScale"))
+    panel.background:SetAlpha(S.Get("panelAlpha"))
+    panel.border._frame:SetAlpha(S.Get("panelAlpha"))
     panel.subtitle:SetText(view.seconds and TEXT_SESSION:format(view.label, DM.Clock(view.seconds)) or view.label)
     panel.title:SetText(DM.DisplayName(source))
-    local lines = data and math.min(C.BREAKDOWN_LINES, #data.combatSpells) or 0
+    local lines = data and math.min(maxLines, #data.combatSpells) or 0
     local color, alpha = Look.BarColor(source, view.index), DM.Setting(view.index, "barAlpha")
     local seconds = view.rate and view.seconds or nil
-    for i = 1, C.BREAKDOWN_LINES do
+    for i = 1, C.BREAKDOWN_MAX do
         local spellRow = panel.rows[i]
         if i <= lines then
+            spellRow:SetWidth(width - 2 * PAD)
             PlaceRow(spellRow, HEADER_H + (i - 1) * (ROW_H + GAP))
             PaintRow(spellRow, data.combatSpells[i], data, color, alpha, seconds)
         else
@@ -186,16 +194,17 @@ function Breakdown.Show(row, source, data, view)
     panel.note:SetShown(lines == 0)
     local bottom = HEADER_H + (lines > 0 and lines * (ROW_H + GAP) - GAP or NOTE_H)
     local targets = view.targets
-    local count = targets and math.min(C.TARGET_LINES, #targets) or 0
+    local count = targets and math.min(maxTargets, #targets) or 0
     panel.targetsTitle:SetShown(count > 0)
     if count > 0 then
         local top = bottom + SECTION_GAP
         panel.targetsTitle:ClearAllPoints()
         panel.targetsTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD, -top)
         local y = top + SECTION_H
-        for i = 1, C.TARGET_LINES do
+        for i = 1, C.TARGET_MAX do
             local targetRow = panel.targetRows[i]
             if i <= count then
+                targetRow:SetWidth(width - 2 * PAD)
                 PlaceRow(targetRow, y + (i - 1) * (ROW_H + GAP))
                 PaintTarget(targetRow, targets[i], targets[1].total, view.seconds, alpha)
             else
@@ -206,7 +215,7 @@ function Breakdown.Show(row, source, data, view)
     else
         for _, targetRow in ipairs(panel.targetRows) do targetRow:Hide() end
     end
-    panel:SetSize(WIDTH, bottom + PAD)
+    panel:SetSize(width, bottom + PAD)
     Place(row, view.toRight)
     panel:Show()
 end

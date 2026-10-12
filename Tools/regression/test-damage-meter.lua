@@ -2983,6 +2983,101 @@ do
         and s.sent[1].text == "Damage Done, Current")
 end
 
+-- the spell panel's size, side and opacity, how many enemies, and how many past fights are offered
+do
+    local function Enemy(name, guid) return { name = name, sourceGUID = guid, sourceCreatureID = 100 } end
+    local function Hit(who, total) return { totalAmount = total, combatSpellDetails = { unitName = who } } end
+    local s = Boot({ settings = { enabled = true } })
+    s.duration = 120
+    local many, hits, mobs = {}, {}, {}
+    for i = 1, 14 do many[i] = Spell(300 + i, 200 - i) end
+    s.spells = { combatSpells = many, maxAmount = 200, totalAmount = 2000 }
+    for i = 1, 8 do
+        mobs[i] = Enemy("Mob " .. i, "E-" .. i)
+        hits["E-" .. i] = { combatSpells = { Hit("You", 100 - i) } }
+    end
+    s.byType = { [10] = { combatSources = mobs } }
+    s.enemyData = hits
+    s.session.combatSources[2].name = "You"
+    s.Login()
+    local w = s.Window()
+    local C = s.DM.C
+    s.Hover(w, 2)
+    local panel = s.Panel()
+    local function Shown(rows)
+        local n = 0
+        for _, row in ipairs(rows) do
+            if row.shown then n = n + 1 end
+        end
+        return n
+    end
+    check("by default: eight spells, five enemies, 300 wide, full size and opacity", Shown(panel.rows) == 8
+        and Shown(panel.targetRows) == 5 and panel.w == 300 and panel.scale == 1 and panel.background.alpha == 1)
+    s.store.Set("panelLines", 3); s.store.Set("targetLines", 2); s.Flush()
+    s.Hover(w, 2)
+    check("Spells Shown and Enemies Shown", Shown(panel.rows) == 3 and Shown(panel.targetRows) == 2
+        and panel.h == 24 + 3 * 20 - 2 + 6 + 16 + 2 * 20 - 2 + 6)
+    s.store.Set("panelLines", 15); s.store.Set("targetLines", 10); s.Flush()
+    s.Hover(w, 2)
+    check("up to fifteen and ten, as many as there are", Shown(panel.rows) == 14 and Shown(panel.targetRows) == 8)
+    s.store.Set("panelWidth", 420); s.Flush()
+    s.Hover(w, 2)
+    check("Panel Width: the panel and its rows", panel.w == 420 and panel.rows[1].w == 408 and panel.targetRows[1].w == 408)
+    s.store.Set("panelScale", 1.25); s.store.Set("panelAlpha", 0.5); s.Flush()
+    s.Hover(w, 2)
+    check("Panel Scale and Opacity", panel.scale == 1.25 and panel.background.alpha == 0.5
+        and panel.border._frame.alpha == 0.5)
+    w.centerX = 100
+    s.Hover(w, 2)
+    check("auto: on the side the window leaves room", panel.points[1][1] == "TOPLEFT")
+    s.store.Set("panelSide", "left"); s.Flush()
+    s.Hover(w, 2)
+    check("Panel Side left, whatever the window's place", panel.points[1][1] == "TOPRIGHT")
+    w.centerX = 900
+    s.store.Set("panelSide", "right"); s.Flush()
+    s.Hover(w, 2)
+    check("or right", panel.points[1][1] == "TOPLEFT")
+    s.store.Set("panelSide", "auto"); s.Flush()
+    s.Hover(w, 2)
+    check("or as the screen has room", panel.points[1][1] == "TOPRIGHT")
+    w.rows[2].scripts.OnLeave(w.rows[2])
+
+    -- the enemies of a player's breakdown follow it
+    s.store.Set("targetLines", 3); s.store.Set("height", 500); s.Flush()
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    local names = {}
+    for _, row in ipairs(w.rows) do
+        if row.shown and row.name.text:find("^Mob") then names[#names + 1] = row.name.text end
+    end
+    check("Enemies Shown in a breakdown too", #names == 3)
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+
+    -- past fights offered
+    s.fights = {}
+    for i = 1, 12 do s.fights[i] = { sessionID = i, durationSeconds = 10 } end
+    w.session.onClick()
+    local offered = 0
+    for _, item in ipairs(s.menu.items) do
+        if item.kind == "radio" and item.text:find("^Fight ") then offered = offered + 1 end
+    end
+    check("the ten newest past fights by default", offered == 10)
+    s.store.Set("fightsShown", 3)
+    w.session.onClick()
+    offered = 0
+    for _, item in ipairs(s.menu.items) do
+        if item.kind == "radio" and item.text:find("^Fight ") then offered = offered + 1 end
+    end
+    check("Past Fights Offered", offered == 3 and s.menu:Find("Fight 12 (0:10)") ~= nil)
+
+    local rows = { "panelLines", "targetLines", "panelWidth", "panelScale", "panelAlpha", "panelSide", "fightsShown" }
+    local all = true
+    for _, key in ipairs(rows) do all = all and RowOf(s.page, key) ~= nil end
+    check("each has a row", all)
+    check("the ranges", RowOf(s.page, "panelLines").slider[2] == 15 and RowOf(s.page, "targetLines").slider[2] == 10
+        and RowOf(s.page, "panelWidth").slider[1] == 240 and RowOf(s.page, "panelWidth").slider[2] == 480
+        and RowOf(s.page, "fightsShown").slider[2] == 30 and C.PANEL_SIDES_ORDER[1] == "auto")
+end
+
 -- the spell breakdown on hover
 do
     local s = Boot({ settings = { enabled = true } })

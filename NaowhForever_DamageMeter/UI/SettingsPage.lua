@@ -46,6 +46,10 @@ local KEEP_RANGE = { C.MIN_KEEP, C.MAX_KEEP, 1 }
 local TILE_RANGE = { C.MIN_TILE, C.MAX_TILE, 8 }
 local VALUE_SIZE_RANGE, RANK_SIZE_RANGE = { 0, C.MAX_FONT, 1 }, { C.MIN_FONT, C.MAX_FONT, 1 }
 local ICON_SIZE_RANGE, ICON_ZOOM_RANGE = { 0, C.MAX_ICON, 1 }, { 0, 30, 1 }
+local PANEL_LINES_RANGE, TARGET_LINES_RANGE = { 1, C.BREAKDOWN_MAX, 1 }, { 1, C.TARGET_MAX, 1 }
+local PANEL_WIDTH_RANGE, PANEL_SCALE_RANGE = { C.MIN_PANEL_WIDTH, C.MAX_PANEL_WIDTH, 5 },
+    { C.MIN_PANEL_SCALE, C.MAX_PANEL_SCALE, 5 }
+local FIGHTS_RANGE = { 1, C.FIGHTS_MAX, 1 }
 local PAD_RANGE, EDGE_RANGE = { 0, C.MAX_PAD, 1 }, { 0, 8, 1 }
 local LETTERS_RANGE, PERCENT_DECIMALS_RANGE = { 0, C.MAX_NAME_LETTERS, 1 }, { 0, C.MAX_PERCENT_DECIMALS, 1 }
 
@@ -68,6 +72,7 @@ local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "cl
 local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
 local BAR_SCALE = { C.BAR_SCALES, C.BAR_SCALES_ORDER }
+local PANEL_SIDE = { C.PANEL_SIDES, C.PANEL_SIDES_ORDER }
 local COLUMN_ORDER = { C.COLUMN_ORDERS, C.COLUMN_ORDERS_ORDER }
 local ICON_SIDE = { C.ICON_SIDES, C.ICON_SIDES_ORDER }
 local TITLE_TEXT = { C.TITLE_TEXTS, C.TITLE_TEXTS_ORDER }
@@ -621,6 +626,19 @@ page:Card({
         { key = "breakdown", label = "Spell Breakdown", toggle = true, needs = Enabled, why = OFF,
           help = "Hover a row to see its spells, or click it to see them in the window, and click again to go "
               .. "back. In combat only your own row and rows the game lets through show spells." },
+        Group("Panel"),
+        { key = "panelLines", label = "Spells Shown", slider = PANEL_LINES_RANGE, needs = Enabled, why = OFF,
+          help = "How many spells the panel lists, the biggest first." },
+        { key = "targetLines", label = "Enemies Shown", slider = TARGET_LINES_RANGE, needs = Enabled, why = OFF,
+          help = "How many enemies it lists under the spells, in the panel and in a player's breakdown." },
+        { key = "panelWidth", label = "Panel Width", slider = PANEL_WIDTH_RANGE, unit = "px", needs = Enabled,
+          why = OFF },
+        { key = "panelScale", label = "Panel Scale", slider = PANEL_SCALE_RANGE, unit = "%", scale = TO_FRACTION,
+          needs = Enabled, why = OFF },
+        { key = "panelAlpha", label = "Panel Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION,
+          needs = Enabled, why = OFF },
+        { key = "panelSide", label = "Panel Side", choice = PANEL_SIDE, needs = Enabled, why = OFF,
+          help = "By the window's side on the screen puts it on the side that has room." },
         Group("Report"),
         { key = "reportLines", label = "Report Lines", slider = REPORT_RANGE, needs = Enabled, why = OFF,
           help = "How many rows Report To sends, out of combat only. Reset has a key binding under Naowh Forever." },
@@ -633,6 +651,8 @@ page:Card({
     summary = HistorySummary,
     rows = {
         { key = "keepFights", label = "Fights Kept", slider = KEEP_RANGE, needs = Enabled, why = OFF },
+        { key = "fightsShown", label = "Past Fights Offered", slider = FIGHTS_RANGE, needs = Enabled, why = OFF,
+          help = "How many of the game's past fights the Session menu lists, the newest first." },
         { label = "Fight History", buttonText = "Open", needs = Enabled, why = OFF,
           button = function() DM.HistoryWindow.Toggle() end,
           help = "The fights kept: when, which, how long, and the per-second figures." },

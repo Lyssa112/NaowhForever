@@ -90,6 +90,10 @@ NaowhForever_DamageMeter/
 - Show Name hides the name of every row of a list (`row.name:SetShown`, and the Name title over it), so
   a row can be only its bar, icon and figures. A breakdown keeps the names of its spells, which are what
   its rows are about.
+- The spell panel's pool is as many rows as the settings can ask for (`BREAKDOWN_MAX`, `TARGET_MAX`) and
+  it shows as many as Spells Shown and Enemies Shown say, at Panel Width, Scale and Opacity, on the side
+  Panel Side says or else the one the window leaves room on. Enemies Shown also sets how many enemies a
+  player's breakdown in the window lists. Past Fights Offered trims the fights the Session menu lists.
 - The columns of figures are three cells of a row, in one order that is a setting (Column Order, per window
   with its own look): A the first figure, B the second (or the only one, or both with the divider), P the
   share, which stands before them, between them or after them. They are anchored from the right end, each
