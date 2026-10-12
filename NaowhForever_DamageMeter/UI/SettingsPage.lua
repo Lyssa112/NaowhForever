@@ -141,7 +141,6 @@ local function FiguresSummary(store)
 end
 
 local function NamesSummary(store)
-    if not store.Get("showName") then return "Hidden" end
     return C.NAME_FORMATS[store.Get("nameFormat")] or ""
 end
 
@@ -559,8 +558,8 @@ page:Card({
 })
 
 page:Card({
-    id = "names", name = "Names", order = 40, switch = "showName",
-    help = "The name of each row. Off, a row is its bar, icon and figures; a breakdown keeps its spell names.",
+    id = "names", name = "Names", order = 40,
+    help = "How a player's name is written and how long, its size, font and color.",
     summary = NamesSummary,
     rows = Join(
         Group("Writing"),
@@ -572,7 +571,7 @@ page:Card({
         { key = "nameMaxLetters", label = "Name Length", slider = LETTERS_RANGE, needs = Enabled, why = OFF,
           help = "Cuts a name to this many letters, with ... after it. Zero leaves names whole." },
         Group("Text"),
-        { key = "fontSize", label = "Name Size", slider = TEXT_RANGE, always = true, needs = Enabled, why = OFF,
+        { key = "fontSize", label = "Name Size", slider = TEXT_RANGE, needs = Enabled, why = OFF,
           help = "The names' size. The figures follow it unless they have a size of their own." },
         FontRows("name"),
         Group("Color"),
@@ -908,7 +907,6 @@ local function OwnLookRows(index, columns)
         headerAlpha = { label = "Title Bar Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION },
         showBorder = { label = "Border", toggle = true },
         barColor = { label = "Bar Color", choice = BAR_COLOR },
-        showName = { label = "Show Name", toggle = true },
         showTotal = { label = "Show Total", toggle = true },
         showRate = { label = "Show Per Second", toggle = true },
         showPercent = { label = "Show Percent", toggle = true },

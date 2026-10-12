@@ -87,11 +87,8 @@ NaowhForever_DamageMeter/
   figure, your rank), each a setting, joined by `SetFormattedText`; Summary Size is its font size. Short
   List Names (`DM.ModeLabel`) swaps a list's label for its short one in the title, the second list's
   strip and the spell panel, and leaves the menus and the reports with the full names.
-- Show Name hides the name of every row of a list (`row.name:SetShown`, and the Name title over it), so
-  a row can be only its bar, icon and figures. A breakdown keeps the names of its spells, which are what
-  its rows are about.
 - The settings page has a card for each part and each text, and what shows or hides a part is the switch of
-  its card (`switch = "showRanks"`, `showName`, `showIcons`, `showColumnHeaders`, `showSummary`, `showTime`),
+  its card (`switch = "showRanks"`, `showIcons`, `showColumnHeaders`, `showSummary`, `showTime`),
   which turns the card's rows off with it. The names, figures, rank, column titles, title, fight time and
   summary line each have a card with their own size, font and outline behind a switch each, and their color;
   Font and Outline holds the window's. Clean Look is on the Looks card, with the other ways to set the look
@@ -115,9 +112,9 @@ NaowhForever_DamageMeter/
   escaped. A text is read key by key: a key that is not a look's, or a value that is not of its kind
   (a color outside 0 to 1, a number out of range, a string for a number), is left out and the rest is
   taken. Copy to Other Windows turns the second and third windows' own looks on, from the first.
-- A second or third window may have a look of its own (`ownLook2`, `ownLook3`): eighteen of the look
+- A second or third window may have a look of its own (`ownLook2`, `ownLook3`): seventeen of the look
   settings (`DM.C.OWN_LOOK_ORDER`: row height and spacing, bar opacity and color, grow direction, text
-  size, icons, ranks, window and title bar opacity, border, and the columns: name, total, per second,
+  size, icons, ranks, window and title bar opacity, border, and the columns: total, per second,
   share, divider, order and their titles; two cards each) have a copy under the
   window's number (`barHeight2`). `DM.Setting(index, key)` reads a look setting for a window, which is the
   copy when the window has its own look and the shared one otherwise, and `DM.LookKey` is the key to

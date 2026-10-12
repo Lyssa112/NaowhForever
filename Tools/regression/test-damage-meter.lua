@@ -743,8 +743,8 @@ do
         check(element .. ": and on with it", font.needs() == true and outline.needs() == true)
     end
     local name, card = RowOf(s.page, "fontSize")
-    check("the names have a size with no switch, which stays on with the names hidden", card.id == "names"
-        and card.switch == "showName" and name.always == true and RowOf(s.page, "nameOwnFont") ~= nil
+    check("the names have a size with no switch, which the figures follow", card.id == "names"
+        and card.switch == nil and name.needs() == true and RowOf(s.page, "nameOwnFont") ~= nil
         and RowOf(s.page, "nameOwnSize") == nil)
     local base = RowOf(s.page, "font")
     check("the window's own font and outline are on the Font and Outline card", base.font == true
@@ -2588,35 +2588,23 @@ do
         and scale.choice[1].top == "Top Player" and scale.choice[1].total == "List Total")
 end
 
--- the name can go too: a row is its bar, its icon and its figures
+-- a name is always shown: there is no setting to take it out of a row
 do
-    local s = Boot({ settings = { enabled = true } })
+    local s = Boot({ settings = { enabled = true, showName = false, showName2 = false } })
     s.Login()
     local w = s.Window()
-    check("the name is shown by default", w.rows[1].name.shown == true and w.panes[1].headName.shown == true
-        and s.store.Get("showName") == true)
-    s.store.Set("showName", false); s.Flush()
-    check("Show Name off: no name, and no title over it", w.rows[1].name.shown == false and w.rows[2].name.shown == false
-        and w.panes[1].headName.shown == false)
-    check("the icon and the figures stay, with their titles", w.rows[1].icon.shown == true and w.rows[1].colA.shown == true
-        and w.rows[1].colB.shown == true and w.panes[1].headA.shown == true and w.panes[1].headB.shown == true)
-    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
-    check("a breakdown keeps the names of the spells", w.rows[1].name.shown == true and w.rows[1].name.text == "Fireball")
-    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
-    check("and the list has none again", w.rows[1].name.shown == false and w.panes[1].headName.shown == false)
-    s.store.Set("showTotal", false); s.store.Set("showRate", false); s.store.Set("showIcons", false); s.Flush()
-    check("with everything off, the bar alone", w.rows[1].shown == true and w.rows[1].name.shown == false
-        and w.rows[1].colA.shown == false and w.rows[1].colB.shown == false and w.rows[1].icon.shown == false)
-    s.store.Set("showName", true); s.Flush()
-    check("on again", w.rows[1].name.shown == true)
+    check("an old setting to hide the names does nothing", w.rows[1].name.shown == true and w.rows[2].name.shown == true
+        and w.panes[1].headName.shown == true)
     local card = CardOf(s.page, "names")
-    check("Show Name is the switch of the Names card", card.switch == "showName" and RowOf(s.page, "showName") == nil
+    check("the Names card has no switch, and no row for it", card.switch == nil and RowOf(s.page, "showName") == nil
         and #card.rows <= 15)
     local inLook = false
-    for _, key in ipairs(s.DM.C.LOOK_KEYS) do
-        if key == "showName" then inLook = true end
+    for _, list in ipairs({ s.DM.C.LOOK_KEYS, s.DM.C.OWN_LOOK_ORDER }) do
+        for _, key in ipairs(list) do
+            if key == "showName" then inLook = true end
+        end
     end
-    check("and part of a look", inLook)
+    check("and a look does not keep one", not inLook and s.DM.C.OWN_LOOK_COLUMNS.showName == nil)
 end
 
 -- looks: kept by name on the account, applied, copied to the other windows, and written as text
@@ -2842,7 +2830,7 @@ do
     got = {}
     for _, row in ipairs(columns.rows) do got[#got + 1] = row.key end
     check("and a card for its columns, with the same switch", columns.switch == "ownLook2" and table.concat(got, ",")
-        == "showName2,showTotal2,showRate2,showPercent2,showDivider2,columnOrder2,showColumnHeaders2"
+        == "showTotal2,showRate2,showPercent2,showDivider2,columnOrder2,showColumnHeaders2"
         and CardOf(s.page, "columns3").switch == "ownLook3")
     check("their summaries", card.summary(s.store) == "Rows 20 px, text 11" and other.summary(s.store) == "Same as the first")
     s.store.Set("ownLook3", true)
@@ -4067,9 +4055,9 @@ do
     local one, two = t.Window(), t.Window(2)
     t.store.Set("ownLook2", true); t.Flush()
     t.store.Set("columnOrder2", "rate,total,percent"); t.store.Set("showPercent2", true)
-    t.store.Set("showName2", false); t.store.Set("showColumnHeaders2", false); t.Flush()
+    t.store.Set("showColumnHeaders2", false); t.Flush()
     check("the second window has its columns its own way", two.rows[1].colA.text == "<a>" and two.rows[1].colB.text == "<100>"
-        and two.rows[1].colP.shown == true and two.rows[1].name.shown == false and two.panes[1].headName.shown == false)
+        and two.rows[1].colP.shown == true and two.panes[1].headName.shown == false)
     check("and the first as it was", one.rows[1].colA.text == "<100>" and one.rows[1].colB.text == "<a>"
         and one.rows[1].colP.shown == false and one.rows[1].name.shown == true and one.panes[1].headName.shown == true)
     t.store.Set("showTotal2", false); t.store.Set("showRate2", true); t.Flush()
@@ -4196,9 +4184,6 @@ do
     check("Number Format", CardOf(page, "numbers").summary(s.store) == "Game Default")
     check("Figures", CardOf(page, "figures").summary(s.store) == "As the Game Has It")
     check("Names", CardOf(page, "names").summary(s.store) == "Full Name")
-    s.store.Set("showName", false)
-    check("Names, hidden", CardOf(page, "names").summary(s.store) == "Hidden")
-    s.store.Set("showName", true)
     check("a text's card says its size", CardOf(page, "ranks").summary(s.store) == "Size 10"
         and CardOf(page, "heads").summary(s.store) == "Size 10")
     s.store.Set("rankOwnSize", true); s.store.Set("rankSize", 14); s.store.Set("rankOwnFont", true)
