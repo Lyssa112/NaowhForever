@@ -55,7 +55,7 @@ read_globals = {
     "CreateFrame", "CreateFromMixins", "CreateMacro", "CreateVector2D", "CUSTOM_CLASS_COLORS",
     "C_AddOns", "C_AuctionHouse", "C_BattleNet",
     "C_ChatInfo", "C_ClassColor", "C_ClassTalents", "C_Container",
-    "C_CurrencyInfo", "C_CurveUtil", "C_CVar", "C_DurationUtil",
+    "C_CurrencyInfo", "C_CurveUtil", "C_CVar", "C_DamageMeter", "C_DurationUtil",
     "C_EquipmentSet",
     "C_ActionBar", "C_FriendList", "C_GamepadUI", "C_GossipInfo", "C_GuildInfo",
     "C_Item", "C_KeyBindings", "C_LFGList", "C_LootHistory", "C_MajorFactions", "C_Map", "C_Navigation", "C_MountJournal", "C_Transmog", "C_MerchantFrame", "C_NamePlate", "C_PaperDollInfo",

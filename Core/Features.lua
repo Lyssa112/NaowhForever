@@ -25,7 +25,6 @@ ns.FEATURES = {
         gossipAuto = false,
         groupButtons = false,
         combatTimer = false,
-        damageMeterSkin = false,
         cursorCooldown = false,
         globalCopy = false,
         badgeChat = true,
@@ -182,6 +181,9 @@ ns.FEATURES = {
         enabled = true,
         focusEnabled = false,
         warnSound = false,
+    },
+    damageMeter = {
+        enabled = false,
     },
     pvp = {
         enabled = false,
