@@ -94,7 +94,7 @@ NaowhForever_DamageMeter/
   size, style, side, crop and gap behind Icons; a text's size, size switch, font, outline and color behind the
   row of the text (Name Settings, with the name's format and length too, Figure Settings, Title Settings, Rank
   Numbers, Show Fight Time, Column Titles, Summary Line); the picture's path and tiling behind Image; the classes' colors behind Bar Color; the spell
-  panel behind Spell Breakdown; a window's own look and columns behind Own Look and Column Order. A row that
+  panel behind Spell Breakdown; a window's own look and columns behind Own Look and Column 1. A row that
   means something for one choice only (`hidden` as a function) is left off while another is picked: Hide
   After, Custom Bar Color, Track Color and Decimals. A row's label is the only one of its name on its card,
   because a cog is found by the label of the row that owns it. A text's size (`SizeRow`) shows the size the
@@ -116,14 +116,24 @@ NaowhForever_DamageMeter/
   it shows as many as Spells Shown and Enemies Shown say, at Panel Width, Scale and Opacity, on the side
   Panel Side says or else the one the window leaves room on. Enemies Shown also sets how many enemies a
   player's breakdown in the window lists. Past Fights Offered trims the fights the Session menu lists.
-- The columns of figures are three cells of a row, in one order that is a setting (Column Order, per window
-  with its own look): A the first figure, B the second (or the only one, or both with the divider), P the
-  share, which stands before them, between them or after them. They are anchored from the right end, each
-  to the left of the one after it, and the name runs to the first. The column titles are put by number at
-  the right end of their columns, take the width of their words and do not wrap, which is what keeps a
-  long one (a wide font, a big text size) from being cut short and lowered a line, as a title with a width
-  of its own and wrapping on was. The DPS and HPS lists lead with the per-second figure unless the order
-  says which way round.
+- The columns of a row, left to right, are one setting (`columns`, per window with its own look): six slots,
+  each the name, the total, the per-second figure, the share, the total of another list for the same player
+  (`damage`, `healing`, `taken`, `avoidable`, `absorbs`, `interrupts`, `dispels` or `deaths`) or none, as the
+  six Column rows on the Figures card. A kind is once and the name is always there; a kind picked that is in
+  another slot trades places with it (`DM.SetColumnSlot`). "auto" is the name, the total and the per-second
+  figure, with the per-second figure first in the DPS and HPS lists, as the game's meter has it; the first
+  change makes it a list. `DM.ColumnSlots` reads it; the old showTotal, showRate, showPercent and
+  columnOrder become it once, at login (`DM.LegacyColumns`).
+  A row is its cells, `Columns` giving each its id: A the first figure, B the second (or the only one, or
+  both with the divider, at the place of the first), P the share and X1 to X5 the totals of other lists.
+  The cells before the name are anchored from the left end, each to the right of the one before it, and the
+  cells after it from the right end, each to the left of the one after it; the name, with its rank and icon,
+  fills what they leave. The column titles are put by number at the right end of their columns, take the
+  width of their words and do not wrap, which is what keeps a long one (a wide font, a big text size) from
+  being cut short and lowered a line, as a title with a width of its own and wrapping on was.
+- A column of another list's total (`Look.Extras`, read as asked for through `DM.Session`) is found for a row
+  by your own row, or by a guid the addon can read: in combat the guid is secret and the cell is empty, as the
+  share is, and fills in after the fight. A player's breakdown does not draw them.
 - A column is as wide as its widest text once every figure shown is known (`FitColumns`, measured on a
   hidden FontString of the figures' font, since a FontString given a width reports no more than it), so the
   name has all the room the figures leave. A figure the game keeps back in combat cannot be measured, and
@@ -205,7 +215,7 @@ NaowhForever_DamageMeter/
   read from unit tokens, which stay plain, and a row is matched to the one member of its class. Your
   own row always comes from your unit. A class two members share, or one not in the group, shows the
   name whole, as the game gives it.
-- Interrupts, Dispels and Deaths have no per-second figure, so Show Per Second skips them. Deaths has
+- Interrupts, Dispels and Deaths have no per-second figure, so a Per Second column skips them. Deaths has
   no spells either.
 - Windows 2 and 3 use the first window's keys with their number added (`mode2`, `width3`,
   `meterPos2`), so the window code takes an index and reads `DM.Key(base, index)`.
@@ -224,8 +234,8 @@ NaowhForever_DamageMeter/
   each update by your own row or its guid, so it follows the player when the order changes. A hovered
   spell shows the game's own tooltip (`SetSpellByID`) on the side away from the window, not for an id the
   game keeps back in combat. The hover panel is as before, with the per-second figure added.
-- The share (Show Percent) is a column of its own at the right end, made from the row's amount and the
-  list's total once both are plain numbers, so it is empty in combat. Deaths has none.
+- The share is a column of its own, made from the row's amount and the list's total once both are plain
+  numbers, so it is empty in combat. Deaths has none.
 - Column Divider writes the total and the per-second figure as one right-aligned text, `"%s | %s"` through
   `SetFormattedText` so a secret amount goes in as it is, in one column (`pane.merged`) as wide as both
   and the bar. The title over it is "Damage | DPS". It does nothing when only one figure is shown, and a

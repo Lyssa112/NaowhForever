@@ -20,7 +20,7 @@ local OFF_IMAGE = "Pick a Background Image"
 local OFF_TILE = "Turn on Tile Image"
 local OFF_OWN = "Pick Your Own Picture in Image"
 local OFF_TIME = "Turn on Show Fight Time"
-local OFF_BOTH = "Turn on Show Total and Show Per Second"
+local OFF_BOTH = "Put Total and Per Second in two columns"
 local OFF_FADE = "Set Out of Combat Opacity below 100%"
 local OFF_SUMMARY = "Turn on Summary Line"
 local OFF_LOCKED = "Turn on Lock Window"
@@ -72,7 +72,7 @@ local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
 local BAR_SCALE = { C.BAR_SCALES, C.BAR_SCALES_ORDER }
 local PANEL_SIDE = { C.PANEL_SIDES, C.PANEL_SIDES_ORDER }
-local COLUMN_ORDER = { C.COLUMN_ORDERS, C.COLUMN_ORDERS_ORDER }
+local COLUMN_KIND = { C.COLUMN_KINDS, C.COLUMN_KINDS_ORDER }
 local ICON_SIDE = { C.ICON_SIDES, C.ICON_SIDES_ORDER }
 local TITLE_TEXT = { C.TITLE_TEXTS, C.TITLE_TEXTS_ORDER }
 local OUTLINE = ns.Shared.Parts.HUD_OUTLINES
@@ -85,7 +85,7 @@ local function OwnCustom() return DM.On() and S.Get("ownBarStyle") == "custom" e
 local function EdgeCustom()
     return DM.On() and S.Get("highlightPlayer") == true and S.Get("edgeStyle") == "custom"
 end
-local function BothFigures() return DM.On() and S.Get("showTotal") == true and S.Get("showRate") == true end
+local function BothFigures() return DM.On() and DM.HasColumn(1, "total") and DM.HasColumn(1, "rate") end
 local function Fading() return DM.On() and S.Get("idleAlpha") < 1 end
 local function Locked() return DM.On() and S.Get("locked") == true end
 -- Custom Image is for the choice of Image that is your own picture, and a picture is there when that has a
@@ -144,9 +144,12 @@ local function RowSummary(store)
     return ("Icons %s, ranks %s"):format(icons, store.Get("showRanks") and "on" or "off")
 end
 
-local function FiguresSummary(store)
-    return ("%s, %s"):format(C.COLUMN_ORDERS[store.Get("columnOrder")] or "",
-        C.NUMBER_UNITS[store.Get("numberUnits")] or "")
+local function FiguresSummary()
+    local names = {}
+    for _, kind in ipairs(DM.ColumnSlots(S.Get("columns"), DM.Mode(S.Get("mode")))) do
+        if kind ~= "none" then names[#names + 1] = C.COLUMN_KINDS[kind] end
+    end
+    return table.concat(names, ", ")
 end
 
 local function HeaderSummary(store)
@@ -368,6 +371,27 @@ local function Join(...)
     end
     for _, row in ipairs(rows) do
         if row.key and RELOAD[row.key] and not row.note then row.note = ReloadNote end
+    end
+    return rows
+end
+
+-- The rows that say which kind of column each slot of a window's columns has, left to right. A kind that is in
+-- another slot trades places with this one. Only the first has the setting's key, for its dot and its reset.
+local function ColumnRows(index, needs, why)
+    local rows = {}
+    local list = DM.Key("mode", index)
+    for slot = 1, C.COLUMN_SLOTS do
+        rows[slot] = {
+            key = slot == 1 and DM.Key("columns", index) or nil,
+            label = "Column " .. slot, choice = COLUMN_KIND, needs = needs, why = why,
+            help = slot == 1 and "Which column stands where, left to right, in each row: the name, the total, "
+                .. "the per-second figure, the share, or another list's total for the same player. Another "
+                .. "list's total fills in after the fight." or nil,
+            get = function()
+                return DM.ColumnSlots(DM.Setting(index, "columns"), DM.Mode(S.Get(list)))[slot]
+            end,
+            set = function(kind) DM.SetColumnSlot(index, slot, kind, DM.Mode(S.Get(list))) end,
+        }
     end
     return rows
 end
@@ -612,22 +636,14 @@ page:Card({
 
 page:Card({
     id = "figures", name = "Figures", order = 50,
-    help = "The columns of figures, in what order, and how numbers, shares and per-second figures are written.",
+    help = "Which columns a row has and where, and how numbers, shares and per-second figures are written.",
     summary = FiguresSummary,
     note = ReloadOf(CARD_RELOAD.figures),
     rows = Join(
         Group("Columns"),
-        { key = "showTotal", label = "Show Total", toggle = true, needs = Enabled, why = OFF },
-        { key = "showRate", label = "Show Per Second", toggle = true, needs = Enabled, why = OFF,
-          help = "Damage, healing and absorbs only." },
+        ColumnRows(1, Enabled, OFF),
         { key = "showDivider", label = "Column Divider", toggle = true, needs = BothFigures, why = OFF_BOTH,
           help = "Writes the total and the per-second figure as one text with a bar between: 117 | 23." },
-        { key = "showPercent", label = "Show Percent", toggle = true, needs = Enabled, why = OFF,
-          help = "Each one's share of what the list totals, in a column of its own. The game hides the figures "
-              .. "in combat, so it fills in after the fight." },
-        { key = "columnOrder", label = "Column Order", choice = COLUMN_ORDER, needs = Enabled, why = OFF,
-          help = "Which way round the figures go, and where the share stands. As the Game Has It leads with "
-              .. "the per-second figure in the DPS and HPS lists." },
         Under(SettingsRow("valueColor", "Figure Settings", "The figures' color. Their size, font and class "
                 .. "colors are behind the cog."),
             "Figure Settings", "The figures' size, font and color.", Join(
@@ -869,16 +885,12 @@ local function OwnLookRows(index, columns)
         headerAlpha = { label = "Title Bar Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION },
         showBorder = { label = "Border", toggle = true },
         barColor = { label = "Bar Color", choice = BAR_COLOR },
-        showTotal = { label = "Show Total", toggle = true },
-        showRate = { label = "Show Per Second", toggle = true },
-        showPercent = { label = "Show Percent", toggle = true },
         showDivider = { label = "Column Divider", toggle = true },
-        columnOrder = { label = "Column Order", choice = COLUMN_ORDER },
         showColumnHeaders = { label = "Column Titles", toggle = true },
     }
     local rows = {}
     for _, key in ipairs(C.OWN_LOOK_ORDER) do
-        if (C.OWN_LOOK_COLUMNS[key] == true) == columns then
+        if key ~= "columns" and (C.OWN_LOOK_COLUMNS[key] == true) == columns then
             local row = { key = key .. index, needs = On("ownLook" .. index), why = OFF_OWN_LOOK }
             for field, value in pairs(specs[key]) do row[field] = value end
             rows[#rows + 1] = row
@@ -892,12 +904,9 @@ end
 local function WindowCard(spec)
     local index = spec.index
     local own = "ownLook" .. index
-    local columns = OwnLookRows(index, true)
-    local columnOrder = "columnOrder" .. index
-    local owner, rest = nil, {}
-    for _, row in ipairs(columns) do
-        if row.key == columnOrder then owner = row else rest[#rest + 1] = row end
-    end
+    local slots = ColumnRows(index, On("ownLook" .. index), OFF_OWN_LOOK)
+    local owner = table.remove(slots, 1)
+    local rest = Join(slots, OwnLookRows(index, true))
     spec.switch = "window" .. index
     spec.help = "A window of its own, with its own list, session and size, and a look of its own if you want one."
     spec.summary = WindowNSummary(index)

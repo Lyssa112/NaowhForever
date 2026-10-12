@@ -55,7 +55,7 @@ end
 function DM.Report(channel, modeKey, sessionKey, fightID)
     if InCombatLockdown() then ns.Print(TEXT_COMBAT) return end
     local lines = DM.ReportLines(DM.Session(modeKey, sessionKey, fightID), DM.Mode(modeKey),
-        DM.SessionName(sessionKey, fightID), S.Get("reportLines"), S.Get("showRate"))
+        DM.SessionName(sessionKey, fightID), S.Get("reportLines"), DM.HasColumn(1, "rate"))
     if #lines < 2 then ns.Print(TEXT_EMPTY) return end
     for _, line in ipairs(lines) do
         if channel == "SELF" then ns.Print(line) else SendChatMessage(line, channel) end

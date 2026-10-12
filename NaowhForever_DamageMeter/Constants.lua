@@ -63,18 +63,9 @@ ns.DamageMeter.C = {
     -- The look settings a second or third window may have of its own (barHeight2, barHeight3, ...): first
     -- the bars and the window, then the columns.
     OWN_LOOK_ORDER = { "barHeight", "barSpacing", "barAlpha", "growUp", "fontSize", "showIcons", "showRanks",
-        "backgroundAlpha", "headerAlpha", "showBorder", "barColor", "showTotal", "showRate",
-        "showPercent", "showDivider", "columnOrder", "showColumnHeaders" },
-    OWN_LOOK_COLUMNS = { showTotal = true, showRate = true, showPercent = true, showDivider = true,
-        columnOrder = true, showColumnHeaders = true },
-    -- Which way round the columns of figures go: each as the figure first and the share before, between or
-    -- after them. "auto" leads with the per-second figure in the lists that do, as the game's own meter does.
-    COLUMN_ORDERS = { auto = "As the Game Has It", ["total,rate,percent"] = "Total, Per Second, Share",
-        ["rate,total,percent"] = "Per Second, Total, Share", ["percent,total,rate"] = "Share, Total, Per Second",
-        ["percent,rate,total"] = "Share, Per Second, Total", ["total,percent,rate"] = "Total, Share, Per Second",
-        ["rate,percent,total"] = "Per Second, Share, Total" },
-    COLUMN_ORDERS_ORDER = { "auto", "total,rate,percent", "rate,total,percent", "percent,total,rate",
-        "percent,rate,total", "total,percent,rate", "rate,percent,total" },
+        "backgroundAlpha", "headerAlpha", "showBorder", "barColor", "columns", "showDivider",
+        "showColumnHeaders" },
+    OWN_LOOK_COLUMNS = { columns = true, showDivider = true, showColumnHeaders = true },
     BAR_SCALES = { top = "Top Player", total = "List Total" },
     BAR_SCALES_ORDER = { "top", "total" },
     OWN_BAR_STYLES = { bar = "Same as Bar Color", class = "Class Color", custom = "Custom Color" },
@@ -127,8 +118,8 @@ for _, key in ipairs(ns.DamageMeter.C.OWN_LOOK_ORDER) do ns.DamageMeter.C.OWN_LO
 -- lists, when it shows or how it behaves. The colors follow.
 do
     local C = ns.DamageMeter.C
-    C.LOOK_KEYS = { "barHeight", "barSpacing", "growUp", "reverseFill", "barScale", "showTotal", "showRate",
-        "showPercent", "showDivider", "columnOrder", "showIcons", "showRanks", "highlightPlayer", "pinSelf", "barColor", "barAlpha",
+    C.LOOK_KEYS = { "barHeight", "barSpacing", "growUp", "reverseFill", "barScale", "columns", "showDivider",
+        "showIcons", "showRanks", "highlightPlayer", "pinSelf", "barColor", "barAlpha",
         "backgroundAlpha", "fontSize", "font", "outline", "texture", "showBorder", "iconStyle", "showColumnHeaders",
         "numberUnits", "numberDecimals", "nameFormat", "showSummary", "summaryName", "summaryTotal", "summaryRate",
         "summaryRank", "summarySize", "shortNames", "titleSize", "timeSize", "showTime",
@@ -140,4 +131,19 @@ do
         "imageAlpha", "imageTile", "imageTileSize", "classColors" }
     for _, entry in ipairs(C.COLORS) do C.LOOK_KEYS[#C.LOOK_KEYS + 1] = entry.key end
     C.MAX_LOOKS, C.LOOK_NAME_MAX, C.LOOK_TEXT_MAX = 12, 24, 20000
+
+    -- The columns of a row, left to right, are a window's setting `columns`: "auto", or COLUMN_SLOTS kinds
+    -- joined by commas. A kind is the name, the list's total, its per-second figure, the share, or the total
+    -- of another list for the same player (its key), and "none" leaves a slot free.
+    C.COLUMN_SLOTS = 6
+    C.COLUMN_EXTRAS = {}
+    C.COLUMN_KINDS = { name = "Name", total = "Total", rate = "Per Second", percent = "Share", none = "None" }
+    C.COLUMN_KINDS_ORDER = { "name", "total", "rate", "percent" }
+    for _, key in ipairs({ "damage", "healing", "taken", "avoidable", "absorbs", "interrupts", "dispels",
+        "deaths" }) do
+        C.COLUMN_EXTRAS[key] = true
+        C.COLUMN_KINDS[key] = C.MODE_LABELS[key]
+        C.COLUMN_KINDS_ORDER[#C.COLUMN_KINDS_ORDER + 1] = key
+    end
+    C.COLUMN_KINDS_ORDER[#C.COLUMN_KINDS_ORDER + 1] = "none"
 end

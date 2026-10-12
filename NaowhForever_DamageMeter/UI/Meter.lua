@@ -180,13 +180,14 @@ local function Render(w, session, available, seconds, lowerSession, fightName)
     local lowerKey = detail and "" or Get(w, "lower")
     frame.lowerOn = lowerKey ~= ""
     local shown, mode = Layout(w, view, modeKey)
-    Look.Paint(frame, view, w.offset, shown, mode, available)
+    local extras = Look.Extras(Get(w, "session"), w.fight)
+    Look.Paint(frame, view, w.offset, shown, mode, available, extras)
     if frame.lowerOn then
         local lowerMode = DM.Mode(lowerKey)
         local lowerView = raid and OwnOnly(lowerSession) or lowerSession
         local lowerShown
         lowerShown, w.offset2 = Look.LayoutLower(frame, #lowerView.combatSources, w.offset2, lowerMode)
-        Look.PaintLower(frame, lowerView, w.offset2, lowerShown, lowerMode, available)
+        Look.PaintLower(frame, lowerView, w.offset2, lowerShown, lowerMode, available, extras)
     else
         Look.HideLower(frame)
     end
@@ -747,8 +748,26 @@ local function TidySizes()
     end
 end
 
+-- The columns a window had before there was a setting for them (showTotal, showRate, showPercent and
+-- columnOrder, with a number for the other windows) become that setting, and the old ones are let go.
+local LEGACY_COLUMNS = { "showTotal", "showRate", "showPercent", "columnOrder" }
+
+local function TidyColumns()
+    if not S.Raw then return end
+    for index = 1, DM.MAX_WINDOWS do
+        local old = {}
+        for i, key in ipairs(LEGACY_COLUMNS) do old[i] = S.Raw(DM.Key(key, index)) end
+        if old[1] ~= nil or old[2] ~= nil or old[3] ~= nil or old[4] ~= nil then
+            local key = DM.Key("columns", index)
+            if S.Raw(key) == nil then S.Set(key, DM.LegacyColumns(old[1], old[2], old[3], old[4])) end
+            for _, legacy in ipairs(LEGACY_COLUMNS) do S.Set(DM.Key(legacy, index), nil) end
+        end
+    end
+end
+
 local function Tidy()
     TidySizes()
+    TidyColumns()
     local picked = S.Get("backgroundImage")
     if C.HIDDEN_BACKGROUNDS[picked] then S.Set("backgroundImage", ""); picked = "" end
     if not S.Raw then return end

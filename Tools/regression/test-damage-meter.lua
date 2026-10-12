@@ -587,15 +587,14 @@ do
     check("Theme Accent: every bar in the Accent", first.color[1] == THEME.accent.r and own.color[1] == THEME.accent.r
         and w.rows[3].color[3] == THEME.accent.b)
     s.store.Set("barColor", "class")
-    s.store.Set("showRate", false)
+    s.store.Set("columns", "name,total")
     s.Flush()
-    check("Show Per Second off: the total alone, in the right column", first.colB.text == "<A>"
+    check("no Per Second column: the total alone, in the right column", first.colB.text == "<A>"
         and first.colA.shown == false)
-    s.store.Set("showTotal", false)
-    s.store.Set("showRate", true)
+    s.store.Set("columns", "name,rate")
     s.Flush()
-    check("Show Total off: the rate alone", first.colB.text == "<a>" and first.colA.shown == false)
-    s.store.Set("showTotal", true)
+    check("no Total column: the rate alone", first.colB.text == "<a>" and first.colA.shown == false)
+    s.store.Set("columns", "auto")
     s.store.Set("mode", "interrupts")
     s.Flush()
     check("a list without a rate shows the total", first.colB.text == "<A>" and first.colA.shown == false)
@@ -1114,12 +1113,12 @@ do
         and w.headA.text == "Damage" and w.headB.text == "DPS" and w.headA.shown == true and w.headB.shown == true)
     check("each column as wide as seven characters of the text size", w.rows[1].colA.w == 47 and w.rows[1].colB.w == 47)
     check("the name stops short of both columns", w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 6 + 6))
-    s.store.Set("showRate", false); s.Flush()
+    s.store.Set("columns", "name,total"); s.Flush()
     check("one column takes less room", w.rows[1].name.points[2][2] == -(6 + 47 + 6))
-    s.store.Set("showTotal", false); s.Flush()
+    s.store.Set("columns", "name"); s.Flush()
     check("none: both hidden and the name takes the row", w.rows[1].colA.shown == false and w.rows[1].colB.shown == false
         and w.rows[1].name.points[2][2] == -12 and w.headB.shown == false)
-    s.store.Set("showTotal", true); s.store.Set("showRate", true); s.Flush()
+    s.store.Set("columns", "auto"); s.Flush()
     s.store.Set("mode", "healing"); s.Flush()
     check("a list names its own columns", w.headA.text == "Healing" and w.headB.text == "HPS")
     s.store.Set("mode", "dps"); s.Flush()
@@ -2366,10 +2365,10 @@ do
     check("and the figures before it", row.colB.points[1][2] == -(6 + 16 + 5)
         and row.name.points[2][2] == -(6 + 16 + 5 + 2 * 47 + 6 + 6))
     check("and the titles over them", w.panes[1].headB.points[1][4] == -(6 + 6 + 16 + 5))
-    s.store.Set("showPercent", true); s.Flush()
+    s.store.Set("columns", "name,total,rate,percent"); s.Flush()
     check("and the share, with the figures before it", row.colP.points[1][2] == -(6 + 16 + 5)
         and row.colB.points[1][2] == row.colP)
-    s.store.Set("showPercent", false); s.Flush()
+    s.store.Set("columns", "auto"); s.Flush()
     s.store.Set("showIcons", false); s.Flush()
     check("with no icons, nothing is left for one", row.colB.points[1][2] == -6)
     s.store.Set("showIcons", true); s.store.Set("iconSide", "before"); s.Flush()
@@ -2470,9 +2469,9 @@ do
     s.store.Set("valueClassColor", true); s.Flush()
     check("and the figures, share too", Is(w.rows[1].colA.textColor, CLASS.MAGE) and Is(w.rows[1].colB.textColor, CLASS.MAGE)
         and Is(w.rows[2].colB.textColor, CLASS.ROGUE))
-    s.store.Set("showPercent", true); s.Flush()
+    s.store.Set("columns", "name,total,rate,percent"); s.Flush()
     check("with the share", Is(w.rows[1].colP.textColor, CLASS.MAGE))
-    s.store.Set("showPercent", false)
+    s.store.Set("columns", "auto")
     w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
     check("a spell is not in the class's color, nor is a heading", Is(w.rows[1].name.textColor, THEME.fg)
         and Is(w.rows[1].colA.textColor, THEME.fg))
@@ -2515,13 +2514,13 @@ do
     s.store.Set("rankSize", 10)
 
     -- numbers
-    s.store.Set("showPercent", true); s.Flush()
+    s.store.Set("columns", "name,total,rate,percent"); s.Flush()
     check("a share with a decimal", w.rows[1].colP.text == "25.0%")
     s.store.Set("percentDecimals", 0); s.Flush()
     check("Percent Decimals zero: whole", w.rows[1].colP.text == "25%")
     s.store.Set("percentDecimals", 2); s.Flush()
     check("two", w.rows[1].colP.text == "25.00%")
-    s.store.Set("percentDecimals", 1); s.store.Set("showPercent", false)
+    s.store.Set("percentDecimals", 1); s.store.Set("columns", "auto")
     s.store.Set("rateSuffix", true); s.Flush()
     check("Per-Second Suffix: /s after the per-second figure only", w.rows[1].colB.text == "<a>/s"
         and w.rows[1].colA.text == "<100>")
@@ -2911,7 +2910,7 @@ do
     check("its bars: opacity and color", two.rows[1].color[4] == 0.4 and Is({ r = two.rows[1].color[1],
         g = two.rows[1].color[2], b = two.rows[1].color[3] }, THEME.accent) and one.rows[1].color[4] == 0.85
         and one.rows[1].color[1] == CLASS.MAGE.r)
-    s.store.Set("showColumnHeaders2", false); s.store.Set("showPercent2", true); s.Flush()
+    s.store.Set("showColumnHeaders2", false); s.store.Set("columns2", "name,total,rate,percent"); s.Flush()
     check("its column titles and share", two.panes[1].headName.shown == false and one.panes[1].headName.shown == true
         and two.rows[1].colP.shown == true and one.rows[1].colP.shown == false)
     s.store.Set("showRanks2", false); s.store.Set("showIcons2", false); s.Flush()
@@ -2966,13 +2965,15 @@ do
         .. "barAlpha2,growUp2,fontSize2,showIcons2,showRanks2,backgroundAlpha2,headerAlpha2,showBorder2,barColor2")
     got = {}
     for _, row in ipairs(card.rows) do
-        if row.under == "Column Order" then got[#got + 1] = row.key end
+        if row.under == "Column 1" then got[#got + 1] = row.label end
     end
-    check("and its columns behind the column order", RowOf(s.page, "columnOrder2").cog ~= nil
-        and table.concat(got, ",") == "showTotal2,showRate2,showPercent2,showDivider2,showColumnHeaders2")
+    check("and its columns behind the first column, whose key is the setting's", RowOf(s.page, "columns2").cog ~= nil
+        and RowOf(s.page, "columns2").label == "Column 1" and table.concat(got, ",")
+        == "Column 2,Column 3,Column 4,Column 5,Column 6,Column Divider,Column Titles"
+        and RowOf(s.page, "showDivider2").under == "Column 1" and RowOf(s.page, "showColumnHeaders2").under == "Column 1")
     check("they wait for the look, and say so", RowOf(s.page, "barHeight2").needs() == true
         and RowOf(s.page, "barHeight3").needs() == false and RowOf(s.page, "barHeight3").why == "Turn on Own Look"
-        and RowOf(s.page, "columnOrder3").needs() == false)
+        and RowOf(s.page, "columns3").needs() == false)
     s.store.Set("ownLook3", true)
     check("a third one's own", s.store.Get("barHeight3") == 20 and RowOf(s.page, "barHeight3").needs() == true)
 end
@@ -3223,9 +3224,9 @@ do
     check("sent to the channel, header first, as many as Report Lines says", #s.sent == 3 and s.sent[1].channel == "PARTY"
         and s.sent[1].text == "Damage Done, Current" and s.sent[3].text == "2. You  <900> (<90>)")
     s.sent = {}
-    s.store.Set("showRate", false)
+    s.store.Set("columns", "name,total")
     DM.Report("RAID", "damage", "overall", nil)
-    check("Show Per Second off: totals only", s.sent[2].text == "1. Aldrin  <1500>" and s.sent[1].text == "Damage Done, Overall")
+    check("no Per Second column: totals only", s.sent[2].text == "1. Aldrin  <1500>" and s.sent[1].text == "Damage Done, Overall")
     s.sent = {}
     s.printed = {}
     DM.Report("SELF", "damage", "current", nil)
@@ -3813,10 +3814,10 @@ do
         and tint.b == THEME.muted.b)
     check("the second list is not drawn while it is open", w.lowerBar.shown == false)
     check("the heading has no edge", w.rows[4].edge.solid[4] == 0)
-    s.store.Set("showPercent", true); s.Flush()
+    s.store.Set("columns", "name,total,rate,percent"); s.Flush()
     check("with the share on: each spell's, and none for the enemies", w.rows[1].colP.text == "60.0%"
         and w.rows[2].colP.text == "30.0%" and w.rows[5].colP.text == "" and w.rows[4].colP.text == "")
-    s.store.Set("showPercent", false); s.Flush()
+    s.store.Set("columns", "auto"); s.Flush()
     w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
     w.rows[4].colA.text, w.rows[4].colB.text, w.rows[4].colP.text = "stale", "stale", "stale"
     w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
@@ -3872,11 +3873,11 @@ do
     check("it is the live row it follows: the bars have its class", w.rows[1].color[1] == CLASS.MAGE.r)
     spells.combatSpells = { Spell(101, SECRET_NUMBER) }
     spells.maxAmount, spells.totalAmount = SECRET_NUMBER, SECRET_NUMBER
-    s.store.Set("showPercent", true)
+    s.store.Set("columns", "name,total,rate,percent")
     s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
     check("an amount the game keeps back: no per-second figure and no share, and nothing made of it",
         w.rows[1].colA.text == "<" .. SECRET_NUMBER .. ">" and w.rows[1].colB.text == "" and w.rows[1].colP.text == "")
-    s.store.Set("showPercent", false)
+    s.store.Set("columns", "auto")
     spells.combatSpells = { Spell(101, 50) }
     spells.maxAmount, spells.totalAmount = 50, 100
     s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
@@ -3994,10 +3995,10 @@ do
     local w = s.Window()
     s.session.totalAmount = 400
     s.session.combatSources[1].totalAmount = 100
-    check("off by default", s.store.Get("showPercent") == false and w.rows[1].colP.shown == false
+    check("off by default", s.store.Get("columns") == "auto" and w.rows[1].colP.shown == false
         and w.panes[1].headP.shown == false)
     check("the name's room as it was", w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 6 + 6))
-    s.store.Set("showPercent", true); s.Flush()
+    s.store.Set("columns", "name,total,rate,percent"); s.Flush()
     check("on: each one's share of what the list totals, at the right end", w.rows[1].colP.shown == true
         and w.rows[1].colP.text == "25.0%" and w.rows[1].colP.points[1][1] == "RIGHT"
         and w.rows[1].colP.points[1][2] == -6 and w.rows[1].colP.w == 42)
@@ -4007,10 +4008,10 @@ do
         and w.rows[1].colB.points[1][4] == -6 and w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 6 + 6 + 42 + 6))
     check("the titles too: each at the right end of its column", w.panes[1].headP.points[1][4] == -12
         and w.panes[1].headB.points[1][4] == -(12 + 42 + 6) and w.panes[1].headA.points[1][4] == -(12 + 42 + 6 + 47 + 6))
-    s.store.Set("showTotal", false); s.store.Set("showRate", false); s.Flush()
+    s.store.Set("columns", "name,percent"); s.Flush()
     check("alone: the name's room is the share's", w.rows[1].colP.shown == true and w.rows[1].colA.shown == false
         and w.rows[1].colB.shown == false and w.rows[1].name.points[2][2] == -(6 + 42 + 6))
-    s.store.Set("showTotal", true); s.store.Set("showRate", true)
+    s.store.Set("columns", "name,total,rate,percent")
     s.store.Set("mode", "deaths"); s.Flush()
     check("Deaths has no share", w.rows[1].colP.shown == false and w.panes[1].headP.shown == false)
     s.store.Set("mode", "damage"); s.Flush()
@@ -4057,7 +4058,7 @@ do
     s.session.combatSources[2].amountPerSecond = 20
     s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
     check("and they are fitted again when it is known", row.colA.w == widthA + 2 and row.colB.w == widthB + 2)
-    s.store.Set("showPercent", true)
+    s.store.Set("columns", "name,total,rate,percent")
     s.session.totalAmount = SECRET_NUMBER
     s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
     check("a share that is not known yet keeps its room", row.colP.text == "" and row.colP.w == math.floor(6 * 0.62 * 12))
@@ -4069,7 +4070,7 @@ do
     end
     check("and is fitted once it is", row.colP.text ~= "" and widthP > 0 and widthP + 2 < math.floor(6 * 0.62 * 12)
         and row.colP.w == widthP + 2)
-    s.store.Set("showPercent", false)
+    s.store.Set("columns", "auto")
     s.store.Set("showDivider", true); s.Flush()
     check("one text with a bar between: the whole text is the width", row.colB.w == #row.colB.text * 7 + 2
         and row.colB.shown == true and row.colA.shown == false)
@@ -4205,7 +4206,7 @@ end
 
 -- the column titles on one line as wide as their words, and the order of the columns, per window
 do
-    local s = Boot({ settings = { enabled = true, showPercent = true } })
+    local s = Boot({ settings = { enabled = true, columns = "name,total,rate,percent" } })
     s.session.totalAmount = 400
     s.session.combatSources[1].totalAmount = 100
     s.Login()
@@ -4221,51 +4222,141 @@ do
         and pane.headP.points[1][4] == -12 and pane.headB.points[1][4] == -(12 + 42 + 6)
         and pane.headA.points[1][4] == -(12 + 42 + 6 + 47 + 6))
 
-    check("the usual order: the total, the per-second figure, the share", s.store.Get("columnOrder") == "auto"
-        and row.colA.text == "<100>" and row.colB.text == "<a>" and row.colB.points[1][2] == row.colP
-        and row.colA.points[1][2] == row.colB)
+    check("the name, the total, the per-second figure, the share", row.colA.text == "<100>" and row.colB.text == "<a>"
+        and row.colB.points[1][2] == row.colP and row.colA.points[1][2] == row.colB)
 
     -- the share first
-    s.store.Set("columnOrder", "percent,total,rate"); s.Flush()
+    s.store.Set("columns", "name,percent,total,rate"); s.Flush()
     check("the share first: the figures at the right end, the share left of them", row.colB.points[1][2] == -6
         and row.colA.points[1][2] == row.colB and row.colP.points[1][2] == row.colA
         and row.name.points[2][2] == -(6 + 47 + 6 + 47 + 6 + 42 + 6))
     check("and its title", pane.headB.points[1][4] == -12 and pane.headA.points[1][4] == -(12 + 47 + 6)
         and pane.headP.points[1][4] == -(12 + 47 + 6 + 47 + 6))
     -- the share between
-    s.store.Set("columnOrder", "total,percent,rate"); s.Flush()
+    s.store.Set("columns", "name,total,percent,rate"); s.Flush()
     check("the share between: the second figure at the end, the share, the first", row.colB.points[1][2] == -6
         and row.colP.points[1][2] == row.colB and row.colA.points[1][2] == row.colP)
     check("and its titles", pane.headB.points[1][4] == -12 and pane.headP.points[1][4] == -(12 + 47 + 6)
         and pane.headA.points[1][4] == -(12 + 47 + 6 + 42 + 6))
     -- the figures the other way round
-    s.store.Set("columnOrder", "rate,total,percent"); s.Flush()
+    s.store.Set("columns", "name,rate,total,percent"); s.Flush()
     check("the per-second figure first", row.colA.text == "<a>" and row.colB.text == "<100>"
         and pane.headA.text == "DPS" and pane.headB.text == "Damage")
-    s.store.Set("columnOrder", "total,rate,percent"); s.Flush()
+    s.store.Set("columns", "name,total,rate,percent"); s.Flush()
     check("and the total first", row.colA.text == "<100>" and row.colB.text == "<a>")
-    -- the lists that lead with the per-second figure, unless the order says
-    s.store.Set("columnOrder", "auto"); s.store.Set("mode", "dps"); s.Flush()
+    -- the lists that lead with the per-second figure, unless the columns say
+    s.store.Set("columns", "auto"); s.store.Set("mode", "dps"); s.Flush()
     check("the DPS list leads with its own, as the game's meter does", row.colA.text == "<a>" and row.colB.text == "<100>")
-    s.store.Set("columnOrder", "total,rate,percent"); s.Flush()
-    check("unless the order says the total", row.colA.text == "<100>" and row.colB.text == "<a>")
-    s.store.Set("columnOrder", "auto"); s.store.Set("mode", "damage")
+    s.store.Set("columns", "name,total,rate"); s.Flush()
+    check("unless the columns say the total", row.colA.text == "<100>" and row.colB.text == "<a>")
+    s.store.Set("columns", "auto"); s.store.Set("mode", "damage")
 
     -- with one figure, and with the divider
-    s.store.Set("showRate", false); s.store.Set("columnOrder", "percent,total,rate"); s.Flush()
+    s.store.Set("columns", "name,percent,total"); s.Flush()
     check("one figure and the share first: the share, then the figure at the end", row.colB.points[1][2] == -6
         and row.colP.points[1][2] == row.colB and row.colA.shown == false)
-    s.store.Set("columnOrder", "total,percent,rate"); s.Flush()
-    check("the share between one figure: after it", row.colB.points[1][2] == row.colP and row.colP.points[1][2] == -6)
-    s.store.Set("showRate", true); s.store.Set("showDivider", true); s.store.Set("columnOrder", "percent,total,rate")
+    s.store.Set("columns", "name,total,percent"); s.Flush()
+    check("the share after one figure", row.colB.points[1][2] == row.colP and row.colP.points[1][2] == -6)
+    s.store.Set("columns", "name,percent,total,rate"); s.store.Set("showDivider", true)
     s.Flush()
     check("the divider with the share first: the two figures as one, the share left of it", row.colB.text == "<100> | <a>"
         and row.colB.points[1][2] == -6 and row.colP.points[1][2] == row.colB and row.colA.shown == false)
-    s.store.Set("showDivider", false); s.store.Set("columnOrder", "auto")
+    s.store.Set("showDivider", false); s.store.Set("columns", "auto")
 
-    local order = RowOf(s.page, "columnOrder")
-    check("the order is a choice of seven, as the game has it first", order.choice[2][1] == "auto" and #order.choice[2] == 7
-        and order.choice[1]["percent,total,rate"] == "Share, Total, Per Second")
+    -- the name stands where the columns put it
+    s.store.Set("columns", "total,rate,name"); s.Flush()
+    check("the name last: the figures from the left end, each to the right of the one before", row.colA.shown == true
+        and row.colA.points[1][1] == "LEFT" and row.colA.points[1][2] == 6 and row.colB.points[1][1] == "LEFT"
+        and row.colB.points[1][2] == row.colA and row.colB.points[1][3] == "RIGHT" and row.colB.points[1][4] == 6)
+    check("and the rank, icon and name after them, to the end of the row", row.rank.points[1][2] == 6 + 47 + 6 + 47 + 6
+        and row.name.points[1][2] == 6 + 47 + 6 + 47 + 6 + 18 + 16 + 5 and row.name.points[2][2] == -12)
+    check("their titles over them, at their right ends", pane.headA.points[1][1] == "TOPRIGHT"
+        and pane.headA.points[1][2] == w and pane.headA.points[1][3] == "TOPLEFT"
+        and pane.headA.points[1][4] == 6 + 6 + 47 and pane.headB.points[1][4] == 6 + 6 + 47 + 6 + 47
+        and pane.headName.points[1][4] == 6 + 6 + 47 + 6 + 47 + 6 + 18)
+    s.store.Set("columns", "total,name,rate"); s.Flush()
+    check("the name between them", row.colA.points[1][2] == 6 and row.colB.points[1][1] == "RIGHT"
+        and row.colB.points[1][2] == -6 and row.name.points[1][2] == 6 + 47 + 6 + 18 + 16 + 5
+        and row.name.points[2][2] == -(6 + 47 + 6))
+    local first = RowOf(s.page, "columns")
+    check("the page's first column row shows what the first slot has", first.label == "Column 1"
+        and first.get() == "total" and first.choice[2][1] == "name")
+    s.store.Set("columns", "auto"); s.Flush()
+    check("auto: the name, then the figures at the right end", row.colA.points[1][1] == "RIGHT"
+        and row.name.points[1][2] == 6 + 18 + 16 + 5)
+
+    -- the totals of other lists, for the same player
+    s.byType = { [5] = { combatSources = { { name = "Aldrin", sourceGUID = "Player-2", totalAmount = 7 },
+        { name = "You", sourceGUID = "Player-1", isLocalPlayer = true, totalAmount = 3 } } },
+        [9] = { combatSources = { { name = "Cara", sourceGUID = "Player-3", totalAmount = 2 } } } }
+    s.store.Set("columns", "name,total,rate,interrupts,deaths"); s.Flush()
+    local you = w.rows[2]
+    check("another list's total as a column: found by guid, and yours as yours", row.colX1.text == "<7>"
+        and you.colX1.text == "<3>" and row.colX2.text == "" and w.rows[3].colX2.text == "<2>")
+    check("a total that is known is as wide as its text, when the figures are not", row.colX1.w == 42
+        and row.colA.w == 47 and row.colB.w == 47)
+    check("titled with the list's name, at the right end", pane.headX1.text == "Interrupts"
+        and pane.headX2.text == "Deaths" and pane.headX1.shown == true and pane.headX2.points[1][4] == -12)
+    check("in the order given, to the left of the name's right side", row.colX2.points[1][2] == -6
+        and row.colX1.points[1][2] == row.colX2 and row.colB.points[1][2] == row.colX1
+        and row.colA.points[1][2] == row.colB)
+    s.store.Set("columns", "interrupts,name,total"); s.Flush()
+    check("before the name too", row.colX1.points[1][1] == "LEFT" and row.colX1.points[1][2] == 6
+        and row.colX1.text == "<7>" and row.colB.points[1][1] == "RIGHT")
+    s.byType[5].combatSources[1].sourceGUID = SECRET_TEXT
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a guid the game keeps back finds nothing: the cell is empty, and yours still is found",
+        row.colX1.text == "" and you.colX1.text == "<3>")
+    s.session.combatSources[2].sourceGUID = SECRET_TEXT
+    s.byType[5].combatSources[2].sourceGUID = SECRET_TEXT
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("yours is found as yours, whatever its guid says", you.colX1.text == "<3>")
+    s.store.Set("columns", "auto"); s.byType = nil
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    s.store.Set("columns", "name,total,rate,interrupts"); s.Flush()
+    check("in a player's breakdown the other lists' columns are not drawn", w.rows[1].colX1.shown == false
+        and w.panes[1].headX1.shown == false)
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    s.store.Set("columns", "auto"); s.Flush()
+
+    -- what the slots make of a setting
+    local DM = s.DM
+    local function Slots(value, mode) return table.concat(DM.ColumnSlots(value, mode), ",") end
+    check("auto is the name, the total and the rate, and the rate first where the list leads with it",
+        Slots("auto") == "name,total,rate,none,none,none"
+        and Slots("auto", DM.Mode("dps")) == "name,rate,total,none,none,none")
+    check("the name is put in when it is missing, a kind is only once, and a word that is no kind is left out",
+        Slots("total,rate") == "name,total,rate,none,none,none"
+        and Slots("name,total,total,bogus,rate") == "name,total,rate,none,none,none"
+        and Slots("total,name,none,rate,percent,interrupts,deaths") == "total,name,none,rate,percent,interrupts"
+        and Slots("total,rate,percent,interrupts,deaths,dispels") == "name,total,rate,percent,interrupts,deaths")
+    s.store.Set("columns", "name,total,rate")
+    DM.SetColumnSlot(1, 3, "percent")
+    check("a kind in a slot", s.store.Get("columns") == "name,total,percent,none,none,none")
+    DM.SetColumnSlot(1, 1, "total")
+    check("a kind that is in another slot trades places", s.store.Get("columns") == "total,name,percent,none,none,none")
+    DM.SetColumnSlot(1, 2, "none")
+    check("the name cannot be taken out", s.store.Get("columns") == "total,name,percent,none,none,none")
+    DM.SetColumnSlot(1, 2, "deaths")
+    check("another kind in the name's slot moves the name to a free one", s.store.Get("columns")
+        == "total,deaths,percent,name,none,none")
+    DM.SetColumnSlot(1, 3, "none")
+    check("a slot can be made free", s.store.Get("columns") == "total,deaths,none,name,none,none")
+    check("what the columns have", DM.HasColumn(1, "deaths") == true and DM.HasColumn(1, "rate") == false)
+    s.store.Set("columns", "auto")
+
+    -- the settings from before were four: they become one, once
+    local old = Boot({ settings = { enabled = true, window2 = true, showTotal = false, showPercent = true,
+        columnOrder = "percent,total,rate", showRate2 = false, columnOrder2 = "rate,total,percent" } })
+    old.Login()
+    check("showTotal, showRate, showPercent and columnOrder become the columns", old.store.Get("columns")
+        == "name,percent,rate" and old.store.Get("columns2") == "name,total"
+        and old.settings.showTotal == nil and old.settings.columnOrder == nil and old.settings.showRate2 == nil
+        and old.settings.columns3 == nil)
+    local plain = Boot({ settings = { enabled = true, columnOrder = "auto", showTotal = true } })
+    plain.Login()
+    check("what said what auto says stays auto", plain.store.Get("columns") == "auto"
+        and plain.settings.columns == nil and plain.settings.showTotal == nil)
 
     -- a window's own
     local t = Boot({ settings = { enabled = true, window2 = true } })
@@ -4273,22 +4364,22 @@ do
     t.Login()
     local one, two = t.Window(), t.Window(2)
     t.store.Set("ownLook2", true); t.Flush()
-    t.store.Set("columnOrder2", "rate,total,percent"); t.store.Set("showPercent2", true)
+    t.store.Set("columns2", "name,rate,total,percent")
     t.store.Set("showColumnHeaders2", false); t.Flush()
     check("the second window has its columns its own way", two.rows[1].colA.text == "<a>" and two.rows[1].colB.text == "<100>"
         and two.rows[1].colP.shown == true and two.panes[1].headName.shown == false)
     check("and the first as it was", one.rows[1].colA.text == "<100>" and one.rows[1].colB.text == "<a>"
         and one.rows[1].colP.shown == false and one.rows[1].name.shown == true and one.panes[1].headName.shown == true)
-    t.store.Set("showTotal2", false); t.store.Set("showRate2", true); t.Flush()
+    t.store.Set("columns2", "name,rate"); t.Flush()
     check("one figure there", two.rows[1].colA.shown == false and two.rows[1].colB.text == "<a>"
         and one.rows[1].colA.shown == true)
-    t.store.Set("showTotal2", true); t.store.Set("showRate2", false); t.Flush()
+    t.store.Set("columns2", "name,total"); t.Flush()
     check("the per-second figure off there only", two.rows[1].colB.text == "<100>" and two.rows[1].colA.shown == false
         and one.rows[1].colA.shown == true and one.rows[1].colB.text == "<a>")
-    t.store.Set("showRate2", true)
-    t.store.Set("showDivider2", true); t.store.Set("showTotal2", true); t.Flush()
-    check("a divider there only", two.rows[1].colB.text:find(" | ", 1, true) ~= nil
-        and one.rows[1].colB.text == "<a>")
+    t.store.Set("columns2", "total,rate,name"); t.store.Set("showDivider2", true); t.Flush()
+    check("a divider there only, and the name last there only", two.rows[1].colB.text:find(" | ", 1, true) ~= nil
+        and one.rows[1].colB.text == "<a>" and two.rows[1].colB.points[1][1] == "LEFT"
+        and one.rows[1].colB.points[1][1] == "RIGHT")
 end
 
 -- a bar between the figures: one text for the total and the per-second figure
@@ -4305,21 +4396,21 @@ do
         and w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 20 + 6))
     check("one title over it, at the right end", w.panes[1].headB.text == "Damage | DPS"
         and w.panes[1].headA.shown == false and w.panes[1].headB.points[1][4] == -12)
-    s.store.Set("showPercent", true); s.Flush()
+    s.store.Set("columns", "name,total,rate,percent"); s.Flush()
     check("with the share, left of it", w.rows[1].colB.points[1][2] == w.rows[1].colP)
-    s.store.Set("showPercent", false)
+    s.store.Set("columns", "auto")
     s.store.Set("mode", "dps"); s.Flush()
     check("the DPS list leads with its per-second figure", w.rows[1].colB.text == "<a> | <A>"
         and w.panes[1].headB.text == "DPS | Damage")
     s.store.Set("mode", "damage")
-    s.store.Set("showRate", false); s.Flush()
+    s.store.Set("columns", "name,total"); s.Flush()
     check("one figure only: nothing to divide, and the column its own width again", w.rows[1].colB.text == "<A>"
         and w.panes[1].headB.text == "Damage" and w.rows[1].colB.w == 47 and w.panes[1].headB.points[1][4] == -12
         and w.rows[1].name.points[2][2] == -(6 + 47 + 6))
     local row = RowOf(s.page, "showDivider")
     check("the setting waits for both figures, and says so", row.needs() == false
-        and row.why == "Turn on Show Total and Show Per Second")
-    s.store.Set("showRate", true); s.Flush()
+        and row.why == "Put Total and Per Second in two columns")
+    s.store.Set("columns", "auto"); s.Flush()
     check("and is on with them", row.needs() == true)
     s.store.Set("mode", "interrupts"); s.Flush()
     check("a list with no per-second figure has nothing to divide either", w.rows[1].colB.text == "<A>")
@@ -4424,7 +4515,10 @@ do
     s.store.Set("locked", false)
     check("Bars", CardOf(page, "bars").summary(s.store) == "20 px rows, 2 px apart")
     check("Row", CardOf(page, "row").summary(s.store) == "Icons left, ranks on")
-    check("Figures", CardOf(page, "figures").summary(s.store) == "As the Game Has It, Game Default")
+    check("Figures", CardOf(page, "figures").summary(s.store) == "Name, Total, Per Second")
+    s.store.Set("columns", "total,name,interrupts")
+    check("Figures, as the columns are", CardOf(page, "figures").summary(s.store) == "Total, Name, Interrupts")
+    s.store.Set("columns", "auto")
     check("Title Bar", CardOf(page, "header").summary(s.store) == "List Name, buttons on")
     s.store.Set("showButtons", false)
     check("Title Bar, no buttons", CardOf(page, "header").summary(s.store) == "List Name, buttons off")
@@ -4490,7 +4584,7 @@ do
             if row.under == nil then got[#got + 1] = row.key end
         end
         check("window" .. n .. ": its own list, second list, session, size, and the look and columns", table.concat(got, ",")
-            == ("mode%d,lower%d,session%d,width%d,height%d,scale%d,ownLook%d,columnOrder%d"):format(n, n, n, n, n, n, n, n))
+            == ("mode%d,lower%d,session%d,width%d,height%d,scale%d,ownLook%d,columns%d"):format(n, n, n, n, n, n, n, n))
     end
     s.store.Set("mode2", "healing")
     check("a second window reads its own list and size", CardOf(page, "window2").summary(s.store)

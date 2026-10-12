@@ -18,8 +18,12 @@ local SUMMARY_H, TIME_CHARS, LOWER_STRIP, LOWER_GAP = C.SUMMARY_H, 7, C.LOWER_ST
 local NAME_GAP, TRACK_ALPHA = 6, 0.6
 local RANK_W, RANK_SIZE = 18, 10
 local COL_CHARS, COL_CHARS_FULL, CHAR_W = 7, 10, 0.62
+-- Every cell a row can have beside its name: A the first figure, B the second (or the only one, or both with a
+-- divider), P the share, and X1 to X5 the totals of other lists. A cell is the row's colA, colB, ... and its
+-- title the pane's headA, headB, ...
+local CELLS = { "A", "B", "P", "X1", "X2", "X3", "X4", "X5" }
 local PERCENT_CHARS, DIVIDER_CHARS = 6, 3
-local FIT_PAD, FIT_CELLS = 2, { "A", "B", "P" }
+local FIT_PAD = 2
 local EMPTY_SIZE = 12
 local TITLE_X = C.TITLE_X
 local TITLE_SIZE, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 11, 10, 3, 11
@@ -153,15 +157,15 @@ end
 
 -- A pane is a list of rows with its column titles. A window has one, and a second below it on request.
 local function NewPane(f, n)
-    local pane = { f = f, n = n, rows = {}, cols = {}, columns = 0, valueWidth = 0, top = 0 }
+    local pane = { f = f, n = n, rows = {}, cols = { x = {} }, order = {}, cells = {}, before = {}, after = {},
+        beforeWidth = 0, afterWidth = 0, top = 0 }
     pane.headName = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
     pane.headName:SetJustifyH("LEFT"); pane.headName:SetWordWrap(false); pane.headName:SetText(TEXT_NAME_HEAD)
-    pane.headA = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
-    pane.headA:SetJustifyH("RIGHT"); pane.headA:SetWordWrap(false)
-    pane.headB = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
-    pane.headB:SetJustifyH("RIGHT"); pane.headB:SetWordWrap(false)
-    pane.headP = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
-    pane.headP:SetJustifyH("RIGHT"); pane.headP:SetWordWrap(false)
+    for _, id in ipairs(CELLS) do
+        local head = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
+        head:SetJustifyH("RIGHT"); head:SetWordWrap(false)
+        pane["head" .. id] = head
+    end
     pane.empty = ns.Font(f, EMPTY_SIZE, "OUTLINE", T.muted)
     return pane
 end
@@ -218,12 +222,11 @@ function Look.Row(pane, i)
     row.edge:SetPoint("TOPLEFT"); row.edge:SetPoint("BOTTOMLEFT")
     row.rank = ns.Font(row, RANK_SIZE, "OUTLINE", T.muted)
     row.icon = row:CreateTexture(nil, "OVERLAY")
-    row.colA = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
-    row.colA:SetJustifyH("RIGHT"); row.colA:SetWordWrap(false)
-    row.colB = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
-    row.colB:SetJustifyH("RIGHT"); row.colB:SetWordWrap(false)
-    row.colP = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
-    row.colP:SetJustifyH("RIGHT"); row.colP:SetWordWrap(false)
+    for _, id in ipairs(CELLS) do
+        local cell = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
+        cell:SetJustifyH("RIGHT"); cell:SetWordWrap(false)
+        row["col" .. id] = cell
+    end
     row.name = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
     row.name:SetJustifyH("LEFT"); row.name:SetWordWrap(false)
     pane.rows[i] = row
@@ -235,47 +238,55 @@ function Look.Capacity(h, bh, gap, top)
     return math.max(1, math.floor((h - (top or HEADER) - 2 * INSET + gap) / (bh + gap)))
 end
 
--- The kinds of value the pane's two figure columns show, left to right: "total", "rate" or nil (one
--- column is the right one), and whether the share is shown and where. The DPS and HPS lists lead with the
--- per-second figure, as the game's meter does, unless the order says which way round.
-local ORDERS = {
-    ["total,rate,percent"] = { rateFirst = false, percent = "last" },
-    ["rate,total,percent"] = { rateFirst = true, percent = "last" },
-    ["percent,total,rate"] = { rateFirst = false, percent = "first" },
-    ["percent,rate,total"] = { rateFirst = true, percent = "first" },
-    ["total,percent,rate"] = { rateFirst = false, percent = "middle" },
-    ["rate,percent,total"] = { rateFirst = true, percent = "middle" },
-}
-
+-- Which cell of a row takes which kind of column, from the window's `columns` setting. pane.order lists N,
+-- the name, and the cells in the order they stand, left to right; pane.before and pane.after the cells on
+-- each side of the name. pane.cols says what the cells show: a and b the kinds of the two figures (b alone
+-- when there is one), merged when both are one text, p the share, x the list each X cell takes its total from.
 local function Columns(pane, mode)
-    local index = pane.f.index
-    local order = ORDERS[DM.Setting(index, "columnOrder")]
-    local total, rate = DM.Setting(index, "showTotal"), DM.Setting(index, "showRate") and mode.rate
-    local first, second = "total", "rate"
-    if (order and order.rateFirst) or (not order and mode.rateFirst) then first, second = "rate", "total" end
-    local a, b = first, second
-    if (first == "total" and not total) or (first == "rate" and not rate) then a = nil end
-    if (second == "total" and not total) or (second == "rate" and not rate) then b = nil end
-    if a and not b then a, b = nil, a end
-    pane.cols.a, pane.cols.b = a, b
-    pane.cols.p = DM.Setting(index, "showPercent") == true and mode.percent ~= false
-    pane.cols.percentAt = order and order.percent or "last"
-    pane.cols.merged = a ~= nil and b ~= nil and DM.Setting(index, "showDivider") == true
-    return a, b
-end
-
--- The cells of a pane that are in use, left to right: A the first figure, B the second (or the only one,
--- or the two together with a divider), P the share, which stands before them, between them or after them.
-local function CellsOf(pane)
-    local cells = {}
-    local a, b, p, at = pane.cols.a, pane.cols.b, pane.cols.p, pane.cols.percentAt
-    local both = a ~= nil and b ~= nil
-    if p and at == "first" then cells[#cells + 1] = "P" end
-    if a and not pane.cols.merged then cells[#cells + 1] = "A" end
-    if p and at == "middle" and both then cells[#cells + 1] = "P" end
-    if b then cells[#cells + 1] = "B" end
-    if p and (at == "last" or (at == "middle" and not both)) then cells[#cells + 1] = "P" end
-    return cells
+    local f = pane.f
+    local slots = DM.ColumnSlots(DM.Setting(f.index, "columns"), mode)
+    local figures, extras, order = {}, {}, {}
+    for _, kind in ipairs(slots) do
+        if kind == "name" then
+            order[#order + 1] = "N"
+        elseif kind == "total" or (kind == "rate" and mode.rate) then
+            figures[#figures + 1] = kind
+            order[#order + 1] = "F" .. #figures
+        elseif kind == "percent" and mode.percent ~= false then
+            order[#order + 1] = "P"
+        elseif C.COLUMN_EXTRAS[kind] and not f.detail then
+            extras[#extras + 1] = kind
+            order[#order + 1] = "X" .. #extras
+        end
+    end
+    local cols = pane.cols
+    local two = #figures == 2
+    cols.a, cols.b = two and figures[1] or nil, figures[two and 2 or 1]
+    cols.merged = two and DM.Setting(f.index, "showDivider") == true
+    cols.p, cols.x = false, {}
+    pane.order, pane.cells, pane.before, pane.after = {}, {}, {}, {}
+    local side = pane.before
+    for _, id in ipairs(order) do
+        if id == "F1" then
+            id = (two and not cols.merged) and "A" or "B"
+        elseif id == "F2" then
+            id = not cols.merged and "B" or nil
+        end
+        if id ~= nil then
+            pane.order[#pane.order + 1] = id
+            if id == "N" then
+                side = pane.after
+            else
+                pane.cells[#pane.cells + 1] = id
+                side[#side + 1] = id
+                if id == "P" then
+                    cols.p = true
+                elseif id:sub(1, 1) == "X" then
+                    cols.x[id] = extras[tonumber(id:sub(2))]
+                end
+            end
+        end
+    end
 end
 
 -- The width of a column of figures: what its texts need once they are known (pane.fit), else what the
@@ -288,28 +299,65 @@ local function CellWidth(g, pane, cell)
     return g.colWidth
 end
 
--- How much room the pane's figures take, with the gaps between them.
-local function ValueWidth(pane, g)
+-- How much room cells take: their widths, and the gaps between them.
+local function GroupWidth(cells, pane, g)
     local width = 0
-    for k, cell in ipairs(pane.cells) do
+    for k, cell in ipairs(cells) do
         width = width + CellWidth(g, pane, cell) + (k > 1 and g.colGap or 0)
     end
     return width
 end
 
--- Sets a row's figures to the widths of their columns, and its name's right end to the room they leave.
+-- The room the cells before the name take, with the gap that keeps the name from them, and the room the cells
+-- after it take.
+local function Measure(pane, g)
+    pane.beforeWidth = #pane.before > 0 and GroupWidth(pane.before, pane, g) + NAME_GAP or 0
+    pane.afterWidth = GroupWidth(pane.after, pane, g)
+end
+
+-- Puts a row's rank, icon and name in the room the cells leave: from after the cells before the name to before
+-- the cells after it.
+local function PlaceName(row, pane, g)
+    local left = g.textPad + pane.beforeWidth
+    row.rank:ClearAllPoints(); row.rank:SetPoint("LEFT", left, 0); row.rank:SetWidth(g.rankWidth)
+    if g.showRanks then left = left + g.rankWidth end
+    row.icon:ClearAllPoints()
+    if g.iconSide == "right" then
+        row.icon:SetPoint("RIGHT", -g.textPad, 0)
+    elseif g.iconSide == "before" then
+        row.icon:SetPoint("RIGHT", row, "LEFT", 0, 0)
+    else
+        row.icon:SetPoint("LEFT", left, 0)
+        if g.showIcons then left = left + g.iconSize + g.iconGap end
+    end
+    row.name:ClearAllPoints()
+    row.name:SetPoint("LEFT", left, 0)
+    row.name:SetPoint("RIGHT", -g.rightInset - pane.afterWidth - NAME_GAP, 0)
+end
+
+-- Sets a row's cells to the widths of their columns, and its name to the room they leave.
 local function SizeCells(row, pane, g)
     for _, cell in ipairs(pane.cells) do
         row["col" .. cell]:SetWidth(CellWidth(g, pane, cell))
     end
-    row.name:ClearAllPoints()
-    row.name:SetPoint("LEFT", row.nameLeft, 0)
-    row.name:SetPoint("RIGHT", -g.rightInset - pane.valueWidth - NAME_GAP, 0)
+    PlaceName(row, pane, g)
 end
 
 local function ColumnTitle(mode, kind)
     if kind == "rate" then return mode.perSecond or TEXT_RATE end
     return mode.total or TEXT_TOTAL
+end
+
+-- The words over a cell: the title of the figure it has, both with a divider, the share, or the other list.
+local function HeadText(pane, mode, id)
+    local cols = pane.cols
+    if id == "P" then return TEXT_PERCENT_HEAD end
+    if id == "A" then return ColumnTitle(mode, cols.a) end
+    if id == "B" then
+        if cols.merged then return DIVIDED_TEXT:format(ColumnTitle(mode, cols.a), ColumnTitle(mode, cols.b)) end
+        return ColumnTitle(mode, cols.b)
+    end
+    return DM.Mode(cols.x[id]).total or TEXT_TOTAL
 end
 
 local function LayRow(row, pane, i, g)
@@ -323,31 +371,34 @@ local function LayRow(row, pane, i, g)
     row:SetStatusBarTexture(UI.TexturePath(g.texture, GRADIENT_TEX))
     row.edge:SetWidth(g.edgeWidth)
     row.track:SetColorTexture(f.trackColor.r, f.trackColor.g, f.trackColor.b, TRACK_ALPHA)
-    local left = g.textPad
-    row.rank:ClearAllPoints(); row.rank:SetPoint("LEFT", left, 0); row.rank:SetWidth(g.rankWidth)
     row.rank:SetShown(g.showRanks)
     row.rank:SetTextColor(f.rankColor.r, f.rankColor.g, f.rankColor.b)
     row.name:SetTextColor(f.nameColor.r, f.nameColor.g, f.nameColor.b)
-    row.colA:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
-    row.colB:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
-    if g.showRanks then left = left + g.rankWidth end
-    row.icon:ClearAllPoints()
     row.icon:SetSize(g.iconSize, g.iconSize)
     row.icon:SetTexCoord(g.iconCrop, 1 - g.iconCrop, g.iconCrop, 1 - g.iconCrop)
     row.icon:SetShown(g.showIcons)
-    if g.iconSide == "right" then
-        row.icon:SetPoint("RIGHT", -g.textPad, 0)
-    elseif g.iconSide == "before" then
-        row.icon:SetPoint("RIGHT", row, "LEFT", 0, 0)
-    else
-        row.icon:SetPoint("LEFT", left, 0)
-        if g.showIcons then left = left + g.iconSize + g.iconGap end
+    for _, id in ipairs(CELLS) do
+        local cell = row["col" .. id]
+        cell:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
+        cell:SetShown(false)
     end
-    row.colP:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
-    row.colA:SetShown(false); row.colB:SetShown(false); row.colP:SetShown(false)
+    -- The cells before the name from the left end, each to the right of the one before; the cells after it
+    -- from the right end, each to the left of the one after.
+    local before
+    for _, id in ipairs(pane.before) do
+        local cell = row["col" .. id]
+        cell:ClearAllPoints()
+        if before then
+            cell:SetPoint("LEFT", before, "RIGHT", g.colGap, 0)
+        else
+            cell:SetPoint("LEFT", g.textPad, 0)
+        end
+        cell:SetShown(true)
+        before = cell
+    end
     local after
-    for k = #pane.cells, 1, -1 do
-        local cell = row["col" .. pane.cells[k]]
+    for k = #pane.after, 1, -1 do
+        local cell = row["col" .. pane.after[k]]
         cell:ClearAllPoints()
         if after then
             cell:SetPoint("RIGHT", after, "LEFT", -g.colGap, 0)
@@ -357,13 +408,12 @@ local function LayRow(row, pane, i, g)
         cell:SetShown(true)
         after = cell
     end
-    row.nameLeft = left
     SizeCells(row, pane, g)
     Parts.HudFont(row.rank, g.rankFont, g.rankSize, g.rankOutline)
     Parts.HudFont(row.name, g.nameFont, g.fontSize, g.nameOutline)
-    Parts.HudFont(row.colA, g.valueFont, g.valueSize, g.valueOutline)
-    Parts.HudFont(row.colB, g.valueFont, g.valueSize, g.valueOutline)
-    Parts.HudFont(row.colP, g.valueFont, g.valueSize, g.valueOutline)
+    for _, id in ipairs(CELLS) do
+        Parts.HudFont(row["col" .. id], g.valueFont, g.valueSize, g.valueOutline)
+    end
 end
 
 -- The column titles above a pane's rows at y: Name, and a title over each value column. A title is put
@@ -373,21 +423,33 @@ local function LayHeads(pane, g, y)
     local f = pane.f
     local show = g.showHead
     pane.headName:SetShown(show)
-    pane.headA:SetShown(false); pane.headB:SetShown(false); pane.headP:SetShown(false)
+    for _, id in ipairs(CELLS) do pane["head" .. id]:SetShown(false) end
     if not show then return end
     local edge = -(INSET + g.rightInset)
-    for k = #pane.cells, 1, -1 do
-        local cell = pane.cells[k]
-        local fs = pane["head" .. cell]
+    for k = #pane.after, 1, -1 do
+        local id = pane.after[k]
+        local fs = pane["head" .. id]
         fs:ClearAllPoints()
         fs:SetPoint("TOPRIGHT", f, "TOPRIGHT", edge, y)
         fs:SetShown(true)
-        edge = edge - CellWidth(g, pane, cell) - g.colGap
+        edge = edge - CellWidth(g, pane, id) - g.colGap
+    end
+    local x = INSET + g.iconOutside + g.textPad
+    for _, id in ipairs(pane.before) do
+        local fs = pane["head" .. id]
+        x = x + CellWidth(g, pane, id)
+        fs:ClearAllPoints()
+        fs:SetPoint("TOPRIGHT", f, "TOPLEFT", x, y)
+        fs:SetShown(true)
+        x = x + g.colGap
     end
     pane.headName:ClearAllPoints()
     pane.headName:SetPoint("TOPLEFT", f, "TOPLEFT",
-        INSET + g.iconOutside + g.textPad + (g.showRanks and g.rankWidth or 0), y)
-    for _, fs in ipairs({ pane.headName, pane.headA, pane.headB, pane.headP }) do
+        INSET + g.iconOutside + g.textPad + pane.beforeWidth + (g.showRanks and g.rankWidth or 0), y)
+    Parts.HudFont(pane.headName, g.headFont, g.headSize, g.headOutline)
+    pane.headName:SetTextColor(f.columnColor.r, f.columnColor.g, f.columnColor.b)
+    for _, id in ipairs(CELLS) do
+        local fs = pane["head" .. id]
         Parts.HudFont(fs, g.headFont, g.headSize, g.headOutline)
         fs:SetTextColor(f.columnColor.r, f.columnColor.g, f.columnColor.b)
     end
@@ -456,16 +518,15 @@ end
 
 -- Lays out one pane's columns, titles and the rows that fit; returns how many rows are shown.
 local function LayPane(pane, mode, total, first, capacity, g, key, headY)
-    local a, b = Columns(pane, mode)
+    Columns(pane, mode)
     pane.capacity = capacity
     pane.merged = pane.cols.merged == true
-    pane.cells = CellsOf(pane)
     first = math.max(0, math.min(first, total - capacity))
     local shown = math.min(total - first, capacity)
-    local paneKey = key .. "|" .. table.concat(pane.cells) .. "|" .. tostring(pane.merged) .. "|" .. capacity
+    local paneKey = key .. "|" .. table.concat(pane.order, ",") .. "|" .. tostring(pane.merged) .. "|" .. capacity
         .. "|" .. pane.top
     local fresh = pane.laidKey ~= paneKey
-    pane.valueWidth = ValueWidth(pane, g)
+    Measure(pane, g)
     pane.headY = headY
     if fresh then
         LayHeads(pane, g, headY)
@@ -473,13 +534,7 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
         pane.empty:SetPoint("TOP", pane.f, "TOPLEFT", g.w / 2, -pane.top - INSET)
     end
     pane.headName:SetText(TEXT_NAME_HEAD)
-    if a then pane.headA:SetText(ColumnTitle(mode, a)) end
-    if pane.merged then
-        pane.headB:SetText(DIVIDED_TEXT:format(ColumnTitle(mode, a), ColumnTitle(mode, b)))
-    elseif b then
-        pane.headB:SetText(ColumnTitle(mode, b))
-    end
-    pane.headP:SetText(TEXT_PERCENT_HEAD)
+    for _, id in ipairs(pane.cells) do pane["head" .. id]:SetText(HeadText(pane, mode, id)) end
     local rows = pane.rows
     for i = 1, shown do
         local row = rows[i] or Look.Row(pane, i)
@@ -583,7 +638,8 @@ end
 function Look.HideLower(f)
     local pane = f.panes[2]
     f.lowerBar:Hide()
-    pane.headName:Hide(); pane.headA:Hide(); pane.headB:Hide(); pane.empty:Hide()
+    pane.headName:Hide(); pane.empty:Hide()
+    for _, id in ipairs(CELLS) do pane["head" .. id]:Hide() end
     for _, row in ipairs(pane.rows) do row:Hide() end
     pane.laidKey = nil
 end
@@ -606,8 +662,19 @@ local function PaintValue(fs, value, suffix)
     end
 end
 
--- The values of a row: the two figures, and its share of the list's total once both are plain numbers.
-local function PaintValues(row, source, cols, session)
+-- The total another list has for a source: yours, or the one with the same guid. A guid the game keeps back
+-- (in combat) finds nothing, so the cell is empty until the fight is over.
+local function ExtraOf(lookup, source)
+    if not lookup then return nil end
+    local other = source.isLocalPlayer == true and lookup.own or nil
+    local guid = source.sourceGUID
+    if not other and DM.Plain(guid, "string") then other = lookup.byGuid[guid] end
+    return other and other.totalAmount
+end
+
+-- The values of a row: the two figures, its share of the list's total once both are plain numbers, and the
+-- totals of other lists.
+local function PaintValues(row, source, cols, session, extras)
     local rate = DM.RateSuffix()
     local suffixA, suffixB = cols.a == "rate" and rate or "", cols.b == "rate" and rate or ""
     if cols.merged then
@@ -627,6 +694,25 @@ local function PaintValues(row, source, cols, session)
         local percent = source.noPercent ~= true and DM.Percent(source.totalAmount, session.totalAmount)
         row.colP:SetText(percent and DM.PercentText(percent) or "")
     end
+    for id, kind in pairs(cols.x) do
+        local value = ExtraOf(extras and extras[kind], source)
+        row["col" .. id]:SetText(DM.Plain(value, "number") and Format(value) or "")
+    end
+end
+
+-- The lists the columns of other lists take their totals from, read as they are asked for: { own, byGuid }
+-- for each, which is a player's row in it, yours or by guid.
+function Look.Extras(sessionKey, fightID)
+    return setmetatable({}, { __index = function(lookups, kind)
+        local lookup = { byGuid = {} }
+        for _, source in ipairs(DM.Session(kind, sessionKey, fightID).combatSources) do
+            if source.isLocalPlayer == true then lookup.own = source end
+            local guid = source.sourceGUID
+            if DM.Plain(guid, "string") then lookup.byGuid[guid] = source end
+        end
+        lookups[kind] = lookup
+        return lookup
+    end })
 end
 
 -- The line under the title bar, from the pieces the settings keep: the session's name, its total, the
@@ -664,7 +750,7 @@ local function PaintHeading(row, source, f)
     row.icon:Hide()
     row.name:SetText(source.label)
     row.name:SetTextColor(f.columnColor.r, f.columnColor.g, f.columnColor.b)
-    row.colA:SetText(""); row.colB:SetText(""); row.colP:SetText("")
+    for _, id in ipairs(CELLS) do row["col" .. id]:SetText("") end
 end
 
 -- A cut of text to letters characters, with ... after it.
@@ -709,7 +795,7 @@ local function FitColumns(pane, shown, plain)
     end
     local fit
     for _, cell in ipairs(pane.cells) do
-        if cell == "P" or plain then
+        if (cell ~= "A" and cell ~= "B") or plain then
             local widest = 0
             for i = 1, shown do
                 local text = pane.rows[i]["col" .. cell]:GetText()
@@ -725,19 +811,19 @@ local function FitColumns(pane, shown, plain)
         end
     end
     local changed = false
-    for _, cell in ipairs(FIT_CELLS) do
+    for _, cell in ipairs(CELLS) do
         if (fit and fit[cell]) ~= (pane.fit and pane.fit[cell]) then changed = true end
     end
     if not changed then return end
     pane.fit = fit
-    pane.valueWidth = ValueWidth(pane, g)
+    Measure(pane, g)
     LayHeads(pane, g, pane.headY)
     for _, row in ipairs(pane.rows) do
-        if row.nameLeft then SizeCells(row, pane, g) end
+        if row.laidKey then SizeCells(row, pane, g) end
     end
 end
 
-local function PaintPane(pane, session, first, shown, mode, available)
+local function PaintPane(pane, session, first, shown, mode, available, extras)
     local sources = session.combatSources
     local you, letters = S.Get("youLabel") == true, S.Get("nameMaxLetters")
     local classNames, classValues = S.Get("nameClassColor") == true, S.Get("valueClassColor") == true
@@ -780,19 +866,17 @@ local function PaintPane(pane, session, first, shown, mode, available)
             row.name:SetTextColor(tint.r, tint.g, tint.b)
             tint = f.valueColor
             if classValues and not source.label then tint = ClassColor(source.classFilename) end
-            row.colA:SetTextColor(tint.r, tint.g, tint.b)
-            row.colB:SetTextColor(tint.r, tint.g, tint.b)
-            row.colP:SetTextColor(tint.r, tint.g, tint.b)
-            PaintValues(row, source, pane.cols, session)
+            for _, id in ipairs(pane.cells) do row["col" .. id]:SetTextColor(tint.r, tint.g, tint.b) end
+            PaintValues(row, source, pane.cols, session, extras)
         end
     end
     FitColumns(pane, shown, plain)
 end
 
-function Look.Paint(f, session, first, shown, mode, available)
-    PaintPane(f.panes[1], session, first, shown, mode, available)
+function Look.Paint(f, session, first, shown, mode, available, extras)
+    PaintPane(f.panes[1], session, first, shown, mode, available, extras)
 end
 
-function Look.PaintLower(f, session, first, shown, mode, available)
-    PaintPane(f.panes[2], session, first, shown, mode, available)
+function Look.PaintLower(f, session, first, shown, mode, available, extras)
+    PaintPane(f.panes[2], session, first, shown, mode, available, extras)
 end

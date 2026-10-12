@@ -10,8 +10,7 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     enabled = F.enabled,
     visibility = "always", locked = false, idleAlpha = 1, hoverFull = true, clickThrough = false,
     barHeight = 20, barSpacing = 2, growUp = false, reverseFill = false, barScale = "top",
-    columnOrder = "auto", showTotal = true, showRate = true, showPercent = false,
-    showDivider = false, showIcons = true, showRanks = true, highlightPlayer = true, pinSelf = false,
+    columns = "auto", showDivider = false, showIcons = true, showRanks = true, highlightPlayer = true, pinSelf = false,
     barColor = "class", barAlpha = 0.85, backgroundAlpha = 0.9,
     fontSize = 11, font = "", outline = "OUTLINE", texture = "",
     hideGameMeter = true, breakdown = true, reportLines = 5, showTime = true,
@@ -47,8 +46,8 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     barHeight2 = 20, barHeight3 = 20, barSpacing2 = 2, barSpacing3 = 2, barAlpha2 = 0.85, barAlpha3 = 0.85, growUp2 = false, growUp3 = false,
     fontSize2 = 11, fontSize3 = 11, showIcons2 = true, showIcons3 = true, showRanks2 = true, showRanks3 = true, backgroundAlpha2 = 0.9, backgroundAlpha3 = 0.9,
     headerAlpha2 = 1, headerAlpha3 = 1, showBorder2 = true, showBorder3 = true, barColor2 = "class", barColor3 = "class",
-    showTotal2 = true, showTotal3 = true, showRate2 = true, showRate3 = true, showPercent2 = false, showPercent3 = false, showDivider2 = false, showDivider3 = false,
-    columnOrder2 = "auto", columnOrder3 = "auto", showColumnHeaders2 = true, showColumnHeaders3 = true,
+    columns2 = "auto", columns3 = "auto", showDivider2 = false, showDivider3 = false,
+    showColumnHeaders2 = true, showColumnHeaders3 = true,
     mode = "damage", session = "current", width = 300, height = 206, lower = "", scale = 1,
     meterPos = { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -24, y = 210 },
     window2 = false, mode2 = "healing", session2 = "current", width2 = 300, height2 = 206, lower2 = "", scale2 = 1,
@@ -87,6 +86,98 @@ end
 
 function DM.Setting(index, key)
     return S.Get(DM.LookKey(index, key))
+end
+
+-- ---- the columns of a row: where its name stands, and which figures and totals come with it
+
+-- The slots of a columns setting, left to right: COLUMN_SLOTS kinds, "none" in a free one. "auto" is the name,
+-- the total and the per-second figure, the per-second figure first in the lists that lead with it, as the
+-- game's own meter does (mode is the list). The name is always there, and a kind only once.
+function DM.ColumnSlots(value, mode)
+    local C = DM.C
+    local slots, seen = {}, {}
+    if type(value) ~= "string" or value == "auto" then
+        slots = { "name", "total", "rate" }
+        if mode and mode.rateFirst then slots[2], slots[3] = "rate", "total" end
+    else
+        for kind in value:gmatch("[^,]+") do
+            if C.COLUMN_KINDS[kind] and #slots < C.COLUMN_SLOTS and (kind == "none" or not seen[kind]) then
+                slots[#slots + 1] = kind
+                seen[kind] = true
+            end
+        end
+    end
+    local named = false
+    for _, kind in ipairs(slots) do
+        if kind == "name" then named = true end
+    end
+    if not named then
+        table.insert(slots, 1, "name")
+        slots[C.COLUMN_SLOTS + 1] = nil
+    end
+    for i = #slots + 1, C.COLUMN_SLOTS do slots[i] = "none" end
+    return slots
+end
+
+-- Puts kind in a slot of a window's columns: a kind that is in another slot trades places with what the
+-- slot had. The name cannot be taken out; it moves to a free slot when another kind takes its place. mode is
+-- the list the window shows, for what "auto" is on it.
+function DM.SetColumnSlot(index, slot, kind, mode)
+    local key = DM.LookKey(index, "columns")
+    local slots = DM.ColumnSlots(S.Get(key), mode)
+    local old = slots[slot]
+    if old == nil or old == kind or not DM.C.COLUMN_KINDS[kind] then return end
+    local holder
+    if kind ~= "none" then
+        for i, other in ipairs(slots) do
+            if other == kind then holder = i end
+        end
+    end
+    if holder then
+        slots[holder], slots[slot] = old, kind
+    elseif old == "name" then
+        local free
+        for i, other in ipairs(slots) do
+            if other == "none" then
+                free = i
+                break
+            end
+        end
+        if kind == "none" or not free then return end
+        slots[free], slots[slot] = "name", kind
+    else
+        slots[slot] = kind
+    end
+    S.Set(key, table.concat(slots, ","))
+end
+
+-- Whether a window's columns have a kind of column.
+function DM.HasColumn(index, kind)
+    for _, other in ipairs(DM.ColumnSlots(DM.Setting(index, "columns"))) do
+        if other == kind then return true end
+    end
+    return false
+end
+
+-- The columns setting that says what showTotal, showRate, showPercent and columnOrder said before there was
+-- one, or nil when they said what "auto" says.
+function DM.LegacyColumns(total, rate, percent, order)
+    total, rate, percent = total ~= false, rate ~= false, percent == true
+    if total and rate and not percent and (order == nil or order == "auto") then return nil end
+    local kinds = { "name" }
+    local seen = {}
+    local function Add(kind)
+        local shown = kind == "total" and total or kind == "rate" and rate or kind == "percent" and percent
+        if shown and not seen[kind] then
+            seen[kind] = true
+            kinds[#kinds + 1] = kind
+        end
+    end
+    if type(order) == "string" and order ~= "auto" then
+        for kind in order:gmatch("[^,]+") do Add(kind) end
+    end
+    Add("total"); Add("rate"); Add("percent")
+    return table.concat(kinds, ",")
 end
 
 function DM.Key(base, index)
