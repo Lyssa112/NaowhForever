@@ -214,7 +214,8 @@ local function Boot(opts)
             GetCombatSessionFromType = function(kind, type)
                 s.calls[#s.calls + 1] = { kind, type }
                 if s.apiError then error("secret") end
-                return s.apiResult == nil and session or s.apiResult
+                if s.apiResult ~= nil then return s.apiResult end
+                return s.byType and s.byType[type] or session
             end,
             GetCombatSessionFromID = function(id, type)
                 s.idCalls[#s.idCalls + 1] = { id, type }
@@ -1111,6 +1112,137 @@ do
         and e.place == "The Deep Hall" and e.damage.own == 0 and e.damage.rank == nil)
 end
 
+-- a second list under the first, in the same window
+do
+    local s = Boot({ settings = { enabled = true, lower = "healing", height = 300 } })
+    local healing = { combatSources = { Source("Mira", "PRIEST", "H1", "h1"), Source("You", "ROGUE", "H2", "h2", true) },
+        maxAmount = Amount("hmax"), totalAmount = Amount("htotal") }
+    s.byType = { [2] = healing }
+    s.Login()
+    local w = s.Window()
+    check("the second list is drawn under the first, its own sources and titles", w.lowerBar.shown == true
+        and w.lowerTitle.text == "Healing Done" and w.rows2[1].name.text == "Mira" and w.rows2[2].name.text == "You"
+        and w.rows2[1].colA.text == "<H1>" and w.rows2[1].colB.text == "<h1>"
+        and w.rows[1].name.text == "Aldrin" and w.rows[1].colA.text == "<A>")
+    check("it has column titles of its own", w.panes[2].headA.text == "Healing" and w.panes[2].headB.text == "HPS"
+        and w.headA.text == "Damage")
+    check("the rows are shared: five above, four below", w.rows[3].shown == true and w.panes[1].rows[6] == nil
+        and w.rows2[2].shown == true and w.rows2[3] == nil)
+    check("the strip sits under the first list's last row", w.lowerBar.points[1][5] == -(42 + 6 + 5 * 20 + 4 * 2 + 4))
+    check("its titles and rows below the strip", w.panes[2].headB.points[1][5] == -(160 + 20) - 3
+        and w.rows2[1].points[1][5] == -(160 + 20 + 16) - 6)
+    check("every row knows its list", w.rows[1].modeKey == "damage" and w.rows2[1].modeKey == "healing"
+        and w.rows[1].pane == 1 and w.rows2[1].pane == 2)
+    check("the title strip names the list, and its button is there", w.lowerButton.shown == true)
+    check("the strip is the title bar's color", w.lowerBackground.solid[1] == THEME.panel.r)
+    check("an empty list says so under its own titles", w.empty.points[1][5] == -(42 + 6)
+        and w.panes[2].empty.points[1][5] == -(196 + 6))
+    s.store.Set("headerColor", { r = 0.3, g = 0.6, b = 0.9 }); s.Flush()
+    check("and takes the title bar's color picked", w.lowerBackground.solid[2] == 0.6)
+    s.store.Set("headerColor", false)
+
+    s.Hover(w, 1)
+    check("a row of the first list asks for its own list's spells", s.spellCalls[#s.spellCalls].type == 0)
+    w.rows2[2].scripts.OnEnter(w.rows2[2])
+    check("a row of the second asks for its own", s.spellCalls[#s.spellCalls].type == 2)
+    w.rows2[2].scripts.OnLeave(w.rows2[2])
+
+    s.store.Set("lower", "interrupts"); s.Flush()
+    check("another list: its own columns", w.lowerTitle.text == "Interrupts" and w.rows2[1].colA.shown == false
+        and w.rows2[1].colB.shown == true and w.panes[2].headB.text == "Interrupts" and w.rows[1].colA.shown == true)
+
+    s.store.Set("raidMode", true); s.Flush()
+    check("Raid Mode keeps your row in each list", w.rows[1].name.text == "You" and w.rows[2].shown == false
+        and w.rows2[1].name.text == "You" and w.rows2[2].shown == false)
+    s.store.Set("raidMode", false)
+
+    s.store.Set("lower", ""); s.Flush()
+    check("none: the strip, its titles and its rows go", w.lowerBar.shown == false and w.rows2[1].shown == false
+        and w.panes[2].headB.shown == false and w.lowerButton.shown == false)
+    check("and the first list has the room again", w.rows[1].shown == true and w.panes[1].rows[6] == nil)
+    s.store.Set("height", 400); s.Flush()
+    check("room for more rows in a taller window", w.rows[3].shown == true)
+end
+
+-- the second list keeps a row in even a very small window, and shows in the sample
+do
+    local s = Boot({ settings = { enabled = true, lower = "healing", height = 70 } })
+    s.Login()
+    local w = s.Window()
+    check("a window at its smallest still has a row for each list", w.rows[1].shown == true and w.rows2[1].shown == true)
+    s.ns.ShowUnlockMode()
+    check("Unlock Mode shows the sample in both", w.rows[1].name.text == "Aldrin" and w.rows2[1].shown == true
+        and w.rows2[1].name.text == "Aldrin")
+end
+
+-- the second list in a small window: scrolled on its own, and its menus
+do
+    local s = Boot({ settings = { enabled = true, lower = "healing", height = 150 } })
+    local healing = { combatSources = { Source("Mira", "PRIEST", "H1", "h1"), Source("You", "ROGUE", "H2", "h2", true) },
+        maxAmount = Amount("hmax"), totalAmount = Amount("htotal") }
+    s.byType = { [2] = healing }
+    s.Login()
+    local w = s.Window()
+    check("a small window: one row each", w.rows[1].shown == true and w.rows[2] == nil and w.rows2[1].shown == true
+        and w.rows2[2] == nil and w.rows2[1].name.text == "Mira")
+    w.rows2[1].scripts.OnMouseWheel(w.rows2[1], -1)
+    check("the wheel on a second-list row scrolls that list alone", w.rows2[1].name.text == "You"
+        and w.rows[1].name.text == "Aldrin")
+    w.rows[1].scripts.OnMouseWheel(w.rows[1], -1)
+    check("and on the first's scrolls the first alone", w.rows[1].name.text == "You" and w.rows2[1].name.text == "You")
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("a reset puts both back at the top", w.rows[1].name.text == "Aldrin" and w.rows2[1].name.text == "Mira")
+
+    w.rows[1].scripts.OnMouseWheel(w.rows[1], -1)
+    w.modeButton.scripts.OnClick(w.modeButton)
+    s.menu:Find("Healing Done").set()
+    s.Flush()
+    check("choosing another first list starts it at the top", w.rows[1].name.text == "Mira")
+    w.rows2[1].scripts.OnMouseWheel(w.rows2[1], -1)
+    w.lowerButton.scripts.OnClick(w.lowerButton)
+    s.menu:Find("Absorbs").set()
+    s.Flush()
+    check("and so does another second list", w.rows2[1].name.text == "Aldrin")
+    s.store.Set("mode", "damage"); s.store.Set("lower", "healing"); s.Flush()
+    w.lowerButton.scripts.OnClick(w.lowerButton)
+    local menu = s.menu
+    check("the strip opens the second list's menu: None, then the lists", menu.owner == w.lowerButton
+        and menu.items[1].text == "Second List" and menu:Find("None") ~= nil and menu:Find("None").selected() == false
+        and menu:Find("Healing Done").selected() == true and #menu.items == 12)
+    menu:Find("Deaths").set()
+    check("choosing one sets it", s.store.Get("lower") == "deaths")
+    menu:Find("None").set()
+    s.Flush()
+    check("None turns it off", s.store.Get("lower") == "" and w.lowerBar.shown == false)
+
+    w.more.onClick()
+    local sub = s.menu:Find("Second List")
+    check("the window menu has it too, None first", sub and sub.items[1].text == "None" and sub.items[1].selected() == true
+        and #sub.items == 11)
+    sub.items[3].set()
+    check("and sets it", s.store.Get("lower") == "dps")
+
+    local page = s.page
+    local row
+    for _, r in ipairs(page.cards[1].rows) do
+        if r.key == "lower" then row = r end
+    end
+    check("the settings page has Second List, None among its choices", row and row.choice[1][""] == "None"
+        and row.choice[2][1] == "" and row.choice[2][2] == "damage" and row.choice[1].healing == "Healing Done")
+end
+
+-- the second list in the second window uses its own setting
+do
+    local s = Boot({ settings = { enabled = true, window2 = true, lower2 = "taken" } })
+    s.Login()
+    local one, two = s.Window(), s.Window(2)
+    check("a window's second list is its own", two.lowerBar.shown == true and one.lowerBar.shown == false
+        and two.lowerTitle.text == "Damage Taken")
+    two.lowerButton.scripts.OnClick(two.lowerButton)
+    s.menu:Find("Absorbs").set()
+    check("its menu sets its own key", s.store.Get("lower2") == "absorbs" and s.settings.lower == nil)
+end
+
 -- Raid Mode: your row alone
 do
     local s = Boot({ settings = { enabled = true } })
@@ -1857,9 +1989,10 @@ do
     s.store.Set("mode2", "healing")
     check("an open one reads its own list", page.cards[3].summary(s.store) == "Second: Healing Done, Third: Off")
     local more = page.cards[3].rows
-    check("each window has a group and five rows, with its own keys", #more == 12 and more[2].key == "window2"
-        and more[3].key == "mode2" and more[6].key == "height2" and more[8].key == "window3" and more[12].key == "height3")
-    check("the labels differ across the card", more[3].label ~= more[9].label and more[2].label ~= more[8].label)
+    check("each window has a group and six rows, with its own keys", #more == 14 and more[2].key == "window2"
+        and more[3].key == "mode2" and more[4].key == "lower2" and more[7].key == "height2" and more[9].key == "window3"
+        and more[14].key == "height3")
+    check("the labels differ across the card", more[3].label ~= more[10].label and more[2].label ~= more[9].label)
     check("an open window's rows are enabled", more[2].needs() == true and more[3].needs() == true)
     s.store.Set("window2", false)
     check("closed: its own rows are disabled, its toggle is not", more[3].needs() == false and more[2].needs() == true)

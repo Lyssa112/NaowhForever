@@ -28,6 +28,7 @@ local TEXT_IN_COMBAT = "Preview is available outside combat."
 local TEXT_RESET_DONE = "Damage meter data reset."
 local TEXT_FIGHT = "Fight"
 local TEXT_LIST_TIP = "Choose what the window lists."
+local TEXT_LOWER_TIP = "Choose the list under the first, or none."
 local TEXT_SESSION_TIP = "The current fight, everything since the last reset, or a past fight."
 local TEXT_MORE_TIP = "Report, reset, add or close a window, and settings."
 
@@ -46,7 +47,7 @@ end
 local function Window(index)
     local w = windows[index]
     if not w then
-        w = { index = index, offset = 0 }
+        w = { index = index, offset = 0, offset2 = 0 }
         windows[index] = w
     end
     return w
@@ -73,11 +74,24 @@ local function OwnOnly(session)
     return { combatSources = sources, maxAmount = session.maxAmount, totalAmount = session.totalAmount, rank = rank }
 end
 
-local function Render(w, session, available, seconds)
+local function Render(w, session, available, seconds, lowerSession)
     local frame = w.frame
-    local view = S.Get("raidMode") and OwnOnly(session) or session
+    local raid = S.Get("raidMode")
+    local view = raid and OwnOnly(session) or session
+    local lowerKey = Get(w, "lower")
+    frame.lowerOn = lowerKey ~= ""
     local shown, mode = Layout(w, view)
     Look.Paint(frame, view, w.offset, shown, mode, available)
+    if frame.lowerOn then
+        local lowerMode = DM.Mode(lowerKey)
+        local lowerView = raid and OwnOnly(lowerSession) or lowerSession
+        local lowerShown
+        lowerShown, w.offset2 = Look.LayoutLower(frame, #lowerView.combatSources, w.offset2, lowerMode)
+        Look.PaintLower(frame, lowerView, w.offset2, lowerShown, lowerMode, available)
+    else
+        Look.HideLower(frame)
+    end
+    frame.lowerButton:SetShown(frame.lowerOn)
     local summary = S.Get("showSummary") == true
     frame.summary:SetShown(summary)
     if summary then
@@ -145,14 +159,19 @@ local function OnHide(w)
     end
 end
 
-local function OnWheel(w, delta)
-    w.offset = math.max(0, w.offset - delta)
+-- The wheel scrolls the pane under it: the second list's rows, or the first's.
+local function OnWheel(w, delta, row)
+    if row and row.pane == 2 then
+        w.offset2 = math.max(0, w.offset2 - delta)
+    else
+        w.offset = math.max(0, w.offset - delta)
+    end
     Update()
 end
 
 -- The spells behind the hovered row; the panel says why when there are none.
 local function ShowBreakdown(w, row)
-    local mode = DM.Mode(Get(w, "mode"))
+    local mode = DM.Mode(row.modeKey or Get(w, "mode"))
     if not S.Get("breakdown") or w.sample or row.source == nil or mode.spells == false then
         Breakdown.Hide()
         return
@@ -186,6 +205,12 @@ local function NewButtons(w)
     frame.modeButton:SetPoint("TOPLEFT"); frame.modeButton:SetPoint("BOTTOMLEFT")
     frame.modeButton:SetScript("OnClick", function() Menus.List(w, frame.modeButton) end)
     ns.Tooltip(frame.modeButton, "List", TEXT_LIST_TIP)
+    frame.lowerButton = CreateFrame("Button", nil, frame)
+    frame.lowerButton:SetPoint("TOPLEFT", frame.lowerBar, "TOPLEFT")
+    frame.lowerButton:SetPoint("BOTTOMRIGHT", frame.lowerBar, "BOTTOMRIGHT")
+    frame.lowerButton:SetScript("OnClick", function() Menus.List(w, frame.lowerButton, 2) end)
+    frame.lowerButton:Hide()
+    ns.Tooltip(frame.lowerButton, "Second List", TEXT_LOWER_TIP)
 end
 
 local function NewGrip(w)
@@ -227,7 +252,7 @@ local function Build(w)
     frame:SetScript("OnHide", function() OnHide(w) end)
     frame:EnableMouseWheel(true)
     frame:SetScript("OnMouseWheel", function(_, delta) OnWheel(w, delta) end)
-    frame.onWheel = function(delta) OnWheel(w, delta) end
+    frame.onWheel = function(delta, row) OnWheel(w, delta, row) end
     frame.onRowEnter = function(row) OnRowEnter(w, row) end
     frame.onRowLeave = OnRowLeave
     frame.mover = AttachMover(frame, index, function(pos) S.Set(Key("meterPos", index), pos) end)
@@ -274,11 +299,13 @@ end
 
 local function Draw(w, sample)
     w.sample = sample
+    local lowerKey = Get(w, "lower")
     if sample then
-        Render(w, DM.SAMPLE, true, DM.SAMPLE.durationSeconds)
+        Render(w, DM.SAMPLE, true, DM.SAMPLE.durationSeconds, lowerKey ~= "" and DM.SAMPLE or nil)
     else
         local session, fight = Get(w, "session"), w.fight
-        Render(w, DM.Session(Get(w, "mode"), session, fight), DM.Available(), DM.Duration(session, fight))
+        local lower = lowerKey ~= "" and DM.Session(lowerKey, session, fight) or nil
+        Render(w, DM.Session(Get(w, "mode"), session, fight), DM.Available(), DM.Duration(session, fight), lower)
     end
     w.frame:Show()
 end
@@ -307,7 +334,7 @@ end
 DM.Refresh = RequestUpdate
 
 local function ForgetFights()
-    for _, w in pairs(windows) do w.fight, w.offset = nil, 0 end
+    for _, w in pairs(windows) do w.fight, w.offset, w.offset2 = nil, 0, 0 end
 end
 
 local function OnEvent(_, event, ...)

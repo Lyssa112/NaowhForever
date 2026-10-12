@@ -29,6 +29,13 @@ local MORE_NAMES = { [2] = "Second Window", [3] = "Third Window" }
 
 local MODE = { C.MODE_LABELS, C.MODE_ORDER }
 local SESSION = { C.SESSION_LABELS, C.SESSION_ORDER }
+-- The second list: any list, or none.
+local LOWER_LABELS, LOWER_ORDER = { [""] = "None" }, { "" }
+for _, key in ipairs(C.MODE_ORDER) do
+    LOWER_LABELS[key] = C.MODE_LABELS[key]
+    LOWER_ORDER[#LOWER_ORDER + 1] = key
+end
+local LOWER = { LOWER_LABELS, LOWER_ORDER }
 local SHOW = { { always = "Always", instance = "In Instances", group = "In a Group", combat = "In Combat" },
     { "always", "instance", "group", "combat" } }
 local DELAY_RANGE = { 0, C.MAX_HIDE_DELAY, 1 }
@@ -90,6 +97,7 @@ local function WindowRows(index)
         Group(title),
         { key = Key("window", index), label = "Show " .. title, toggle = true, needs = Enabled, why = OFF },
         { key = Key("mode", index), label = title .. " Shows", choice = MODE, needs = On, why = OFF_WINDOW },
+        { key = Key("lower", index), label = title .. " Second List", choice = LOWER, needs = On, why = OFF_WINDOW },
         { key = Key("session", index), label = title .. " Session", choice = SESSION, needs = On, why = OFF_WINDOW },
         { key = Key("width", index), label = title .. " Width", slider = WIDTH_RANGE, needs = On, why = OFF_WINDOW },
         { key = Key("height", index), label = title .. " Height", slider = HEIGHT_RANGE, needs = On, why = OFF_WINDOW },
@@ -225,6 +233,8 @@ page:Card({
         Group("List"),
         { key = "mode", label = "Show", choice = MODE, needs = Enabled, why = OFF,
           help = "Click the title in the window to choose a list." },
+        { key = "lower", label = "Second List", choice = LOWER, needs = Enabled, why = OFF,
+          help = "A second list under the first, in the same window, like damage above healing." },
         { key = "session", label = "Session", choice = SESSION, needs = Enabled, why = OFF,
           help = "The current fight, or everything since the last reset. Past fights are in the window's "
               .. "Session button." },

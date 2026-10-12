@@ -62,6 +62,11 @@ NaowhForever_DamageMeter/
   fight whose total, length and your own figures are all plain is kept. A fight under five seconds is
   not. The boss comes from `ENCOUNTER_END` while it is recent, the place from the instance or the
   zone. The kept fights are the module's own setting, so they outlive a reload, not the game's sessions.
+- A second list is a second pane in the same window (`Look.LayoutLower`): the rows that fit are shared
+  between the panes, the first taking the larger half, and each pane has its own columns, titles and
+  scroll position. The strip above it is a button that opens its list menu, a row's wheel scrolls its own
+  pane, and a row remembers its list (`row.modeKey`) so the spell panel asks for the right one. Both
+  panes read the same session, so a session or a past fight changes them together.
 - Raid Mode hands the window a copy of the session with only your row in it (found by
   `isLocalPlayer`, which is never secret), still ranked by its place in the game's order and still
   against the group's largest bar. Where = In Combat shows the windows while you fight and for Hide

@@ -6,7 +6,7 @@ local DM = ns.DamageMeter
 local S = DM.Settings
 local C, Key = DM.C, DM.Key
 
-local TEXT_LIST = "List"
+local TEXT_LIST, TEXT_LOWER, TEXT_NONE = "List", "Second List", "None"
 local TEXT_SESSION = "Session"
 local TEXT_FIGHTS, TEXT_NO_FIGHTS = "Past Fights", "No Past Fights Yet"
 local TEXT_REPORT, TEXT_RESET, TEXT_RESET_ASK = "Report To", "Reset Data", "Reset the damage meter data?"
@@ -22,12 +22,22 @@ local function Chosen(w, base, value)
     return function() return w.fight == nil and S.Get(Key(base, w.index)) == value end
 end
 
-function Menus.List(w, owner)
+-- The first list, or with pane 2 the list under it, which can also be none.
+function Menus.List(w, owner, pane)
+    local lower = pane == 2
+    local setting = Key(lower and "lower" or "mode", w.index)
+    local function Choose(key)
+        if lower then w.offset2 = 0 else w.offset = 0 end
+        S.Set(setting, key)
+    end
     MenuUtil.CreateContextMenu(owner, function(_, root)
-        root:CreateTitle(TEXT_LIST)
+        root:CreateTitle(lower and TEXT_LOWER or TEXT_LIST)
+        if lower then
+            root:CreateRadio(TEXT_NONE, function() return S.Get(setting) == "" end, function() Choose("") end)
+        end
         for _, key in ipairs(C.MODE_ORDER) do
-            root:CreateRadio(C.MODE_LABELS[key], function() return S.Get(Key("mode", w.index)) == key end,
-                function() w.offset = 0; S.Set(Key("mode", w.index), key) end)
+            root:CreateRadio(C.MODE_LABELS[key], function() return S.Get(setting) == key end,
+                function() Choose(key) end)
         end
     end)
 end
@@ -80,6 +90,13 @@ function Menus.Window(w, owner)
         local free = FirstClosed()
         if free then root:CreateButton(TEXT_ADD, function() S.Set(Key("window", free), true) end) end
         if w.index > 1 then root:CreateButton(TEXT_CLOSE, function() S.Set(Key("window", w.index), false) end) end
+        local lower = root:CreateButton(TEXT_LOWER)
+        lower:CreateRadio(TEXT_NONE, function() return S.Get(Key("lower", w.index)) == "" end,
+            function() w.offset2 = 0; S.Set(Key("lower", w.index), "") end)
+        for _, key in ipairs(C.MODE_ORDER) do
+            lower:CreateRadio(C.MODE_LABELS[key], function() return S.Get(Key("lower", w.index)) == key end,
+                function() w.offset2 = 0; S.Set(Key("lower", w.index), key) end)
+        end
         local bars = root:CreateButton(TEXT_BAR_COLOR)
         for _, key in ipairs(C.BAR_COLORS_ORDER) do
             bars:CreateRadio(C.BAR_COLORS[key], function() return S.Get("barColor") == key end,

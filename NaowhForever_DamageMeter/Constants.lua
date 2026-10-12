@@ -32,7 +32,7 @@ ns.DamageMeter.C = {
     ROUND = 0.5,
     DEFAULT_MODE = "damage",
     BREAKDOWN_LINES = 8, REPORT_MAX = 10, FIGHTS_MAX = 10,
-    COLUMN_HEAD = 16, COL_GAP = 6, SUMMARY_H = 16,
+    COLUMN_HEAD = 16, COL_GAP = 6, SUMMARY_H = 16, LOWER_STRIP = 20, LOWER_GAP = 4,
     MIN_TITLE = 8, MAX_TITLE = 20,
     NUMBER_UNITS = { game = "Game Default", latin = "K, M, B", asian = "Ten-thousands", full = "Full Numbers" },
     NUMBER_UNITS_ORDER = { "game", "latin", "asian", "full" },
