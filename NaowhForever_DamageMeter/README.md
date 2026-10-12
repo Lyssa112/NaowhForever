@@ -51,9 +51,11 @@ NaowhForever_DamageMeter/
   the bars. Each is `false` until a color is picked and then follows the theme's token
   it stands in for, so a theme switch restyles what was not picked. `Look.Color(key)` is the one place
   that resolves it.
-- Your own bar can have a color of its own (`ownBarColor`, found by `isLocalPlayer`) over whichever Bar
-  Color is chosen, and the window menu switches Bar Color between Class Colors, Theme Accent and
-  Custom Color without opening the settings.
+- Your own bar (found by `isLocalPlayer`, never secret) and the strip beside it each have a style:
+  the same as the others, your class's color, or a color of their own (`ownBarStyle`, `edgeStyle`),
+  over whichever Bar Color is chosen. The window menu switches Bar Color between Class Colors, Theme
+  Accent and Custom Color without opening the settings. The sample's "You" row takes your own class
+  (`DM.Sample`), so the preview and Unlock Mode show your bar and edge as they will be.
 - Class Colors can be changed class by class (`classColors`, class to color), kept apart from the
   theme tokens since the game gives every class its own. A background image is a name from the shared
   media's `background` list, drawn above the window's color and below the rows, stretched or tiled.

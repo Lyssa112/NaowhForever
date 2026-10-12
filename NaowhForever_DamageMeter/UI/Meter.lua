@@ -301,7 +301,8 @@ local function Draw(w, sample)
     w.sample = sample
     local lowerKey = Get(w, "lower")
     if sample then
-        Render(w, DM.SAMPLE, true, DM.SAMPLE.durationSeconds, lowerKey ~= "" and DM.SAMPLE or nil)
+        local sample = DM.Sample()
+        Render(w, sample, true, sample.durationSeconds, lowerKey ~= "" and sample or nil)
     else
         local session, fight = Get(w, "session"), w.fight
         local lower = lowerKey ~= "" and DM.Session(lowerKey, session, fight) or nil

@@ -39,6 +39,10 @@ ns.DamageMeter.C = {
     NUMBER_DECIMALS_MAX = 2, MAX_HIDE_DELAY = 60, MIN_KEEP = 5, MAX_KEEP = 100,
     BAR_COLORS = { class = "Class Colors", accent = "Theme Accent", custom = "Custom Color" },
     BAR_COLORS_ORDER = { "class", "accent", "custom" },
+    OWN_BAR_STYLES = { bar = "Same as Bar Color", class = "Class Color", custom = "Custom Color" },
+    OWN_BAR_STYLES_ORDER = { "bar", "class", "custom" },
+    EDGE_STYLES = { accent = "Theme Accent", class = "Class Color", custom = "Custom Color" },
+    EDGE_STYLES_ORDER = { "accent", "class", "custom" },
     NAME_FORMATS = { full = "Full Name", first = "First Name", last = "Last Name", initials = "Initials",
         firstInitial = "First Name and Initial" },
     NAME_FORMATS_ORDER = { "full", "first", "last", "initials", "firstInitial" },
@@ -52,7 +56,8 @@ ns.DamageMeter.C = {
     -- color is picked, and then follows the theme's token.
     COLORS = {
         { key = "barCustomColor", label = "Custom Bar Color", group = "Bars", token = "accent" },
-        { key = "edgeColor", label = "Your Row Edge", group = "Bars", token = "accent" },
+        { key = "ownBarColor", label = "Your Bar Color", group = "Bars", token = "accent" },
+        { key = "edgeColor", label = "Edge Color", group = "Bars", token = "accent" },
         { key = "nameColor", label = "Names", group = "Text", token = "fg" },
         { key = "valueColor", label = "Amounts", group = "Text", token = "fg" },
         { key = "rankColor", label = "Ranks", group = "Text", token = "muted" },

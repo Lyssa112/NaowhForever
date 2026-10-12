@@ -511,6 +511,24 @@ do
     check("and the API was asked for it", s.calls[#s.calls][2] == 5)
 end
 
+-- the sample shows you, in your own class, on your own bar and edge
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.ownClass = "MAGE"
+    s.Login()
+    s.ns.ShowUnlockMode()
+    local w = s.Window()
+    check("the row that is you takes your class", w.rows[2].icon.texture == "Interface\\Icons\\ClassIcon_MAGE"
+        and w.rows[2].color[1] == CLASS.MAGE.r and w.rows[2].name.text == "You")
+    s.store.Set("ownBarStyle", "custom"); s.store.Set("ownBarColor", { r = 0.1, g = 0.8, b = 0.2 }); s.Flush()
+    check("with your own bar color on it", w.rows[2].color[2] == 0.8 and w.rows[1].color[1] == CLASS.MAGE.r)
+    s.store.Set("edgeStyle", "class"); s.Flush()
+    check("and your edge", w.rows[2].edge.solid[1] == CLASS.MAGE.r)
+    s.ns.HideUnlockMode()
+    s.ns.PreviewDamageMeter()
+    check("the preview too", w.rows[2].icon.texture == "Interface\\Icons\\ClassIcon_MAGE" and w.rows[2].color[2] == 0.8)
+end
+
 -- the fight time in the title bar
 do
     local s = Boot({ settings = { enabled = true } })
@@ -835,7 +853,9 @@ do
     check("the window and its border take the background opacity", w.background.alpha == 0.9
         and w.border._frame.alpha == 0.9)
 
+    s.store.Set("ownBarStyle", "custom"); s.store.Set("edgeStyle", "custom"); s.Flush()
     local parts = {
+        ownBarColor = function() return { r = own.color[1], g = own.color[2], b = own.color[3] } end,
         nameColor = function() return row.name.textColor end,
         valueColor = function() return row.colB.textColor end,
         columnColor = function() return w.headB.textColor end,
@@ -859,7 +879,8 @@ do
         Unpick(key)
         check(key .. ": back to the theme", not Is(read(), PICK))
     end
-    check("every color of the window is covered", count == 11)
+    check("every color of the window is covered", count == 12)
+    s.store.Set("ownBarStyle", "bar"); s.store.Set("edgeStyle", "accent"); s.Flush()
     Pick("valueColor")
     check("a picked amount color reaches both columns", Is(row.colA.textColor, PICK) and Is(row.colB.textColor, PICK))
     Unpick("valueColor")
@@ -1349,13 +1370,29 @@ do
 
     local MINE = { r = 0.9, g = 0.2, b = 0.7 }
     s.store.Set("ownBarColor", MINE); s.Flush()
-    check("Your Bar Color: your bar alone", Is(Bar(own), MINE) and Is(Bar(row), CLASS.MAGE) and Is(Bar(third), CLASS.MAGE))
+    check("a color picked does nothing until Your Bar is Custom Color", Is(Bar(own), CLASS.ROGUE))
+    s.store.Set("ownBarStyle", "custom"); s.Flush()
+    check("Your Bar: Custom Color, your bar alone", Is(Bar(own), MINE) and Is(Bar(row), CLASS.MAGE)
+        and Is(Bar(third), CLASS.MAGE))
     s.store.Set("barColor", "accent"); s.Flush()
     check("whichever Bar Color is chosen", Is(Bar(own), MINE) and Is(Bar(row), THEME.accent))
-    s.store.Set("barColor", "custom"); s.Flush()
-    check("custom too", Is(Bar(own), MINE))
+    s.store.Set("ownBarStyle", "class"); s.Flush()
+    check("Class Color: your class's, with the others on the Accent", Is(Bar(own), CLASS.ROGUE)
+        and Is(Bar(row), THEME.accent))
+    s.store.Set("classColors", { ROGUE = { r = 0.4, g = 0.4, b = 0.4 } }); s.Flush()
+    check("and the class color picked for it", Is(Bar(own), { r = 0.4, g = 0.4, b = 0.4 }))
+    s.store.Set("classColors", {})
+    s.store.Set("ownBarStyle", "bar"); s.store.Set("barColor", "custom"); s.Flush()
+    check("Same as Bar Color: custom too", Is(Bar(own), THEME.accent))
     s.store.Set("barColor", "class"); s.store.Set("ownBarColor", false); s.Flush()
-    check("not picked: your bar follows Bar Color", Is(Bar(own), CLASS.ROGUE))
+    check("and the class's with Class Colors", Is(Bar(own), CLASS.ROGUE))
+
+    check("the edge is the Accent by default", own.edge.solid[1] == THEME.accent.r)
+    s.store.Set("edgeStyle", "class"); s.Flush()
+    check("Class Color: your class's", own.edge.solid[1] == CLASS.ROGUE.r and row.edge.solid[1] == CLASS.MAGE.r)
+    s.store.Set("edgeStyle", "custom"); s.store.Set("edgeColor", { r = 0.2, g = 0.7, b = 0.3 }); s.Flush()
+    check("Custom Color: the one picked, on your row alone", own.edge.solid[2] == 0.7 and row.edge.solid[1] == CLASS.MAGE.r)
+    s.store.Set("edgeStyle", "accent"); s.store.Set("edgeColor", false); s.Flush()
 
     check("no image by default", w.image.shown == false)
     s.store.Set("backgroundImage", "Marble"); s.Flush()
@@ -1401,12 +1438,18 @@ do
     check("a Your Bar Color row, a color picker", mine and mine.colour == true and mine.label == "Your Bar Color")
     s.store.Set("classColors", {})
     local mr, mg, mb = mine.get()
-    check("it shows what your bar is now, your class's color", mr == CLASS.ROGUE.r and mg == CLASS.ROGUE.g
-        and mb == CLASS.ROGUE.b)
-    s.store.Set("barColor", "accent")
-    mr = mine.get()
-    check("and follows Bar Color", mr == THEME.accent.r)
-    s.store.Set("barColor", "class")
+    check("it shows the Accent until one is picked", mr == THEME.accent.r and mg == THEME.accent.g
+        and mb == THEME.accent.b)
+    check("and is only for Custom Color", mine.needs() == false)
+    local style
+    for _, r2 in ipairs(rows) do
+        if r2.key == "ownBarStyle" then style = r2 end
+    end
+    check("Your Bar: same, class or custom", style and style.choice[2][1] == "bar" and style.choice[2][2] == "class"
+        and style.choice[2][3] == "custom" and style.choice[1].class == "Class Color")
+    s.store.Set("ownBarStyle", "custom")
+    check("which turns the picker on", mine.needs() == true)
+    s.store.Set("ownBarStyle", "bar")
     mine.set(0.1, 0.2, 0.3)
     local stored = s.store.Get("ownBarColor")
     check("picking stores it", type(stored) == "table" and stored.r == 0.1 and stored.g == 0.2 and stored.b == 0.3)
@@ -1979,9 +2022,21 @@ do
     check("the custom bar color needs Custom Color", colors.barCustomColor.needs() == false)
     s.store.Set("barColor", "custom")
     check("which turns it on", colors.barCustomColor.needs() == true)
-    check("the row edge needs Highlight Your Row", colors.edgeColor.needs() == true)
+    check("the edge color needs Custom Color for the edge", colors.edgeColor.needs() == false)
+    s.store.Set("edgeStyle", "custom")
+    check("which turns it on", colors.edgeColor.needs() == true)
     s.store.Set("highlightPlayer", false)
-    check("and is off without it", colors.edgeColor.needs() == false)
+    check("and Highlight Your Row", colors.edgeColor.needs() == false)
+    s.store.Set("highlightPlayer", true)
+    s.store.Set("edgeStyle", "accent")
+    local edge
+    for _, r2 in ipairs(page.cards[2].rows) do
+        if r2.key == "edgeStyle" then edge = r2 end
+    end
+    check("Your Row Edge: the Accent, your class or custom", edge and edge.choice[2][1] == "accent"
+        and edge.choice[2][2] == "class" and edge.choice[2][3] == "custom" and edge.needs() == true)
+    s.store.Set("highlightPlayer", false)
+    check("and only with Highlight Your Row", edge.needs() == false)
     s.store.Set("highlightPlayer", true)
 
     check("the closed windows say off", page.cards[3].summary(s.store) == "Second: Off, Third: Off")

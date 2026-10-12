@@ -40,6 +40,8 @@ local SHOW = { { always = "Always", instance = "In Instances", group = "In a Gro
     { "always", "instance", "group", "combat" } }
 local DELAY_RANGE = { 0, C.MAX_HIDE_DELAY, 1 }
 local BAR_COLOR = { C.BAR_COLORS, C.BAR_COLORS_ORDER }
+local OWN_BAR = { C.OWN_BAR_STYLES, C.OWN_BAR_STYLES_ORDER }
+local EDGE = { C.EDGE_STYLES, C.EDGE_STYLES_ORDER }
 local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "class" } }
 local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
@@ -50,14 +52,12 @@ local KEEP_RANGE = { C.MIN_KEEP, C.MAX_KEEP, 1 }
 local function Enabled() return DM.On() and true or false end
 local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
 local function Highlighting() return DM.On() and S.Get("highlightPlayer") == true end
+local function OwnCustom() return DM.On() and S.Get("ownBarStyle") == "custom" end
+local function EdgeCustom()
+    return DM.On() and S.Get("highlightPlayer") == true and S.Get("edgeStyle") == "custom"
+end
 local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
 local function HasImage() return DM.On() and S.Get("backgroundImage") ~= "" end
--- Your own bar: the color picked for it, or what the settings would give your class.
-local function OwnBarGet()
-    local c = DM.Look.BarColor({ isLocalPlayer = true, classFilename = select(2, UnitClass("player")) })
-    return c.r, c.g, c.b, 1
-end
-
 local function ClassBars() return DM.On() and S.Get("barColor") == "class" end
 local function Abbreviating()
     local units = S.Get("numberUnits")
@@ -124,11 +124,13 @@ local function PickedSet(key)
     return function(r, g, b) S.Set(key, { r = r, g = g, b = b }) end
 end
 
-local COLOR_NEEDS = { barCustomColor = CustomBars, edgeColor = Highlighting }
-local COLOR_WHY = { barCustomColor = OFF_CUSTOM, edgeColor = OFF_HIGHLIGHT }
+local COLOR_NEEDS = { barCustomColor = CustomBars, ownBarColor = OwnCustom, edgeColor = EdgeCustom }
+local COLOR_WHY = { barCustomColor = OFF_CUSTOM, ownBarColor = "Set Your Bar to Custom Color",
+    edgeColor = "Set Your Row Edge to Custom Color" }
 local COLOR_HELP = {
     barCustomColor = "The bars' color when Bar Color is Custom Color.",
-    edgeColor = "The strip on the left of your own row.",
+    ownBarColor = "The color of your own bar when Your Bar is Custom Color.",
+    edgeColor = "The strip on the left of your row when Your Row Edge is Custom Color.",
 }
 
 local function ColorsSummary(store)
@@ -200,9 +202,11 @@ local function ColorRows()
         { key = "barColor", label = "Bar Color", choice = BAR_COLOR, needs = Enabled, why = OFF,
           help = "Class Colors: each player's class. Theme Accent: every bar in your theme's Accent. Custom "
               .. "Color: every bar in the one you pick." },
-        { key = "ownBarColor", label = "Your Bar Color", colour = true, get = OwnBarGet, set = PickedSet("ownBarColor"),
-          needs = Enabled, why = OFF, help = "A color for your own bar alone, whichever Bar Color is chosen. "
-              .. "Reset it to follow Bar Color." },
+        { key = "ownBarStyle", label = "Your Bar", choice = OWN_BAR, needs = Enabled, why = OFF,
+          help = "Your own bar: the same as the others, in your class's color, or in a color of its own." },
+        { key = "edgeStyle", label = "Your Row Edge", choice = EDGE, needs = Highlighting, why = OFF_HIGHLIGHT,
+          help = "The strip on the left of your row: the theme's Accent, your class's color, or one of your "
+              .. "own." },
     }
     local group = "Bars"
     for _, entry in ipairs(C.COLORS) do

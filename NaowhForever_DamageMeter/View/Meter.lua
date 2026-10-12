@@ -74,17 +74,26 @@ function Look.Color(key)
     return T[tokenOf[key]]
 end
 
--- A source's bar color: yours if you picked one, else its class, the theme's Accent for everyone, or the
--- one picked for everyone.
+-- A source's bar color: your own as Your Bar says, else its class, the theme's Accent for everyone, or
+-- the one picked for everyone.
 function Look.BarColor(source)
     if source.isLocalPlayer == true then
-        local own = S.Get("ownBarColor")
-        if type(own) == "table" then return own end
+        local style = S.Get("ownBarStyle")
+        if style == "custom" then return Look.Color("ownBarColor") end
+        if style == "class" then return ClassColor(source.classFilename) end
     end
     local choice = S.Get("barColor")
     if choice == "accent" then return T.accent end
     if choice == "custom" then return Look.Color("barCustomColor") end
     return ClassColor(source.classFilename)
+end
+
+-- The strip on the left of your row: the theme's Accent, your class's color, or the one picked.
+function Look.EdgeColor(source)
+    local style = S.Get("edgeStyle")
+    if style == "class" then return ClassColor(source.classFilename) end
+    if style == "custom" then return Look.Color("edgeColor") end
+    return T.accent
 end
 
 -- How wide the fight time is at the size the settings give it.
@@ -408,7 +417,6 @@ local function PaintPane(pane, session, first, shown, mode, available)
     local alpha = S.Get("barAlpha")
     local own = S.Get("highlightPlayer")
     local classOnly = S.Get("iconStyle") == "class"
-    local edge = Look.Color("edgeColor")
     pane.empty:SetText(available and TEXT_EMPTY or TEXT_UNAVAILABLE)
     pane.empty:SetShown(shown == 0)
     for i = 1, shown do
@@ -418,7 +426,7 @@ local function PaintPane(pane, session, first, shown, mode, available)
         row:SetStatusBarColor(c.r, c.g, c.b, alpha)
         row:SetMinMaxValues(0, session.maxAmount)
         row:SetValue(source.totalAmount)
-        local e = own and source.isLocalPlayer == true and edge or c
+        local e = own and source.isLocalPlayer == true and Look.EdgeColor(source) or c
         row.edge:SetColorTexture(e.r, e.g, e.b, 1)
         row.rank:SetFormattedText(RANK_TEXT, session.rank or first + i)
         row.icon:SetTexture(IconOf(source, classOnly))
