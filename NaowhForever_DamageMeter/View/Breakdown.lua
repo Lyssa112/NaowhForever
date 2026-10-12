@@ -10,6 +10,7 @@ local C, Look, Format = DM.C, DM.Look, DM.Format
 local CROP = ns.Shared.Style.ICON_CROP
 
 local WIDTH, ROW_H, GAP, PAD, HEADER_H, NOTE_H = 260, 18, 2, 6, 24, 22
+local SECTION_GAP, SECTION_H = 6, 16
 local TEXT_SIZE, TITLE_SIZE, ICON_PAD, VALUE_W = 11, 12, 2, 96
 local SIDE_GAP = 6
 local GRADIENT_TEX = ns.MEDIA .. "NaowhGradient.tga"
@@ -17,35 +18,47 @@ local GRADIENT_TEX = ns.MEDIA .. "NaowhGradient.tga"
 local TEXT_COMBAT = "Spells show after combat."
 local TEXT_NONE = "No spell data."
 local TEXT_UNKNOWN = "Unknown"
+local TEXT_TARGETS = "Targets"
 local VALUE_PERCENT = "%s  %.1f%%"
+local VALUE_TARGET = "%s | %s"
 
 local Breakdown = {}
 DM.Breakdown = Breakdown
 
 local panel
 
-local function NewRow(i)
+-- A row of the panel: a bar with a name and a value, and for a spell its icon. Rows are placed when the
+-- panel is shown, since the sections stack.
+local function NewRow(pool, i, withIcon)
     local row = CreateFrame("StatusBar", nil, panel)
     row:SetMinMaxValues(0, 1)
-    row:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD, -HEADER_H - (i - 1) * (ROW_H + GAP))
     row:SetSize(WIDTH - 2 * PAD, ROW_H)
-    row.icon = row:CreateTexture(nil, "OVERLAY")
-    row.icon:SetPoint("LEFT", ICON_PAD, 0); row.icon:SetSize(ROW_H - 2 * ICON_PAD, ROW_H - 2 * ICON_PAD)
-    row.icon:SetTexCoord(CROP, 1 - CROP, CROP, 1 - CROP)
     row.value = ns.Font(row, TEXT_SIZE, "OUTLINE", T.fg)
     row.value:SetPoint("RIGHT", -PAD, 0); row.value:SetWidth(VALUE_W); row.value:SetJustifyH("RIGHT")
     row.name = ns.Font(row, TEXT_SIZE, "OUTLINE", T.fg)
-    row.name:SetPoint("LEFT", row.icon, "RIGHT", ICON_PAD + 2, 0)
+    if withIcon then
+        row.icon = row:CreateTexture(nil, "OVERLAY")
+        row.icon:SetPoint("LEFT", ICON_PAD, 0); row.icon:SetSize(ROW_H - 2 * ICON_PAD, ROW_H - 2 * ICON_PAD)
+        row.icon:SetTexCoord(CROP, 1 - CROP, CROP, 1 - CROP)
+        row.name:SetPoint("LEFT", row.icon, "RIGHT", ICON_PAD + 2, 0)
+    else
+        row.name:SetPoint("LEFT", PAD, 0)
+    end
     row.name:SetPoint("RIGHT", row.value, "LEFT", -PAD, 0)
     row.name:SetJustifyH("LEFT"); row.name:SetWordWrap(false)
-    panel.rows[i] = row
+    pool[i] = row
     return row
+end
+
+local function PlaceRow(row, y)
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD, -y)
 end
 
 local function Build()
     panel = CreateFrame("Frame", "NaowhForeverDamageMeterBreakdown", UIParent)
     panel:SetFrameStrata("TOOLTIP"); panel:SetClampedToScreen(true)
-    panel.rows = {}
+    panel.rows, panel.targetRows = {}, {}
     panel.background = ns.Solid(panel, "BACKGROUND", T.bg, 1)
     panel.background:SetAllPoints()
     panel.border = ns.Border(panel)
@@ -54,7 +67,10 @@ local function Build()
     panel.title:SetJustifyH("LEFT"); panel.title:SetWordWrap(false)
     panel.note = ns.Font(panel, TEXT_SIZE, "OUTLINE", T.muted)
     panel.note:SetPoint("TOPLEFT", PAD, -HEADER_H)
-    for i = 1, C.BREAKDOWN_LINES do NewRow(i) end
+    panel.targetsTitle = ns.Font(panel, TEXT_SIZE, "OUTLINE", T.muted)
+    panel.targetsTitle:SetText(TEXT_TARGETS)
+    for i = 1, C.BREAKDOWN_LINES do NewRow(panel.rows, i, true) end
+    for i = 1, C.TARGET_LINES do NewRow(panel.targetRows, i, false) end
     panel:Hide()
 end
 
@@ -106,12 +122,33 @@ local function Style()
     panel.title:SetTextColor(title.r, title.g, title.b)
     Parts.HudFont(panel.note, font, TEXT_SIZE, outline)
     panel.note:SetTextColor(rank.r, rank.g, rank.b)
-    for _, row in ipairs(panel.rows) do
-        Parts.HudFont(row.name, font, TEXT_SIZE, outline)
-        Parts.HudFont(row.value, font, TEXT_SIZE, outline)
-        row.name:SetTextColor(name.r, name.g, name.b)
-        row.value:SetTextColor(value.r, value.g, value.b)
+    Parts.HudFont(panel.targetsTitle, font, TEXT_SIZE, outline)
+    panel.targetsTitle:SetTextColor(rank.r, rank.g, rank.b)
+    for _, pool in ipairs({ panel.rows, panel.targetRows }) do
+        for _, row in ipairs(pool) do
+            Parts.HudFont(row.name, font, TEXT_SIZE, outline)
+            Parts.HudFont(row.value, font, TEXT_SIZE, outline)
+            row.name:SetTextColor(name.r, name.g, name.b)
+            row.value:SetTextColor(value.r, value.g, value.b)
+        end
     end
+end
+
+-- A target: its bar against the largest, its name, and the damage with its per-second figure.
+local function PaintTarget(row, target, largest, seconds, alpha)
+    local c = C.ENEMY_COLOR
+    row:SetStatusBarTexture(UI.TexturePath(S.Get("texture"), GRADIENT_TEX))
+    row:SetStatusBarColor(c.r, c.g, c.b, alpha)
+    row:SetMinMaxValues(0, largest)
+    row:SetValue(target.total)
+    row.name:SetText(target.name)
+    local perSecond = DM.PerSecond(target.total, seconds)
+    if perSecond then
+        row.value:SetFormattedText(VALUE_TARGET, Format(target.total), Format(perSecond))
+    else
+        row.value:SetText(Format(target.total))
+    end
+    row:Show()
 end
 
 local function Place(owner, toRight)
@@ -123,24 +160,47 @@ local function Place(owner, toRight)
     end
 end
 
--- Shows source's spells beside row. data is the game's answer for the source, or nil: then the panel says why.
-function Breakdown.Show(row, source, data, toRight, inCombat)
+-- Shows source's spells beside row. data is the game's answer for the source, or nil: then the panel says
+-- why. targets, when there are any, are the enemies it hurt, and seconds the session's length.
+function Breakdown.Show(row, source, data, toRight, inCombat, targets, seconds)
     if not panel then Build() end
     Style()
     panel.title:SetText(DM.DisplayName(source))
     local lines = data and math.min(C.BREAKDOWN_LINES, #data.combatSpells) or 0
     local color, alpha = Look.BarColor(source), S.Get("barAlpha")
     for i = 1, C.BREAKDOWN_LINES do
+        local spellRow = panel.rows[i]
         if i <= lines then
-            PaintRow(panel.rows[i], data.combatSpells[i], data, color, alpha)
+            PlaceRow(spellRow, HEADER_H + (i - 1) * (ROW_H + GAP))
+            PaintRow(spellRow, data.combatSpells[i], data, color, alpha)
         else
-            panel.rows[i]:Hide()
+            spellRow:Hide()
         end
     end
     panel.note:SetText(inCombat and TEXT_COMBAT or TEXT_NONE)
     panel.note:SetShown(lines == 0)
-    local body = lines > 0 and lines * (ROW_H + GAP) - GAP or NOTE_H
-    panel:SetSize(WIDTH, HEADER_H + body + PAD)
+    local bottom = HEADER_H + (lines > 0 and lines * (ROW_H + GAP) - GAP or NOTE_H)
+    local count = targets and math.min(C.TARGET_LINES, #targets) or 0
+    panel.targetsTitle:SetShown(count > 0)
+    if count > 0 then
+        local top = bottom + SECTION_GAP
+        panel.targetsTitle:ClearAllPoints()
+        panel.targetsTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD, -top)
+        local y = top + SECTION_H
+        for i = 1, C.TARGET_LINES do
+            local targetRow = panel.targetRows[i]
+            if i <= count then
+                PlaceRow(targetRow, y + (i - 1) * (ROW_H + GAP))
+                PaintTarget(targetRow, targets[i], targets[1].total, seconds, alpha)
+            else
+                targetRow:Hide()
+            end
+        end
+        bottom = y + count * (ROW_H + GAP) - GAP
+    else
+        for _, targetRow in ipairs(panel.targetRows) do targetRow:Hide() end
+    end
+    panel:SetSize(WIDTH, bottom + PAD)
     Place(row, toRight)
     panel:Show()
 end

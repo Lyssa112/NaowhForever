@@ -177,8 +177,14 @@ local function ShowBreakdown(w, row)
         return
     end
     local data = DM.SourceSpells(mode.key, Get(w, "session"), w.fight, row.source)
+    local inCombat = InCombatLockdown()
+    local targets, seconds
+    if mode.targets and not inCombat then
+        targets = DM.Targets(Get(w, "session"), w.fight, row.source.name)
+        seconds = DM.Duration(Get(w, "session"), w.fight)
+    end
     local x = w.frame:GetCenter()
-    Breakdown.Show(row, row.source, data, x ~= nil and x < UIParent:GetWidth() / 2, InCombatLockdown())
+    Breakdown.Show(row, row.source, data, x ~= nil and x < UIParent:GetWidth() / 2, inCombat, targets, seconds)
 end
 
 local function OnRowEnter(w, row)
@@ -339,6 +345,7 @@ local function ForgetFights()
 end
 
 local function OnEvent(_, event, ...)
+    if event == "PLAYER_REGEN_DISABLED" or event:find("^DAMAGE_METER") then DM.ClearTargets() end
     if event == "PLAYER_REGEN_DISABLED" then
         preview, override = false, nil
         DM.History.OnCombatStart()

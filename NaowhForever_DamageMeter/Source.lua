@@ -127,6 +127,68 @@ function DM.SessionName(sessionKey, fightID)
     return "Fight " .. fightID
 end
 
+local targetsCache = {}
+
+-- Forgets the targets read, when the game's data has changed.
+function DM.ClearTargets()
+    for key in pairs(targetsCache) do targetsCache[key] = nil end
+end
+
+-- What one enemy took from the player of that name: the enemy's list is by attacker and spell, so the
+-- player's spells are added up. Plain numbers only, so after combat.
+local function Share(sessionKey, fightID, kind, enemy, name)
+    local guid = enemy.sourceGUID
+    if IsSecret(guid) then return 0 end
+    local ok, data
+    if fightID ~= nil then
+        ok, data = pcall(C_DamageMeter.GetCombatSessionSourceFromID, fightID, kind, guid, enemy.sourceCreatureID)
+    else
+        ok, data = pcall(C_DamageMeter.GetCombatSessionSourceFromType, SessionType(sessionKey), kind, guid,
+            enemy.sourceCreatureID)
+    end
+    if not (ok and type(data) == "table" and type(data.combatSpells) == "table") then return 0 end
+    local total = 0
+    for _, spell in ipairs(data.combatSpells) do
+        local details = spell.combatSpellDetails
+        local who = type(details) == "table" and details.unitName
+        if Plain(who, "string") and who == name and Plain(spell.totalAmount, "number") then
+            total = total + spell.totalAmount
+        end
+    end
+    return total
+end
+
+local function Biggest(a, b)
+    return a.total > b.total
+end
+
+-- The enemies a player hurt and how much each took, biggest first: { { name, total }, ... }, or nil.
+function DM.Targets(sessionKey, fightID, name)
+    if not DM.Available() or not Plain(name, "string") or name == "" then return nil end
+    local kind = Enum.DamageMeterType.EnemyDamageTaken
+    if kind == nil then return nil end
+    local key = tostring(fightID or sessionKey) .. "|" .. name
+    local cached = targetsCache[key]
+    if cached ~= nil then return cached or nil end
+    local ok, session
+    if fightID ~= nil then
+        ok, session = pcall(C_DamageMeter.GetCombatSessionFromID, fightID, kind)
+    else
+        ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, SessionType(sessionKey), kind)
+    end
+    local list = {}
+    if ok and type(session) == "table" and type(session.combatSources) == "table" then
+        for _, enemy in ipairs(session.combatSources) do
+            local total = Share(sessionKey, fightID, kind, enemy, name)
+            if total > 0 then list[#list + 1] = { name = enemy.name, total = total } end
+        end
+    end
+    table.sort(list, Biggest)
+    if #list == 0 then list = nil end
+    targetsCache[key] = list or false
+    return list
+end
+
 -- Seconds the shown session has run, as a plain number, or nil when the game keeps it back.
 function DM.Duration(sessionKey, fightID)
     if not DM.Available() then return nil end

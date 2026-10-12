@@ -4,8 +4,10 @@ local ns = _G.NaowhForever
 -- Each list: its game type, whether it has a per-second figure, and the titles of its two columns. The
 -- DPS and HPS lists are the game's own, sorted by the per-second figure, which then leads.
 local MODES = {
-    { key = "damage", label = "Damage Done", type = "DamageDone", rate = true, total = "Damage", perSecond = "DPS" },
-    { key = "dps", label = "DPS", type = "Dps", rate = true, rateFirst = true, total = "Damage", perSecond = "DPS" },
+    { key = "damage", label = "Damage Done", type = "DamageDone", rate = true, total = "Damage", perSecond = "DPS",
+      targets = true },
+    { key = "dps", label = "DPS", type = "Dps", rate = true, rateFirst = true, total = "Damage", perSecond = "DPS",
+      targets = true },
     { key = "healing", label = "Healing Done", type = "HealingDone", rate = true, total = "Healing", perSecond = "HPS" },
     { key = "hps", label = "HPS", type = "Hps", rate = true, rateFirst = true, total = "Healing", perSecond = "HPS" },
     { key = "taken", label = "Damage Taken", type = "DamageTaken", rate = true, total = "Taken", perSecond = "DTPS" },
@@ -31,7 +33,8 @@ ns.DamageMeter.C = {
     INSET = 6, HEADER = 26,
     ROUND = 0.5,
     DEFAULT_MODE = "damage",
-    BREAKDOWN_LINES = 8, REPORT_MAX = 10, FIGHTS_MAX = 10,
+    BREAKDOWN_LINES = 8, TARGET_LINES = 5, REPORT_MAX = 10, FIGHTS_MAX = 10,
+    ENEMY_COLOR = { r = 0.78, g = 0.2, b = 0.2 },
     COLUMN_HEAD = 16, COL_GAP = 6, SUMMARY_H = 16, LOWER_STRIP = 20, LOWER_GAP = 4,
     MIN_TITLE = 8, MAX_TITLE = 20,
     NUMBER_UNITS = { game = "Game Default", latin = "K, M, B", asian = "Ten-thousands", full = "Full Numbers" },

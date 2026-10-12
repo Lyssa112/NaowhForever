@@ -111,7 +111,7 @@ end
 local function Boot(opts)
     opts = opts or {}
     local s = { settings = opts.settings or {}, calls = {}, idCalls = {}, spellCalls = {}, spellIdCalls = {},
-        durationCalls = {}, duration = 125,
+        durationCalls = {}, duration = 125, enemyCalls = {}, enemyIdCalls = {},
         cvars = { damageMeterEnabled = opts.gameMeter or "1" }, timers = {}, printed = {}, frames = {}, buttons = {},
         confirms = {}, hooks = {}, account = {}, sent = {}, movers = {}, names = { [101] = "Fireball", [102] = "Pyroblast" } }
     local defaults
@@ -224,7 +224,7 @@ local function Boot(opts)
         CLASS_SORT_ORDER = opts.classes,
         LOCALIZED_CLASS_NAMES_MALE = { MAGE = "Mage", ROGUE = "Rogue" },
         Enum = { DamageMeterType = { DamageDone = 0, Dps = 1, HealingDone = 2, Hps = 3, DamageTaken = 7,
-                AvoidableDamageTaken = 8, Absorbs = 4, Interrupts = 5, Dispels = 6, Deaths = 9 },
+                AvoidableDamageTaken = 8, Absorbs = 4, Interrupts = 5, Dispels = 6, Deaths = 9, EnemyDamageTaken = 10 },
             DamageMeterSessionType = { Overall = 0, Current = 1 } },
         C_DamageMeter = {
             GetCombatSessionFromType = function(kind, type)
@@ -248,12 +248,20 @@ local function Boot(opts)
                 return s.fights or {}
             end,
             GetCombatSessionSourceFromType = function(kind, type, guid, creature)
+                if type == 10 then
+                    s.enemyCalls[#s.enemyCalls + 1] = { kind = kind, guid = guid, creature = creature }
+                    return s.enemyData and s.enemyData[guid]
+                end
                 s.spellCalls[#s.spellCalls + 1] = { kind = kind, type = type, guid = guid, creature = creature }
                 if s.spellError then error("secret") end
                 if s.spellsResult ~= nil then return s.spellsResult end
                 return s.spells
             end,
             GetCombatSessionSourceFromID = function(id, type, guid, creature)
+                if type == 10 then
+                    s.enemyIdCalls[#s.enemyIdCalls + 1] = { id = id, guid = guid, creature = creature }
+                    return s.enemyData and s.enemyData[guid]
+                end
                 s.spellIdCalls[#s.spellIdCalls + 1] = { id = id, type = type, guid = guid, creature = creature }
                 return s.spells
             end,
@@ -1506,13 +1514,17 @@ do
     s.store.Set("backgroundPath", "")
     local info = page.infos and page.infos[1]
     check("a card that says how to add a picture", info and info.id == "images" and info.name == "Add Your Own Image"
-        and #info.lines == 4)
+        and #info.lines == 5)
     local text = {}
     for _, line in ipairs(info.lines) do text[#text + 1] = line.title .. " " .. line.text end
     local all = table.concat(text, " ")
-    check("it names the file kinds, the folder, the restart and the box", all:find(".tga", 1, true) ~= nil
+    check("it names the file kinds, the folder, the restart and the box", all:find(".png", 1, true) ~= nil
+        and all:find(".tga", 1, true) ~= nil and all:find(".blp", 1, true) ~= nil
         and all:find("AddOns", 1, true) ~= nil and all:find("Restart the game", 1, true) ~= nil
-        and all:find("Custom Image", 1, true) ~= nil and all:find("power of two", 1, true) ~= nil)
+        and all:find("Custom Image", 1, true) ~= nil and all:find("powers of two", 1, true) ~= nil)
+    check("it says a .jpg is not read, and what a green square means", all:find(".jpg", 1, true) ~= nil
+        and all:find("green square", 1, true) ~= nil)
+    check("and the extension is part of the path", all:find("panel.png", 1, true) ~= nil)
     s.store.Set("backgroundImage", "Lost")
     values, order = choices()
     check("a name that is not there stays chosen, marked", values.Lost == "Lost (unavailable)" and order[4] == "Lost")
@@ -1987,6 +1999,111 @@ do
     s.store.Set("breakdown", true)
 end
 
+-- the targets: the enemies a player hurt, from the enemies' own damage taken, after combat
+do
+    local function Enemy(name, guid) return { name = name, sourceGUID = guid, sourceCreatureID = 100 } end
+    local function Hit(who, total) return { totalAmount = total, combatSpellDetails = { unitName = who } } end
+    local function Setup(extra)
+        local s = Boot({ settings = { enabled = true } })
+        s.duration = 120
+        s.byType = { [10] = { combatSources = { Enemy("Defias Cutpurse", "E-1"), Enemy("Defias Thug", "E-2"),
+            Enemy("Gnoll Brute", "E-3"), Enemy("Unhurt", "E-4"), Enemy("Hidden", SECRET_TEXT) } } }
+        s.enemyData = {
+            ["E-1"] = { combatSpells = { Hit("You", 100), Hit("You", 20), Hit("Aldrin", 500) } },
+            ["E-2"] = { combatSpells = { Hit("You", 60), Hit(SECRET_TEXT, 999), { totalAmount = 5 } } },
+            ["E-3"] = { combatSpells = { Hit("You", 12), Hit("You", SECRET_NUMBER) } },
+            ["E-4"] = { combatSpells = { Hit("Aldrin", 40) } },
+        }
+        if extra then extra(s) end
+        s.Login()
+        return s
+    end
+
+    local s = Setup()
+    local w = s.Window()
+    s.session.combatSources[2].name = "You"
+    s.Hover(w, 2)
+    local panel = s.Panel()
+    check("after combat the panel has a Targets section under the spells", panel.targetsTitle.shown == true
+        and panel.targetsTitle.text == "Targets")
+    check("the enemies the player hurt, biggest first, with what each took and the per-second figure",
+        panel.targetRows[1].name.text == "Defias Cutpurse" and panel.targetRows[1].value.text == "<120> | <1>"
+        and panel.targetRows[2].name.text == "Defias Thug" and panel.targetRows[2].value.text == "<60> | <0.5>"
+        and panel.targetRows[3].name.text == "Gnoll Brute" and panel.targetRows[3].value.text == "<12> | <0.1>")
+    check("only the player's spells are added; others' are not, nor secret ones", panel.targetRows[4].shown == false)
+    check("the bars against the largest, in the enemy's red", panel.targetRows[1].barMax == 120
+        and panel.targetRows[2].barValue == 60 and panel.targetRows[1].color[1] == 0.78)
+    check("under the spells: the section, then its rows", panel.targetsTitle.points[1][5] == -(24 + 3 * 20 - 2 + 6)
+        and panel.targetRows[1].points[1][5] == -(24 + 3 * 20 - 2 + 6 + 16))
+    check("and the panel is as tall as both", panel.h == 24 + 3 * 20 - 2 + 6 + 16 + 3 * 20 - 2 + 6)
+    local asked = #s.enemyCalls
+    check("each enemy was asked, with its guid and creature", asked == 4 and s.enemyCalls[1].guid == "E-1"
+        and s.enemyCalls[1].creature == 100 and s.enemyCalls[1].kind == 1)
+    w.rows[2].scripts.OnLeave(w.rows[2])
+    s.Hover(w, 2)
+    check("hovering again reads from what was read", #s.enemyCalls == asked)
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    s.Hover(w, 2)
+    check("a change in the data reads again", #s.enemyCalls > asked)
+
+    s.combat = true
+    local before = #s.enemyCalls
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    s.Hover(w, 2)
+    check("in combat there are none, and the game is not asked", panel.targetsTitle.shown == false
+        and panel.targetRows[1].shown == false and #s.enemyCalls == before)
+    s.combat = false
+
+    s.store.Set("mode", "healing"); s.Flush()
+    local calls = #s.enemyCalls
+    s.Hover(w, 2)
+    check("only for damage: Healing Done has no targets", panel.targetsTitle.shown == false and #s.enemyCalls == calls)
+    s.store.Set("mode", "dps"); s.Flush()
+    s.Hover(w, 2)
+    check("DPS has them", panel.targetsTitle.shown == true)
+    s.store.Set("mode", "damage"); s.Flush()
+
+    s.fights = { { sessionID = 4, name = "Pull" } }
+    w.session.onClick()
+    s.menu:Find("Pull").set()
+    s.Flush()
+    s.Hover(w, 2)
+    check("a past fight is read by its id", #s.enemyIdCalls > 0 and s.enemyIdCalls[1].id == 4)
+
+    -- nothing to show
+    local none = Setup(function(t) t.enemyData = {} end)
+    none.Hover(none.Window(), 2)
+    check("no enemy hurt by the player: no section", none.Panel().targetsTitle.shown == false
+        and none.DM.Targets("current", nil, "You") == nil)
+    local secretName = Setup()
+    secretName.session.combatSources[2].name = SECRET_TEXT
+    secretName.Hover(secretName.Window(), 2)
+    check("a name the game keeps back: no section, and no question", secretName.Panel().targetsTitle.shown == false
+        and #secretName.enemyCalls == 0)
+    local DM = secretName.DM
+    check("a missing API: none", (function()
+        secretName.env.C_DamageMeter = nil
+        return DM.Targets("current", nil, "You") == nil
+    end)())
+
+    local many = Setup(function(t)
+        local sources, data = {}, {}
+        for i = 1, 8 do
+            sources[i] = Enemy("Mob " .. i, "M-" .. i)
+            data["M-" .. i] = { combatSpells = { Hit("You", i * 10) } }
+        end
+        t.byType = { [10] = { combatSources = sources } }
+        t.enemyData = data
+    end)
+    many.Hover(many.Window(), 2)
+    local mp = many.Panel()
+    check("at most five, the biggest", mp.targetRows[1].name.text == "Mob 8" and mp.targetRows[5].name.text == "Mob 4"
+        and mp.targetRows[5].shown == true)
+    check("each bar against the largest, and the panel as tall as the five",
+        mp.targetRows[5].barMax == 80 and mp.targetRows[5].barValue == 40
+        and mp.h == 24 + 3 * 20 - 2 + 6 + 16 + 5 * 20 - 2 + 6)
+end
+
 -- the panel follows updates, and goes with its window
 do
     local s = Boot({ settings = { enabled = true, visibility = "group" } })
@@ -2033,6 +2150,17 @@ do
     local keys = {}
     for _, card in ipairs(page.cards) do
         check(card.id .. ": a name and a short help", card.name ~= nil and #card.help < 120)
+        -- a tooltip is a card of fixed width: a word with no spaces that is wider than it is cut short
+        local function Wraps(text)
+            for word in (text or ""):gmatch("%S+") do
+                if #word > 24 then return false end
+            end
+            return true
+        end
+        check(card.id .. ": its help wraps", Wraps(card.help))
+        for _, row in ipairs(card.rows) do
+            check((row.label or row.key or "?") .. ": its help wraps", Wraps(row.help))
+        end
         check(card.id .. ": no more than fifteen entries", #card.rows <= 15)
         for _, row in ipairs(card.rows) do
             if row.key then

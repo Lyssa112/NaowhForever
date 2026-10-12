@@ -287,11 +287,9 @@ page:Card({
           scale = TO_FRACTION, needs = Enabled, why = OFF },
         { key = "showBorder", label = "Border", toggle = true, needs = Enabled, why = OFF },
         { key = "backgroundImage", label = "Image", choice = ImageChoices, needs = Enabled, why = OFF,
-          help = "A picture behind the rows, from a shared media add-on. To use your own, see Add Your Own "
-              .. "Image." },
+          help = "A picture behind the rows, from a shared media add-on. For your own, see Add Your Own Image." },
         { key = "backgroundPath", label = "Custom Image", text = true, wide = true, needs = Enabled, why = OFF,
-          help = "The path of a picture you added, in place of Image: Interface\\AddOns\\MyBackgrounds\\panel. "
-              .. "See Add Your Own Image." },
+          help = "The path of a picture you added. It takes the place of Image. See Add Your Own Image." },
         { key = "imageAlpha", label = "Image Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION,
           needs = HasImage, why = OFF_IMAGE },
         { key = "imageTile", label = "Tile Image", toggle = true, needs = HasImage, why = OFF_IMAGE,
@@ -311,16 +309,19 @@ page:Info({
     id = "images", name = "Add Your Own Image", order = 25,
     summary = "Where to put a picture, and what to type",
     lines = {
-        { title = "The picture", text = "A .tga (32-bit, not compressed) or a .blp. Its width and height should "
-            .. "each be a power of two: 128, 256, 512 or 1024. A small one, 128 or 256, is good for a pattern "
-            .. "that is repeated with Tile Image." },
+        { title = "The picture", text = "A .png, .tga or .blp file. Make its width and height powers of two, "
+            .. "such as 128, 256, 512 or 1024, to be safe; a small one, 128 or 256, is good for a pattern that "
+            .. "is repeated with Tile Image. A .jpg is most likely not read by the game: open it and save it "
+            .. "as a .png first." },
         { title = "Where it goes", text = "In the game's Interface\\AddOns folder make a folder of your own, "
-            .. "such as MyBackgrounds, and put the file in it, for instance MyBackgrounds\\panel.tga. A folder "
+            .. "such as MyBackgrounds, and put the file in it, for instance MyBackgrounds\\panel.png. A folder "
             .. "of your own is not touched when add-ons are updated. Restart the game once so it finds "
             .. "the file." },
         { title = "What to type", text = "In Custom Image, under Window, write the path from Interface, with "
-            .. "backslashes and without the extension: Interface\\AddOns\\MyBackgrounds\\panel. It takes "
-            .. "the place of Image. Empty it to go back." },
+            .. "backslashes and with the file's extension: Interface\\AddOns\\MyBackgrounds\\panel.png. It "
+            .. "takes the place of Image. Empty it to go back." },
+        { title = "If it is a green square", text = "The game did not find the file. Check the folder name, "
+            .. "the spelling and the extension, and that the game was restarted after the file was added." },
         { title = "Or a media add-on", text = "An add-on that adds pictures to the shared media, such as a "
             .. "SharedMedia pack, lists them under Image. The game's plain ones, Solid among them, are left out." },
     },

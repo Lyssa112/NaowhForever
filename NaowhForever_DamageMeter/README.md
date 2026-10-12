@@ -61,8 +61,10 @@ NaowhForever_DamageMeter/
   media's `background` list, or a path typed in Custom Image, which wins; it is drawn above the
   window's color and below the rows, stretched or tiled. The game's plain backgrounds (Solid, Blizzard
   Tooltip, Out of Control, Low Health) are left out of the list and read as none. An info card on the
-  page says how to add a picture: a .tga or .blp in a folder of the player's own under `AddOns`, and
-  its path without the extension.
+  page says how to add a picture: a .png, .tga or .blp in a folder of the player's own under `AddOns`,
+  and its path with the extension. A .png loads on this client as it does for other add-ons here; a
+  .jpg is not known to. The tooltip is a fixed-width card, so a help text must not hold a long word with
+  no spaces, such as a path: it is cut short, which is why the example lives on the info card.
 - A fight is kept when combat ends, as plain numbers only: the game's amounts stay secret for a moment
   after the fight, so the session is read again every couple of seconds, a few times, and only a
   fight whose total, length and your own figures are all plain is kept. A fight under five seconds is
@@ -103,6 +105,11 @@ NaowhForever_DamageMeter/
 - A spell panel asks the game for a source by guid, and in combat the game takes a plain guid only:
   your own row's (`UnitGUID("player")`) or one whose guid is not secret. Any other row says its spells
   show after combat. The share is shown only when the amount and the total are plain numbers.
+- Targets (the enemies a player hurt) come from the game's Enemy Damage Taken list: each enemy's data is
+  by attacker and spell, so a player's share is the sum of that player's spells over the enemies. That
+  is arithmetic over many amounts and a comparison of names, so it is done after combat only, from
+  plain numbers, and only for Damage Done and DPS. It asks the game once per enemy, so the result is kept
+  until the game's data changes.
 - A spell's icon and name come from `C_Spell` through `pcall` and are tested with `type()`, never by
   truthiness, since a secret id gives a secret answer. They go to the texture and the text as they are.
 - A report is made of plain numbers, so it is sent outside combat only, and a source whose name or
