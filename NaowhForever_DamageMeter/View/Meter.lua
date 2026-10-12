@@ -34,9 +34,24 @@ local classIcons = {}
 local tokenOf = {}
 for _, entry in ipairs(C.COLORS) do tokenOf[entry.key] = entry.token end
 
+-- A class's bar color: the one picked for it in the settings, or the game's.
 local function ClassColor(class)
-    return class and RAID_CLASS_COLORS[class] or FALLBACK
+    local picked = S.Get("classColors")
+    local c = type(picked) == "table" and class and picked[class]
+    return c or class and RAID_CLASS_COLORS[class] or FALLBACK
 end
+
+local function SharedMedia()
+    return LibStub and LibStub("LibSharedMedia-3.0", true)
+end
+
+-- The path of a background picked by name from the shared media, or nil.
+local function ImagePath(name)
+    local LSM = SharedMedia()
+    return LSM and name and name ~= "" and LSM:Fetch("background", name, true) or nil
+end
+
+Look.ClassColor = ClassColor
 
 local function ClassIcon(class)
     local path = classIcons[class]
@@ -85,6 +100,9 @@ function Look.New(frame, index)
     frame.headerBackground:SetAllPoints()
     local rule = ns.Solid(frame.header, "OVERLAY", T.line, 1)
     rule:SetPoint("BOTTOMLEFT"); rule:SetPoint("BOTTOMRIGHT"); rule:SetHeight(1)
+    frame.image = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
+    frame.image:SetAllPoints()
+    frame.image:Hide()
     frame.empty = ns.Font(frame, EMPTY_SIZE, "OUTLINE", T.muted)
     frame.empty:SetPoint("CENTER", 0, EMPTY_Y)
     frame.title = ns.Font(frame.header, TITLE_SIZE, "OUTLINE", T.fg)
@@ -108,8 +126,6 @@ function Look.Row(f, i)
     row:SetScript("OnEnter", function(self) if f.onRowEnter then f.onRowEnter(self) end end)
     row:SetScript("OnLeave", function() if f.onRowLeave then f.onRowLeave() end end)
     row:SetScript("OnMouseWheel", function(_, delta) if f.onWheel then f.onWheel(delta) end end)
-    row.bg = row:CreateTexture(nil, "BACKGROUND")
-    row.bg:SetAllPoints()
     row.edge = row:CreateTexture(nil, "OVERLAY")
     row.edge:SetPoint("TOPLEFT"); row.edge:SetPoint("BOTTOMLEFT"); row.edge:SetWidth(EDGE_W)
     row.rank = ns.Font(row, RANK_SIZE, "OUTLINE", T.muted)
@@ -187,6 +203,12 @@ local function LayHeads(f, g)
     Parts.HudFont(f.title, g.font, g.titleSize, g.outline)
     Parts.HudFont(f.time, g.font, g.timeSize, g.outline)
     f.time:SetWidth(Look.TimeWidth())
+    local path = ImagePath(g.image)
+    if path then
+        f.image:SetTexture(path, g.tile and "REPEAT" or nil, g.tile and "REPEAT" or nil)
+        f.image:SetHorizTile(g.tile); f.image:SetVertTile(g.tile)
+    end
+    f.image:SetShown(path ~= nil)
     f.headName:SetShown(show)
     f.headA:SetShown(show and g.columns == 2)
     f.headB:SetShown(show and g.columns >= 1)
@@ -211,6 +233,7 @@ local function PaintFrame(f)
     local summary = Look.Color("summaryColor")
     local alpha = S.Get("backgroundAlpha")
     f.summary:SetTextColor(summary.r, summary.g, summary.b)
+    f.image:SetAlpha(S.Get("imageAlpha"))
     f.background:SetColorTexture(window.r, window.g, window.b, 1)
     f.background:SetAlpha(alpha)
     f.headerBackground:SetColorTexture(header.r, header.g, header.b, 1)
@@ -250,8 +273,9 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.columns, g.colWidth, g.valueWidth = columns, colWidth, valueWidth
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
     g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
+    g.image, g.tile = S.Get("backgroundImage"), S.Get("imageTile") == true
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, columns, colWidth, g.texture, g.font, g.outline, name.r, name.g, name.b, value.r, value.g, value.b,
+        headTop, g.titleSize, g.timeSize, g.image, tostring(g.tile), columns, colWidth, g.texture, g.font, g.outline, name.r, name.g, name.b, value.r, value.g, value.b,
         rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
     if f.laidKey ~= key then LayHeads(f, g) end
     f.headName:SetText(TEXT_NAME_HEAD)
@@ -304,7 +328,7 @@ function Look.Paint(f, session, first, shown, _, available)
     local alpha = S.Get("barAlpha")
     local own = S.Get("highlightPlayer")
     local classOnly = S.Get("iconStyle") == "class"
-    local track, edge = Look.Color("trackColor"), Look.Color("edgeColor")
+    local edge = Look.Color("edgeColor")
     f.empty:SetText(available and TEXT_EMPTY or TEXT_UNAVAILABLE)
     f.empty:SetShown(shown == 0)
     for i = 1, shown do
@@ -314,7 +338,6 @@ function Look.Paint(f, session, first, shown, _, available)
         row:SetStatusBarColor(c.r, c.g, c.b, alpha)
         row:SetMinMaxValues(0, session.maxAmount)
         row:SetValue(source.totalAmount)
-        row.bg:SetColorTexture(track.r, track.g, track.b, 1)
         local e = own and source.isLocalPlayer == true and edge or c
         row.edge:SetColorTexture(e.r, e.g, e.b, 1)
         row.rank:SetFormattedText(RANK_TEXT, first + i)

@@ -43,11 +43,15 @@ NaowhForever_DamageMeter/
 - The game's meter is the `damageMeterEnabled` setting. It is turned off while this one is on and put
   back as it was after, kept on the account so it survives a reload. It is left alone in combat and
   done again when combat ends.
-- Every part of a window has its own color setting (`DM.C.COLORS`): the bars' custom color, their
-  background and your row's edge, the names, amounts, ranks, title and fight time, and the window, the
-  title bar and the border. Each is `false` until a color is picked and then follows the theme's token
+- Every part of a window has its own color setting (`DM.C.COLORS`): the bars' custom color and your
+  row's edge, the names, amounts, ranks, column titles, title, fight time and summary line, and the
+  window, the title bar and the border. A row has no background of its own: the window's shows behind
+  the bars. Each is `false` until a color is picked and then follows the theme's token
   it stands in for, so a theme switch restyles what was not picked. `Look.Color(key)` is the one place
   that resolves it.
+- Class Colors can be changed class by class (`classColors`, class to color), kept apart from the
+  theme tokens since the game gives every class its own. A background image is a name from the shared
+  media's `background` list, drawn above the window's color and below the rows, stretched or tiled.
 - The windows are plain frames, so they move and resize in combat; only Lock Window stops that. The
   sizing flag lives on the frame (`frame.sizing`), which is what the layout reads while the client
   resizes it.

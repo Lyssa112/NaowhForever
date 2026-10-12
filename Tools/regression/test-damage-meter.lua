@@ -41,7 +41,7 @@ local function Region(kind, parent)
     function r:SetStatusBarColor(rr, g, b, a) self.color = { rr, g, b, a } end
     function r:SetStatusBarTexture(t) self.barTexture = t end
     function r:SetColorTexture(rr, g, b, a) self.solid = { rr, g, b, a } end
-    function r:SetTexture(t) self.texture = t end
+    function r:SetTexture(t, h, v) self.texture = t; self.wrap = { h, v } end
     function r:CreateTexture() return Region("Texture", self) end
     function r:GetLeft() return 100 end
     function r:GetTop() return 300 end
@@ -198,6 +198,9 @@ local function Boot(opts)
             return "{" .. tostring(n) .. ":" .. #options.config.rows .. "}"
         end,
         GetLocale = function() return s.locale or "enUS" end,
+        LibStub = function() return s.lsm end,
+        CLASS_SORT_ORDER = opts.classes,
+        LOCALIZED_CLASS_NAMES_MALE = { MAGE = "Mage", ROGUE = "Rogue" },
         Enum = { DamageMeterType = { DamageDone = 0, Dps = 1, HealingDone = 2, Hps = 3, DamageTaken = 7,
                 AvoidableDamageTaken = 8, Absorbs = 4, Interrupts = 5, Dispels = 6, Deaths = 9 },
             DamageMeterSessionType = { Overall = 0, Current = 1 } },
@@ -272,6 +275,12 @@ local function Boot(opts)
         chunk("NaowhForever")
     end
     s.ns, s.store, s.env = ns, store, env
+    if opts.media then
+        s.lsm = { List = function(_, kind) return kind == "background" and { "Marble", "Dots" } or {} end,
+            Fetch = function(_, kind, name)
+                if kind == "background" and (name == "Marble" or name == "Dots") then return "Media\\" .. name end
+            end }
+    end
     s.DM = ns.DamageMeter
     for _, f in ipairs(s.frames) do
         if f.events and f.events.PLAYER_LOGIN then s.boot = f end
@@ -813,8 +822,9 @@ do
         and Is(w.time.textColor, THEME.muted) and Is(w.empty.textColor, THEME.muted))
     check("the window, the title bar and the border their own tokens", Is(Solid(w.background), THEME.bg)
         and Is(Solid(w.headerBackground), THEME.panel) and Is(w.border.color, THEME.line))
-    check("a row's background is the panel color, your row's edge the Accent", Is(Solid(row.bg), THEME.panel)
-        and Is(Solid(own.edge), THEME.accent))
+    check("your row's edge is the Accent", Is(Solid(own.edge), THEME.accent))
+    check("a row has no background of its own: the window's shows behind the bars", row.bg == nil and own.bg == nil
+        and w.rows[3].bg == nil)
     check("the window and its border take the background opacity", w.background.alpha == 0.9
         and w.border._frame.alpha == 0.9)
 
@@ -826,7 +836,6 @@ do
         titleColor = function() return w.title.textColor end,
         timeColor = function() return w.time.textColor end,
         summaryColor = function() return w.summary.textColor end,
-        trackColor = function() return Solid(row.bg) end,
         edgeColor = function() return Solid(own.edge) end,
         windowColor = function() return Solid(w.background) end,
         headerColor = function() return Solid(w.headerBackground) end,
@@ -843,7 +852,7 @@ do
         Unpick(key)
         check(key .. ": back to the theme", not Is(read(), PICK))
     end
-    check("every color of the window is covered", count == 12)
+    check("every color of the window is covered", count == 11)
     Pick("valueColor")
     check("a picked amount color reaches both columns", Is(row.colA.textColor, PICK) and Is(row.colB.textColor, PICK))
     Unpick("valueColor")
@@ -884,23 +893,91 @@ do
     check("and back", row.icon.texture == 62)
 
     Pick("nameColor"); Pick("valueColor"); Pick("titleColor"); Pick("windowColor"); Pick("borderColor")
-    Pick("trackColor"); Pick("rankColor")
+    Pick("rankColor")
     s.Hover(w, 2)
     local panel = s.Panel()
     check("the spell panel's names, amounts and title", Is(panel.rows[1].name.textColor, PICK)
         and Is(panel.rows[1].value.textColor, PICK) and Is(panel.title.textColor, PICK))
-    check("its window, border, bars' background", Is(Solid(panel.background), PICK) and Is(panel.border.color, PICK)
-        and Is(Solid(panel.rows[1].bg), PICK))
+    check("its window and border", Is(Solid(panel.background), PICK) and Is(panel.border.color, PICK)
+        and panel.rows[1].bg == nil)
     s.store.Set("showBorder", false)
     s.Hover(w, 2)
     check("and its border follows Border", panel.border._frame.shown == false)
-    for _, key in ipairs({ "nameColor", "valueColor", "titleColor", "windowColor", "borderColor", "trackColor",
+    for _, key in ipairs({ "nameColor", "valueColor", "titleColor", "windowColor", "borderColor",
         "rankColor" }) do s.store.Set(key, false) end
     s.store.Set("showBorder", true)
     s.spellsResult = { combatSpells = {} }
     s.Hover(w, 2)
     check("without picks the panel follows the theme", Is(panel.title.textColor, THEME.fg)
         and Is(panel.note.textColor, THEME.muted) and Is(Solid(panel.background), THEME.bg))
+end
+
+-- bar colors by class, alternating rows, a background image
+do
+    local s = Boot({ settings = { enabled = true }, media = true, classes = { "ROGUE", "MAGE" } })
+    s.Login()
+    local w = s.Window()
+    local row, own, third = w.rows[1], w.rows[2], w.rows[3]
+    local function Is(c, t) return c.r == t.r and c.g == t.g and c.b == t.b end
+    local function Bar(r) return { r = r.color[1], g = r.color[2], b = r.color[3] } end
+
+    s.store.Set("classColors", { MAGE = { r = 0.1, g = 0.9, b = 0.5 } }); s.Flush()
+    check("a class picked in the settings colors its bars", Is(Bar(row), { r = 0.1, g = 0.9, b = 0.5 })
+        and Is(Bar(third), { r = 0.1, g = 0.9, b = 0.5 }))
+    check("and the others keep the game's", Is(Bar(own), CLASS.ROGUE))
+    s.store.Set("barColor", "accent"); s.Flush()
+    check("Theme Accent ignores the picks", Is(Bar(row), THEME.accent))
+    s.store.Set("barColor", "class"); s.store.Set("classColors", {}); s.Flush()
+    check("none picked: the game's colors", Is(Bar(row), CLASS.MAGE))
+
+    check("no image by default", w.image.shown == false)
+    s.store.Set("backgroundImage", "Marble"); s.Flush()
+    check("a background from the shared media, stretched", w.image.shown == true and w.image.texture == "Media\\Marble"
+        and w.image.alpha == 1 and w.image.wrap[1] == nil)
+    s.store.Set("imageAlpha", 0.4); s.Flush()
+    check("at its own opacity", w.image.alpha == 0.4)
+    s.store.Set("backgroundImage", "Gone"); s.Flush()
+    check("a name the media no longer has: no image", w.image.shown == false)
+    s.store.Set("backgroundImage", "Dots"); s.store.Set("imageTile", true); s.Flush()
+    check("another, tiled", w.image.shown == true and w.image.texture == "Media\\Dots"
+        and w.image.wrap[1] == "REPEAT" and w.image.wrap[2] == "REPEAT")
+    s.store.Set("backgroundImage", ""); s.Flush()
+    check("none again", w.image.shown == false)
+
+    local page = s.page
+    local rows = page.cards[2].rows
+    local classRows = {}
+    for _, r in ipairs(rows) do
+        if r.key == "classColors" then classRows[#classRows + 1] = r end
+    end
+    check("a color row per class, in the game's order", #classRows == 2 and classRows[1].field == "ROGUE"
+        and classRows[2].field == "MAGE" and classRows[2].label == "Mage")
+    local r, g, b = classRows[2].get()
+    check("it shows the game's color until one is picked", r == CLASS.MAGE.r and g == CLASS.MAGE.g and b == CLASS.MAGE.b)
+    classRows[2].set(0.2, 0.3, 0.4)
+    local picked = s.store.Get("classColors")
+    check("picking adds that class alone", picked.MAGE.r == 0.2 and picked.MAGE.g == 0.3 and picked.ROGUE == nil)
+    classRows[1].set(0.9, 0.8, 0.7)
+    picked = s.store.Get("classColors")
+    check("and the next keeps the first", picked.MAGE.r == 0.2 and picked.ROGUE.r == 0.9)
+    r = classRows[2].get()
+    check("the picker shows it", r == 0.2)
+    check("they need Class Colors", classRows[1].needs() == true)
+    s.store.Set("barColor", "accent")
+    check("and are off without it", classRows[1].needs() == false)
+    s.store.Set("barColor", "class")
+
+    local choices
+    for _, r2 in ipairs(page.cards[1].rows) do
+        if r2.key == "backgroundImage" then choices = r2.choice end
+    end
+    local values, order = choices()
+    check("the image choices: None, then the media's", values[""] == "None" and order[1] == "" and order[2] == "Marble"
+        and order[3] == "Dots")
+    s.store.Set("backgroundImage", "Lost")
+    values, order = choices()
+    check("a name that is not there stays chosen, marked", values.Lost == "Lost (unavailable)" and order[4] == "Lost")
+    s.store.Set("backgroundImage", "")
 end
 
 -- moving and resizing work in combat too, and a resize keeps the size the client gives
@@ -1402,14 +1479,20 @@ do
                 keys[#keys + 1] = row.key
                 check("the setting " .. row.key .. " has a default", s.store.Get(row.key) ~= nil or row.key == "backgroundColor")
                 if row.choice then
-                    for _, value in ipairs(row.choice[2]) do
-                        check(row.key .. " choice " .. value .. " has a label", row.choice[1][value] ~= nil)
+                    local values, order
+                    if type(row.choice) == "function" then
+                        values, order = row.choice()
+                    else
+                        values, order = row.choice[1], row.choice[2]
+                    end
+                    for _, value in ipairs(order) do
+                        check(row.key .. " choice " .. value .. " has a label", values[value] ~= nil)
                     end
                 end
             end
         end
     end
-    check("the rows cover the windows, the rows, the hover and the colors", #keys >= 50)
+    check("the rows cover the windows, the rows, the hover and the colors", #keys >= 55)
     check("one short help sentence on each card", #page.cards[1].help < 120 and #page.cards[2].help < 120
         and #page.cards[3].help < 120)
     check("the first card's summary reads window one", page.cards[1].summary(s.store) == "Damage Done, 300 by 206")

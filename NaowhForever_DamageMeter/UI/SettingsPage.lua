@@ -14,6 +14,8 @@ local OFF_WINDOW = "Turn this window on first"
 local OFF_CUSTOM = "Set Bar Color to Custom Color"
 local OFF_HIGHLIGHT = "Turn on Highlight Your Row"
 local OFF_ABBREVIATING = "Number Format is Game Default or Full Numbers"
+local OFF_CLASS = "Set Bar Color to Class Colors"
+local OFF_IMAGE = "Pick a Background Image"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local BAR_RANGE, SPACING_RANGE = { C.MIN_BAR, C.MAX_BAR, 1 }, { 0, C.MAX_SPACING, 1 }
@@ -38,6 +40,8 @@ local TITLE_RANGE = { C.MIN_TITLE, C.MAX_TITLE, 1 }
 local function Enabled() return DM.On() and true or false end
 local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
 local function Highlighting() return DM.On() and S.Get("highlightPlayer") == true end
+local function HasImage() return DM.On() and S.Get("backgroundImage") ~= "" end
+local function ClassBars() return DM.On() and S.Get("barColor") == "class" end
 local function Abbreviating()
     local units = S.Get("numberUnits")
     return DM.On() and (units == "latin" or units == "asian")
@@ -107,7 +111,6 @@ local COLOR_WHY = { barCustomColor = OFF_CUSTOM, edgeColor = OFF_HIGHLIGHT }
 local COLOR_HELP = {
     barCustomColor = "The bars' color when Bar Color is Custom Color.",
     edgeColor = "The strip on the left of your own row.",
-    trackColor = "What shows behind a bar.",
 }
 
 local function ColorsSummary(store)
@@ -116,6 +119,61 @@ local function ColorsSummary(store)
         if type(store.Get(entry.key)) == "table" then picked = picked + 1 end
     end
     return picked == 0 and "Theme" or picked .. " picked"
+end
+
+-- The classes the game has, in its own order, each with a picker for its bar color.
+local function ClassList()
+    local list = {}
+    if CLASS_SORT_ORDER then
+        for _, class in ipairs(CLASS_SORT_ORDER) do list[#list + 1] = class end
+    else
+        for class in pairs(RAID_CLASS_COLORS or {}) do list[#list + 1] = class end
+        table.sort(list)
+    end
+    return list
+end
+
+local function ClassName(class)
+    return LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[class] or class
+end
+
+local function ClassRow(class)
+    return { key = "classColors", field = class, label = ClassName(class), colour = true,
+        get = function()
+            local c = DM.Look.ClassColor(class)
+            return c.r, c.g, c.b, 1
+        end,
+        set = function(r, g, b)
+            local picked = {}
+            for k, v in pairs(S.Get("classColors") or {}) do picked[k] = v end
+            picked[class] = { r = r, g = g, b = b }
+            S.Set("classColors", picked)
+        end,
+        needs = ClassBars, why = OFF_CLASS }
+end
+
+local function ClassRows()
+    local rows = { Group("Class Colors") }
+    for _, class in ipairs(ClassList()) do rows[#rows + 1] = ClassRow(class) end
+    return rows
+end
+
+-- The backgrounds the shared media offers, by name.
+local function ImageChoices()
+    local values, order = { [""] = "None" }, { "" }
+    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+    if LSM then
+        for _, name in ipairs(LSM:List("background")) do
+            values[name] = name
+            order[#order + 1] = name
+        end
+    end
+    local picked = S.Get("backgroundImage")
+    if picked ~= "" and not values[picked] then
+        values[picked] = picked .. " (unavailable)"
+        order[#order + 1] = picked
+    end
+    return values, order
 end
 
 local function ColorRows()
@@ -135,6 +193,7 @@ local function ColorRows()
             set = PickedSet(entry.key), needs = COLOR_NEEDS[entry.key] or Enabled,
             why = COLOR_WHY[entry.key] or OFF, help = COLOR_HELP[entry.key] }
     end
+    for _, row in ipairs(ClassRows()) do rows[#rows + 1] = row end
     return rows
 end
 
@@ -170,6 +229,12 @@ page:Card({
         { key = "titleSize", label = "Title Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
         { key = "timeSize", label = "Fight Time Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
         { key = "showBorder", label = "Border", toggle = true, needs = Enabled, why = OFF },
+        { key = "backgroundImage", label = "Background Image", choice = ImageChoices, needs = Enabled, why = OFF,
+          help = "A picture behind the rows, from the shared media." },
+        { key = "imageAlpha", label = "Image Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION,
+          needs = HasImage, why = OFF_IMAGE },
+        { key = "imageTile", label = "Tile Image", toggle = true, needs = HasImage, why = OFF_IMAGE,
+          help = "Repeats the picture in place of stretching it, for patterns." },
         { key = "backgroundAlpha", label = "Background Opacity", slider = BACKGROUND_RANGE, unit = "%",
           scale = TO_FRACTION, needs = Enabled, why = OFF },
         { key = "hideGameMeter", label = "Replace the Game's Meter", toggle = true, needs = Enabled, why = OFF,

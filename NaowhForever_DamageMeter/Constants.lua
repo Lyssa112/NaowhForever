@@ -50,7 +50,6 @@ ns.DamageMeter.C = {
     -- color is picked, and then follows the theme's token.
     COLORS = {
         { key = "barCustomColor", label = "Custom Bar Color", group = "Bars", token = "accent" },
-        { key = "trackColor", label = "Bar Background", group = "Bars", token = "panel" },
         { key = "edgeColor", label = "Your Row Edge", group = "Bars", token = "accent" },
         { key = "nameColor", label = "Names", group = "Text", token = "fg" },
         { key = "valueColor", label = "Amounts", group = "Text", token = "fg" },
