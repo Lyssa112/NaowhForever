@@ -45,8 +45,11 @@ local function SharedMedia()
     return LibStub and LibStub("LibSharedMedia-3.0", true)
 end
 
--- The path of a background picked by name from the shared media, or nil.
-local function ImagePath(name)
+-- The path of the background in use: the path typed in the settings, or else the one picked by name from
+-- the shared media. Nil for none.
+local function ImagePath(name, typed)
+    if type(typed) == "string" and typed ~= "" then return typed end
+    if C.HIDDEN_BACKGROUNDS[name] then return nil end
     local LSM = SharedMedia()
     return LSM and name and name ~= "" and LSM:Fetch("background", name, true) or nil
 end
@@ -255,7 +258,7 @@ local function LayFrame(f, g)
     Parts.HudFont(f.lowerTitle, g.font, g.titleSize, g.outline)
     Parts.HudFont(f.time, g.font, g.timeSize, g.outline)
     f.time:SetWidth(Look.TimeWidth())
-    local path = ImagePath(g.image)
+    local path = ImagePath(g.image, g.path)
     if path then
         f.image:SetTexture(path, g.tile and "REPEAT" or nil, g.tile and "REPEAT" or nil)
         f.image:SetHorizTile(g.tile); f.image:SetVertTile(g.tile)
@@ -347,11 +350,11 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.colWidth = math.floor(chars * CHAR_W * fontSize)
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
     g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
-    g.image, g.tile = S.Get("backgroundImage"), S.Get("imageTile") == true
+    g.image, g.path, g.tile = S.Get("backgroundImage"), S.Get("backgroundPath"), S.Get("imageTile") == true
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, g.image, tostring(g.tile), g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
+        headTop, g.titleSize, g.timeSize, g.image, g.path, tostring(g.tile), g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
         name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
     g.key = key
     if f.laidKey ~= key then LayFrame(f, g) end

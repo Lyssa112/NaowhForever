@@ -27,7 +27,7 @@ NaowhForever_DamageMeter/
     History.lua                  the kept fights in a window of their own (DM.HistoryWindow)
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
-    SettingsPage.lua             its settings page, declared as cards
+    SettingsPage.lua             its settings page: fourteen small cards and one that explains images
   README.md                      this file
 ```
 
@@ -58,7 +58,11 @@ NaowhForever_DamageMeter/
   (`DM.Sample`), so the preview and Unlock Mode show your bar and edge as they will be.
 - Class Colors can be changed class by class (`classColors`, class to color), kept apart from the
   theme tokens since the game gives every class its own. A background image is a name from the shared
-  media's `background` list, drawn above the window's color and below the rows, stretched or tiled.
+  media's `background` list, or a path typed in Custom Image, which wins; it is drawn above the
+  window's color and below the rows, stretched or tiled. The game's plain backgrounds (Solid, Blizzard
+  Tooltip, Out of Control, Low Health) are left out of the list and read as none. An info card on the
+  page says how to add a picture: a .tga or .blp in a folder of the player's own under `AddOns`, and
+  its path without the extension.
 - A fight is kept when combat ends, as plain numbers only: the game's amounts stay secret for a moment
   after the fight, so the session is read again every couple of seconds, a few times, and only a
   fight whose total, length and your own figures are all plain is kept. A fight under five seconds is

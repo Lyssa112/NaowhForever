@@ -16,7 +16,7 @@ local TIME_ROOM = 2 * TITLE_PAD + SESSION_W + MORE_W + BUTTON_GAP - BUTTON_RIGHT
 local GRIP_SIZE, GRIP_INSET, GRIP_LEVEL, GRIP_LOCKED_ALPHA = 20, 2, 20, 0.4
 local HOME_X, HOME_Y = -24, 210
 local FRAME_NAME = "NaowhForeverDamageMeter"
-local CARD, CARD_MORE = C.PAGE .. ":meter", C.PAGE .. ":windows"
+local CARD, CARD_SECOND, CARD_THIRD = C.PAGE .. ":window", C.PAGE .. ":window2", C.PAGE .. ":window3"
 local GAME_CVAR, GAME_CVAR_OFF = "damageMeterEnabled", "0"
 local GAME_CVAR_SAVED = "damageMeterGameWas"
 local DATA_EVENTS = { "DAMAGE_METER_COMBAT_SESSION_UPDATED", "DAMAGE_METER_CURRENT_SESSION_UPDATED",
@@ -227,12 +227,12 @@ local function NewGrip(w)
     frame.grip:SetScript("OnMouseUp", function() OnGripUp(w) end)
 end
 
--- The first window's mover points at the meter card, the others' at the card of the extra windows.
+-- A window's mover points at the card with its size: the Window card, or the card of the second or third.
 local function AttachMover(frame, index, onSave)
-    if index == 1 then
-        return UI.AttachMover(frame, DM.WindowName(index), onSave, C.PAGE, CARD)
-    end
-    return UI.AttachMover(frame, DM.WindowName(index), onSave, C.PAGE, CARD_MORE)
+    local name = DM.WindowName(index)
+    if index == 1 then return UI.AttachMover(frame, name, onSave, C.PAGE, CARD) end
+    if index == 2 then return UI.AttachMover(frame, name, onSave, C.PAGE, CARD_SECOND) end
+    return UI.AttachMover(frame, name, onSave, C.PAGE, CARD_THIRD)
 end
 
 local function Build(w)

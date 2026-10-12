@@ -60,6 +60,21 @@ local CLASS = { MAGE = { r = 0.25, g = 0.78, b = 0.92 }, ROGUE = { r = 1, g = 0.
 -- what the stub client calls secret: a flagged table, this number and this string
 local SECRET_NUMBER, SECRET_TEXT = 424242, "secret-name"
 
+-- A row of the settings page by its key (not the per-class ones), and a card by its id.
+local function RowOf(page, key)
+    for _, card in ipairs(page.cards) do
+        for _, row in ipairs(card.rows) do
+            if row.key == key and row.field == nil then return row, card end
+        end
+    end
+end
+
+local function CardOf(page, id)
+    for _, card in ipairs(page.cards) do
+        if card.id == id then return card end
+    end
+end
+
 local function Amount(name) return setmetatable({ name = name }, { __tostring = function() return name end }) end
 
 local function Source(name, class, total, rate, own, guid)
@@ -133,6 +148,7 @@ local function Boot(opts)
                     local page = { store = st, cards = {} }
                     function page:Window(def) self.window = def; return self end
                     function page:Card(def) self.cards[#self.cards + 1] = def; s.page = self; return self end
+                    function page:Info(def) self.infos = self.infos or {}; self.infos[#self.infos + 1] = def; return self end
                     return page
                 end },
         },
@@ -283,9 +299,14 @@ local function Boot(opts)
     end
     s.ns, s.store, s.env = ns, store, env
     if opts.media then
-        s.lsm = { List = function(_, kind) return kind == "background" and { "Marble", "Dots" } or {} end,
+        local all = { Marble = true, Dots = true, Solid = true, ["Blizzard Tooltip"] = true,
+            ["Blizzard Out of Control"] = true, ["Blizzard Low Health"] = true }
+        s.lsm = { List = function(_, kind)
+                return kind == "background" and { "Marble", "Dots", "Solid", "Blizzard Tooltip",
+                    "Blizzard Out of Control", "Blizzard Low Health" } or {}
+            end,
             Fetch = function(_, kind, name)
-                if kind == "background" and (name == "Marble" or name == "Dots") then return "Media\\" .. name end
+                if kind == "background" and all[name] then return "Media\\" .. name end
             end }
     end
     s.DM = ns.DamageMeter
@@ -1244,10 +1265,7 @@ do
     check("and sets it", s.store.Get("lower") == "dps")
 
     local page = s.page
-    local row
-    for _, r in ipairs(page.cards[1].rows) do
-        if r.key == "lower" then row = r end
-    end
+    local row = RowOf(page, "lower")
     check("the settings page has Second List, None among its choices", row and row.choice[1][""] == "None"
         and row.choice[2][1] == "" and row.choice[2][2] == "damage" and row.choice[1].healing == "Healing Done")
 end
@@ -1408,8 +1426,24 @@ do
     s.store.Set("backgroundImage", ""); s.Flush()
     check("none again", w.image.shown == false)
 
+    for _, plain in ipairs({ "Solid", "Blizzard Tooltip", "Blizzard Out of Control", "Blizzard Low Health" }) do
+        s.store.Set("backgroundImage", plain); s.Flush()
+        check(plain .. ": left out, so no picture", w.image.shown == false)
+    end
+    s.store.Set("backgroundImage", "")
+
+    local mine = "Interface\\AddOns\\MyBackgrounds\\panel"
+    s.store.Set("backgroundPath", mine); s.Flush()
+    check("a path typed: that picture", w.image.shown == true and w.image.texture == mine)
+    s.store.Set("backgroundImage", "Marble"); s.Flush()
+    check("takes the place of one picked by name", w.image.texture == mine)
+    s.store.Set("backgroundPath", ""); s.Flush()
+    check("emptied: the one picked by name again", w.image.texture == "Media\\Marble")
+    s.store.Set("backgroundImage", "")
+    s.Flush()
+
     local page = s.page
-    local rows = page.cards[2].rows
+    local rows = CardOf(page, "classColors").rows
     local classRows = {}
     for _, r in ipairs(rows) do
         if r.key == "classColors" then classRows[#classRows + 1] = r end
@@ -1431,20 +1465,14 @@ do
     check("and are off without it", classRows[1].needs() == false)
     s.store.Set("barColor", "class")
 
-    local mine
-    for _, r2 in ipairs(rows) do
-        if r2.key == "ownBarColor" then mine = r2 end
-    end
+    local mine = RowOf(page, "ownBarColor")
     check("a Your Bar Color row, a color picker", mine and mine.colour == true and mine.label == "Your Bar Color")
     s.store.Set("classColors", {})
     local mr, mg, mb = mine.get()
     check("it shows the Accent until one is picked", mr == THEME.accent.r and mg == THEME.accent.g
         and mb == THEME.accent.b)
     check("and is only for Custom Color", mine.needs() == false)
-    local style
-    for _, r2 in ipairs(rows) do
-        if r2.key == "ownBarStyle" then style = r2 end
-    end
+    local style = RowOf(page, "ownBarStyle")
     check("Your Bar: same, class or custom", style and style.choice[2][1] == "bar" and style.choice[2][2] == "class"
         and style.choice[2][3] == "custom" and style.choice[1].class == "Class Color")
     s.store.Set("ownBarStyle", "custom")
@@ -1457,13 +1485,34 @@ do
     check("and it shows it", mr == 0.1 and mg == 0.2)
     s.store.Set("ownBarColor", false)
 
-    local choices
-    for _, r2 in ipairs(page.cards[1].rows) do
-        if r2.key == "backgroundImage" then choices = r2.choice end
-    end
+    local choices = RowOf(page, "backgroundImage").choice
     local values, order = choices()
-    check("the image choices: None, then the media's", values[""] == "None" and order[1] == "" and order[2] == "Marble"
-        and order[3] == "Dots")
+    check("the image choices: None, then the media's, without the plain ones", values[""] == "None"
+        and order[1] == "" and order[2] == "Marble" and order[3] == "Dots" and #order == 3 and values.Solid == nil
+        and values["Blizzard Tooltip"] == nil and values["Blizzard Out of Control"] == nil
+        and values["Blizzard Low Health"] == nil)
+    s.store.Set("backgroundImage", "Solid")
+    values, order = choices()
+    check("one picked before they were left out reads as None, and is not offered", values.Solid == "None"
+        and #order == 3 and RowOf(page, "imageAlpha").needs() == false)
+    s.store.Set("backgroundImage", "")
+    local custom = RowOf(page, "backgroundPath")
+    check("a text row for a path, wide", custom and custom.text == true and custom.wide == true
+        and custom.label == "Custom Image")
+    check("and the image rows follow it", RowOf(page, "imageAlpha").needs() == false)
+    s.store.Set("backgroundPath", "Interface" .. string.char(92) .. "x")
+    check("an image once a path is typed", RowOf(page, "imageAlpha").needs() == true
+        and RowOf(page, "imageTile").needs() == true)
+    s.store.Set("backgroundPath", "")
+    local info = page.infos and page.infos[1]
+    check("a card that says how to add a picture", info and info.id == "images" and info.name == "Add Your Own Image"
+        and #info.lines == 4)
+    local text = {}
+    for _, line in ipairs(info.lines) do text[#text + 1] = line.title .. " " .. line.text end
+    local all = table.concat(text, " ")
+    check("it names the file kinds, the folder, the restart and the box", all:find(".tga", 1, true) ~= nil
+        and all:find("AddOns", 1, true) ~= nil and all:find("Restart the game", 1, true) ~= nil
+        and all:find("Custom Image", 1, true) ~= nil and all:find("power of two", 1, true) ~= nil)
     s.store.Set("backgroundImage", "Lost")
     values, order = choices()
     check("a name that is not there stays chosen, marked", values.Lost == "Lost (unavailable)" and order[4] == "Lost")
@@ -1638,8 +1687,8 @@ do
     two.header.scripts.OnDragStop(two.header)
     check("dragging a window saves its own place", s.store.Get("meterPos2").point == "TOPLEFT"
         and s.settings.meterPos == nil)
-    check("their own name, page and card for Unlock Mode", s.movers["Damage Meter"].card == "Damage Meter/Settings:meter"
-        and s.movers["Damage Meter 2"].card == "Damage Meter/Settings:windows"
+    check("their own name, page and card for Unlock Mode", s.movers["Damage Meter"].card == "Damage Meter/Settings:window"
+        and s.movers["Damage Meter 2"].card == "Damage Meter/Settings:window2"
         and s.movers["Damage Meter 2"].page == "Damage Meter/Settings")
     s.movers["Damage Meter 2"].save({ point = "CENTER", relPoint = "CENTER", x = 5, y = 6 })
     check("a moved window saves its own place", s.store.Get("meterPos2").x == 5 and s.store.Get("meterPos").x == -24)
@@ -1651,6 +1700,16 @@ do
     check("switching one off hides just it", two.shown == false and one.shown == true)
     s.store.Set("enabled", false)
     check("the module off hides all", one.shown == false and not s.Listening())
+end
+
+-- all three windows: each mover points at its own card
+do
+    local s = Boot({ settings = { enabled = true, window2 = true, window3 = true } })
+    s.Login()
+    check("three windows, each with its own card in Unlock Mode", s.Window(3) ~= nil
+        and s.movers["Damage Meter"].card == "Damage Meter/Settings:window"
+        and s.movers["Damage Meter 2"].card == "Damage Meter/Settings:window2"
+        and s.movers["Damage Meter 3"].card == "Damage Meter/Settings:window3")
 end
 
 -- the wheel scrolls the window under it, from its rows or from its frame
@@ -1956,18 +2015,29 @@ do
     local s = Boot()
     local page = s.page
     local C = s.DM.C
-    check("one page, three cards: the meter, its colors and its more windows", page and #page.cards == 3
-        and page.cards[1].id == "meter" and page.cards[2].id == "colors" and page.cards[3].id == "windows"
-        and page.window ~= nil)
+    local ids = {}
+    for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
+    check("fourteen cards, in their order", table.concat(ids, ",") == "lists,window,rows,numbers,header,text,hover,"
+        .. "history,barColors,textColors,windowColors,classColors,window2,window3" and page.window ~= nil)
+    local orders = {}
+    for i, card in ipairs(page.cards) do orders[i] = card.order end
+    local sorted = true
+    for i = 2, #orders do
+        if orders[i] <= orders[i - 1] then sorted = false end
+    end
+    check("each one after the last", sorted)
     check("the heading reads the state", page.window.headline() == "Damage Meter is off")
     s.store.Set("enabled", true)
     check("on: it names the list", page.window.headline() == "Damage Done")
+
     local keys = {}
     for _, card in ipairs(page.cards) do
+        check(card.id .. ": a name and a short help", card.name ~= nil and #card.help < 120)
+        check(card.id .. ": no more than fifteen entries", #card.rows <= 15)
         for _, row in ipairs(card.rows) do
             if row.key then
                 keys[#keys + 1] = row.key
-                check("the setting " .. row.key .. " has a default", s.store.Get(row.key) ~= nil or row.key == "backgroundColor")
+                check("the setting " .. row.key .. " has a default", s.store.Get(row.key) ~= nil)
                 if row.choice then
                     local values, order
                     if type(row.choice) == "function" then
@@ -1982,26 +2052,45 @@ do
             end
         end
     end
-    check("the rows cover the windows, the rows, the hover and the colors", #keys >= 55)
-    check("one short help sentence on each card", #page.cards[1].help < 120 and #page.cards[2].help < 120
-        and #page.cards[3].help < 120)
-    local delay
-    for _, r in ipairs(page.cards[1].rows) do
-        if r.key == "hideDelay" then delay = r end
-    end
-    check("Hide After needs Where on In Combat", delay and delay.needs() == false)
-    s.store.Set("visibility", "combat")
-    check("which turns it on", delay.needs() == true)
-    s.store.Set("visibility", "always")
-    check("the first card's summary reads window one", page.cards[1].summary(s.store) == "Damage Done, 300 by 206")
+    check("every setting of the page is on it once", #keys >= 60)
 
-    local colors = {}
-    for _, row in ipairs(page.cards[2].rows) do
-        if row.colour then colors[row.key] = row end
-    end
+    -- each card says what it holds when it is closed
+    check("Lists", CardOf(page, "lists").summary(s.store) == "Damage Done, current")
+    s.store.Set("lower", "healing"); s.store.Set("session", "overall")
+    check("Lists with a second list and another session", CardOf(page, "lists").summary(s.store)
+        == "Damage Done over Healing Done, overall")
+    s.store.Set("lower", ""); s.store.Set("session", "current")
+    check("Window", CardOf(page, "window").summary(s.store) == "300 by 206")
+    s.store.Set("locked", true)
+    check("Window, locked", CardOf(page, "window").summary(s.store) == "300 by 206, locked")
+    s.store.Set("locked", false)
+    check("Rows", CardOf(page, "rows").summary(s.store) == "20 px rows, 2 px apart")
+    check("Numbers and Names", CardOf(page, "numbers").summary(s.store) == "Game Default, Full Name")
+    check("Title Bar", CardOf(page, "header").summary(s.store) == "Time on, summary off")
+    check("Text and Bars", CardOf(page, "text").summary(s.store) == "Size 11")
+    check("Hover and Report", CardOf(page, "hover").summary(s.store) == "Spells on, reports of 5 lines")
+    check("Fight History", CardOf(page, "history").summary(s.store) == "0 of 30 fights kept")
+    s.store.Set("history", { {}, {} })
+    check("Fight History counts them", CardOf(page, "history").summary(s.store) == "2 of 30 fights kept")
+    s.store.Set("history", {})
+    check("Bar Colors", CardOf(page, "barColors").summary(s.store) == "Class Colors")
+    check("Text Colors and Window Colors", CardOf(page, "textColors").summary(s.store) == "Theme"
+        and CardOf(page, "windowColors").summary(s.store) == "Theme")
+    s.store.Set("nameColor", { r = 1, g = 1, b = 1 })
+    s.store.Set("rankColor", { r = 1, g = 1, b = 1 })
+    s.store.Set("borderColor", { r = 1, g = 1, b = 1 })
+    check("and count what was picked, each its own", CardOf(page, "textColors").summary(s.store) == "2 picked"
+        and CardOf(page, "windowColors").summary(s.store) == "1 picked")
+    s.store.Set("nameColor", false); s.store.Set("rankColor", false); s.store.Set("borderColor", false)
+    check("Class Colors", CardOf(page, "classColors").summary(s.store) == "The game's")
+    s.store.Set("classColors", { MAGE = { r = 1, g = 0, b = 0 } })
+    check("Class Colors counted", CardOf(page, "classColors").summary(s.store) == "1 picked")
+    s.store.Set("classColors", {})
+
+    -- every color is a picker that shows the theme's until one is picked
     for _, entry in ipairs(C.COLORS) do
-        local row = colors[entry.key]
-        check(entry.key .. ": a color row, labeled", row and row.label == entry.label)
+        local row = RowOf(page, entry.key)
+        check(entry.key .. ": a color row, labeled", row and row.colour == true and row.label == entry.label)
         local token = THEME[entry.token]
         local r, g, b = row.get()
         check(entry.key .. ": shows the theme's " .. entry.token .. " until one is picked",
@@ -2013,44 +2102,61 @@ do
         check(entry.key .. ": and shows it", r == 0.1 and g == 0.2 and b == 0.3)
         s.store.Set(entry.key, false)
     end
-    check("the colors card counts what was picked", page.cards[2].summary(s.store) == "Theme")
-    s.store.Set("nameColor", { r = 1, g = 1, b = 1 })
-    s.store.Set("rankColor", { r = 1, g = 1, b = 1 })
-    check("and says how many", page.cards[2].summary(s.store) == "2 picked")
-    s.store.Set("nameColor", false); s.store.Set("rankColor", false)
-
-    check("the custom bar color needs Custom Color", colors.barCustomColor.needs() == false)
-    s.store.Set("barColor", "custom")
-    check("which turns it on", colors.barCustomColor.needs() == true)
-    check("the edge color needs Custom Color for the edge", colors.edgeColor.needs() == false)
-    s.store.Set("edgeStyle", "custom")
-    check("which turns it on", colors.edgeColor.needs() == true)
-    s.store.Set("highlightPlayer", false)
-    check("and Highlight Your Row", colors.edgeColor.needs() == false)
-    s.store.Set("highlightPlayer", true)
-    s.store.Set("edgeStyle", "accent")
-    local edge
-    for _, r2 in ipairs(page.cards[2].rows) do
-        if r2.key == "edgeStyle" then edge = r2 end
+    local where = {}
+    for _, entry in ipairs(C.COLORS) do
+        local _, card = RowOf(page, entry.key)
+        where[entry.key] = card.id
     end
-    check("Your Row Edge: the Accent, your class or custom", edge and edge.choice[2][1] == "accent"
-        and edge.choice[2][2] == "class" and edge.choice[2][3] == "custom" and edge.needs() == true)
-    s.store.Set("highlightPlayer", false)
-    check("and only with Highlight Your Row", edge.needs() == false)
-    s.store.Set("highlightPlayer", true)
+    check("the colors sit on their cards", where.nameColor == "textColors" and where.summaryColor == "textColors"
+        and where.windowColor == "windowColors" and where.borderColor == "windowColors"
+        and where.barCustomColor == "barColors" and where.ownBarColor == "barColors" and where.edgeColor == "barColors")
 
-    check("the closed windows say off", page.cards[3].summary(s.store) == "Second: Off, Third: Off")
-    s.store.Set("window2", true)
+    check("the custom bar color needs Custom Color", RowOf(page, "barCustomColor").needs() == false)
+    s.store.Set("barColor", "custom")
+    check("which turns it on", RowOf(page, "barCustomColor").needs() == true)
+    s.store.Set("barColor", "class")
+    check("the edge color needs Custom Color for the edge", RowOf(page, "edgeColor").needs() == false)
+    s.store.Set("edgeStyle", "custom")
+    check("which turns it on", RowOf(page, "edgeColor").needs() == true)
+    s.store.Set("highlightPlayer", false)
+    check("and Highlight Your Row", RowOf(page, "edgeColor").needs() == false)
+    local edge = RowOf(page, "edgeStyle")
+    check("Your Row Edge: the Accent, your class or custom", edge.choice[2][1] == "accent"
+        and edge.choice[2][2] == "class" and edge.choice[2][3] == "custom" and edge.needs() == false)
+    s.store.Set("highlightPlayer", true)
+    check("and only with Highlight Your Row", edge.needs() == true)
+    s.store.Set("edgeStyle", "accent")
+
+    -- the second and third windows: a switch each, and their own rows
+    for _, n in ipairs({ 2, 3 }) do
+        local card = CardOf(page, "window" .. n)
+        check("window" .. n .. ": a switch on its own setting", card.switch == "window" .. n)
+        local got = {}
+        for _, row in ipairs(card.rows) do got[#got + 1] = row.key end
+        check("window" .. n .. ": its own list, second list, session and size", table.concat(got, ",")
+            == ("mode%d,lower%d,session%d,width%d,height%d"):format(n, n, n, n, n))
+    end
     s.store.Set("mode2", "healing")
-    check("an open one reads its own list", page.cards[3].summary(s.store) == "Second: Healing Done, Third: Off")
-    local more = page.cards[3].rows
-    check("each window has a group and six rows, with its own keys", #more == 14 and more[2].key == "window2"
-        and more[3].key == "mode2" and more[4].key == "lower2" and more[7].key == "height2" and more[9].key == "window3"
-        and more[14].key == "height3")
-    check("the labels differ across the card", more[3].label ~= more[10].label and more[2].label ~= more[9].label)
-    check("an open window's rows are enabled", more[2].needs() == true and more[3].needs() == true)
-    s.store.Set("window2", false)
-    check("closed: its own rows are disabled, its toggle is not", more[3].needs() == false and more[2].needs() == true)
+    check("a second window reads its own list and size", CardOf(page, "window2").summary(s.store)
+        == "Healing Done, 300 by 206")
+    check("and the third its own", CardOf(page, "window3").summary(s.store) == "Damage Taken, 300 by 206")
+
+    -- the time of the fight, and Hide After
+    local delay = RowOf(page, "hideDelay")
+    check("Hide After needs Where on In Combat", delay.needs() == false)
+    s.store.Set("visibility", "combat")
+    check("which turns it on", delay.needs() == true)
+    s.store.Set("visibility", "always")
+    local decimals = RowOf(page, "numberDecimals")
+    check("Decimals need a format that abbreviates", decimals.needs() == false)
+    s.store.Set("numberUnits", "latin")
+    check("which Ten-thousands and K, M, B are", decimals.needs() == true)
+    s.store.Set("numberUnits", "game")
+    local image = RowOf(page, "imageAlpha")
+    check("the image rows need an image", image.needs() == false and RowOf(page, "imageTile").needs() == false)
+    s.store.Set("backgroundImage", "Marble")
+    check("and have one", image.needs() == true and RowOf(page, "imageTile").needs() == true)
+    s.store.Set("backgroundImage", "")
 end
 
 print("PASS damage meter: " .. checks .. " checks")

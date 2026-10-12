@@ -37,6 +37,9 @@ ns.DamageMeter.C = {
     NUMBER_UNITS = { game = "Game Default", latin = "K, M, B", asian = "Ten-thousands", full = "Full Numbers" },
     NUMBER_UNITS_ORDER = { "game", "latin", "asian", "full" },
     NUMBER_DECIMALS_MAX = 2, MAX_HIDE_DELAY = 60, MIN_KEEP = 5, MAX_KEEP = 100,
+    -- Pictures the shared media lists that are not backgrounds worth putting behind a meter.
+    HIDDEN_BACKGROUNDS = { ["Solid"] = true, ["Blizzard Tooltip"] = true, ["Blizzard Out of Control"] = true,
+        ["Blizzard Low Health"] = true },
     BAR_COLORS = { class = "Class Colors", accent = "Theme Accent", custom = "Custom Color" },
     BAR_COLORS_ORDER = { "class", "accent", "custom" },
     OWN_BAR_STYLES = { bar = "Same as Bar Color", class = "Class Color", custom = "Custom Color" },
