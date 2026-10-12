@@ -45,10 +45,10 @@ local function SharedMedia()
     return LibStub and LibStub("LibSharedMedia-3.0", true)
 end
 
--- The path of the background in use: the path typed in the settings, or else the one picked by name from
--- the shared media. Nil for none.
-local function ImagePath(name, typed)
-    if type(typed) == "string" and typed ~= "" then return typed end
+-- The path of the background in use: the path typed in the settings when your own picture is on, or else
+-- the one picked by name from the shared media. Nil for none.
+local function ImagePath(name, typed, own)
+    if own then return typed ~= "" and typed or nil end
     if C.HIDDEN_BACKGROUNDS[name] then return nil end
     local LSM = SharedMedia()
     return LSM and name and name ~= "" and LSM:Fetch("background", name, true) or nil
@@ -263,7 +263,7 @@ end
 -- The picture behind the rows: stretched over the window, or repeated with each repeat tileSize wide.
 -- The repeat is worked out here from the window's size, since a picture's own size is not known.
 local function LayImage(f, g, w, h)
-    local path = ImagePath(g.image, g.path)
+    local path = ImagePath(g.image, g.path, g.own)
     f.image:SetShown(path ~= nil)
     if not path then
         f.imageKey = nil
@@ -366,6 +366,7 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
     g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
     g.image, g.path, g.tile = S.Get("backgroundImage"), S.Get("backgroundPath"), S.Get("imageTile") == true
+    g.own = S.Get("customImage") == true
     g.tileSize = math.max(C.MIN_TILE, S.Get("imageTileSize"))
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP

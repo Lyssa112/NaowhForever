@@ -448,6 +448,16 @@ hooksecurefunc(ns, "Apply", Apply)
 hooksecurefunc(ns, "ShowUnlockMode", OnUnlock)
 hooksecurefunc(ns, "HideUnlockMode", OnLock)
 
+-- Settings from before: a background the page no longer lists is none, and a path typed before there was a
+-- switch is your own picture.
+local function Tidy()
+    if C.HIDDEN_BACKGROUNDS[S.Get("backgroundImage")] then S.Set("backgroundImage", "") end
+    if S.Raw and S.Raw("customImage") == nil and S.Get("backgroundPath") ~= "" then S.Set("customImage", true) end
+end
+
 local boot = CreateFrame("Frame")
 boot:RegisterEvent("PLAYER_LOGIN")
-boot:SetScript("OnEvent", Apply)
+boot:SetScript("OnEvent", function()
+    Tidy()
+    Apply()
+end)

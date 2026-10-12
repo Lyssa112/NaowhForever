@@ -124,6 +124,7 @@ local function Boot(opts)
     end
     function store.Set(k, v) s.settings[k] = v end
     function store.DB() return s.settings end
+    function store.Raw(k) return s.settings[k] end
     local session = { combatSources = { Source("Aldrin", "MAGE", "A", "a", false, "Player-2"),
         Source("You", "ROGUE", "B", "b", true, "Player-1"), Source("Cara", "MAGE", "C", "c", false, "Player-3") },
         maxAmount = Amount("max"), totalAmount = Amount("total") }
@@ -134,6 +135,7 @@ local function Boot(opts)
         UI = {
             ModuleSettings = function(_, d) defaults = d; return store end,
             TexturePath = function(name, fallback) return name ~= "" and name or fallback end,
+            RefreshPage = function() s.refreshed = (s.refreshed or 0) + 1 end,
             AttachMover = function(frame, label, onSave, page, card)
                 local m = Region("Mover", frame)
                 s.mover = m
@@ -145,6 +147,13 @@ local function Boot(opts)
             Style = { ICON_CROP = 0.08, ALPHA_RANGE = { 0, 100, 5 }, OPACITY_STEP = 5, PERCENT_SCALE = 0.01 },
             Parts = { HudFont = function(fs, font, size) fs.fontSize = size; fs.font = font end },
             Settings = { Group = function(name) return { group = name } end, Look = function(_, o) return { look = o } end,
+                CardOf = function(uid)
+                    local id = uid:match(":([^:]+)$")
+                    for _, info in ipairs(s.page and s.page.infos or {}) do
+                        if info.id == id then return info end
+                    end
+                end,
+                SetOpen = function(card, on) card.opened = on end,
                 Page = function(_, st)
                     local page = { store = st, cards = {} }
                     function page:Window(def) self.window = def; return self end
@@ -1291,6 +1300,23 @@ do
     check("its menu sets its own key", s.store.Get("lower2") == "absorbs" and s.settings.lower == nil)
 end
 
+-- settings from before are tidied once, at login
+do
+    local s = Boot({ settings = { enabled = true, backgroundPath = "Interface\\x", backgroundImage = "Solid" } })
+    s.Login()
+    check("a path typed before there was a switch turns it on", s.store.Get("customImage") == true)
+    check("a background the page no longer lists is none", s.store.Get("backgroundImage") == "")
+    local chosen = Boot({ settings = { enabled = true, backgroundPath = "Interface\\x", customImage = false } })
+    chosen.Login()
+    check("a switch left off on purpose stays off", chosen.store.Get("customImage") == false)
+    local plain = Boot({ settings = { enabled = true, backgroundImage = "Marble" } })
+    plain.Login()
+    check("nothing to tidy: nothing changed", plain.settings.customImage == nil and plain.store.Get("backgroundImage") == "Marble")
+    local listed = Boot({ settings = { enabled = true } })
+    listed.Login()
+    check("and nothing set that was not", listed.settings.customImage == nil and listed.settings.backgroundImage == nil)
+end
+
 -- Raid Mode: your row alone
 do
     local s = Boot({ settings = { enabled = true } })
@@ -1456,11 +1482,15 @@ do
 
     local mine = "Interface\\AddOns\\MyBackgrounds\\panel"
     s.store.Set("backgroundPath", mine); s.Flush()
-    check("a path typed: that picture", w.image.shown == true and w.image.texture == mine)
+    check("a path typed does nothing until Use Your Own Picture is on", w.image.shown == false)
+    s.store.Set("customImage", true); s.Flush()
+    check("on: that picture", w.image.shown == true and w.image.texture == mine)
     s.store.Set("backgroundImage", "Marble"); s.Flush()
-    check("takes the place of one picked by name", w.image.texture == mine)
+    check("and the one picked by name is not used", w.image.texture == mine)
     s.store.Set("backgroundPath", ""); s.Flush()
-    check("emptied: the one picked by name again", w.image.texture == "Media\\Marble")
+    check("an empty path: no picture, not the one picked by name", w.image.shown == false)
+    s.store.Set("customImage", false); s.Flush()
+    check("off: the one picked by name again", w.image.texture == "Media\\Marble")
     s.store.Set("backgroundImage", "")
     s.Flush()
 
@@ -1521,11 +1551,30 @@ do
     local custom = RowOf(page, "backgroundPath")
     check("a text row for a path, wide", custom and custom.text == true and custom.wide == true
         and custom.label == "Custom Image")
-    check("and the image rows follow it", RowOf(page, "imageAlpha").needs() == false)
+    local own, listed = RowOf(page, "customImage"), RowOf(page, "backgroundImage")
+    check("a switch for your own picture, off", own and own.toggle == true and own.label == "Use Your Own Picture"
+        and s.store.Get("customImage") == false)
+    check("off: Image is on and Custom Image greyed", listed.needs() == true and custom.needs() == false)
+    s.store.Set("customImage", true)
+    check("on: Image is greyed and Custom Image is on", listed.needs() == false and custom.needs() == true)
+    check("each says why", listed.why == "Use Your Own Picture is on" and custom.why == "Turn on Use Your Own Picture")
+    check("and the image rows wait for a path", RowOf(page, "imageAlpha").needs() == false)
     s.store.Set("backgroundPath", "Interface" .. string.char(92) .. "x")
     check("an image once a path is typed", RowOf(page, "imageAlpha").needs() == true
         and RowOf(page, "imageTile").needs() == true)
-    s.store.Set("backgroundPath", "")
+    s.store.Set("backgroundPath", ""); s.store.Set("customImage", false)
+    local howTo, hostCard
+    for _, card in ipairs(page.cards) do
+        for _, row in ipairs(card.rows) do
+            if row.label == "Adding a Picture" then howTo, hostCard = row, card end
+        end
+    end
+    check("a button for how to add a picture, inside the Window card", howTo and hostCard.id == "window"
+        and howTo.buttonText == "Show How")
+    local infoCard = page.infos[1]
+    check("the card of its own is shut", infoCard.opened == nil)
+    howTo.button()
+    check("the button opens it, and draws the page again", infoCard.opened == true and s.refreshed == 1)
     local info = page.infos and page.infos[1]
     check("a card that says how to add a picture", info and info.id == "images" and info.name == "Add Your Own Image"
         and #info.lines == 5)
@@ -1538,6 +1587,7 @@ do
         and all:find("Custom Image", 1, true) ~= nil and all:find("powers of two", 1, true) ~= nil)
     check("it says a .jpg is not read, and what a green square means", all:find(".jpg", 1, true) ~= nil
         and all:find("green square", 1, true) ~= nil)
+    check("and to turn the switch on", all:find("Use Your Own Picture", 1, true) ~= nil)
     check("and the extension is part of the path", all:find("panel.png", 1, true) ~= nil)
     s.store.Set("backgroundImage", "Lost")
     values, order = choices()
@@ -2148,7 +2198,7 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("fifteen cards, in their order", table.concat(ids, ",") == "lists,window,image,rows,numbers,header,text,hover,"
+    check("fourteen cards, in their order", table.concat(ids, ",") == "lists,window,rows,numbers,header,text,hover,"
         .. "history,barColors,textColors,windowColors,classColors,window2,window3" and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end
@@ -2206,14 +2256,6 @@ do
     s.store.Set("locked", true)
     check("Window, locked", CardOf(page, "window").summary(s.store) == "300 by 206, locked")
     s.store.Set("locked", false)
-    check("Background Image", CardOf(page, "image").summary(s.store) == "None")
-    s.store.Set("backgroundImage", "Marble")
-    check("Background Image names it", CardOf(page, "image").summary(s.store) == "Marble")
-    s.store.Set("backgroundImage", "Solid")
-    check("one the page leaves out reads as none", CardOf(page, "image").summary(s.store) == "None")
-    s.store.Set("backgroundImage", ""); s.store.Set("backgroundPath", "Interface\\x")
-    check("a path typed", CardOf(page, "image").summary(s.store) == "Your own picture")
-    s.store.Set("backgroundPath", "")
     check("Rows", CardOf(page, "rows").summary(s.store) == "20 px rows, 2 px apart")
     check("Numbers and Names", CardOf(page, "numbers").summary(s.store) == "Game Default, Full Name")
     check("Title Bar", CardOf(page, "header").summary(s.store) == "Time on, summary off")

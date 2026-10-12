@@ -19,6 +19,8 @@ local OFF_CLASS = "Set Bar Color to Class Colors"
 local OFF_IMAGE = "Pick a Background Image"
 local OFF_COMBAT = "Set Where to In Combat"
 local OFF_TILE = "Turn on Tile Image"
+local OFF_OWN = "Turn on Use Your Own Picture"
+local OFF_LISTED = "Use Your Own Picture is on"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local BAR_RANGE, SPACING_RANGE = { C.MIN_BAR, C.MAX_BAR, 1 }, { 0, C.MAX_SPACING, 1 }
@@ -59,9 +61,15 @@ local function EdgeCustom()
     return DM.On() and S.Get("highlightPlayer") == true and S.Get("edgeStyle") == "custom"
 end
 local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
+-- A picture from the shared media is picked, or your own is on: only one of them is used at a time.
+local function OwnPicture() return S.Get("customImage") == true end
+local function ListedPicture() return DM.On() and not OwnPicture() end
+local function PicturePath() return DM.On() and OwnPicture() end
 local function HasImage()
+    if not DM.On() then return false end
+    if OwnPicture() then return S.Get("backgroundPath") ~= "" end
     local picked = S.Get("backgroundImage")
-    return DM.On() and (S.Get("backgroundPath") ~= "" or (picked ~= "" and not C.HIDDEN_BACKGROUNDS[picked]))
+    return picked ~= "" and not C.HIDDEN_BACKGROUNDS[picked]
 end
 local function TilesImage() return HasImage() and S.Get("imageTile") == true end
 local function Abbreviating()
@@ -88,11 +96,11 @@ local function ListsSummary(store)
     return ("%s, %s"):format(text, (C.SESSION_LABELS[store.Get("session")] or C.SESSION_LABELS.current):lower())
 end
 
-local function ImageSummary(store)
-    if store.Get("backgroundPath") ~= "" then return "Your own picture" end
-    local picked = store.Get("backgroundImage")
-    if picked == "" or C.HIDDEN_BACKGROUNDS[picked] then return "None" end
-    return picked
+-- Opens the how-to card, under the cards, and draws the page again so it shows.
+local function OpenHowTo()
+    local card = Settings.CardOf(C.PAGE .. ":images")
+    if card then Settings.SetOpen(card, true) end
+    if ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
 end
 
 local function WindowSummary(store)
@@ -262,7 +270,7 @@ page:Window({
 
 page:Card({
     id = "lists", name = "Lists", order = 10,
-    help = "What the window lists, for which session, and when it shows.",
+    help = "What the window lists, for which session, and when it shows. Preview shows it with sample bars.",
     summary = ListsSummary,
     rows = {
         { key = "mode", label = "Show", choice = MODE, needs = Enabled, why = OFF,
@@ -273,18 +281,24 @@ page:Card({
           help = "The current fight, or everything since the last reset. Past fights are in the window's "
               .. "Session button." },
         Group("Showing"),
+        { key = "hideGameMeter", label = "Replace the Game's Meter", toggle = true, needs = Enabled, why = OFF,
+          help = "Turns the game's own damage meter off while this one is on." },
         { key = "visibility", label = "Where", choice = SHOW, needs = Enabled, why = OFF,
           help = "In Combat shows it while you fight and a while after. A key binding shows or hides it." },
         { key = "hideDelay", label = "Hide After", slider = DELAY_RANGE, unit = "s", needs = HidesAfterCombat,
           why = OFF_COMBAT },
         { key = "raidMode", label = "Raid Mode", toggle = true, needs = Enabled, why = OFF,
           help = "Only your own row, with your rank, in place of the whole group." },
+        { label = "Show It on Screen", buttonText = "Preview", needs = Enabled, why = OFF,
+          button = function() ns.PreviewDamageMeter() end,
+          help = "Shows the meter with sample bars where it sits on your screen, for ten seconds. Out of "
+              .. "combat only." },
     },
 })
 
 page:Card({
     id = "window", name = "Window", order = 20,
-    help = "Its size, its look and the game's own meter. Move it in the HUD Editor.",
+    help = "Its size, its background and its picture. Move it in the HUD Editor.",
     summary = WindowSummary,
     rows = {
         Group("Size"),
@@ -296,28 +310,16 @@ page:Card({
         { key = "backgroundAlpha", label = "Opacity", slider = BACKGROUND_RANGE, unit = "%",
           scale = TO_FRACTION, needs = Enabled, why = OFF },
         { key = "showBorder", label = "Border", toggle = true, needs = Enabled, why = OFF },
-        Group("Game's Meter"),
-        { key = "hideGameMeter", label = "Replace the Game's Meter", toggle = true, needs = Enabled, why = OFF,
-          help = "Turns the game's own damage meter off while this one is on." },
-        Group("Preview"),
-        { label = "Show It on Screen", buttonText = "Preview", needs = Enabled, why = OFF,
-          button = function() ns.PreviewDamageMeter() end,
-          help = "Shows the meter with sample bars where it sits on your screen, for ten seconds. Out of "
-              .. "combat only." },
-    },
-})
-
-page:Card({
-    id = "image", name = "Background Image", order = 22,
-    help = "A picture behind the rows. To use your own, see Add Your Own Image.",
-    summary = ImageSummary,
-    rows = {
         Group("Picture"),
-        { key = "backgroundImage", label = "Image", choice = ImageChoices, needs = Enabled, why = OFF,
-          help = "From a shared media add-on." },
-        { key = "backgroundPath", label = "Custom Image", text = true, wide = true, needs = Enabled, why = OFF,
-          help = "The path of a picture you added. It takes the place of Image." },
-        Group("Look"),
+        { key = "customImage", label = "Use Your Own Picture", toggle = true, needs = Enabled, why = OFF,
+          help = "Show a picture you added, by its path, in place of one from the list. Only one is used." },
+        { key = "backgroundImage", label = "Image", choice = ImageChoices, needs = ListedPicture, why = OFF_LISTED,
+          help = "A picture from a shared media add-on." },
+        { key = "backgroundPath", label = "Custom Image", text = true, wide = true, needs = PicturePath,
+          why = OFF_OWN, help = "The path of the picture you added." },
+        { label = "Adding a Picture", buttonText = "Show How", needs = Enabled, why = OFF,
+          button = function() OpenHowTo() end,
+          help = "Opens Add Your Own Image, below this card." },
         { key = "imageAlpha", label = "Image Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION,
           needs = HasImage, why = OFF_IMAGE },
         { key = "imageTile", label = "Tile Image", toggle = true, needs = HasImage, why = OFF_IMAGE,
@@ -339,9 +341,10 @@ page:Info({
             .. "such as MyBackgrounds, and put the file in it, for instance MyBackgrounds\\panel.png. A folder "
             .. "of your own is not touched when add-ons are updated. Restart the game once so it finds "
             .. "the file." },
-        { title = "What to type", text = "In Custom Image, under Background Image, write the path from Interface, with "
-            .. "backslashes and with the file's extension: Interface\\AddOns\\MyBackgrounds\\panel.png. It "
-            .. "takes the place of Image. Empty it to go back." },
+        { title = "What to do in the settings", text = "In the Window card, under Picture, turn on Use Your Own "
+            .. "Picture and write the path from Interface in Custom Image, with backslashes and with the "
+            .. "file's extension: Interface\\AddOns\\MyBackgrounds\\panel.png. While it is on, Image is "
+            .. "not used. Turn it off to go back to Image." },
         { title = "If it is a green square", text = "The game did not find the file. Check the folder name, "
             .. "the spelling and the extension, and that the game was restarted after the file was added." },
         { title = "Or a media add-on", text = "An add-on that adds pictures to the shared media, such as a "
