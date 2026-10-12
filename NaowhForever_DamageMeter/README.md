@@ -50,6 +50,13 @@ NaowhForever_DamageMeter/
 - The windows are plain frames, so they move and resize in combat; only Lock Window stops that. The
   sizing flag lives on the frame (`frame.sizing`), which is what the layout reads while the client
   resizes it.
+- A row has two value columns, the total and the per-second figure, each its own text with a title
+  above it. The DPS and HPS lists are the game's own, sorted by the per-second figure, so they lead
+  with it and the bars still show the total, as the game's meter does.
+- Number formats go through the client's `AbbreviateNumbers` with a config of breakpoints (`DM.Format`),
+  which takes a secret and returns a string made from it, so K / M / B, a chosen number of decimals,
+  ten-thousands (by the client's locale) and full numbers all work in combat. A client without it
+  falls back to `AbbreviateLargeNumbers`.
 - Interrupts, Dispels and Deaths have no per-second figure, so Show Per Second skips them. Deaths has
   no spells either.
 - Windows 2 and 3 use the first window's keys with their number added (`mode2`, `width3`,

@@ -13,6 +13,7 @@ local OFF = "Turn on the Damage Meter"
 local OFF_WINDOW = "Turn this window on first"
 local OFF_CUSTOM = "Set Bar Color to Custom Color"
 local OFF_HIGHLIGHT = "Turn on Highlight Your Row"
+local OFF_ABBREVIATING = "Number Format is Game Default or Full Numbers"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local BAR_RANGE, SPACING_RANGE = { C.MIN_BAR, C.MAX_BAR, 1 }, { 0, C.MAX_SPACING, 1 }
@@ -29,10 +30,16 @@ local SHOW = { { always = "Always", instance = "In Instances", group = "In a Gro
 local BAR_COLOR = { { class = "Class Colors", accent = "Theme Accent", custom = "Custom Color" },
     { "class", "accent", "custom" } }
 local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "class" } }
+local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
+local DECIMALS_RANGE = { 0, C.NUMBER_DECIMALS_MAX, 1 }
 
 local function Enabled() return DM.On() and true or false end
 local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
 local function Highlighting() return DM.On() and S.Get("highlightPlayer") == true end
+local function Abbreviating()
+    local units = S.Get("numberUnits")
+    return DM.On() and (units == "latin" or units == "asian")
+end
 
 local function Headline()
     if not DM.On() then return "Damage Meter is off" end
@@ -166,6 +173,12 @@ page:Card({
         { key = "showTotal", label = "Show Total", toggle = true, needs = Enabled, why = OFF },
         { key = "showRate", label = "Show Per Second", toggle = true, needs = Enabled, why = OFF,
           help = "Damage, healing and absorbs only." },
+        { key = "showColumnHeaders", label = "Column Titles", toggle = true, needs = Enabled, why = OFF,
+          help = "A line of titles above the rows: Name and what each column shows." },
+        { key = "numberUnits", label = "Number Format", choice = NUMBER_UNITS, needs = Enabled, why = OFF,
+          help = "How big numbers are written. Ten-thousands groups by ten-thousands and hundred-millions." },
+        { key = "numberDecimals", label = "Decimals", slider = DECIMALS_RANGE, needs = Abbreviating,
+          why = OFF_ABBREVIATING },
         { key = "showIcons", label = "Icons", toggle = true, needs = Enabled, why = OFF },
         { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
         { key = "showRanks", label = "Rank Numbers", toggle = true, needs = Enabled, why = OFF },

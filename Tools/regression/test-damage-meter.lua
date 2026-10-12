@@ -170,8 +170,14 @@ local function Boot(opts)
             return (type(v) == "table" and v.secret == true) or v == SECRET_NUMBER or v == SECRET_TEXT
         end,
         AbbreviateLargeNumbers = function(n) return "<" .. tostring(n) .. ">" end,
-        Enum = { DamageMeterType = { DamageDone = 0, HealingDone = 2, DamageTaken = 7, AvoidableDamageTaken = 8,
-                Absorbs = 4, Interrupts = 5, Dispels = 6, Deaths = 9 },
+        CreateAbbreviateConfig = function(rows) s.configs = (s.configs or 0) + 1; return { rows = rows } end,
+        AbbreviateNumbers = function(n, options)
+            s.abbreviated = { n = n, rows = options.config.rows }
+            return "{" .. tostring(n) .. ":" .. #options.config.rows .. "}"
+        end,
+        GetLocale = function() return s.locale or "enUS" end,
+        Enum = { DamageMeterType = { DamageDone = 0, Dps = 1, HealingDone = 2, Hps = 3, DamageTaken = 7,
+                AvoidableDamageTaken = 8, Absorbs = 4, Interrupts = 5, Dispels = 6, Deaths = 9 },
             DamageMeterSessionType = { Overall = 0, Current = 1 } },
         C_DamageMeter = {
             GetCombatSessionFromType = function(kind, type)
@@ -288,8 +294,11 @@ do
     check("class colors by default", s.store.Get("barColor") == "class")
     local DM = s.DM
     local C = DM.C
-    check("eight lists, in order", #C.MODES == 8 and C.MODE_ORDER[1] == "damage" and C.MODE_ORDER[4] == "avoidable"
-        and C.MODE_ORDER[8] == "deaths")
+    check("ten lists, in order", #C.MODES == 10 and C.MODE_ORDER[1] == "damage" and C.MODE_ORDER[2] == "dps"
+        and C.MODE_ORDER[4] == "hps" and C.MODE_ORDER[6] == "avoidable" and C.MODE_ORDER[10] == "deaths")
+    check("DPS and HPS are the game's own lists and lead with the per-second figure",
+        DM.Mode("dps").type == "Dps" and DM.Mode("hps").type == "Hps" and DM.Mode("dps").rateFirst == true
+        and DM.Mode("damage").rateFirst == nil)
     check("each has its game type", DM.Mode("healing").type == "HealingDone" and DM.Mode("deaths").type == "Deaths"
         and DM.Mode("avoidable").type == "AvoidableDamageTaken" and DM.Mode("interrupts").rate == false
         and DM.Mode("damage").rate == true)
@@ -429,7 +438,8 @@ do
     check("on: three rows", #w.rows == 3 and w.rows[3].shown)
     local first, own = w.rows[1], w.rows[2]
     check("the name goes straight to the text", first.name.text == "Aldrin")
-    check("the value shows total and per second, secret-safe", first.value.text == "<A> (<a>)")
+    check("two columns: the total, then the per-second figure, secret-safe", first.colA.text == "<A>"
+        and first.colB.text == "<a>" and first.colA.shown == true and first.colB.shown == true)
     check("the bar is the amount out of the maximum", first.barMax == s.session.maxAmount
         and first.barValue == s.session.combatSources[1].totalAmount)
     check("class colors", first.color[1] == CLASS.MAGE.r and own.color[1] == CLASS.ROGUE.r)
@@ -448,15 +458,16 @@ do
     s.store.Set("barColor", "class")
     s.store.Set("showRate", false)
     s.Flush()
-    check("Show Per Second off: the total alone", first.value.text == "<A>")
+    check("Show Per Second off: the total alone, in the right column", first.colB.text == "<A>"
+        and first.colA.shown == false)
     s.store.Set("showTotal", false)
     s.store.Set("showRate", true)
     s.Flush()
-    check("Show Total off: the rate alone", first.value.text == "<a>")
+    check("Show Total off: the rate alone", first.colB.text == "<a>" and first.colA.shown == false)
     s.store.Set("showTotal", true)
     s.store.Set("mode", "interrupts")
     s.Flush()
-    check("a list without a rate shows the total", first.value.text == "<A>")
+    check("a list without a rate shows the total", first.colB.text == "<A>" and first.colA.shown == false)
     check("and is titled so", w.title.text == "Interrupts")
     check("and the API was asked for it", s.calls[#s.calls][2] == 5)
 end
@@ -488,6 +499,91 @@ do
     check("the sample has a length too", w.time.text == "3:25")
 end
 
+-- the columns and their titles
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    check("column titles over the columns, from the list", w.headName.shown == true and w.headName.text == "Name"
+        and w.headA.text == "Damage" and w.headB.text == "DPS" and w.headA.shown == true and w.headB.shown == true)
+    check("each column as wide as seven characters of the text size", w.rows[1].colA.w == 47 and w.rows[1].colB.w == 47)
+    check("the name stops short of both columns", w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 6 + 6))
+    s.store.Set("showRate", false); s.Flush()
+    check("one column takes less room", w.rows[1].name.points[2][2] == -(6 + 47 + 6))
+    s.store.Set("showTotal", false); s.Flush()
+    check("none: both hidden and the name takes the row", w.rows[1].colA.shown == false and w.rows[1].colB.shown == false
+        and w.rows[1].name.points[2][2] == -12 and w.headB.shown == false)
+    s.store.Set("showTotal", true); s.store.Set("showRate", true); s.Flush()
+    s.store.Set("mode", "healing"); s.Flush()
+    check("a list names its own columns", w.headA.text == "Healing" and w.headB.text == "HPS")
+    s.store.Set("mode", "dps"); s.Flush()
+    check("DPS leads with the per-second figure", w.headA.text == "DPS" and w.headB.text == "Damage"
+        and w.rows[1].colA.text == "<a>" and w.rows[1].colB.text == "<A>")
+    s.store.Set("mode", "interrupts"); s.Flush()
+    check("a list with one column has one title", w.headB.text == "Interrupts" and w.headA.shown == false)
+    s.store.Set("mode", "damage"); s.store.Set("showColumnHeaders", false); s.Flush()
+    check("Column Titles off: none, and the rows move up", w.headName.shown == false and w.headB.shown == false)
+    local up = w.rows[1].points[1][5]
+    s.store.Set("showColumnHeaders", true); s.Flush()
+    check("on they are back, and the rows sit below them", w.headB.shown == true
+        and w.rows[1].points[1][5] == up - 16)
+    s.store.Set("showRanks", false); s.Flush()
+    check("the Name title follows the rank column", w.headName.points[1][4] == 12)
+    s.store.Set("showRanks", true); s.Flush()
+    check("and goes back past it", w.headName.points[1][4] == 12 + 18)
+    s.store.Set("fontSize", 16); s.Flush()
+    check("the columns grow with the text", w.rows[1].colA.w == math.floor(7 * 0.62 * 16))
+    s.store.Set("fontSize", 11)
+    s.store.Set("numberUnits", "full"); s.Flush()
+    check("Full Numbers need more room", w.rows[1].colA.w == math.floor(10 * 0.62 * 11))
+end
+
+-- number formats
+do
+    local s = Boot({ settings = { enabled = true } })
+    local DM = s.DM
+    check("Game Default: the game's own abbreviation", DM.Format(1234) == "<1234>" and s.configs == nil)
+    s.store.Set("numberUnits", "latin")
+    check("K, M, B: the client's AbbreviateNumbers with a config", DM.Format(1234) == "{1234:4}")
+    local rows = s.abbreviated.rows
+    check("with B, M, K and a plain tier, largest first", rows[1].abbreviation == "B" and rows[1].breakpoint == 1e9
+        and rows[2].abbreviation == "M" and rows[3].abbreviation == "K" and rows[4].breakpoint == 1
+        and rows[4].abbreviation == "")
+    check("one decimal: the M tier is in tenths", rows[2].fractionDivisor == 10 and rows[2].significandDivisor == 1e5
+        and rows[3].significandDivisor == 100)
+    DM.Format(1)
+    check("the config is built once", s.configs == 1)
+    s.store.Set("numberDecimals", 0)
+    DM.Format(1)
+    rows = s.abbreviated.rows
+    check("no decimals: whole units", s.configs == 2 and rows[2].fractionDivisor == 1 and rows[2].significandDivisor == 1e6)
+    s.store.Set("numberDecimals", 2)
+    DM.Format(1)
+    rows = s.abbreviated.rows
+    check("two: hundredths", rows[2].fractionDivisor == 100 and rows[2].significandDivisor == 1e4)
+    s.store.Set("numberUnits", "asian")
+    DM.Format(1)
+    rows = s.abbreviated.rows
+    check("ten-thousands: hundred-millions, ten-thousands and thousands", rows[1].breakpoint == 1e8
+        and rows[2].breakpoint == 1e4 and rows[3].breakpoint == 1e3 and #rows == 4)
+    check("the simplified Chinese glyphs by default", rows[2].abbreviation == "\228\184\135")
+    s.locale = "koKR"
+    DM.Format(1)
+    check("the Korean ones on a Korean client", s.abbreviated.rows[2].abbreviation == "\235\167\140")
+    s.locale = "zhTW"
+    DM.Format(1)
+    check("the traditional ones on a Taiwanese client", s.abbreviated.rows[2].abbreviation == "\232\144\172")
+    s.store.Set("numberUnits", "full")
+    DM.Format(1)
+    check("Full Numbers: one plain tier", #s.abbreviated.rows == 1 and s.abbreviated.rows[1].breakpoint == 1)
+    s.env.AbbreviateNumbers = nil
+    check("a client without it falls back to the game's", DM.Format(5) == "<5>")
+    local secret = Amount("s")
+    s.env.AbbreviateNumbers = function(n) return n end
+    s.store.Set("numberUnits", "latin")
+    check("a secret number goes straight through", DM.Format(secret) == secret)
+end
+
 -- the colors: each part from its own setting, the theme's until one is picked
 do
     local s = Boot({ settings = { enabled = true } })
@@ -501,7 +597,7 @@ do
     local function Unpick(key) s.store.Set(key, false); s.Flush() end
 
     check("names, amounts and the title follow the theme", Is(row.name.textColor, THEME.fg)
-        and Is(row.value.textColor, THEME.fg) and Is(w.title.textColor, THEME.fg))
+        and Is(row.colA.textColor, THEME.fg) and Is(row.colB.textColor, THEME.fg) and Is(w.title.textColor, THEME.fg))
     check("ranks, the time and the empty line its muted color", Is(row.rank.textColor, THEME.muted)
         and Is(w.time.textColor, THEME.muted) and Is(w.empty.textColor, THEME.muted))
     check("the window, the title bar and the border their own tokens", Is(Solid(w.background), THEME.bg)
@@ -513,7 +609,8 @@ do
 
     local parts = {
         nameColor = function() return row.name.textColor end,
-        valueColor = function() return row.value.textColor end,
+        valueColor = function() return row.colB.textColor end,
+        columnColor = function() return w.headB.textColor end,
         rankColor = function() return row.rank.textColor end,
         titleColor = function() return w.title.textColor end,
         timeColor = function() return w.time.textColor end,
@@ -534,7 +631,10 @@ do
         Unpick(key)
         check(key .. ": back to the theme", not Is(read(), PICK))
     end
-    check("every color of the window is covered", count == 10)
+    check("every color of the window is covered", count == 11)
+    Pick("valueColor")
+    check("a picked amount color reaches both columns", Is(row.colA.textColor, PICK) and Is(row.colB.textColor, PICK))
+    Unpick("valueColor")
     Pick("nameColor")
     check("a picked name color reaches every row", Is(w.rows[3].name.textColor, PICK))
     Unpick("nameColor")
@@ -556,6 +656,7 @@ do
     Pick("edgeColor")
     check("no highlight: your edge is your class color, whatever is picked", Is(Solid(own.edge), CLASS.ROGUE))
     s.store.Set("highlightPlayer", true); Unpick("edgeColor")
+    check("the column title color is its own", Is(w.headA.textColor, THEME.muted))
 
     s.store.Set("showBorder", false); s.Flush()
     check("Border off hides it", w.border._frame.shown == false)
@@ -642,7 +743,7 @@ do
     w.modeButton.scripts.OnClick(w.modeButton)
     local list = s.menu
     check("the title opens the list menu on itself", list.owner == w.modeButton and list.items[1].text == "List")
-    check("with the eight lists, the current one chosen", #list.items == 9 and list:Find("Damage Done").selected() == true
+    check("with the ten lists, the current one chosen", #list.items == 11 and list:Find("Damage Done").selected() == true
         and list:Find("Healing Done").selected() == false)
     list:Find("Healing Done").set()
     check("choosing one sets it", s.store.Get("mode") == "healing")
@@ -747,7 +848,7 @@ do
     check("its own list and session", two.title.text == "Damage Taken" and two.session.label == "Overall"
         and one.title.text == "Damage Done" and one.session.label == "Current")
     check("each asked the game for its own", s.calls[#s.calls][2] == 7 and s.calls[#s.calls][1] == 0)
-    check("its own size", two.w == 240 and two.h == 120 and one.w == 300 and one.h == 190)
+    check("its own size", two.w == 240 and two.h == 120 and one.w == 300 and one.h == 206)
     s.store.Set("mode2", "healing")
     s.Flush()
     check("a change to one leaves the other", two.title.text == "Healing Done" and one.title.text == "Damage Done")
@@ -1096,10 +1197,10 @@ do
             end
         end
     end
-    check("the rows cover the windows, the rows, the hover and the colors", #keys >= 43)
+    check("the rows cover the windows, the rows, the hover and the colors", #keys >= 47)
     check("one short help sentence on each card", #page.cards[1].help < 120 and #page.cards[2].help < 120
         and #page.cards[3].help < 120)
-    check("the first card's summary reads window one", page.cards[1].summary(s.store) == "Damage Done, 300 by 190")
+    check("the first card's summary reads window one", page.cards[1].summary(s.store) == "Damage Done, 300 by 206")
 
     local colors = {}
     for _, row in ipairs(page.cards[2].rows) do

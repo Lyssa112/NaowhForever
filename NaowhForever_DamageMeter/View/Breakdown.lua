@@ -6,7 +6,7 @@ local T = ns.THEME
 local Parts = ns.Shared.Parts
 local DM = ns.DamageMeter
 local S = DM.Settings
-local C, Look, Short = DM.C, DM.Look, DM.Short
+local C, Look, Format = DM.C, DM.Look, DM.Format
 local CROP = ns.Shared.Style.ICON_CROP
 
 local WIDTH, ROW_H, GAP, PAD, HEADER_H, NOTE_H = 260, 18, 2, 6, 24, 22
@@ -89,9 +89,9 @@ local function PaintRow(row, spell, data, color, alpha)
     row.name:SetText(SpellName(spell))
     local percent = DM.Percent(spell.totalAmount, data.totalAmount)
     if percent then
-        row.value:SetFormattedText(VALUE_PERCENT, Short(spell.totalAmount), percent)
+        row.value:SetFormattedText(VALUE_PERCENT, Format(spell.totalAmount), percent)
     else
-        row.value:SetText(Short(spell.totalAmount))
+        row.value:SetText(Format(spell.totalAmount))
     end
     row:Show()
 end

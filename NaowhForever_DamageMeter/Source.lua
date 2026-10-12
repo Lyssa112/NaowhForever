@@ -12,10 +12,45 @@ function DM.IsSecret(value)
 end
 local IsSecret = DM.IsSecret
 
--- The client's own abbreviation takes a secret number and returns a string made from it.
-function DM.Short(n)
+-- The client's own abbreviation takes a secret number and returns a string made from it, and so does
+-- AbbreviateNumbers with a config of breakpoints, which is how the other formats are made.
+local function Game(n)
     if AbbreviateLargeNumbers then return AbbreviateLargeNumbers(n) end
     return tostring(n)
+end
+
+local PLAIN_TIER = { breakpoint = 1, abbreviation = "", significandDivisor = 1, fractionDivisor = 1,
+    abbreviationIsGlobal = false }
+
+local function Tier(base, glyph, decimals)
+    local d = 10 ^ decimals
+    return { breakpoint = base, abbreviation = glyph, significandDivisor = base / d, fractionDivisor = d,
+        abbreviationIsGlobal = false }
+end
+
+local function Tiers(units, decimals)
+    if units == "latin" then
+        return { Tier(1e9, "B", decimals), Tier(1e6, "M", decimals), Tier(1e3, "K", decimals), PLAIN_TIER }
+    elseif units == "asian" then
+        local g = C.ASIAN_GLYPHS[GetLocale and GetLocale()] or C.ASIAN_GLYPHS.zhCN
+        return { Tier(1e8, g[3], decimals), Tier(1e4, g[2], decimals), Tier(1e3, g[1], decimals), PLAIN_TIER }
+    end
+    return { PLAIN_TIER }
+end
+
+local formatKey, formatOptions
+
+-- A number as the settings write it. n may be secret, and the answer is a string made from it.
+function DM.Format(n)
+    local units = DM.Settings.Get("numberUnits")
+    if units == "game" or not (AbbreviateNumbers and CreateAbbreviateConfig) then return Game(n) end
+    local decimals = DM.Settings.Get("numberDecimals")
+    local key = units .. decimals .. (GetLocale and GetLocale() or "")
+    if key ~= formatKey then
+        formatOptions = { config = CreateAbbreviateConfig(Tiers(units, decimals)) }
+        formatKey = key
+    end
+    return AbbreviateNumbers(n, formatOptions)
 end
 
 function DM.Mode(key)

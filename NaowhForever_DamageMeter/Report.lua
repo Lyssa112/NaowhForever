@@ -4,7 +4,7 @@ local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
 local S = DM.Settings
-local Short = DM.Short
+local Format = DM.Format
 
 local TEXT_COMBAT = "Reports are sent outside combat."
 local TEXT_EMPTY = "There is nothing to report yet."
@@ -48,8 +48,8 @@ function DM.ReportLines(session, mode, sessionName, count, withRate)
         local source = sources[i]
         local name, total, rate = source.name, source.totalAmount, source.amountPerSecond
         if Plain(name, "string") and Plain(total, "number") then
-            local value = Short(total)
-            if withRate and mode.rate and Plain(rate, "number") then value = LINE_RATE:format(value, Short(rate)) end
+            local value = Format(total)
+            if withRate and mode.rate and Plain(rate, "number") then value = LINE_RATE:format(value, Format(rate)) end
             lines[#lines + 1] = LINE:format(#lines, name, value)
         end
     end
