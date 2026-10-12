@@ -19,6 +19,7 @@ NaowhForever_DamageMeter/
   Source.lua                     reading the game's sessions, fights and spells (DM.Session, DM.Fights, DM.SourceSpells)
   Numbers.lua                    how a number is written, and the sums over plain numbers (DM.Format, DM.Clock, DM.Percent)
   Spells.lua                     a source's spells and the enemies it hurt, as rows of a session (DM.SpellSession)
+  Looks.lua                      the look kept by name, applied, and written as text (DM.SaveLook, DM.EncodeLook)
   Names.lua                      a player's name as written: first, last, initials (DM.DisplayName, DM.ScanRoster)
   Report.lua                     the lines a report sends, and where it can go (DM.Report, DM.Channels)
   History.lua                    a summary of each fight, kept when it ends (DM.History)
@@ -30,7 +31,7 @@ NaowhForever_DamageMeter/
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
-    SettingsPage.lua             its settings page: twenty small cards
+    SettingsPage.lua             its settings page: twenty-one small cards
   README.md                      this file
 ```
 
@@ -82,6 +83,13 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- A look is the visual settings (`DM.C.LOOK_KEYS`: not places, lists, rules or behaviour). Looks are kept
+  on the account by name (`damageMeterLooks`, twelve at most), applied key by key with `DM.ApplyLook`, and
+  written as one line, `NFDM1|key=value|...`, each value with its kind in front (`n` number, `b` boolean,
+  `s` string, `c` color, `m` colors by class), with `|`, `=`, `;`, `:`, `,`, `%` and bytes above 127
+  escaped. A text is read key by key: a key that is not a look's, or a value that is not of its kind
+  (a color outside 0 to 1, a number out of range, a string for a number), is left out and the rest is
+  taken. Copy to Other Windows turns the second and third windows' own looks on, from the first.
 - A second or third window may have a look of its own (`ownLook2`, `ownLook3`): thirteen of the look
   settings (`DM.C.OWN_LOOK_ORDER`: row height and spacing, bar opacity and color, grow direction, text
   size, icons, ranks, column titles, share, window and title bar opacity, border) have a copy under the

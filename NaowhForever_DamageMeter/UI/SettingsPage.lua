@@ -24,6 +24,10 @@ local OFF_TIME = "Turn on Show Fight Time"
 local OFF_BOTH = "Turn on Show Total and Show Per Second"
 local OFF_FADE = "Set Out of Combat Opacity below 100%"
 local OFF_TRACK = "Turn on Bar Track"
+local TEXT_LOOK_NAME, TEXT_LOOK_EXPORT, TEXT_LOOK_IMPORT = "Name this look", "Look", "Paste a look"
+local TEXT_LOOKS_FULL = "There is room for twelve looks. Delete one first."
+local TEXT_LOOK_NO_NAME, TEXT_LOOK_BAD = "A look needs a name.", "That is not a look."
+local TEXT_LOOK_DELETE = "Delete the look %s?"
 local OFF_LOCKED = "Turn on Lock Window"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
@@ -156,6 +160,11 @@ local function SpacingSummary(store)
     local size = store.Get("iconSize")
     return ("Icon %s, %s"):format(size > 0 and size .. " px" or "fitted",
         (C.ICON_SIDES[store.Get("iconSide")] or ""):lower())
+end
+
+local function LooksSummary()
+    local count = #DM.LookNames()
+    return count == 0 and "None kept" or ("%d kept"):format(count)
 end
 
 local function FadeSummary(store)
@@ -601,6 +610,68 @@ page:Card({
           button = function() ns.Confirm(C.TEXT_RESET_ASK, DM.Reset) end,
           help = "Clears the game's damage meter data, as Reset Data in the window's menu does." },
     },
+})
+
+-- Saving, sharing and applying looks: the buttons, then a row to apply and one to delete for each look kept.
+local function LookRows()
+    local rows = {
+        Group("Save and Share"),
+        { label = "Save This Look", buttonText = "Save", needs = Enabled, why = OFF,
+          button = function()
+              ns.PromptText(TEXT_LOOK_NAME, "", C.LOOK_NAME_MAX, function(name)
+                  local ok, why = DM.SaveLook(name)
+                  if not ok then
+                      ns.Print(why == "full" and TEXT_LOOKS_FULL or TEXT_LOOK_NO_NAME)
+                  elseif ns.UI.RefreshPage then
+                      ns.UI:RefreshPage(true)
+                  end
+              end)
+          end,
+          help = "Keeps the look the meter has now, under a name, for every character." },
+        { label = "Copy to Other Windows", buttonText = "Copy", needs = Enabled, why = OFF,
+          button = function() DM.CopyLookToWindows() end,
+          help = "Gives the second and third windows this look as their own." },
+        { label = "Export This Look", buttonText = "Export", needs = Enabled, why = OFF,
+          button = function() ns.ShowCopyBox(TEXT_LOOK_EXPORT, DM.EncodeLook(DM.CaptureLook())) end,
+          help = "Shows the look as a line of text to copy and give to someone." },
+        { label = "Import a Look", buttonText = "Import", needs = Enabled, why = OFF,
+          button = function()
+              ns.PromptText(TEXT_LOOK_IMPORT, "", C.LOOK_TEXT_MAX, function(text)
+                  local look = DM.DecodeLook(text)
+                  if not look then
+                      ns.Print(TEXT_LOOK_BAD)
+                  else
+                      DM.ApplyLook(look)
+                      if ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
+                  end
+              end)
+          end,
+          help = "Takes a look somebody exported. Only the look's settings are set." },
+    }
+    local names = DM.LookNames()
+    if #names > 0 then rows[#rows + 1] = Group("Saved Looks") end
+    for _, name in ipairs(names) do
+        rows[#rows + 1] = { label = name, buttonText = "Apply", needs = Enabled, why = OFF,
+            button = function()
+                DM.ApplyLook(DM.SavedLook(name))
+                if ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
+            end }
+        rows[#rows + 1] = { label = "Delete " .. name, buttonText = "Delete", needs = Enabled, why = OFF,
+            button = function()
+                ns.Confirm(TEXT_LOOK_DELETE:format(name), function()
+                    DM.DeleteLook(name)
+                    if ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
+                end)
+            end }
+    end
+    return rows
+end
+
+page:Card({
+    id = "looks", name = "Looks", order = 87,
+    help = "Keep the way the meter looks under a name, copy it to the other windows, or share it as text.",
+    summary = LooksSummary,
+    rows = LookRows,
 })
 
 page:Card({

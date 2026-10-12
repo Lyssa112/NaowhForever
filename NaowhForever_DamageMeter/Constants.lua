@@ -105,3 +105,20 @@ ns.DamageMeter.C = {
 }
 
 for _, key in ipairs(ns.DamageMeter.C.OWN_LOOK_ORDER) do ns.DamageMeter.C.OWN_LOOK[key] = true end
+
+-- The settings that are the look of the meter, in the order a look is written: not where it is, what it
+-- lists, when it shows or how it behaves. The colors follow.
+do
+    local C = ns.DamageMeter.C
+    C.LOOK_KEYS = { "barHeight", "barSpacing", "growUp", "reverseFill", "barScale", "showTotal", "showRate",
+        "showPercent", "showDivider", "showIcons", "showRanks", "highlightPlayer", "pinSelf", "barColor", "barAlpha",
+        "backgroundAlpha", "fontSize", "font", "outline", "texture", "showBorder", "iconStyle", "showColumnHeaders",
+        "numberUnits", "numberDecimals", "nameFormat", "showSummary", "titleSize", "timeSize", "showTime",
+        "titleText", "titleX", "titleY", "timeX", "timeY", "showButtons", "headerAlpha", "timeBrackets",
+        "timeByTitle", "iconSize", "iconGap", "iconSide", "iconZoom", "textPad", "colGap", "edgeWidth", "barTrack",
+        "nameClassColor", "valueClassColor", "valueFontSize", "rankSize", "youLabel", "nameMaxLetters",
+        "percentDecimals", "rateSuffix", "ownBarStyle", "edgeStyle", "backgroundImage", "backgroundPath",
+        "imageAlpha", "imageTile", "imageTileSize", "classColors" }
+    for _, entry in ipairs(C.COLORS) do C.LOOK_KEYS[#C.LOOK_KEYS + 1] = entry.key end
+    C.MAX_LOOKS, C.LOOK_NAME_MAX, C.LOOK_TEXT_MAX = 12, 24, 20000
+end

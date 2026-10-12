@@ -56,6 +56,11 @@ function DM.LookKey(index, key)
     return key
 end
 
+-- A window takes the look every window shares as its own, to start from.
+function DM.CopyLook(index)
+    for _, key in ipairs(DM.C.OWN_LOOK_ORDER) do S.Set(key .. index, S.Get(key)) end
+end
+
 function DM.Setting(index, key)
     return S.Get(DM.LookKey(index, key))
 end

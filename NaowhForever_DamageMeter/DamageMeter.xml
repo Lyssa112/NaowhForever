@@ -6,6 +6,7 @@
     <Script file="Source.lua"/>
     <Script file="Numbers.lua"/>
     <Script file="Spells.lua"/>
+    <Script file="Looks.lua"/>
     <Script file="Names.lua"/>
     <Script file="Report.lua"/>
     <Script file="History.lua"/>

@@ -691,15 +691,10 @@ function NaowhForever_ResetDamageMeter()
     ns.Print(TEXT_RESET_DONE)
 end
 
--- A window that takes its own look starts from the look every window has.
-local function CopyLook(index)
-    for _, key in ipairs(C.OWN_LOOK_ORDER) do S.Set(key .. index, S.Get(key)) end
-end
-
 local function OnSet(key)
     if key:find("^meterPos") then return end
     local own = key:match("^ownLook(%d)$")
-    if own and S.Get(key) == true then CopyLook(tonumber(own)) end
+    if own and S.Get(key) == true then DM.CopyLook(tonumber(own)) end
     if key == "overallOutOfCombat" and S.Get("overallOutOfCombat") then ShowOverall(not InCombatLockdown()) end
     if key == "enabled" or key == "hideGameMeter" or key:find("^window%d$") then
         previewGeneration = previewGeneration + 1

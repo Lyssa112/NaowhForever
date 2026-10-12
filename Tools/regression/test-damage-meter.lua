@@ -129,7 +129,7 @@ local function Boot(opts)
     local s = { settings = opts.settings or {}, calls = {}, idCalls = {}, spellCalls = {}, spellIdCalls = {},
         durationCalls = {}, duration = 125, enemyCalls = {}, enemyIdCalls = {},
         cvars = { damageMeterEnabled = opts.gameMeter or "1" }, timers = {}, printed = {}, frames = {}, buttons = {},
-        confirms = {}, modals = {}, shells = {}, hooks = {}, account = {}, sent = {}, movers = {}, names = { [101] = "Fireball", [102] = "Pyroblast" } }
+        confirms = {}, prompts = {}, modals = {}, shells = {}, hooks = {}, account = {}, sent = {}, movers = {}, names = { [101] = "Fireball", [102] = "Pyroblast" } }
     local defaults
     local store = {}
     function store.Get(k)
@@ -140,6 +140,7 @@ local function Boot(opts)
     function store.Set(k, v) s.settings[k] = v end
     function store.DB() return s.settings end
     function store.Raw(k) return s.settings[k] end
+    function store.Default(k) return defaults[k] end
     local session = { combatSources = { Source("Aldrin", "MAGE", "A", "a", false, "Player-2"),
         Source("You", "ROGUE", "B", "b", true, "Player-1"), Source("Cara", "MAGE", "C", "c", false, "Player-3") },
         maxAmount = Amount("max"), totalAmount = Amount("total") }
@@ -150,6 +151,7 @@ local function Boot(opts)
         UI = {
             ModuleSettings = function(_, d) defaults = d; return store end,
             TexturePath = function(name, fallback) return name ~= "" and name or fallback end,
+            RefreshPage = function() s.refreshed = (s.refreshed or 0) + 1 end,
             KeepFont = function(panel, key, size, outline, color)
                 panel.kept = panel.kept or {}
                 local fs = panel.kept[key] or Region("FontString", panel)
@@ -177,7 +179,10 @@ local function Boot(opts)
                 Page = function(_, st)
                     local page = { store = st, cards = {} }
                     function page:Window(def) self.window = def; return self end
-                    function page:Card(def) self.cards[#self.cards + 1] = def; s.page = self; return self end
+                    function page:Card(def)
+                        if type(def.rows) == "function" then def.rowsFn, def.rows = def.rows, {} end
+                        self.cards[#self.cards + 1] = def; s.page = self; return self
+                    end
                     return page
                 end },
         },
@@ -195,6 +200,8 @@ local function Boot(opts)
         SetButtonText = function(b, text) b.label = text end,
         Tooltip = Noop, AllowOffscreen = Noop,
         Confirm = function(text, yes) s.confirms[#s.confirms + 1] = { text = text, yes = yes } end,
+        PromptText = function(title, text, max, accept) s.prompts[#s.prompts + 1] = { title = title, max = max, accept = accept } end,
+        ShowCopyBox = function(title, text) s.copied = { title = title, text = text } end,
         MakeModal = function(w, h, key)
             local shell = s.shells[key]
             if not shell then
@@ -345,7 +352,7 @@ local function Boot(opts)
     }
     env._G = env
     env.UIParent.w = 1000
-    local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Numbers.lua", "Spells.lua", "Names.lua", "Report.lua",
+    local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Numbers.lua", "Spells.lua", "Looks.lua", "Names.lua", "Report.lua",
         "History.lua", "View/Meter.lua", "View/Breakdown.lua", "UI/History.lua", "UI/Menus.lua", "UI/Meter.lua",
         "UI/ImageHelp.lua", "UI/SettingsPage.lua" }
     for _, file in ipairs(files) do
@@ -2437,6 +2444,146 @@ do
         and scale.choice[1].top == "Top Player" and scale.choice[1].total == "List Total")
 end
 
+-- looks: kept by name on the account, applied, copied to the other windows, and written as text
+do
+    local s = Boot({ settings = { enabled = true, window2 = true } })
+    s.Login()
+    local DM = s.DM
+    local C = DM.C
+    local w = s.Window()
+
+    local seen, dup, missing = {}, false, {}
+    for _, key in ipairs(C.LOOK_KEYS) do
+        if seen[key] then dup = true end
+        seen[key] = true
+        if s.store.Get(key) == nil then missing[#missing + 1] = key end
+    end
+    check("every key of a look has a default, once", not dup and #missing == 0 and #C.LOOK_KEYS > 60)
+    check("and none is a place, a list or a rule", not seen.meterPos and not seen.mode and not seen.width
+        and not seen.visibility and not seen.enabled and not seen.history and not seen.scale and not seen.locked)
+    check("the colors are in it", seen.nameColor and seen.borderColor and seen.trackColor and seen.classColors)
+
+    -- keeping and applying
+    s.store.Set("barHeight", 30); s.store.Set("nameColor", { r = 0.1, g = 0.2, b = 0.3 })
+    s.store.Set("classColors", { MAGE = { r = 1, g = 0, b = 0 } }); s.store.Set("backgroundPath", "Interface\\x")
+    s.Flush()
+    local ok, name = DM.SaveLook("  Neat  ")
+    check("a name is trimmed, and the look kept on the account", ok == true and name == "Neat"
+        and s.account.damageMeterLooks.Neat.barHeight == 30 and s.account.damageMeterLooks.Neat.nameColor.g == 0.2)
+    check("it is a copy, not the settings' own table", s.account.damageMeterLooks.Neat.classColors ~= s.store.Get("classColors"))
+    check("the names, in order", (function()
+        DM.SaveLook("alpha"); DM.SaveLook("Zed")
+        local n = DM.LookNames()
+        return table.concat(n, ",") == "alpha,Neat,Zed"
+    end)())
+    s.store.Set("barHeight", 14); s.store.Set("nameColor", false); s.store.Set("classColors", {}); s.Flush()
+    check("changed", w.rows[1].h == 14)
+    check("a look applied: its settings come back", DM.ApplyLook(DM.SavedLook("Neat")) > 50
+        and s.store.Get("barHeight") == 30 and s.store.Get("nameColor").b == 0.3
+        and s.store.Get("classColors").MAGE.r == 1)
+    s.Flush()
+    check("and the window follows", w.rows[1].h == 30)
+    s.store.Get("classColors").MAGE.r = 0.5
+    check("the settings took a copy: changing theirs does not change the kept look",
+        DM.SavedLook("Neat").classColors.MAGE.r == 1)
+    s.store.Get("classColors").MAGE.r = 1
+    check("what a look does not hold is not touched", s.store.Get("width") == 300 and s.store.Get("mode") == "damage")
+    check("a name with nothing in it, or with room for none", DM.SaveLook("   ") == false and DM.SaveLook(nil) == false)
+    check("a name is cut", select(2, DM.SaveLook(string.rep("x", 40))) == string.rep("x", 24))
+    DM.DeleteLook(string.rep("x", 24))
+    DM.DeleteLook("alpha"); DM.DeleteLook("Zed")
+    check("deleted", #DM.LookNames() == 1)
+    for i = 1, 11 do DM.SaveLook("look" .. i) end
+    local full, why = DM.SaveLook("one too many")
+    check("twelve at most", #DM.LookNames() == 12 and full == false and why == "full")
+    check("but one of them may be kept over again", DM.SaveLook("look3") == true and #DM.LookNames() == 12)
+    for i = 1, 11 do DM.DeleteLook("look" .. i) end
+
+    -- as text
+    local text = DM.EncodeLook(DM.CaptureLook())
+    check("one line, headed", text:sub(1, 6) == "NFDM1|" and not text:find("\n", 1, true))
+    local look = DM.DecodeLook(text)
+    check("read back: numbers, booleans, strings, colors and the class colors", look.barHeight == 30
+        and look.showRanks == true and look.nameColor.r == 0.1 and look.classColors.MAGE.r == 1
+        and look.backgroundPath == "Interface\\x" and look.windowColor == false and look.barColor == "class")
+    s.store.Set("backgroundPath", "Interface\\AddOns\\My|Folder=x;y%z:\195\169.png")
+    local back = DM.DecodeLook(DM.EncodeLook(DM.CaptureLook()))
+    check("a string with the characters that mean something comes back whole",
+        back.backgroundPath == "Interface\\AddOns\\My|Folder=x;y%z:\195\169.png")
+    check("not a look: nil", DM.DecodeLook("hello") == nil and DM.DecodeLook("") == nil and DM.DecodeLook(nil) == nil
+        and DM.DecodeLook("NFDM2|barHeight=n20") == nil and DM.DecodeLook("NFDM1|") == nil)
+    local part = DM.DecodeLook("NFDM1|barHeight=n24|nonsense=n1|width=n999|showRanks=sno|fontSize=nbad|"
+        .. "nameColor=c2,0,0|windowColor=c0.1,0.2,0.3|barAlpha=n0.5|classColors=mMAGE:0.1,0.2,0.3;ROGUE:9,9,9|"
+        .. "showBorder=bf")
+    check("a key or value that does not fit is left out, the rest is taken", part.barHeight == 24 and part.barAlpha == 0.5
+        and part.windowColor.g == 0.2 and part.showBorder == false and part.nonsense == nil and part.width == nil
+        and part.showRanks == nil and part.fontSize == nil and part.nameColor == nil and part.classColors == nil)
+    check("a number out of any sense is left out", DM.DecodeLook("NFDM1|barHeight=n1e300|barAlpha=n0.5").barHeight == nil
+        and DM.DecodeLook("NFDM1|barHeight=n1e300|barAlpha=n0.5").barAlpha == 0.5)
+    check("class colors that do not read are left out whole",
+        DM.DecodeLook("NFDM1|classColors=mMAGE:bad|barHeight=n24").classColors == nil
+        and DM.DecodeLook("NFDM1|classColors=mMAGE:0.1,0.2,0.3|barHeight=n24").classColors.MAGE.g == 0.2)
+    check("a text read by trimming its ends", DM.DecodeLook("  NFDM1|barHeight=n22  \n").barHeight == 22)
+    local before = s.store.Get("barHeight")
+    check("applying what does not fit sets nothing", DM.ApplyLook({ barHeight = "x", showRanks = 5, nameColor = 7 }) == 0
+        and s.store.Get("barHeight") == before)
+    check("applying it sets what fits", DM.ApplyLook(part) == 4 and s.store.Get("barHeight") == 24)
+
+    -- the page
+    local card = CardOf(s.page, "looks")
+    check("a card of its own, between Data and Reset and the colors", card ~= nil and card.rowsFn ~= nil)
+    local function Rows()
+        local out = {}
+        for _, row in ipairs(card.rowsFn()) do out[#out + 1] = row end
+        return out
+    end
+    local function Row(label)
+        for _, row in ipairs(Rows()) do
+            if row.label == label then return row end
+        end
+    end
+    check("its summary", card.summary(s.store) == "1 kept")
+    check("the buttons, and a row to apply and one to delete for each look kept", Row("Save This Look") and Row("Export This Look")
+        and Row("Import a Look") and Row("Copy to Other Windows") and Row("Neat") and Row("Delete Neat"))
+    Row("Save This Look").button()
+    check("Save asks for a name, up to 24 letters", s.prompts[1].title == "Name this look" and s.prompts[1].max == 24)
+    s.prompts[1].accept("Second")
+    check("and keeps it, and draws the page again so that it shows", s.DM.SavedLook("Second") ~= nil
+        and Row("Second") ~= nil and s.refreshed == 1)
+    s.prompts[1].accept("   ")
+    check("a name with nothing in it says so", s.printed[#s.printed] == "A look needs a name.")
+    for i = 1, 12 do DM.SaveLook("fill" .. i) end
+    s.prompts[1].accept("a thirteenth")
+    check("a thirteenth look says there is no room",
+        s.printed[#s.printed] == "There is room for twelve looks. Delete one first."
+        and DM.SavedLook("a thirteenth") == nil)
+    for i = 1, 12 do DM.DeleteLook("fill" .. i) end
+    Row("Export This Look").button()
+    check("Export shows the text", s.copied.title == "Look" and s.copied.text:sub(1, 6) == "NFDM1|")
+    s.store.Set("barHeight", 16)
+    Row("Neat").button()
+    check("Apply sets that look, and draws the page again", s.store.Get("barHeight") == 30 and s.refreshed == 2)
+    Row("Delete Neat").button()
+    check("Delete asks first", #s.confirms >= 1 and s.DM.SavedLook("Neat") ~= nil
+        and s.confirms[#s.confirms].text == "Delete the look Neat?")
+    s.confirms[#s.confirms].yes()
+    check("and then deletes", s.DM.SavedLook("Neat") == nil and Row("Neat") == nil)
+    Row("Import a Look").button()
+    s.prompts[#s.prompts].accept("NFDM1|barHeight=n26|barAlpha=n0.7")
+    check("Import applies a text", s.store.Get("barHeight") == 26 and s.store.Get("barAlpha") == 0.7
+        and s.prompts[#s.prompts].max == 20000)
+    s.prompts[#s.prompts].accept("garbage")
+    check("and says when it is not a look", s.printed[#s.printed] == "That is not a look.")
+
+    -- to the other windows
+    s.store.Set("barHeight", 22); s.store.Set("fontSize", 13)
+    Row("Copy to Other Windows").button()
+    check("the others have it as their own", s.store.Get("ownLook2") == true and s.store.Get("ownLook3") == true
+        and s.store.Get("barHeight2") == 22 and s.store.Get("fontSize3") == 13)
+    s.Flush()
+    check("and the second window shows it", s.Window(2).rows[1].h == 22)
+end
+
 -- a window may have a look of its own: row height, text, opacities and more
 do
     local s = Boot({ settings = { enabled = true, window2 = true, window3 = true } })
@@ -3562,8 +3709,8 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("twenty cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,spacing,numbers,header,"
-        .. "time,text,hover,history,data,barColors,textColors,windowColors,classColors,window2,look2,window3,look3"
+    check("twenty-one cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,spacing,numbers,header,"
+        .. "time,text,hover,history,data,looks,barColors,textColors,windowColors,classColors,window2,look2,window3,look3"
         and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end
