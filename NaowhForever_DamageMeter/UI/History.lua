@@ -103,7 +103,7 @@ local function Paint()
         end
         if entry then
             local values = Values(entry)
-            for n, column in ipairs(COLUMNS) do row.cells[n]:SetText(values[column.key]) end
+            for n, spec in ipairs(COLUMNS) do row.cells[n]:SetText(values[spec.key]) end
         end
     end
 end

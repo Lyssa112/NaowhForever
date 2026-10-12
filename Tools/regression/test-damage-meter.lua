@@ -1905,23 +1905,23 @@ do
     check("and are off without it", classRows[1].needs() == false)
     s.store.Set("barColor", "class")
 
-    local mine = RowOf(page, "ownBarColor")
-    check("a Your Bar Color row, a color picker", mine and mine.colour == true and mine.label == "Your Bar Color")
+    local ownColor = RowOf(page, "ownBarColor")
+    check("a Your Bar Color row, a color picker", ownColor and ownColor.colour == true and ownColor.label == "Your Bar Color")
     s.store.Set("classColors", {})
-    local mr, mg, mb = mine.get()
+    local mr, mg, mb = ownColor.get()
     check("it shows the Accent until one is picked", mr == THEME.accent.r and mg == THEME.accent.g
         and mb == THEME.accent.b)
-    check("and is only for Custom Color", mine.needs() == false)
+    check("and is only for Custom Color", ownColor.needs() == false)
     local style = RowOf(page, "ownBarStyle")
     check("Your Bar: same, class or custom", style and style.choice[2][1] == "bar" and style.choice[2][2] == "class"
         and style.choice[2][3] == "custom" and style.choice[1].class == "Class Color")
     s.store.Set("ownBarStyle", "custom")
-    check("which turns the picker on", mine.needs() == true)
+    check("which turns the picker on", ownColor.needs() == true)
     s.store.Set("ownBarStyle", "bar")
-    mine.set(0.1, 0.2, 0.3)
+    ownColor.set(0.1, 0.2, 0.3)
     local stored = s.store.Get("ownBarColor")
     check("picking stores it", type(stored) == "table" and stored.r == 0.1 and stored.g == 0.2 and stored.b == 0.3)
-    mr, mg = mine.get()
+    mr, mg = ownColor.get()
     check("and it shows it", mr == 0.1 and mg == 0.2)
     s.store.Set("ownBarColor", false)
 
@@ -1959,8 +1959,8 @@ do
     s.store.Set("backgroundPath", ""); s.store.Set("backgroundImage", "")
     local howTo, hostCard
     for _, card in ipairs(page.cards) do
-        for _, row in ipairs(card.rows) do
-            if row.label == "Adding a Picture" then howTo, hostCard = row, card end
+        for _, item in ipairs(card.rows) do
+            if item.label == "Adding a Picture" then howTo, hostCard = item, card end
         end
     end
     check("a button for how to add a picture, inside the Window card", howTo and hostCard.id == "window"
@@ -1979,6 +1979,9 @@ do
         and all:find(".tga", 1, true) ~= nil and all:find(".blp", 1, true) ~= nil
         and all:find("AddOns", 1, true) ~= nil and all:find("Restart the game", 1, true) ~= nil
         and all:find("Custom Image", 1, true) ~= nil and all:find("powers of two", 1, true) ~= nil)
+    check("its paths have their backslashes", all:find("Interface" .. string.char(92) .. "AddOns" .. string.char(92)
+        .. "MyBackgrounds" .. string.char(92) .. "panel.png", 1, true) ~= nil
+        and all:find("Interface" .. string.char(92) .. "AddOns folder", 1, true) ~= nil)
     check("it says a .jpg is not read, and what a green square means", all:find(".jpg", 1, true) ~= nil
         and all:find("green square", 1, true) ~= nil)
     check("and to pick Your Own Picture in Image", all:find("pick Your Own Picture", 1, true) ~= nil)
@@ -2251,7 +2254,7 @@ do
     s.ns.HideUnlockMode(); s.Flush()
     s.store.Set("locked", false); s.Flush()
     check("unlocked: it takes the mouse", w.rows[1].mouse == true and w.header.mouse == true and w.grip.shown == true)
-    local fade, hover, through = RowOf(s.page, "idleAlpha"), RowOf(s.page, "hoverFull"), RowOf(s.page, "clickThrough")
+    local fade, hover = RowOf(s.page, "idleAlpha"), RowOf(s.page, "hoverFull")
     check("the fade and the mouse are behind cogs, on the Window card", fade.cog ~= nil and hover.under == fade.label
         and through.under == "Lock Window" and RowOf(s.page, "locked").cog ~= nil
         and select(2, RowOf(s.page, "idleAlpha")).id == "window")

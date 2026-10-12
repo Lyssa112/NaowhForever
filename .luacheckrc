@@ -35,7 +35,8 @@ globals = {
 -- The game's API and constants the addon reads. A name missing here is flagged, which is
 -- how a misspelled global, or one Forever does not have, gets caught.
 read_globals = {
-    "C_PlayerInfo", "GetLocale", "Screenshot",
+    "C_PlayerInfo", "GetLocale", "Screenshot", "AbbreviateLargeNumbers", "AbbreviateNumbers",
+    "CLASS_SORT_ORDER", "CreateAbbreviateConfig",
     "AcceptQuest", "ActionBarButtonEventsFrame", "ActionStatus", "AlertFrame", "Ambiguate",
     "AnchorUtil", "AuraContainerSortMethod", "AuraUtil", "BACKPACK_CONTAINER",
     "bit", "BNET_CLIENT_WOW", "BNGetInfo", "BNGetNumFriends", "BreakUpLargeNumbers", "BuyMerchantItem", "BuyTrainerService",

@@ -678,10 +678,10 @@ local function PaintValues(row, source, cols, session, extras)
     end
 end
 
-local extras, extraPool = {}, {}
+local extraLists, extraPool = {}, {}
 local extrasSession, extrasFight
 
-setmetatable(extras, { __index = function(lookups, kind)
+setmetatable(extraLists, { __index = function(lookups, kind)
     local lookup = extraPool[kind]
     if not lookup then
         lookup = { byGuid = {} }
@@ -699,9 +699,9 @@ setmetatable(extras, { __index = function(lookups, kind)
 end })
 
 function Look.Extras(sessionKey, fightID)
-    for kind in pairs(extras) do extras[kind] = nil end
+    for kind in pairs(extraLists) do extraLists[kind] = nil end
     extrasSession, extrasFight = sessionKey, fightID
-    return extras
+    return extraLists
 end
 
 function Look.PaintSummary(f, session, mode, name, seconds)

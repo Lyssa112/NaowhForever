@@ -111,9 +111,9 @@ local function PaintTitleBar(frame, mode, seconds, fightName, text)
         clock:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP + S.Get("timeX"), S.Get("timeY"))
         clock:SetJustifyH("RIGHT")
     end
-    local text = shown and DM.Clock(seconds) or ""
-    if shown and S.Get("timeBrackets") == true then text = TIME_BRACKETS:format(text) end
-    clock:SetText(text)
+    local words = shown and DM.Clock(seconds) or ""
+    if shown and S.Get("timeBrackets") == true then words = TIME_BRACKETS:format(words) end
+    clock:SetText(words)
     clock:SetShown(shown)
 end
 

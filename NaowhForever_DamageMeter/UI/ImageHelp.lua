@@ -14,13 +14,13 @@ DM.IMAGE_HELP = {
         .. "such as 128, 256, 512 or 1024, to be safe; a small one, 128 or 256, is good for a pattern that "
         .. "is repeated with Tile Image, and Tile Size says how wide each repeat is. A .jpg is most "
         .. "likely not read by the game: open it and save it as a .png first." },
-    { title = "Where it goes", text = "In the game's Interface\AddOns folder make a folder of your own, "
-        .. "such as MyBackgrounds, and put the file in it, for instance MyBackgrounds\panel.png. A folder "
+    { title = "Where it goes", text = "In the game's Interface\\AddOns folder make a folder of your own, "
+        .. "such as MyBackgrounds, and put the file in it, for instance MyBackgrounds\\panel.png. A folder "
         .. "of your own is not touched when add-ons are updated. Restart the game once so it finds "
         .. "the file." },
     { title = "What to do in the settings", text = "In the Window card, under Picture, pick Your Own Picture "
         .. "in Image, and write the path from Interface in Custom Image, with backslashes and with the "
-        .. "file's extension: Interface\AddOns\MyBackgrounds\panel.png. Pick None or another "
+        .. "file's extension: Interface\\AddOns\\MyBackgrounds\\panel.png. Pick None or another "
         .. "picture in Image to go back." },
     { title = "If it is a green square", text = "The game did not find the file. Check the folder name, "
         .. "the spelling and the extension, and that the game was restarted after the file was added." },
