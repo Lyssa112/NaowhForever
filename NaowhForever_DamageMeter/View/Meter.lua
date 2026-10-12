@@ -18,7 +18,7 @@ local SUMMARY_H, TIME_CHARS, LOWER_STRIP, LOWER_GAP = C.SUMMARY_H, 7, C.LOWER_ST
 local TEXT_PAD, NAME_GAP, EDGE_W = 6, 6, 2
 local RANK_W, RANK_SIZE = 18, 10
 local COL_CHARS, COL_CHARS_FULL, CHAR_W = 7, 10, 0.62
-local PERCENT_CHARS = 6
+local PERCENT_CHARS, DIVIDER_CHARS = 6, 3
 local EMPTY_SIZE = 12
 local TITLE_X = C.TITLE_X
 local TITLE_SIZE, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 11, 10, 3, 11
@@ -26,7 +26,7 @@ local TITLE_SIZE, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 11, 10, 3, 
 local TEXT_EMPTY = "No data yet"
 local TEXT_UNAVAILABLE = "The damage meter is not available"
 local TEXT_NAME_HEAD, TEXT_TOTAL, TEXT_RATE, TEXT_PERCENT_HEAD = "Name", "Total", "Per Sec", "%"
-local PERCENT_TEXT = "%.1f%%"
+local PERCENT_TEXT, DIVIDED_TEXT = "%.1f%%", "%s | %s"
 local SUMMARY_GAP, TEXT_RAID, TEXT_RANK = "   ", "Raid %s", "Rank %d/%d"
 local RANK_TEXT = "%d"
 
@@ -204,6 +204,7 @@ local function Columns(pane, mode)
     if a and not b then a, b = nil, a end
     pane.cols.a, pane.cols.b = a, b
     pane.cols.p = S.Get("showPercent") == true and mode.percent ~= false
+    pane.cols.merged = a ~= nil and b ~= nil and S.Get("showDivider") == true
     return a, b
 end
 
@@ -239,7 +240,7 @@ local function LayRow(row, pane, i, g)
     else
         row.colB:SetPoint("RIGHT", -TEXT_PAD, 0)
     end
-    row.colB:SetWidth(g.colWidth)
+    row.colB:SetWidth(pane.merged and g.mergedWidth or g.colWidth)
     row.colB:SetShown(pane.columns >= 1)
     row.colA:ClearAllPoints(); row.colA:SetPoint("RIGHT", row.colB, "LEFT", -COL_GAP, 0); row.colA:SetWidth(g.colWidth)
     row.colA:SetShown(pane.columns == 2)
@@ -268,7 +269,7 @@ local function LayHeads(pane, g, y)
     else
         pane.headB:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + TEXT_PAD), y)
     end
-    pane.headB:SetWidth(g.colWidth)
+    pane.headB:SetWidth(pane.merged and g.mergedWidth or g.colWidth)
     pane.headA:ClearAllPoints(); pane.headA:SetPoint("TOPRIGHT", pane.headB, "TOPLEFT", -COL_GAP, 0)
     pane.headA:SetWidth(g.colWidth)
     pane.headName:ClearAllPoints()
@@ -343,15 +344,21 @@ end
 -- Lays out one pane's columns, titles and the rows that fit; returns how many rows are shown.
 local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     local a, b = Columns(pane, mode)
-    pane.columns = (a and 1 or 0) + (b and 1 or 0)
+    pane.merged = pane.cols.merged == true
+    pane.columns = pane.merged and 1 or (a and 1 or 0) + (b and 1 or 0)
     pane.percent = pane.cols.p == true
-    pane.valueWidth = pane.columns == 0 and 0 or pane.columns * g.colWidth + (pane.columns - 1) * COL_GAP
+    if pane.merged then
+        pane.valueWidth = g.mergedWidth
+    else
+        pane.valueWidth = pane.columns == 0 and 0 or pane.columns * g.colWidth + (pane.columns - 1) * COL_GAP
+    end
     if pane.percent then
         pane.valueWidth = pane.valueWidth + (pane.columns > 0 and COL_GAP or 0) + g.pctWidth
     end
     first = math.max(0, math.min(first, total - capacity))
     local shown = math.min(total - first, capacity)
-    local paneKey = key .. "|" .. pane.columns .. "|" .. tostring(pane.percent) .. "|" .. pane.top
+    local paneKey = key .. "|" .. pane.columns .. "|" .. tostring(pane.percent) .. "|" .. tostring(pane.merged)
+        .. "|" .. pane.top
     local fresh = pane.laidKey ~= paneKey
     if fresh then
         LayHeads(pane, g, headY)
@@ -360,7 +367,11 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     end
     pane.headName:SetText(TEXT_NAME_HEAD)
     if a then pane.headA:SetText(ColumnTitle(mode, a)) end
-    if b then pane.headB:SetText(ColumnTitle(mode, b)) end
+    if pane.merged then
+        pane.headB:SetText(DIVIDED_TEXT:format(ColumnTitle(mode, a), ColumnTitle(mode, b)))
+    elseif b then
+        pane.headB:SetText(ColumnTitle(mode, b))
+    end
     pane.headP:SetText(TEXT_PERCENT_HEAD)
     local rows = pane.rows
     for i = 1, shown do
@@ -407,6 +418,7 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.showRanks, g.showIcons, g.showHead = S.Get("showRanks") and not f.detail, S.Get("showIcons"), showHead
     g.colWidth = math.floor(chars * CHAR_W * fontSize)
     g.pctWidth = math.floor(PERCENT_CHARS * CHAR_W * fontSize)
+    g.mergedWidth = 2 * g.colWidth + math.floor(DIVIDER_CHARS * CHAR_W * fontSize)
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
     g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
     g.titleX, g.titleY = S.Get("titleX"), S.Get("titleY")
@@ -461,8 +473,17 @@ end
 
 -- The values of a row: the two figures, and its share of the list's total once both are plain numbers.
 local function PaintValues(row, source, cols, session)
-    if cols.a then PaintValue(row.colA, ValueOf(source, cols.a)) end
-    if cols.b then PaintValue(row.colB, ValueOf(source, cols.b)) end
+    if cols.merged then
+        local first, second = ValueOf(source, cols.a), ValueOf(source, cols.b)
+        if first ~= nil and second ~= nil then
+            row.colB:SetFormattedText(DIVIDED_TEXT, Format(first), Format(second))
+        else
+            PaintValue(row.colB, first == nil and second or first)
+        end
+    else
+        if cols.a then PaintValue(row.colA, ValueOf(source, cols.a)) end
+        if cols.b then PaintValue(row.colB, ValueOf(source, cols.b)) end
+    end
     if cols.p then
         local percent = source.noPercent ~= true and DM.Percent(source.totalAmount, session.totalAmount)
         row.colP:SetText(percent and PERCENT_TEXT:format(percent) or "")

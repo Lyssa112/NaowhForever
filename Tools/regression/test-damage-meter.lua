@@ -2851,7 +2851,50 @@ do
         and w.more.shown == false and w.rows[1].rank.shown == false and w.headerBackground.alpha == 0
         and w.background.alpha == 0)
     check("and the time is in brackets after the title", w.time.text == "(2:05)" and w.time.points[1][2] == w.title)
+    check("and the figures are one text with a bar between", s.store.Get("showDivider") == true
+        and w.rows[1].colB.text == "<A> | <a>" and w.rows[1].colA.shown == false)
     check("the rows start under the title bar, with nothing between", w.rows[1].points[1][5] == -26 - 6)
+end
+
+-- a bar between the figures: one text for the total and the per-second figure
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    check("off by default: two columns", w.rows[1].colA.text == "<A>" and w.rows[1].colB.text == "<a>"
+        and w.rows[1].colA.shown == true and s.store.Get("showDivider") == false)
+    s.store.Set("showDivider", true); s.Flush()
+    check("on: one text, the total and the per-second figure, as the picture has it", w.rows[1].colB.text == "<A> | <a>"
+        and w.rows[1].colA.shown == false and w.rows[1].colB.shown == true)
+    check("wide enough for both and the bar, and the name leaves room for it", w.rows[1].colB.w == 2 * 47 + 20
+        and w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 20 + 6))
+    check("one title over it", w.panes[1].headB.text == "Damage | DPS" and w.panes[1].headA.shown == false
+        and w.panes[1].headB.w == 2 * 47 + 20)
+    s.store.Set("showPercent", true); s.Flush()
+    check("with the share, left of it", w.rows[1].colB.points[1][2] == w.rows[1].colP)
+    s.store.Set("showPercent", false)
+    s.store.Set("mode", "dps"); s.Flush()
+    check("the DPS list leads with its per-second figure", w.rows[1].colB.text == "<a> | <A>"
+        and w.panes[1].headB.text == "DPS | Damage")
+    s.store.Set("mode", "damage")
+    s.store.Set("showRate", false); s.Flush()
+    check("one figure only: nothing to divide, and the column its own width again", w.rows[1].colB.text == "<A>"
+        and w.panes[1].headB.text == "Damage" and w.rows[1].colB.w == 47 and w.panes[1].headB.w == 47
+        and w.rows[1].name.points[2][2] == -(6 + 47 + 6))
+    local row = RowOf(s.page, "showDivider")
+    check("the setting waits for both figures, and says so", row.needs() == false
+        and row.why == "Turn on Show Total and Show Per Second")
+    s.store.Set("showRate", true); s.Flush()
+    check("and is on with them", row.needs() == true)
+    s.store.Set("mode", "interrupts"); s.Flush()
+    check("a list with no per-second figure has nothing to divide either", w.rows[1].colB.text == "<A>")
+    s.store.Set("mode", "damage"); s.Flush()
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("the breakdown's spells too", w.rows[1].colB.text == "<600> | <4.8>")
+    s.spells.combatSpells = { Spell(101, SECRET_NUMBER) }
+    s.spells.maxAmount, s.spells.totalAmount = SECRET_NUMBER, SECRET_NUMBER
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a spell with no per-second figure yet: the amount alone, no bar", w.rows[1].colB.text == "<424242>")
 end
 
 -- the page

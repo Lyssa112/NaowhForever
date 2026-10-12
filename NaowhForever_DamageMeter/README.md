@@ -118,10 +118,14 @@ NaowhForever_DamageMeter/
   game keeps back in combat. The hover panel is as before, with the per-second figure added.
 - The share (Show Percent) is a column of its own at the right end, made from the row's amount and the
   list's total once both are plain numbers, so it is empty in combat. Deaths has none.
+- Column Divider writes the total and the per-second figure as one right-aligned text, `"%s | %s"` through
+  `SetFormattedText` so a secret amount goes in as it is, in one column (`pane.merged`) as wide as both
+  and the bar. The title over it is "Damage | DPS". It does nothing when only one figure is shown, and a
+  spell whose per-second figure is not known yet shows its amount alone.
 - Clean Look is one button for what makes the window as plain as the game's own bars: no column titles,
   buttons, rank numbers, backgrounds or border (the title bar and the window at zero opacity: `headerAlpha`
-  and `backgroundAlpha` draw nothing, the line under the bar included), and the time in brackets after
-  the title (`timeBrackets`, `timeByTitle`). It sets plain settings, each of which has a control of its
+  and `backgroundAlpha` draw nothing, the line under the bar included), the column divider, and the time in
+  brackets after the title (`timeBrackets`, `timeByTitle`). It sets plain settings, each of which has a control of its
   own, and asks first. The fifteen-entry limit of a card is why Fight Time has a card of its own.
 - The title bar's menu: the list and the session are in the window's ... menu, which a right click on the
   bar opens too. The session and ... buttons can be hidden (Show Buttons); the room they take is kept, so

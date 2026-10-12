@@ -10,7 +10,7 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     enabled = F.enabled,
     visibility = "always", locked = false,
     barHeight = 20, barSpacing = 2,
-    showTotal = true, showRate = true, showPercent = false, showIcons = true, showRanks = true, highlightPlayer = true,
+    showTotal = true, showRate = true, showPercent = false, showDivider = false, showIcons = true, showRanks = true, highlightPlayer = true,
     barColor = "class", barAlpha = 0.85, backgroundAlpha = 0.9,
     fontSize = 11, font = "", outline = "OUTLINE", texture = "",
     hideGameMeter = true, breakdown = true, reportLines = 5, showTime = true,

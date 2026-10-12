@@ -21,6 +21,7 @@ local OFF_COMBAT = "Set Where to In Combat"
 local OFF_TILE = "Turn on Tile Image"
 local OFF_OWN = "Pick Your Own Picture in Image"
 local OFF_TIME = "Turn on Show Fight Time"
+local OFF_BOTH = "Turn on Show Total and Show Per Second"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local BAR_RANGE, SPACING_RANGE = { C.MIN_BAR, C.MAX_BAR, 1 }, { 0, C.MAX_SPACING, 1 }
@@ -64,6 +65,7 @@ local function EdgeCustom()
 end
 local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
 local function ShowingTime() return DM.On() and S.Get("showTime") == true end
+local function BothFigures() return DM.On() and S.Get("showTotal") == true and S.Get("showRate") == true end
 -- Custom Image is for the choice of Image that is your own picture, and a picture is there when that has a
 -- path or another choice is a picture.
 local function OwnPicture() return S.Get("backgroundImage") == C.OWN_PICTURE end
@@ -116,7 +118,8 @@ end
 -- The settings that leave only the title and the bars: no titles over the columns, no buttons, no rank
 -- numbers, nothing behind or around, and the time in brackets after the title.
 local CLEAN_LOOK = { showColumnHeaders = false, showButtons = false, showSummary = false, showRanks = false,
-    showBorder = false, headerAlpha = 0, backgroundAlpha = 0, timeBrackets = true, timeByTitle = true }
+    showBorder = false, headerAlpha = 0, backgroundAlpha = 0, timeBrackets = true, timeByTitle = true,
+    showDivider = true }
 local TEXT_CLEAN_ASK = "Hide the column titles, buttons, rank numbers, backgrounds and border?"
 
 local function ApplyCleanLook()
@@ -366,6 +369,8 @@ page:Card({
         { key = "showTotal", label = "Show Total", toggle = true, needs = Enabled, why = OFF },
         { key = "showRate", label = "Show Per Second", toggle = true, needs = Enabled, why = OFF,
           help = "Damage, healing and absorbs only." },
+        { key = "showDivider", label = "Column Divider", toggle = true, needs = BothFigures, why = OFF_BOTH,
+          help = "Writes the total and the per-second figure as one text with a bar between: 117 | 23." },
         { key = "showPercent", label = "Show Percent", toggle = true, needs = Enabled, why = OFF,
           help = "Each one's share of what the list totals, in a column of its own. The game hides the figures "
               .. "in combat, so it fills in after the fight." },
@@ -411,7 +416,7 @@ page:Card({
         { label = "Clean Look", buttonText = "Apply", needs = Enabled, why = OFF,
           button = function() ns.Confirm(TEXT_CLEAN_ASK, ApplyCleanLook) end,
           help = "Only the title and the bars: no column titles, buttons, rank numbers, backgrounds or "
-              .. "border, and the time in brackets after the title." },
+              .. "border, the time in brackets after the title, and a bar between the figures." },
     },
 })
 
