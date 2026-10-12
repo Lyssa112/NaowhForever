@@ -46,6 +46,8 @@ NaowhForever_DamageMeter/
 - The API calls go through `pcall`: an error reads as no data and the window says so, not a Lua error.
 - Updates are coalesced, 0.25 seconds after the first event of a burst, since the game fires one per
   source per update. All open windows redraw together.
+- While it is off nothing is built or listened to but the frame that waits for the login: the event frame
+  is made when it is first turned on, and the fade's OnUpdate runs only while a window is fading.
 - The game's meter is the `damageMeterEnabled` setting. It is turned off while this one is on and put
   back as it was after, kept on the account so it survives a reload. It is left alone in combat and
   done again when combat ends.

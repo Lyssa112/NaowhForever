@@ -40,8 +40,7 @@ local lastCombatEnd, override
 local lastInstance, wasGrouped
 local preview = false
 local updateGeneration, previewGeneration = 0, 0
-local events = CreateFrame("Frame")
-local fader = CreateFrame("Frame")
+local events, fader
 local fadeElapsed = 0
 local Update
 
@@ -457,6 +456,7 @@ local function OnFadeTick(_, elapsed)
 end
 
 local function StartFade()
+    fader = fader or CreateFrame("Frame")
     fader:SetScript("OnUpdate", OnFadeTick)
 end
 
@@ -603,6 +603,10 @@ local function OnEvent(_, event, ...)
 end
 
 local function Listen()
+    if not events then
+        events = CreateFrame("Frame")
+        events:SetScript("OnEvent", OnEvent)
+    end
     for _, event in ipairs(DATA_EVENTS) do events:RegisterEvent(event) end
     for _, event in ipairs(STATE_EVENTS) do events:RegisterEvent(event) end
     events:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -611,7 +615,7 @@ local function Listen()
 end
 
 local function Apply()
-    events:UnregisterAllEvents()
+    if events then events:UnregisterAllEvents() end
     updateGeneration = updateGeneration + 1; pendingUpdate = false
     GameMeter(DM.On() and S.Get("hideGameMeter"))
     if not (DM.On() or unlocked) then HideAll() return end
@@ -683,7 +687,6 @@ local function OnLock()
     if windows[1] and windows[1].frame then Apply() end
 end
 
-events:SetScript("OnEvent", OnEvent)
 hooksecurefunc(S, "Set", OnSet)
 hooksecurefunc(ns, "Apply", Apply)
 hooksecurefunc(ns, "ShowUnlockMode", OnUnlock)

@@ -554,7 +554,7 @@ do
     local s = Boot()
     s.Login()
     check("off: no window", s.Window() == nil and s.Window(2) == nil)
-    check("off: no damage meter events", not s.Listening())
+    check("off: no damage meter events, and no frame built but the one that waits for the login", #s.frames == 1 and not s.Listening())
     check("off: the game's meter is untouched", s.cvars.damageMeterEnabled == "1" and s.account.damageMeterGameWas == nil)
     s.env.NaowhForever_ResetDamageMeter()
     check("off: the reset key says so and resets nothing", s.resets == nil and #s.printed == 1)
