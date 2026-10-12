@@ -714,15 +714,14 @@ do
     local s = Boot({ settings = { enabled = true } })
     local texts = {
         { "rank", "Rank", "Rank Numbers", "row", "rankSize", "rankColor", 10 },
-        { "value", "Figure", "Figure Settings", "figures", "valueFontSize", "valueColor", 11, true },
+        { "value", "Figure", "Figure Settings", "figures", "valueFontSize", "valueColor", 11 },
         { "head", "Column Title", "Column Titles", "header", "headSize", "columnColor", 10 },
-        { "title", "Title", "Title Settings", "header", "titleSize", "titleColor", 12, true },
+        { "title", "Title", "Title Settings", "header", "titleSize", "titleColor", 12 },
         { "time", "Time", "Show Fight Time", "header", "timeSize", "timeColor", 11 },
         { "summary", "Summary", "Summary Line", "header", "summarySize", "summaryColor", 11 },
     }
     for _, t in ipairs(texts) do
         local element, noun, owner, cardId, sizeKey, colorKey, usual = t[1], t[2], t[3], t[4], t[5], t[6], t[7]
-        local inside = t[8] == true
         local own, card = RowOf(s.page, element .. "OwnSize")
         local size, color = RowOf(s.page, sizeKey), RowOf(s.page, colorKey)
         local ownFont, font, outline = RowOf(s.page, element .. "OwnFont"), RowOf(s.page, element .. "Font"),
@@ -736,9 +735,9 @@ do
         check(noun .. ": its size switch, font, outline and color are behind that cog", own.under == owner
             and ownFont.under == owner and font.under == owner and outline.under == owner
             and (color.under == owner or color == ownerRow))
-        check(noun .. ": its size is " .. (inside and "behind the cog of its settings" or "on the card, in sight"),
-            (inside and size.under == owner or not inside and size.under == nil) and size.label == noun .. " Size"
-            and size.slider ~= nil and select(2, RowOf(s.page, sizeKey)) == card and size.needs() == true)
+        check(noun .. ": its size is behind the cog of its text, with its other settings", size.under == owner
+            and size.label == noun .. " Size" and size.slider ~= nil and select(2, RowOf(s.page, sizeKey)) == card
+            and size.needs() == true)
         check(noun .. ": the rows are named for it", own.label == "Own " .. noun .. " Size" and own.toggle == true
             and ownFont.label == "Own " .. noun .. " Font" and ownFont.toggle == true
             and font.label == noun .. " Font" and font.font == true and outline.label == noun .. " Outline"
@@ -763,6 +762,8 @@ do
         card.id == "row" and name.label == "Name Size" and name.under == "Name Settings" and name.needs() == true
         and RowOf(s.page, "nameColor").label == "Name Settings" and RowOf(s.page, "nameColor").cog ~= nil
         and RowOf(s.page, "nameOwnFont").under == "Name Settings" and RowOf(s.page, "nameOwnSize") == nil
+        and RowOf(s.page, "nameFormat").under == "Name Settings" and RowOf(s.page, "youLabel").under == "Name Settings"
+        and RowOf(s.page, "nameMaxLetters").under == "Name Settings"
         and RowOf(s.page, "nameFont").needs() == false)
     local base = RowOf(s.page, "font")
     check("the window's own font and outline are on the Window card", base.font == true
@@ -2422,9 +2423,9 @@ do
     check("and is there with it", colorRow.hidden() == false)
     s.store.Set("barTrack", false)
     local icons, card = RowOf(s.page, "showIcons")
-    check("Icons is a toggle with a cog on the Row card, its size beside it and the rest behind it", icons.toggle == true
+    check("Icons is a toggle with a cog on the Row card, with its size and the rest behind it", icons.toggle == true
         and icons.cog ~= nil and card.id == "row" and select(2, RowOf(s.page, "iconSize")) == card
-        and RowOf(s.page, "iconSize").under == nil and RowOf(s.page, "iconSide").under == "Icons"
+        and RowOf(s.page, "iconSize").under == "Icons" and RowOf(s.page, "iconSide").under == "Icons"
         and RowOf(s.page, "iconGap").under == "Icons" and RowOf(s.page, "iconSide").choice[2][2] == "right")
     check("the room around the texts is on the Row card, the edge's width behind Highlight Your Row",
         select(2, RowOf(s.page, "textPad")) == card and select(2, RowOf(s.page, "colGap")) == card
@@ -4120,7 +4121,7 @@ do
 
     local heads = RowOf(s.page, "showColumnHeaders")
     check("Column Titles is a toggle with a cog, holding the titles' text", heads.toggle == true and heads.cog ~= nil
-        and RowOf(s.page, "headOwnSize").under == "Column Titles" and RowOf(s.page, "headSize").under == nil)
+        and RowOf(s.page, "headOwnSize").under == "Column Titles" and RowOf(s.page, "headSize").under == "Column Titles")
     local brackets, byTitle = RowOf(s.page, "timeBrackets"), RowOf(s.page, "timeByTitle")
     check("and the time's choices are behind the cog of Show Fight Time", brackets.under == "Show Fight Time"
         and byTitle.under == "Show Fight Time" and brackets.needs() == true and byTitle.needs() == true

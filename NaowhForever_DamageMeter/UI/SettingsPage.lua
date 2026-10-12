@@ -492,11 +492,14 @@ page:Card({
 
 page:Card({
     id = "row", name = "Row", order = 40,
-    help = "What each row has before its figures: icon, rank and name, with their sizes, fonts and colors.",
+    help = "What each row has before its figures: icon, rank and name, each with its settings behind its cog.",
     summary = RowSummary,
     rows = Join(
         Under({ key = "showIcons", label = "Icons", toggle = true, needs = Enabled, why = OFF },
-            "Icon", "The icon's style, side and crop.", {
+            "Icon Settings", "The icon's size, style, side and crop.", {
+            { key = "iconSize", label = "Icon Size", slider = ICON_SIZE_RANGE, unit = "px", needs = Enabled,
+              why = OFF, help = "Zero fits the icon to the row, as tall as the bar when it stands before it. A "
+                  .. "size of your own may be taller than the row." },
             { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
             { key = "iconSide", label = "Icon Side", choice = ICON_SIDE, needs = Enabled, why = OFF,
               help = "Before the Bar puts it outside the bar, touching its left end." },
@@ -504,16 +507,21 @@ page:Card({
               why = OFF, help = "How much of the icon's edge is cut off, so the frame in it does not show." },
             { key = "iconGap", label = "Icon Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
               help = "The room between the icon and the name. None before the bar." } }),
-        { key = "iconSize", label = "Icon Size", slider = ICON_SIZE_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "Zero fits the icon to the row, as tall as the bar when it stands before it. A size of "
-              .. "your own may be taller than the row." },
         Under({ key = "showRanks", label = "Rank Numbers", toggle = true, needs = Enabled, why = OFF },
-            "Rank Text", "The rank's size switch, font and color.",
-            Join(TextRows("Rank", "rank", "Off: the usual size."), ColorRow("rankColor"))),
-        SizeRow("Rank", "rank", "rankSize", TEXT_RANGE),
-        Under(SettingsRow("nameColor", "Name Settings", "The names' color. Their size, font and class colors "
-                .. "are behind the cog."),
-            "Name Settings", "The name's size, font and color.", {
+            "Rank Settings", "The rank's size, font and color.", Join(
+            SizeRow("Rank", "rank", "rankSize", TEXT_RANGE),
+            TextRows("Rank", "rank", "Off: the usual size."),
+            ColorRow("rankColor"))),
+        Under(SettingsRow("nameColor", "Name Settings", "The names' color. How a name is written, and its size "
+                .. "and font, are behind the cog."),
+            "Name Settings", "How a name is written, and its size, font and color.", {
+            { key = "nameFormat", label = "Name Format", choice = NAME_FORMAT, needs = Enabled, why = OFF,
+              help = "How a player's name is written. In combat the game hides other players' names, so those "
+                  .. "are found by class and left whole when two players share one." },
+            { key = "youLabel", label = "Call Me You", toggle = true, needs = Enabled, why = OFF,
+              help = "Your own row says You in place of your name." },
+            { key = "nameMaxLetters", label = "Name Length", slider = LETTERS_RANGE, needs = Enabled, why = OFF,
+              help = "Cuts a name to this many letters, with ... after it. Zero leaves names whole." },
             { key = "fontSize", label = "Name Size", slider = TEXT_RANGE, needs = Enabled, why = OFF,
               help = "The names' size. The figures follow it unless they have a size of their own." },
             { key = "nameOwnFont", label = "Own Name Font", toggle = true, needs = Enabled, why = OFF,
@@ -523,13 +531,6 @@ page:Card({
               why = OFF_OWN_FONT },
             { key = "nameClassColor", label = "Class Colored Names", toggle = true, needs = Enabled, why = OFF,
               help = "Each name in its class's color, in place of the name's color." } }),
-        { key = "nameFormat", label = "Name Format", choice = NAME_FORMAT, needs = Enabled, why = OFF,
-          help = "How a player's name is written. In combat the game hides other players' names, so those "
-              .. "are found by class and left whole when two players share one." },
-        { key = "youLabel", label = "Call Me You", toggle = true, needs = Enabled, why = OFF,
-          help = "Your own row says You in place of your name." },
-        { key = "nameMaxLetters", label = "Name Length", slider = LETTERS_RANGE, needs = Enabled, why = OFF,
-          help = "Cuts a name to this many letters, with ... after it. Zero leaves names whole." },
         { key = "textPad", label = "Text Padding", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
           help = "The room at the ends of a row, before the first text and after the last." },
         { key = "colGap", label = "Column Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
@@ -606,7 +607,7 @@ page:Card({
         Group("Fight Time"),
         Under({ key = "showTime", label = "Show Fight Time", toggle = true, needs = Enabled, why = OFF,
             help = "How long the shown session has run, when there is room beside the title." },
-            "Fight Time", "Where the time sits, and its size switch, font and color.", Join(
+            "Fight Time Settings", "Where the time sits, and its size, font and color.", Join(
             { key = "timeBrackets", label = "Time in Brackets", toggle = true, needs = On("showTime"),
               why = OFF_TIME, help = "Writes the time as (0:05)." },
             { key = "timeByTitle", label = "Time Next to Title", toggle = true, needs = On("showTime"),
@@ -615,19 +616,20 @@ page:Card({
               why = OFF_TIME, help = "Moves the time right, or left below zero, from where it sits." },
             { key = "timeY", label = "Time Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = On("showTime"),
               why = OFF_TIME, help = "Moves the time up, or down below zero." },
+            SizeRow("Time", "time", "timeSize", TITLE_RANGE),
             TextRows("Time", "time", "Off: the usual size."),
             ColorRow("timeColor"))),
-        SizeRow("Time", "time", "timeSize", TITLE_RANGE),
         Group("Under the Bar"),
         Under({ key = "showColumnHeaders", label = "Column Titles", toggle = true, needs = Enabled, why = OFF,
             help = "A line of titles above the rows: Name and what each column shows." },
-            "Column Title Text", "The column titles' size switch, font and color.",
-            Join(TextRows("Column Title", "head", "Off: the usual size."), ColorRow("columnColor"))),
-        SizeRow("Column Title", "head", "headSize", TEXT_RANGE),
+            "Column Title Settings", "The column titles' size, font and color.", Join(
+            SizeRow("Column Title", "head", "headSize", TEXT_RANGE),
+            TextRows("Column Title", "head", "Off: the usual size."),
+            ColorRow("columnColor"))),
         Under({ key = "showSummary", label = "Summary Line", toggle = true, needs = Enabled, why = OFF,
             help = "Under the title bar: the session, its total, the raid's per-second figure once the fight "
                 .. "is over, and your rank." },
-            "Summary Line", "What the line says, and its size switch, font and color.", Join(
+            "Summary Settings", "What the line says, and its size, font and color.", Join(
             { key = "summaryName", label = "Session Name", toggle = true, needs = On("showSummary"),
               why = OFF_SUMMARY },
             { key = "summaryTotal", label = "Total", toggle = true, needs = On("showSummary"), why = OFF_SUMMARY },
@@ -635,9 +637,9 @@ page:Card({
               why = OFF_SUMMARY, help = "The raid's figure per second, once the fight is over." },
             { key = "summaryRank", label = "Your Rank", toggle = true, needs = On("showSummary"),
               why = OFF_SUMMARY },
+            SizeRow("Summary", "summary", "summarySize", TEXT_RANGE),
             TextRows("Summary", "summary", "Off: the usual size."),
-            ColorRow("summaryColor"))),
-        SizeRow("Summary", "summary", "summarySize", TEXT_RANGE)
+            ColorRow("summaryColor")))
     ),
 })
 

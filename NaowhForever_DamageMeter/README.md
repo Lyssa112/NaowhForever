@@ -91,17 +91,17 @@ NaowhForever_DamageMeter/
   Fights and Data, Looks, and a Second and a Third Window. A card shows what is used most, in two columns,
   and keeps the rest behind the cog of the row it belongs to (`cog` on the row, `under = <its label>` on the
   rows behind it, which the framework leaves off the page, searches and resets with the card): the icon's
-  style, side, crop and gap behind Icons; a text's size switch, font, outline and color behind the row of its
-  color or its switch (Name Settings, Figure Settings, Title Settings, Rank Numbers, Show Fight Time, Column
-  Titles, Summary Line); the picture's path and tiling behind Image; the classes' colors behind Bar Color; the spell
+  size, style, side, crop and gap behind Icons; a text's size, size switch, font, outline and color behind the
+  row of the text (Name Settings, with the name's format and length too, Figure Settings, Title Settings, Rank
+  Numbers, Show Fight Time, Column Titles, Summary Line); the picture's path and tiling behind Image; the classes' colors behind Bar Color; the spell
   panel behind Spell Breakdown; a window's own look and columns behind Own Look and Column Order. A row that
   means something for one choice only (`hidden` as a function) is left off while another is picked: Hide
   After, Custom Bar Color, Track Color and Decimals. A row's label is the only one of its name on its card,
   because a cog is found by the label of the row that owns it. A text's size (`SizeRow`) shows the size the
   text has, and setting it sets the size and turns the text's Own Size switch on, which the cog turns off
-  again; it is beside the toggle of Rank Numbers, Show Fight Time, Column Titles and Summary Line, and in the
-  cog of Name Settings, Figure Settings and Title Settings, whose rows are a color picker called what the
-  cog holds (still found by the color's name). A card folded with its cog open takes the cog's panel
+  again; it is in the cog of its text, with the text's font and color. The rows of Name Settings, Figure
+  Settings and Title Settings are color pickers called what their cog holds (still found by the color's
+  name); the others are the text's toggle. A card folded with its cog open takes the cog's panel
   with it (`Draw:Card` in the shared page). The window's own font and outline are on the Window card; Clean
   Look is on the Looks card.
 - Reset All Settings (Fights and Data card, asks first) clears every key of the module's settings but
