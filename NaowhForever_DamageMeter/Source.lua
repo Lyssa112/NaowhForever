@@ -26,7 +26,11 @@ function DM.ModeLabel(mode)
 end
 
 function DM.Available()
-    return C_DamageMeter ~= nil and Enum.DamageMeterType ~= nil and Enum.DamageMeterSessionType ~= nil
+    if not (C_DamageMeter ~= nil and Enum.DamageMeterType ~= nil and Enum.DamageMeterSessionType ~= nil) then
+        return false
+    end
+    if not C_DamageMeter.IsDamageMeterAvailable then return true end
+    return C_DamageMeter.IsDamageMeterAvailable()
 end
 
 local function SessionType(key)

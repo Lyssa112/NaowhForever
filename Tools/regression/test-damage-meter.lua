@@ -303,6 +303,10 @@ local function Boot(opts)
                 if s.fightsError then error("secret") end
                 return s.fights or {}
             end,
+            IsDamageMeterAvailable = function()
+                if s.unavailable then return false, s.unavailable end
+                return true, ""
+            end,
             GetCombatSessionSourceFromType = function(kind, type, guid, creature)
                 if type == 10 then
                     s.enemyCalls[#s.enemyCalls + 1] = { kind = kind, guid = guid, creature = creature }
@@ -435,6 +439,11 @@ do
         and DM.Mode("damage").rate == true)
     check("an unknown list reads as Damage Done", DM.Mode("bogus").key == "damage" and DM.Mode(nil).key == "damage")
     check("the API is there", DM.Available() == true)
+    s.unavailable = "Not here."
+    local ok, why = DM.Available()
+    check("the game says no: not available, with its reason", ok == false and why == "Not here."
+        and #DM.Session("damage", "current").combatSources == 0 and #s.calls == 0)
+    s.unavailable = nil
     local got = DM.Session("taken", "overall")
     check("the session is the API's, by session type and list type",
         got == s.session and s.calls[1][1] == 0 and s.calls[1][2] == 7)
@@ -2183,6 +2192,7 @@ do
     check("Out of Combat Opacity: it fades toward that, a step at a time", w.alpha < 1 and w.alpha > 0.3)
     Tick(30)
     check("and gets there", math.abs(w.alpha - 0.3) < 1e-9)
+    check("Full While Hovered still has the mouse to watch", Fader() ~= nil)
     w.mouseOver = true
     Tick(30)
     check("full with the mouse over it", w.alpha == 1)
@@ -2193,6 +2203,7 @@ do
     w.mouseOver = true
     Tick(30)
     check("with Full While Hovered off: the mouse is not looked at", math.abs(w.alpha - 0.3) < 1e-9)
+    check("and nothing is watching once it is there", Fader() == nil)
     w.mouseOver = false
     s.combat = true
     s.Fire("PLAYER_REGEN_DISABLED"); s.Flush()
@@ -2214,6 +2225,8 @@ do
     s.Flush()
     Tick(30)
     check("and faded after it", math.abs(w.alpha - 0.3) < 1e-9)
+    check("each of those starts the fade again and stops it once there", Fader() == nil)
+    s.store.Set("hoverFull", true); s.Flush()
     local before = w.alpha
     local f = Fader()
     s.store.Set("idleAlpha", 0.8)
@@ -3125,6 +3138,52 @@ do
     s.Login()
     local w = s.Window()
     check("no API: the window says so", w.empty.text == "The damage meter is not available" and w.empty.shown == true)
+
+    local s2 = Boot({ settings = { enabled = true } })
+    s2.unavailable = "Not available in this zone."
+    s2.Login()
+    local w2 = s2.Window()
+    check("the game says it is not available: the window gives its reason",
+        w2.empty.text == "Not available in this zone." and w2.empty.shown == true)
+    s2.unavailable = ""
+    s2.Fire("GROUP_ROSTER_UPDATE"); s2.Flush()
+    check("and with no reason, that it is not available", w2.empty.text == "The damage meter is not available")
+    s2.unavailable = nil
+    s2.Fire("GROUP_ROSTER_UPDATE"); s2.Flush()
+    check("and once it is: the window is back", w2.empty.text ~= "The damage meter is not available")
+end
+
+-- with the addon disabled or removed, the core puts the game's meter back at login
+do
+    local f = assert(io.open("Core/Core.lua", "rb"))
+    local source = f:read("*a"):gsub("\r\n", "\n")
+    f:close()
+    local first = assert(source:find("local function RestoreGameMeter()", 1, true))
+    local last = assert(source:find("\nlocal meterCheck", first, true))
+    local names = assert(source:match("\n(local DAMAGE_METER_ADDON, .-\n)local "))
+    local account, cvars, loaded, combat = {}, { damageMeterEnabled = "0" }, false, false
+    local chunk = assert(loadstring(names .. source:sub(first, last) .. "return RestoreGameMeter"))
+    setfenv(chunk, setmetatable({
+        ns = { AccountSettings = function() return account end },
+        C_AddOns = { IsAddOnLoaded = function(name) return loaded and name == "NaowhForever_DamageMeter" end },
+        InCombatLockdown = function() return combat end,
+        C_CVar = { SetCVar = function(k, v) cvars[k] = v end },
+    }, { __index = _G }))
+    local Restore = chunk()
+    Restore()
+    check("core: nothing kept, nothing changed", cvars.damageMeterEnabled == "0")
+    account.damageMeterGameWas = "1"
+    loaded = true
+    Restore()
+    check("core: the addon loaded is left to put it back itself",
+        cvars.damageMeterEnabled == "0" and account.damageMeterGameWas == "1")
+    loaded, combat = false, true
+    Restore()
+    check("core: not in combat", cvars.damageMeterEnabled == "0" and account.damageMeterGameWas == "1")
+    combat = false
+    Restore()
+    check("core: the addon not loaded: put back as it was, and forgotten",
+        cvars.damageMeterEnabled == "1" and account.damageMeterGameWas == nil)
 end
 
 -- the reset key

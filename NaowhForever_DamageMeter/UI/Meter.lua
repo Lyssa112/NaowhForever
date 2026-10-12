@@ -28,6 +28,7 @@ local STATE_EVENTS = { "PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE" }
 local FADE_EVERY, FADE_STEP, FADE_SNAP = 0.1, 0.35, 0.02
 
 local TEXT_OFF = "Enable the Damage Meter first."
+local TEXT_UNAVAILABLE = "The damage meter is not available"
 local TEXT_IN_COMBAT = "Preview is available outside combat."
 local TEXT_RESET_DONE = "Damage meter data reset."
 local TEXT_RESET_INSTANCE_ASK = "You entered a new instance. Reset the damage meter data?"
@@ -151,7 +152,7 @@ local function DetailView(w, session, lowerSession, seconds)
     return view, mode.key, title, list or session
 end
 
-local function Render(w, session, available, seconds, lowerSession, fightName)
+local function Render(w, session, unavailable, seconds, lowerSession, fightName)
     local frame = w.frame
     local raid = S.Get("raidMode")
     local detail = w.detail ~= nil and not w.sample and S.Get("breakdown") == true
@@ -163,13 +164,13 @@ local function Render(w, session, available, seconds, lowerSession, fightName)
     frame.lowerOn = lowerKey ~= ""
     local shown, mode = Layout(w, view, modeKey)
     local extras = Look.Extras(Get(w, "session"), w.fight)
-    Look.Paint(frame, view, w.offset, shown, mode, available, extras)
+    Look.Paint(frame, view, w.offset, shown, mode, unavailable, extras)
     if frame.lowerOn then
         local lowerMode = DM.Mode(lowerKey)
         local lowerView = raid and OwnOnly(lowerSession) or lowerSession
         local lowerShown
         lowerShown, w.offset2 = Look.LayoutLower(frame, #lowerView.combatSources, w.offset2, lowerMode)
-        Look.PaintLower(frame, lowerView, w.offset2, lowerShown, lowerMode, available, extras)
+        Look.PaintLower(frame, lowerView, w.offset2, lowerShown, lowerMode, unavailable, extras)
     else
         Look.HideLower(frame)
     end
@@ -432,11 +433,16 @@ local function TargetAlpha(w)
     return idle
 end
 
+local function WatchesMouse()
+    return S.Get("idleAlpha") < 1 and S.Get("hoverFull") and not (unlocked or preview or InCombatLockdown())
+end
+
 local function StepFade()
-    local moving = false
+    local moving, shown = false, false
     for index = 1, DM.MAX_WINDOWS do
         local w = windows[index]
         if w and w.frame and w.frame:IsShown() then
+            shown = true
             local target, now = TargetAlpha(w), w.frame:GetAlpha()
             if now ~= target then
                 local nextAlpha = now + (target - now) * FADE_STEP
@@ -446,14 +452,15 @@ local function StepFade()
             end
         end
     end
-    return moving
+    return moving, shown
 end
 
 local function OnFadeTick(_, elapsed)
     fadeElapsed = fadeElapsed + elapsed
     if fadeElapsed < FADE_EVERY then return end
     fadeElapsed = 0
-    if not StepFade() and S.Get("idleAlpha") >= 1 then fader:SetScript("OnUpdate", nil) end
+    local moving, shown = StepFade()
+    if not moving and not (shown and WatchesMouse()) then fader:SetScript("OnUpdate", nil) end
 end
 
 local function StartFade()
@@ -490,13 +497,14 @@ local function Draw(w, asSample)
     local lowerKey = Get(w, "lower")
     if asSample then
         local sample = DM.Sample()
-        Render(w, sample, true, sample.durationSeconds, lowerKey ~= "" and sample or nil, sample.fightName)
+        Render(w, sample, nil, sample.durationSeconds, lowerKey ~= "" and sample or nil, sample.fightName)
     else
         local session, fight = Get(w, "session"), w.fight
         local lower = lowerKey ~= "" and DM.Session(lowerKey, session, fight) or nil
         local name = S.Get("titleText") ~= "list" and DM.FightName(session, fight) or nil
-        Render(w, DM.Session(Get(w, "mode"), session, fight), DM.Available(), DM.Duration(session, fight), lower,
-            name)
+        local available, why = DM.Available()
+        local unavailable = not available and (why ~= nil and why ~= "" and why or TEXT_UNAVAILABLE) or nil
+        Render(w, DM.Session(Get(w, "mode"), session, fight), unavailable, DM.Duration(session, fight), lower, name)
     end
     w.frame:Show()
     ApplyMouse(w)
