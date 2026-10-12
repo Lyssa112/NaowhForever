@@ -46,9 +46,9 @@ local function Region(kind, parent)
     function r:GetLeft() return 100 end
     function r:GetTop() return 300 end
     function r:GetEffectiveScale() return 1 end
-    function r:StartMoving() self.moving = true end
-    function r:StartSizing() self.sizing = true end
-    function r:StopMovingOrSizing() self.moving, self.sizing = false, false end
+    function r:StartMoving() self.dragging = true end
+    function r:StartSizing(point) self.sizingFrom = point end
+    function r:StopMovingOrSizing() self.dragging, self.sizingFrom = false, nil end
     return r
 end
 
@@ -137,7 +137,10 @@ local function Boot(opts)
                 end },
         },
         Solid = function(parent) return Region("Solid", parent) end,
-        Border = function(frame) return { _frame = Region("Border", frame) } end,
+        Border = function(frame)
+            return { _frame = Region("Border", frame),
+                SetColor = function(self, r, g, b, a) self.color = { r = r, g = g, b = b, a = a } end }
+        end,
         Font = function(parent) return Region("FontString", parent) end,
         Button = function(parent, text, w, h, onClick)
             local b = Region("Button", parent); b.label = text; b.onClick = onClick
@@ -485,39 +488,149 @@ do
     check("the sample has a length too", w.time.text == "3:25")
 end
 
--- the text color
+-- the colors: each part from its own setting, the theme's until one is picked
 do
     local s = Boot({ settings = { enabled = true } })
     s.Login()
     local w = s.Window()
-    local row = w.rows[1]
-    check("text follows the theme by default", row.name.textColor.r == THEME.fg.r and row.value.textColor.g == THEME.fg.g
-        and w.title.textColor.b == THEME.fg.b)
-    check("ranks, the time and the empty line are the muted color", row.rank.textColor.r == THEME.muted.r
-        and w.time.textColor.r == THEME.muted.r and w.empty.textColor.r == THEME.muted.r)
-    s.store.Set("textColor", { r = 1, g = 0.2, b = 0.1 })
-    s.Flush()
-    check("a picked color goes to names, amounts and the title", row.name.textColor.r == 1 and row.name.textColor.g == 0.2
-        and row.value.textColor.b == 0.1 and w.title.textColor.g == 0.2)
-    check("and to the rank, the time and the empty line", row.rank.textColor.g == 0.2 and w.time.textColor.g == 0.2
-        and w.empty.textColor.g == 0.2)
-    check("every row, not the first alone", w.rows[3].name.textColor.r == 1 and w.rows[3].rank.textColor.g == 0.2)
-    s.store.Set("textColor", false)
-    s.Flush()
-    check("back to the theme", row.name.textColor.r == THEME.fg.r and row.rank.textColor.r == THEME.muted.r
-        and w.title.textColor.r == THEME.fg.r)
+    local row, own = w.rows[1], w.rows[2]
+    local PICK = { r = 0.9, g = 0.1, b = 0.4 }
+    local function Is(c, t) return c ~= nil and c.r == t.r and c.g == t.g and c.b == t.b end
+    local function Solid(r) return { r = r.solid[1], g = r.solid[2], b = r.solid[3] } end
+    local function Pick(key) s.store.Set(key, PICK); s.Flush() end
+    local function Unpick(key) s.store.Set(key, false); s.Flush() end
 
-    s.store.Set("textColor", { r = 0, g = 1, b = 0 })
-    s.Flush()
+    check("names, amounts and the title follow the theme", Is(row.name.textColor, THEME.fg)
+        and Is(row.value.textColor, THEME.fg) and Is(w.title.textColor, THEME.fg))
+    check("ranks, the time and the empty line its muted color", Is(row.rank.textColor, THEME.muted)
+        and Is(w.time.textColor, THEME.muted) and Is(w.empty.textColor, THEME.muted))
+    check("the window, the title bar and the border their own tokens", Is(Solid(w.background), THEME.bg)
+        and Is(Solid(w.headerBackground), THEME.panel) and Is(w.border.color, THEME.line))
+    check("a row's background is the panel color, your row's edge the Accent", Is(Solid(row.bg), THEME.panel)
+        and Is(Solid(own.edge), THEME.accent))
+    check("the window and its border take the background opacity", w.background.alpha == 0.9
+        and w.border._frame.alpha == 0.9)
+
+    local parts = {
+        nameColor = function() return row.name.textColor end,
+        valueColor = function() return row.value.textColor end,
+        rankColor = function() return row.rank.textColor end,
+        titleColor = function() return w.title.textColor end,
+        timeColor = function() return w.time.textColor end,
+        trackColor = function() return Solid(row.bg) end,
+        edgeColor = function() return Solid(own.edge) end,
+        windowColor = function() return Solid(w.background) end,
+        headerColor = function() return Solid(w.headerBackground) end,
+        borderColor = function() return w.border.color end,
+    }
+    local count = 0
+    for key, read in pairs(parts) do
+        count = count + 1
+        Pick(key)
+        check(key .. ": its part takes it", Is(read(), PICK))
+        for other, readOther in pairs(parts) do
+            if other ~= key then check(key .. " leaves " .. other .. " alone", not Is(readOther(), PICK)) end
+        end
+        Unpick(key)
+        check(key .. ": back to the theme", not Is(read(), PICK))
+    end
+    check("every color of the window is covered", count == 10)
+    Pick("nameColor")
+    check("a picked name color reaches every row", Is(w.rows[3].name.textColor, PICK))
+    Unpick("nameColor")
+    Pick("rankColor")
+    check("the rank color is the empty line's too", Is(w.empty.textColor, PICK))
+    Unpick("rankColor")
+
+    s.store.Set("barColor", "custom"); s.Flush()
+    check("Custom Color before one is picked: the theme's Accent", row.color[1] == THEME.accent.r
+        and row.color[3] == THEME.accent.b)
+    Pick("barCustomColor")
+    check("Custom Color: every bar the one picked", row.color[1] == PICK.r and own.color[2] == PICK.g
+        and w.rows[3].color[3] == PICK.b)
+    s.store.Set("barColor", "class"); s.Flush()
+    check("Class Colors ignore it", row.color[1] == CLASS.MAGE.r and own.color[1] == CLASS.ROGUE.r)
+    Unpick("barCustomColor")
+
+    s.store.Set("highlightPlayer", false)
+    Pick("edgeColor")
+    check("no highlight: your edge is your class color, whatever is picked", Is(Solid(own.edge), CLASS.ROGUE))
+    s.store.Set("highlightPlayer", true); Unpick("edgeColor")
+
+    s.store.Set("showBorder", false); s.Flush()
+    check("Border off hides it", w.border._frame.shown == false)
+    s.store.Set("showBorder", true); s.Flush()
+    check("and on shows it", w.border._frame.shown == true)
+
+    s.session.combatSources[1].specIconID = 62
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a spec icon when the game gives one", row.icon.texture == 62)
+    s.store.Set("iconStyle", "class"); s.Flush()
+    check("Class Icon: the class's, always", row.icon.texture == "Interface\\Icons\\ClassIcon_MAGE")
+    s.store.Set("iconStyle", "spec"); s.Flush()
+    check("and back", row.icon.texture == 62)
+
+    Pick("nameColor"); Pick("valueColor"); Pick("titleColor"); Pick("windowColor"); Pick("borderColor")
+    Pick("trackColor"); Pick("rankColor")
     s.Hover(w, 2)
     local panel = s.Panel()
-    check("the spell panel takes it", panel.title.textColor.g == 1 and panel.rows[1].name.textColor.g == 1
-        and panel.rows[1].value.textColor.g == 1)
-    s.store.Set("textColor", false)
+    check("the spell panel's names, amounts and title", Is(panel.rows[1].name.textColor, PICK)
+        and Is(panel.rows[1].value.textColor, PICK) and Is(panel.title.textColor, PICK))
+    check("its window, border, bars' background", Is(Solid(panel.background), PICK) and Is(panel.border.color, PICK)
+        and Is(Solid(panel.rows[1].bg), PICK))
+    s.store.Set("showBorder", false)
+    s.Hover(w, 2)
+    check("and its border follows Border", panel.border._frame.shown == false)
+    for _, key in ipairs({ "nameColor", "valueColor", "titleColor", "windowColor", "borderColor", "trackColor",
+        "rankColor" }) do s.store.Set(key, false) end
+    s.store.Set("showBorder", true)
     s.spellsResult = { combatSpells = {} }
     s.Hover(w, 2)
-    check("and the theme's colors without one", panel.title.textColor.r == THEME.fg.r
-        and panel.note.textColor.r == THEME.muted.r)
+    check("without picks the panel follows the theme", Is(panel.title.textColor, THEME.fg)
+        and Is(panel.note.textColor, THEME.muted) and Is(Solid(panel.background), THEME.bg))
+end
+
+-- moving and resizing work in combat too, and a resize keeps the size the client gives
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local one = s.Window()
+    local grip
+    for _, f in ipairs(s.frames) do
+        if f.parent == one and f.kind == "Button" and f.scripts.OnMouseDown then grip = f end
+    end
+    s.combat = true
+    grip.scripts.OnMouseDown(grip, "LeftButton")
+    check("in combat: the corner starts sizing", one.sizingFrom == "BOTTOMRIGHT")
+    one.w, one.h = 420, 260
+    one.scripts.OnSizeChanged(one, 420, 260)
+    check("the window keeps the size the client gives, not the saved one", one.w == 420 and one.h == 260)
+    grip.scripts.OnMouseUp(grip)
+    check("on release the size is saved", s.store.Get("width") == 420 and s.store.Get("height") == 260
+        and one.sizingFrom == nil)
+    s.Flush()
+    check("and the window stays that size", one.w == 420 and one.h == 260)
+
+    one.header.scripts.OnDragStart(one.header)
+    check("in combat: the title bar starts moving", one.dragging == true)
+    one.header.scripts.OnDragStop(one.header)
+    check("and the place is saved", s.store.Get("meterPos").point == "TOPLEFT" and one.dragging == false)
+
+    s.store.Set("locked", true)
+    one.header.scripts.OnDragStart(one.header)
+    check("Lock Window: it does not move", not one.dragging)
+    grip.scripts.OnMouseDown(grip, "LeftButton")
+    check("nor resize", one.sizingFrom == nil)
+    s.store.Set("locked", false)
+
+    s.combat = false
+    one.header.scripts.OnDragStart(one.header)
+    s.combat = true
+    s.Fire("PLAYER_REGEN_DISABLED")
+    check("combat starting does not cancel a drag", one.dragging == true)
+    one.header.scripts.OnDragStop(one.header)
+    one.scripts.OnHide(one)
+    check("hiding the window ends a drag", one.dragging == false)
 end
 
 -- the menus: the list, the session, and the rest
@@ -688,7 +801,7 @@ do
         if f.parent == two and f.kind == "Button" and f.scripts.OnMouseDown then grip = f end
     end
     grip.scripts.OnMouseDown(grip, "LeftButton")
-    check("the grip sizes the window", two.sizing == true)
+    check("the grip sizes the window", two.sizingFrom == "BOTTOMRIGHT")
     two.w, two.h = 260.4, 150.6
     grip.scripts.OnMouseUp(grip)
     check("and saves its size under its number", s.store.Get("width2") == 260 and s.store.Get("height2") == 151
@@ -962,8 +1075,10 @@ end
 do
     local s = Boot()
     local page = s.page
-    check("one page, two cards: the meter and its more windows", page and #page.cards == 2
-        and page.cards[1].id == "meter" and page.cards[2].id == "windows" and page.window ~= nil)
+    local C = s.DM.C
+    check("one page, three cards: the meter, its colors and its more windows", page and #page.cards == 3
+        and page.cards[1].id == "meter" and page.cards[2].id == "colors" and page.cards[3].id == "windows"
+        and page.window ~= nil)
     check("the heading reads the state", page.window.headline() == "Damage Meter is off")
     s.store.Set("enabled", true)
     check("on: it names the list", page.window.headline() == "Damage Done")
@@ -981,27 +1096,48 @@ do
             end
         end
     end
-    check("the rows cover the windows, the rows, the hover and the colors", #keys >= 28)
-    check("one short help sentence on each card", #page.cards[1].help < 120 and #page.cards[2].help < 120)
-    local pick
-    for _, r in ipairs(page.cards[1].rows) do
-        if r.key == "textColor" then pick = r end
-    end
-    check("a Text Color row, a color picker", pick and pick.colour == true and pick.label == "Text Color")
-    local pr, pg, pb = pick.get()
-    check("it shows the theme's foreground until one is picked", pr == THEME.fg.r and pg == THEME.fg.g and pb == THEME.fg.b)
-    pick.set(0.1, 0.2, 0.3)
-    local c = s.store.Get("textColor")
-    check("picking stores the color", type(c) == "table" and c.r == 0.1 and c.g == 0.2 and c.b == 0.3)
-    pr, pg, pb = pick.get()
-    check("and the picker shows it", pr == 0.1 and pg == 0.2 and pb == 0.3)
-    s.store.Set("textColor", false)
+    check("the rows cover the windows, the rows, the hover and the colors", #keys >= 43)
+    check("one short help sentence on each card", #page.cards[1].help < 120 and #page.cards[2].help < 120
+        and #page.cards[3].help < 120)
     check("the first card's summary reads window one", page.cards[1].summary(s.store) == "Damage Done, 300 by 190")
-    check("the closed windows say off", page.cards[2].summary(s.store) == "Second: Off, Third: Off")
+
+    local colors = {}
+    for _, row in ipairs(page.cards[2].rows) do
+        if row.colour then colors[row.key] = row end
+    end
+    for _, entry in ipairs(C.COLORS) do
+        local row = colors[entry.key]
+        check(entry.key .. ": a color row, labeled", row and row.label == entry.label)
+        local token = THEME[entry.token]
+        local r, g, b = row.get()
+        check(entry.key .. ": shows the theme's " .. entry.token .. " until one is picked",
+            r == token.r and g == token.g and b == token.b)
+        row.set(0.1, 0.2, 0.3)
+        local c = s.store.Get(entry.key)
+        check(entry.key .. ": picking stores it", type(c) == "table" and c.r == 0.1 and c.g == 0.2 and c.b == 0.3)
+        r, g, b = row.get()
+        check(entry.key .. ": and shows it", r == 0.1 and g == 0.2 and b == 0.3)
+        s.store.Set(entry.key, false)
+    end
+    check("the colors card counts what was picked", page.cards[2].summary(s.store) == "Theme")
+    s.store.Set("nameColor", { r = 1, g = 1, b = 1 })
+    s.store.Set("rankColor", { r = 1, g = 1, b = 1 })
+    check("and says how many", page.cards[2].summary(s.store) == "2 picked")
+    s.store.Set("nameColor", false); s.store.Set("rankColor", false)
+
+    check("the custom bar color needs Custom Color", colors.barCustomColor.needs() == false)
+    s.store.Set("barColor", "custom")
+    check("which turns it on", colors.barCustomColor.needs() == true)
+    check("the row edge needs Highlight Your Row", colors.edgeColor.needs() == true)
+    s.store.Set("highlightPlayer", false)
+    check("and is off without it", colors.edgeColor.needs() == false)
+    s.store.Set("highlightPlayer", true)
+
+    check("the closed windows say off", page.cards[3].summary(s.store) == "Second: Off, Third: Off")
     s.store.Set("window2", true)
     s.store.Set("mode2", "healing")
-    check("an open one reads its own list", page.cards[2].summary(s.store) == "Second: Healing Done, Third: Off")
-    local more = page.cards[2].rows
+    check("an open one reads its own list", page.cards[3].summary(s.store) == "Second: Healing Done, Third: Off")
+    local more = page.cards[3].rows
     check("each window has a group and five rows, with its own keys", #more == 12 and more[2].key == "window2"
         and more[3].key == "mode2" and more[6].key == "height2" and more[8].key == "window3" and more[12].key == "height3")
     check("the labels differ across the card", more[3].label ~= more[9].label and more[2].label ~= more[8].label)

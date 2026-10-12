@@ -1,4 +1,4 @@
--- Meter.lua: the Damage Meter's look and layout, in the theme's colors.
+-- Meter.lua: the Damage Meter's look and layout, in the theme's colors unless the settings pick others.
 local ns = _G.NaowhForever
 
 local UI = ns.UI
@@ -28,35 +28,40 @@ local Look = {}
 DM.Look = Look
 
 local classIcons = {}
+local tokenOf = {}
+for _, entry in ipairs(C.COLORS) do tokenOf[entry.key] = entry.token end
 
 local function ClassColor(class)
     return class and RAID_CLASS_COLORS[class] or FALLBACK
 end
 
-local function IconOf(source)
+local function ClassIcon(class)
+    local path = classIcons[class]
+    if not path then path = CLASS_ICON .. class; classIcons[class] = path end
+    return path
+end
+
+local function IconOf(source, classOnly)
     local id = source.specIconID
-    if type(id) == "number" and id ~= 0 then return id end
+    if not classOnly and type(id) == "number" and id ~= 0 then return id end
     local class = source.classFilename
-    if class and class ~= "" then
-        local path = classIcons[class]
-        if not path then path = CLASS_ICON .. class; classIcons[class] = path end
-        return path
-    end
+    if class and class ~= "" then return ClassIcon(class) end
     return UNKNOWN_ICON
 end
 
--- The text color: the one picked, or the theme's foreground.
-function Look.TextColor()
-    local c = S.Get("textColor")
+-- A color of the window: the one picked in the settings, or the theme's token it stands in for.
+function Look.Color(key)
+    local c = S.Get(key)
     if type(c) == "table" then return c end
-    return T.fg
+    return T[tokenOf[key]]
 end
 
--- Ranks, the fight time and notes: the picked color too, or the theme's muted one.
-function Look.QuietColor()
-    local c = S.Get("textColor")
-    if type(c) == "table" then return c end
-    return T.muted
+-- A source's bar color: its class, the theme's Accent for everyone, or the one picked.
+function Look.BarColor(source)
+    local choice = S.Get("barColor")
+    if choice == "accent" then return T.accent end
+    if choice == "custom" then return Look.Color("barCustomColor") end
+    return ClassColor(source.classFilename)
 end
 
 function Look.New(frame, index)
@@ -67,7 +72,8 @@ function Look.New(frame, index)
     frame.border = ns.Border(frame)
     frame.header = CreateFrame("Frame", nil, frame)
     frame.header:SetPoint("TOPLEFT"); frame.header:SetPoint("TOPRIGHT"); frame.header:SetHeight(HEADER)
-    ns.Solid(frame.header, "BACKGROUND", T.panel, 1):SetAllPoints()
+    frame.headerBackground = ns.Solid(frame.header, "BACKGROUND", T.panel, 1)
+    frame.headerBackground:SetAllPoints()
     local rule = ns.Solid(frame.header, "OVERLAY", T.line, 1)
     rule:SetPoint("BOTTOMLEFT"); rule:SetPoint("BOTTOMRIGHT"); rule:SetHeight(1)
     frame.empty = ns.Font(frame, EMPTY_SIZE, "OUTLINE", T.muted)
@@ -112,9 +118,9 @@ local function LayRow(row, f, i, bh, gap, w, fontSize, showRanks, showIcons, val
     local left = TEXT_PAD
     row.rank:ClearAllPoints(); row.rank:SetPoint("LEFT", left, 0); row.rank:SetWidth(RANK_W)
     row.rank:SetShown(showRanks)
-    row.rank:SetTextColor(f.quietColor.r, f.quietColor.g, f.quietColor.b)
-    row.name:SetTextColor(f.textColor.r, f.textColor.g, f.textColor.b)
-    row.value:SetTextColor(f.textColor.r, f.textColor.g, f.textColor.b)
+    row.rank:SetTextColor(f.rankColor.r, f.rankColor.g, f.rankColor.b)
+    row.name:SetTextColor(f.nameColor.r, f.nameColor.g, f.nameColor.b)
+    row.value:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
     if showRanks then left = left + RANK_W end
     local iconSize = math.min(ICON_MAX, bh - ICON_PAD)
     row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", left, 0); row.icon:SetSize(iconSize, iconSize)
@@ -125,6 +131,22 @@ local function LayRow(row, f, i, bh, gap, w, fontSize, showRanks, showIcons, val
     row.name:SetPoint("RIGHT", -TEXT_PAD - valueWidth - NAME_GAP, 0)
     Parts.HudFont(row.name, font, fontSize, outline)
     Parts.HudFont(row.value, font, fontSize, outline)
+end
+
+-- The window's own colors: the frame, the title bar and its texts.
+local function PaintFrame(f)
+    local window, header, border = Look.Color("windowColor"), Look.Color("headerColor"), Look.Color("borderColor")
+    local title, time, rank = Look.Color("titleColor"), Look.Color("timeColor"), Look.Color("rankColor")
+    local alpha = S.Get("backgroundAlpha")
+    f.background:SetColorTexture(window.r, window.g, window.b, 1)
+    f.background:SetAlpha(alpha)
+    f.headerBackground:SetColorTexture(header.r, header.g, header.b, 1)
+    f.border:SetColor(border.r, border.g, border.b, 1)
+    f.border._frame:SetShown(S.Get("showBorder"))
+    f.border._frame:SetAlpha(alpha)
+    f.title:SetTextColor(title.r, title.g, title.b)
+    f.time:SetTextColor(time.r, time.g, time.b)
+    f.empty:SetTextColor(rank.r, rank.g, rank.b)
 end
 
 -- Sizes the window and lays the rows that fit; returns how many are shown and the first one's index.
@@ -141,13 +163,11 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     local chars = columns == 2 and VALUE_CHARS_BOTH or columns == 1 and VALUE_CHARS_ONE or 0
     local valueWidth = math.floor(chars * CHAR_W * fontSize)
     local texture, font, outline = S.Get("texture"), S.Get("font"), S.Get("outline")
-    local text, quiet = Look.TextColor(), Look.QuietColor()
-    f.textColor, f.quietColor = text, quiet
-    f.title:SetTextColor(text.r, text.g, text.b)
-    f.time:SetTextColor(quiet.r, quiet.g, quiet.b)
-    f.empty:SetTextColor(quiet.r, quiet.g, quiet.b)
+    PaintFrame(f)
+    local name, value, rank = Look.Color("nameColor"), Look.Color("valueColor"), Look.Color("rankColor")
+    f.nameColor, f.valueColor, f.rankColor = name, value, rank
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(showRanks), tostring(showIcons), valueWidth,
-        texture, font, outline, text.r, text.g, text.b, quiet.r, quiet.g, quiet.b }, "|")
+        texture, font, outline, name.r, name.g, name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b }, "|")
     local rows = f.rows
     for i = 1, shown do
         local row = rows[i] or Look.Row(f, i)
@@ -159,8 +179,6 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     end
     f.laidKey = key
     for i = shown + 1, #rows do rows[i]:Hide() end
-    f.background:SetAlpha(S.Get("backgroundAlpha"))
-    f.border._frame:SetAlpha(S.Get("backgroundAlpha"))
     return shown, first
 end
 
@@ -177,31 +195,27 @@ local function PaintValue(row, source, mode, showTotal, showRate)
     end
 end
 
--- A source's bar color: its class, or the theme's Accent for everyone.
-function Look.Color(source)
-    if S.Get("barColor") == "accent" then return T.accent end
-    return ClassColor(source.classFilename)
-end
-
 function Look.Paint(f, session, first, shown, mode, available)
     local sources = session.combatSources
     local alpha = S.Get("barAlpha")
     local showTotal, showRate = S.Get("showTotal"), S.Get("showRate")
     local own = S.Get("highlightPlayer")
+    local classOnly = S.Get("iconStyle") == "class"
+    local track, edge = Look.Color("trackColor"), Look.Color("edgeColor")
     f.empty:SetText(available and TEXT_EMPTY or TEXT_UNAVAILABLE)
     f.empty:SetShown(shown == 0)
     for i = 1, shown do
         local source, row = sources[first + i], f.rows[i]
-        local c = Look.Color(source)
+        local c = Look.BarColor(source)
         row.source = source
         row:SetStatusBarColor(c.r, c.g, c.b, alpha)
         row:SetMinMaxValues(0, session.maxAmount)
         row:SetValue(source.totalAmount)
-        row.bg:SetColorTexture(T.panel.r, T.panel.g, T.panel.b, 1)
-        local mine = own and source.isLocalPlayer == true
-        row.edge:SetColorTexture(mine and T.accent.r or c.r, mine and T.accent.g or c.g, mine and T.accent.b or c.b, 1)
+        row.bg:SetColorTexture(track.r, track.g, track.b, 1)
+        local e = own and source.isLocalPlayer == true and edge or c
+        row.edge:SetColorTexture(e.r, e.g, e.b, 1)
         row.rank:SetFormattedText(RANK_TEXT, first + i)
-        row.icon:SetTexture(IconOf(source))
+        row.icon:SetTexture(IconOf(source, classOnly))
         row.name:SetText(source.name)
         PaintValue(row, source, mode, showTotal, showRate)
     end

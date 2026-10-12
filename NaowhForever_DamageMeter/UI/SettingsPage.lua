@@ -11,6 +11,8 @@ local Group = Settings.Group
 
 local OFF = "Turn on the Damage Meter"
 local OFF_WINDOW = "Turn this window on first"
+local OFF_CUSTOM = "Set Bar Color to Custom Color"
+local OFF_HIGHLIGHT = "Turn on Highlight Your Row"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local BAR_RANGE, SPACING_RANGE = { C.MIN_BAR, C.MAX_BAR, 1 }, { 0, C.MAX_SPACING, 1 }
@@ -18,25 +20,19 @@ local TEXT_RANGE = { C.MIN_FONT, C.MAX_FONT, 1 }
 local BACKGROUND_RANGE, BAR_ALPHA_RANGE = Style.ALPHA_RANGE, { 10, 100, Style.OPACITY_STEP }
 local TO_FRACTION = Style.PERCENT_SCALE
 local REPORT_RANGE = { 1, C.REPORT_MAX, 1 }
-local ORDER_METER, ORDER_MORE = 10, 20
+local ORDER_METER, ORDER_COLORS, ORDER_MORE = 10, 15, 20
 local MORE_NAMES = { [2] = "Second Window", [3] = "Third Window" }
 
 local MODE = { C.MODE_LABELS, C.MODE_ORDER }
 local SESSION = { C.SESSION_LABELS, C.SESSION_ORDER }
 local SHOW = { { always = "Always", instance = "In Instances", group = "In a Group" }, { "always", "instance", "group" } }
-local BAR_COLOR = { { class = "Class Colors", accent = "Theme Accent" }, { "class", "accent" } }
+local BAR_COLOR = { { class = "Class Colors", accent = "Theme Accent", custom = "Custom Color" },
+    { "class", "accent", "custom" } }
+local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "class" } }
 
 local function Enabled() return DM.On() and true or false end
-
--- The picker shows the color in use, the theme's until one is picked.
-local function TextColorGet()
-    local c = DM.Look.TextColor()
-    return c.r, c.g, c.b, 1
-end
-
-local function TextColorSet(r, g, b)
-    S.Set("textColor", { r = r, g = g, b = b })
-end
+local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
+local function Highlighting() return DM.On() and S.Get("highlightPlayer") == true end
 
 local function Headline()
     if not DM.On() then return "Damage Meter is off" end
@@ -85,6 +81,54 @@ local function MoreRows()
     return rows
 end
 
+-- A color picker shows the color in use: the theme's until one is picked.
+local function PickedGet(key)
+    return function()
+        local c = DM.Look.Color(key)
+        return c.r, c.g, c.b, 1
+    end
+end
+
+local function PickedSet(key)
+    return function(r, g, b) S.Set(key, { r = r, g = g, b = b }) end
+end
+
+local COLOR_NEEDS = { barCustomColor = CustomBars, edgeColor = Highlighting }
+local COLOR_WHY = { barCustomColor = OFF_CUSTOM, edgeColor = OFF_HIGHLIGHT }
+local COLOR_HELP = {
+    barCustomColor = "The bars' color when Bar Color is Custom Color.",
+    edgeColor = "The strip on the left of your own row.",
+    trackColor = "What shows behind a bar.",
+}
+
+local function ColorsSummary(store)
+    local picked = 0
+    for _, entry in ipairs(C.COLORS) do
+        if type(store.Get(entry.key)) == "table" then picked = picked + 1 end
+    end
+    return picked == 0 and "Theme" or picked .. " picked"
+end
+
+local function ColorRows()
+    local rows = {
+        Group("Bars"),
+        { key = "barColor", label = "Bar Color", choice = BAR_COLOR, needs = Enabled, why = OFF,
+          help = "Class Colors: each player's class. Theme Accent: every bar in your theme's Accent. Custom "
+              .. "Color: every bar in the one you pick." },
+    }
+    local group = "Bars"
+    for _, entry in ipairs(C.COLORS) do
+        if entry.group ~= group then
+            group = entry.group
+            rows[#rows + 1] = Group(group)
+        end
+        rows[#rows + 1] = { key = entry.key, label = entry.label, colour = true, get = PickedGet(entry.key),
+            set = PickedSet(entry.key), needs = COLOR_NEEDS[entry.key] or Enabled,
+            why = COLOR_WHY[entry.key] or OFF, help = COLOR_HELP[entry.key] }
+    end
+    return rows
+end
+
 local page = Settings.Page(C.PAGE, S)
 
 page:Window({
@@ -108,9 +152,10 @@ page:Card({
         { key = "width", label = "Width", slider = WIDTH_RANGE, needs = Enabled, why = OFF },
         { key = "height", label = "Window Height", slider = HEIGHT_RANGE, needs = Enabled, why = OFF },
         { key = "locked", label = "Lock Window", toggle = true, needs = Enabled, why = OFF,
-          help = "Off: drag the title bar or resize with the corner, outside combat." },
+          help = "Off: drag the title bar to move it and the corner to resize it, in combat too." },
         { key = "showTime", label = "Show Fight Time", toggle = true, needs = Enabled, why = OFF,
           help = "How long the shown session has run, in the title bar when there is room." },
+        { key = "showBorder", label = "Border", toggle = true, needs = Enabled, why = OFF },
         { key = "backgroundAlpha", label = "Background Opacity", slider = BACKGROUND_RANGE, unit = "%",
           scale = TO_FRACTION, needs = Enabled, why = OFF },
         { key = "hideGameMeter", label = "Replace the Game's Meter", toggle = true, needs = Enabled, why = OFF,
@@ -121,7 +166,8 @@ page:Card({
         { key = "showTotal", label = "Show Total", toggle = true, needs = Enabled, why = OFF },
         { key = "showRate", label = "Show Per Second", toggle = true, needs = Enabled, why = OFF,
           help = "Damage, healing and absorbs only." },
-        { key = "showIcons", label = "Spec Icons", toggle = true, needs = Enabled, why = OFF },
+        { key = "showIcons", label = "Icons", toggle = true, needs = Enabled, why = OFF },
+        { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
         { key = "showRanks", label = "Rank Numbers", toggle = true, needs = Enabled, why = OFF },
         { key = "highlightPlayer", label = "Highlight Your Row", toggle = true, needs = Enabled, why = OFF },
         Settings.Look("", { text = true, size = TEXT_RANGE, bar = "Naowh Gradient", needs = Enabled, why = OFF }),
@@ -133,17 +179,19 @@ page:Card({
               .. "show spells." },
         { key = "reportLines", label = "Report Lines", slider = REPORT_RANGE, needs = Enabled, why = OFF,
           help = "How many rows Report To sends, out of combat only. Reset has a key binding under Naowh Forever." },
-        Group("Colors"),
-        { key = "barColor", label = "Bar Color", choice = BAR_COLOR, needs = Enabled, why = OFF,
-          help = "Class Colors: each player's class. Theme Accent: every bar in your theme's Accent." },
-        { key = "textColor", label = "Text Color", colour = true, get = TextColorGet, set = TextColorSet,
-          needs = Enabled, why = OFF,
-          help = "Names, amounts, ranks and the title. Reset it to follow your theme." },
+        Group("Preview"),
         { label = "Show It on Screen", buttonText = "Preview", needs = Enabled, why = OFF,
           button = function() ns.PreviewDamageMeter() end,
           help = "Shows the meter with sample bars where it sits on your screen, for ten seconds. Out of "
               .. "combat only." },
     },
+})
+
+page:Card({
+    id = "colors", name = "Colors", order = ORDER_COLORS,
+    help = "A color for each part of the window. Until you pick one, a part follows your theme.",
+    summary = ColorsSummary,
+    rows = ColorRows(),
 })
 
 page:Card({

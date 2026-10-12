@@ -28,6 +28,21 @@ ns.DamageMeter.C = {
     DEFAULT_MODE = "damage",
     BREAKDOWN_LINES = 8, REPORT_MAX = 10, FIGHTS_MAX = 10,
     TIME_WIDTH = 48,
+    -- The colors of a window, in the order the page shows them. Each is a setting that is false until a
+    -- color is picked, and then follows the theme's token.
+    COLORS = {
+        { key = "barCustomColor", label = "Custom Bar Color", group = "Bars", token = "accent" },
+        { key = "trackColor", label = "Bar Background", group = "Bars", token = "panel" },
+        { key = "edgeColor", label = "Your Row Edge", group = "Bars", token = "accent" },
+        { key = "nameColor", label = "Names", group = "Text", token = "fg" },
+        { key = "valueColor", label = "Amounts", group = "Text", token = "fg" },
+        { key = "rankColor", label = "Ranks", group = "Text", token = "muted" },
+        { key = "titleColor", label = "Title", group = "Text", token = "fg" },
+        { key = "timeColor", label = "Fight Time", group = "Text", token = "muted" },
+        { key = "windowColor", label = "Window Background", group = "Window", token = "bg" },
+        { key = "headerColor", label = "Title Bar", group = "Window", token = "panel" },
+        { key = "borderColor", label = "Border", group = "Window", token = "line" },
+    },
     MODES = MODES, MODE_BY_KEY = byKey, MODE_LABELS = labels, MODE_ORDER = order,
     SESSION_LABELS = { current = "Current", overall = "Overall" },
     SESSION_ORDER = { "current", "overall" },

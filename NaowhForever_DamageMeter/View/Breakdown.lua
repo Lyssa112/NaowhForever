@@ -96,19 +96,25 @@ local function PaintRow(row, spell, data, color, alpha)
     row:Show()
 end
 
--- The font, outline and text colors the meter's settings ask for.
+-- The font, outline and colors the meter's settings ask for.
 local function Style()
     local font, outline = S.Get("font"), S.Get("outline")
-    local text, quiet = Look.TextColor(), Look.QuietColor()
+    local name, value, rank = Look.Color("nameColor"), Look.Color("valueColor"), Look.Color("rankColor")
+    local title, track = Look.Color("titleColor"), Look.Color("trackColor")
+    local window, border = Look.Color("windowColor"), Look.Color("borderColor")
+    panel.background:SetColorTexture(window.r, window.g, window.b, 1)
+    panel.border:SetColor(border.r, border.g, border.b, 1)
+    panel.border._frame:SetShown(S.Get("showBorder"))
     Parts.HudFont(panel.title, font, TITLE_SIZE, outline)
-    panel.title:SetTextColor(text.r, text.g, text.b)
+    panel.title:SetTextColor(title.r, title.g, title.b)
     Parts.HudFont(panel.note, font, TEXT_SIZE, outline)
-    panel.note:SetTextColor(quiet.r, quiet.g, quiet.b)
+    panel.note:SetTextColor(rank.r, rank.g, rank.b)
     for _, row in ipairs(panel.rows) do
         Parts.HudFont(row.name, font, TEXT_SIZE, outline)
         Parts.HudFont(row.value, font, TEXT_SIZE, outline)
-        row.name:SetTextColor(text.r, text.g, text.b)
-        row.value:SetTextColor(text.r, text.g, text.b)
+        row.name:SetTextColor(name.r, name.g, name.b)
+        row.value:SetTextColor(value.r, value.g, value.b)
+        row.bg:SetColorTexture(track.r, track.g, track.b, 1)
     end
 end
 
@@ -127,7 +133,7 @@ function Breakdown.Show(row, source, data, toRight, inCombat)
     Style()
     panel.title:SetText(source.name)
     local lines = data and math.min(C.BREAKDOWN_LINES, #data.combatSpells) or 0
-    local color, alpha = Look.Color(source), S.Get("barAlpha")
+    local color, alpha = Look.BarColor(source), S.Get("barAlpha")
     for i = 1, C.BREAKDOWN_LINES do
         if i <= lines then
             PaintRow(panel.rows[i], data.combatSpells[i], data, color, alpha)

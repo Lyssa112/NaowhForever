@@ -42,8 +42,14 @@ NaowhForever_DamageMeter/
 - The game's meter is the `damageMeterEnabled` setting. It is turned off while this one is on and put
   back as it was after, kept on the account so it survives a reload. It is left alone in combat and
   done again when combat ends.
-- Text Color is `false` until one is picked, and then every text follows the theme's foreground, and
-  the ranks, the fight time and the notes its muted one. A picked color is used for all of them.
+- Every part of a window has its own color setting (`DM.C.COLORS`): the bars' custom color, their
+  background and your row's edge, the names, amounts, ranks, title and fight time, and the window, the
+  title bar and the border. Each is `false` until a color is picked and then follows the theme's token
+  it stands in for, so a theme switch restyles what was not picked. `Look.Color(key)` is the one place
+  that resolves it.
+- The windows are plain frames, so they move and resize in combat; only Lock Window stops that. The
+  sizing flag lives on the frame (`frame.sizing`), which is what the layout reads while the client
+  resizes it.
 - Interrupts, Dispels and Deaths have no per-second figure, so Show Per Second skips them. Deaths has
   no spells either.
 - Windows 2 and 3 use the first window's keys with their number added (`mode2`, `width3`,

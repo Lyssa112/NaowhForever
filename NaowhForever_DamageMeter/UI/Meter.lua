@@ -98,32 +98,34 @@ local function SavePosition(w)
 end
 
 local function OnDragStart(w)
-    if not S.Get("locked") and not unlocked and not InCombatLockdown() then
-        w.moving = true; w.frame:StartMoving()
-    end
+    if S.Get("locked") or unlocked then return end
+    w.frame.moving = true; w.frame:StartMoving()
 end
 
 local function OnDragStop(w)
-    if w.moving then w.frame:StopMovingOrSizing(); w.moving = false; SavePosition(w) end
+    local frame = w.frame
+    if frame.moving then frame:StopMovingOrSizing(); frame.moving = false; SavePosition(w) end
 end
 
 local function OnGripDown(w, button)
-    if button ~= "LeftButton" or S.Get("locked") or unlocked or InCombatLockdown() then return end
+    if button ~= "LeftButton" or S.Get("locked") or unlocked then return end
     SavePosition(w)
-    w.sizing = true; w.frame:StartSizing("BOTTOMRIGHT")
+    w.frame.sizing = true; w.frame:StartSizing("BOTTOMRIGHT")
 end
 
 local function OnGripUp(w)
-    if not w.sizing then return end
-    local width, height = w.frame:GetWidth(), w.frame:GetHeight()
-    w.frame:StopMovingOrSizing(); w.sizing = false
+    local frame = w.frame
+    if not frame.sizing then return end
+    local width, height = frame:GetWidth(), frame:GetHeight()
+    frame:StopMovingOrSizing(); frame.sizing = false
     S.Set(Key("width", w.index), math.floor(width + ROUND)); S.Set(Key("height", w.index), math.floor(height + ROUND))
     SavePosition(w); Update()
 end
 
 local function OnHide(w)
-    if w.moving or w.sizing then
-        w.frame:StopMovingOrSizing(); w.moving, w.sizing = false, false
+    local frame = w.frame
+    if frame.moving or frame.sizing then
+        frame:StopMovingOrSizing(); frame.moving, frame.sizing = false, false
     end
 end
 
@@ -179,7 +181,7 @@ local function NewGrip(w)
     frame.grip:SetNormalTexture(C.GRIP_UP)
     frame.grip:SetHighlightTexture(C.GRIP_HIGHLIGHT)
     frame.grip:SetPushedTexture(C.GRIP_DOWN)
-    ns.Tooltip(frame.grip, "Resize Damage Meter", "Drag to resize. Turn off Lock Window first; resizing is available outside combat.")
+    ns.Tooltip(frame.grip, "Resize Damage Meter", "Drag to resize. Turn off Lock Window first.")
     frame.grip:SetScript("OnMouseDown", function(_, button) OnGripDown(w, button) end)
     frame.grip:SetScript("OnMouseUp", function() OnGripUp(w) end)
 end
@@ -204,7 +206,7 @@ local function Build(w)
     frame.header:SetScript("OnDragStart", function() OnDragStart(w) end)
     frame.header:SetScript("OnDragStop", function() OnDragStop(w) end)
     NewGrip(w)
-    frame:SetScript("OnSizeChanged", function() if w.sizing then Update() end end)
+    frame:SetScript("OnSizeChanged", function() if frame.sizing then Update() end end)
     ns.AllowOffscreen(frame)
     frame:SetScript("OnHide", function() OnHide(w) end)
     frame:EnableMouseWheel(true)
@@ -289,11 +291,6 @@ end
 local function OnEvent(_, event)
     if event == "PLAYER_REGEN_DISABLED" then
         preview = false
-        for _, w in pairs(windows) do
-            if w.frame and (w.sizing or w.moving) then
-                w.frame:StopMovingOrSizing(); w.sizing, w.moving = false, false
-            end
-        end
     elseif event == "PLAYER_REGEN_ENABLED" then
         GameMeter(DM.On() and S.Get("hideGameMeter"))
     elseif event == "DAMAGE_METER_RESET" then
