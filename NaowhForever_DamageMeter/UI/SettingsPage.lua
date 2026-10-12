@@ -349,6 +349,9 @@ page:Card({
         { key = "showTotal", label = "Show Total", toggle = true, needs = Enabled, why = OFF },
         { key = "showRate", label = "Show Per Second", toggle = true, needs = Enabled, why = OFF,
           help = "Damage, healing and absorbs only." },
+        { key = "showPercent", label = "Show Percent", toggle = true, needs = Enabled, why = OFF,
+          help = "Each one's share of what the list totals, in a column of its own. The game hides the figures "
+              .. "in combat, so it fills in after the fight." },
         { key = "showColumnHeaders", label = "Column Titles", toggle = true, needs = Enabled, why = OFF,
           help = "A line of titles above the rows: Name and what each column shows." },
         Group("Writing"),
@@ -411,8 +414,8 @@ page:Card({
     rows = {
         Group("Spells"),
         { key = "breakdown", label = "Spell Breakdown", toggle = true, needs = Enabled, why = OFF,
-          help = "Hover a row to see its spells. In combat only your own row and rows the game lets through "
-              .. "show spells." },
+          help = "Hover a row to see its spells, or click it to see them in the window, and click again to go "
+              .. "back. In combat only your own row and rows the game lets through show spells." },
         Group("Report"),
         { key = "reportLines", label = "Report Lines", slider = REPORT_RANGE, needs = Enabled, why = OFF,
           help = "How many rows Report To sends, out of combat only. Reset has a key binding under Naowh Forever." },

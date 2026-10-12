@@ -1,5 +1,4 @@
--- Breakdown.lua: the spells behind a row, in a small panel beside it, in the theme's colors. It follows the
--- hovered row, and stays on one that was clicked, where its spells show their tooltips.
+-- Breakdown.lua: the spells behind a hovered row, in a small panel beside it, in the theme's colors.
 local ns = _G.NaowhForever
 
 local UI = ns.UI
@@ -12,42 +11,22 @@ local CROP = ns.Shared.Style.ICON_CROP
 
 local WIDTH, ROW_H, GAP, PAD, HEADER_H, NOTE_H = 300, 18, 2, 6, 24, 22
 local SECTION_GAP, SECTION_H = 6, 16
-local TEXT_SIZE, TITLE_SIZE, ICON_PAD, VALUE_W, CLOSE_W = 11, 12, 2, 140, 18
+local TEXT_SIZE, TITLE_SIZE, ICON_PAD, VALUE_W = 11, 12, 2, 140
 local SIDE_GAP = 6
 local GRADIENT_TEX = ns.MEDIA .. "NaowhGradient.tga"
 
-local TEXT_COMBAT = "Spells show after combat."
-local TEXT_NONE = "No spell data."
-local TEXT_UNKNOWN = "Unknown"
+local TEXT_COMBAT, TEXT_NONE = C.TEXT_SPELLS_COMBAT, C.TEXT_SPELLS_NONE
 local TEXT_TARGETS = "Targets"
 local VALUE_PERCENT = "%s  %.1f%%"
 local VALUE_RATE = "%s  %s"
 local VALUE_FULL = "%s  %s  %.1f%%"
 local VALUE_TARGET = "%s | %s"
-local TEXT_CLOSE, TEXT_SESSION = "X", "%s (%s)"
+local TEXT_SESSION = "%s (%s)"
 
 local Breakdown = {}
 DM.Breakdown = Breakdown
 
 local panel
-
--- The game's tooltip for a spell row, at the side of the panel away from the window. A spell id the game
--- keeps back in combat is secret, and is not asked for.
-local function ShowSpellTip(row)
-    local id = row.spellID
-    if type(id) ~= "number" or DM.IsSecret(id) then return end
-    local getName = C_Spell and C_Spell.GetSpellName
-    if getName and not getName(id) then return end
-    GameTooltip:SetOwner(row, panel.toRight and "ANCHOR_RIGHT" or "ANCHOR_LEFT")
-    GameTooltip:SetSpellByID(id)
-    GameTooltip:Show()
-end
-
--- Takes the tooltip down if it is one of the panel's.
-local function HideSpellTip()
-    local owner = GameTooltip:GetOwner()
-    if owner and owner.isSpellRow then GameTooltip:Hide() end
-end
 
 -- A row of the panel: a bar with a name and a value, and for a spell its icon. Rows are placed when the
 -- panel is shown, since the sections stack.
@@ -59,9 +38,6 @@ local function NewRow(pool, i, withIcon)
     row.value:SetPoint("RIGHT", -PAD, 0); row.value:SetWidth(VALUE_W); row.value:SetJustifyH("RIGHT")
     row.name = ns.Font(row, TEXT_SIZE, "OUTLINE", T.fg)
     if withIcon then
-        row.isSpellRow = true
-        row:SetScript("OnEnter", ShowSpellTip)
-        row:SetScript("OnLeave", HideSpellTip)
         row.icon = row:CreateTexture(nil, "OVERLAY")
         row.icon:SetPoint("LEFT", ICON_PAD, 0); row.icon:SetSize(ROW_H - 2 * ICON_PAD, ROW_H - 2 * ICON_PAD)
         row.icon:SetTexCoord(CROP, 1 - CROP, CROP, 1 - CROP)
@@ -82,18 +58,16 @@ end
 
 local function Build()
     panel = CreateFrame("Frame", "NaowhForeverDamageMeterBreakdown", UIParent)
-    panel:SetFrameStrata("FULLSCREEN_DIALOG"); panel:SetClampedToScreen(true)
+    panel:SetFrameStrata("TOOLTIP"); panel:SetClampedToScreen(true)
     panel.rows, panel.targetRows = {}, {}
     panel.background = ns.Solid(panel, "BACKGROUND", T.bg, 1)
     panel.background:SetAllPoints()
     panel.border = ns.Border(panel)
-    panel.close = ns.Button(panel, TEXT_CLOSE, CLOSE_W, CLOSE_W, function()
-        if panel.onClose then panel.onClose() end
-    end)
-    panel.close:SetPoint("TOPRIGHT", -PAD, -PAD / 2)
     panel.subtitle = ns.Font(panel, TEXT_SIZE, "OUTLINE", T.muted)
+    panel.subtitle:SetPoint("TOPRIGHT", -PAD, -PAD)
     panel.subtitle:SetJustifyH("RIGHT"); panel.subtitle:SetWordWrap(false)
     panel.title = ns.Font(panel, TITLE_SIZE, "OUTLINE", T.fg)
+    panel.title:SetPoint("TOPLEFT", PAD, -PAD); panel.title:SetPoint("RIGHT", panel.subtitle, "LEFT", -PAD, 0)
     panel.title:SetJustifyH("LEFT"); panel.title:SetWordWrap(false)
     panel.note = ns.Font(panel, TEXT_SIZE, "OUTLINE", T.muted)
     panel.note:SetPoint("TOPLEFT", PAD, -HEADER_H)
@@ -105,22 +79,9 @@ local function Build()
 end
 
 local function PaintIcon(icon, spell)
-    local getTexture = C_Spell and C_Spell.GetSpellTexture
-    if not getTexture then icon:Hide() return end
-    local ok, texture = pcall(getTexture, spell.spellID)
-    local has = ok and type(texture) ~= "nil"
-    if has then icon:SetTexture(texture) end
-    icon:SetShown(has)
-end
-
-local function SpellName(spell)
-    local getName = C_Spell and C_Spell.GetSpellName
-    if getName then
-        local ok, name = pcall(getName, spell.spellID)
-        if ok and type(name) == "string" then return name end
-    end
-    if type(spell.creatureName) == "string" then return spell.creatureName end
-    return TEXT_UNKNOWN
+    local texture = DM.SpellIcon(spell)
+    if texture ~= nil then icon:SetTexture(texture) end
+    icon:SetShown(texture ~= nil)
 end
 
 -- A spell: its bar against the largest, its name, and its amount with its per-second figure (when the
@@ -130,9 +91,8 @@ local function PaintRow(row, spell, data, color, alpha, seconds)
     row:SetStatusBarColor(color.r, color.g, color.b, alpha)
     row:SetMinMaxValues(0, data.maxAmount)
     row:SetValue(spell.totalAmount)
-    row.spellID = spell.spellID
     PaintIcon(row.icon, spell)
-    row.name:SetText(SpellName(spell))
+    row.name:SetText(DM.SpellName(spell))
     local amount = Format(spell.totalAmount)
     local percent = DM.Percent(spell.totalAmount, data.totalAmount)
     local rate = seconds and DM.PerSecond(spell.totalAmount, seconds)
@@ -204,27 +164,17 @@ end
 -- Shows source's spells beside row. data is the game's answer for the source, or nil: then the panel says
 -- why. view says how: toRight (the side of the window), inCombat, targets (the enemies it hurt, when
 -- there are any), seconds (the session's length), rate (the list has a per-second figure), label (the
--- list's name), and pinned with onClose, for a panel that was clicked and stays.
+-- list's name).
 function Breakdown.Show(row, source, data, view)
     if not panel then Build() end
     Style()
-    local pinned = view.pinned == true
-    panel.toRight, panel.onClose = view.toRight, view.onClose
-    panel:EnableMouse(pinned)
-    panel.close:SetShown(pinned)
-    panel.subtitle:ClearAllPoints()
-    panel.subtitle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", pinned and -(2 * PAD + CLOSE_W) or -PAD, -PAD)
     panel.subtitle:SetText(view.seconds and TEXT_SESSION:format(view.label, DM.Clock(view.seconds)) or view.label)
-    panel.title:ClearAllPoints()
-    panel.title:SetPoint("TOPLEFT", PAD, -PAD)
-    panel.title:SetPoint("RIGHT", panel.subtitle, "LEFT", -PAD, 0)
     panel.title:SetText(DM.DisplayName(source))
     local lines = data and math.min(C.BREAKDOWN_LINES, #data.combatSpells) or 0
     local color, alpha = Look.BarColor(source), S.Get("barAlpha")
     local seconds = view.rate and view.seconds or nil
     for i = 1, C.BREAKDOWN_LINES do
         local spellRow = panel.rows[i]
-        spellRow:EnableMouse(pinned)
         if i <= lines then
             PlaceRow(spellRow, HEADER_H + (i - 1) * (ROW_H + GAP))
             PaintRow(spellRow, data.combatSpells[i], data, color, alpha, seconds)
@@ -262,7 +212,5 @@ function Breakdown.Show(row, source, data, view)
 end
 
 function Breakdown.Hide()
-    if not panel then return end
-    HideSpellTip()
-    panel:Hide()
+    if panel then panel:Hide() end
 end

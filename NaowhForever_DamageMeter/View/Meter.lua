@@ -18,13 +18,15 @@ local SUMMARY_H, TIME_CHARS, LOWER_STRIP, LOWER_GAP = C.SUMMARY_H, 7, C.LOWER_ST
 local TEXT_PAD, NAME_GAP, EDGE_W = 6, 6, 2
 local RANK_W, RANK_SIZE = 18, 10
 local COL_CHARS, COL_CHARS_FULL, CHAR_W = 7, 10, 0.62
+local PERCENT_CHARS = 6
 local EMPTY_SIZE = 12
 local TITLE_X = C.TITLE_X
 local TITLE_SIZE, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 11, 10, 3, 11
 
 local TEXT_EMPTY = "No data yet"
 local TEXT_UNAVAILABLE = "The damage meter is not available"
-local TEXT_NAME_HEAD, TEXT_TOTAL, TEXT_RATE = "Name", "Total", "Per Sec"
+local TEXT_NAME_HEAD, TEXT_TOTAL, TEXT_RATE, TEXT_PERCENT_HEAD = "Name", "Total", "Per Sec", "%"
+local PERCENT_TEXT = "%.1f%%"
 local SUMMARY_GAP, TEXT_RAID, TEXT_RANK = "   ", "Raid %s", "Rank %d/%d"
 local RANK_TEXT = "%d"
 
@@ -64,6 +66,7 @@ local function ClassIcon(class)
 end
 
 local function IconOf(source, classOnly)
+    if source.icon ~= nil then return source.icon end
     local id = source.specIconID
     if not classOnly and type(id) == "number" and id ~= 0 then return id end
     local class = source.classFilename
@@ -81,6 +84,7 @@ end
 -- A source's bar color: your own as Your Bar says, else its class, the theme's Accent for everyone, or
 -- the one picked for everyone.
 function Look.BarColor(source)
+    if source.color then return source.color end
     if source.isLocalPlayer == true then
         local style = S.Get("ownBarStyle")
         if style == "custom" then return Look.Color("ownBarColor") end
@@ -114,6 +118,8 @@ local function NewPane(f, n)
     pane.headA:SetJustifyH("RIGHT")
     pane.headB = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
     pane.headB:SetJustifyH("RIGHT")
+    pane.headP = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
+    pane.headP:SetJustifyH("RIGHT")
     pane.empty = ns.Font(f, EMPTY_SIZE, "OUTLINE", T.muted)
     return pane
 end
@@ -171,6 +177,8 @@ function Look.Row(pane, i)
     row.colA:SetJustifyH("RIGHT")
     row.colB = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
     row.colB:SetJustifyH("RIGHT")
+    row.colP = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
+    row.colP:SetJustifyH("RIGHT")
     row.name = ns.Font(row, C.MIN_FONT, "OUTLINE", T.fg)
     row.name:SetJustifyH("LEFT"); row.name:SetWordWrap(false)
     pane.rows[i] = row
@@ -193,6 +201,7 @@ local function Columns(pane, mode)
     if (second == "total" and not total) or (second == "rate" and not rate) then b = nil end
     if a and not b then a, b = nil, a end
     pane.cols.a, pane.cols.b = a, b
+    pane.cols.p = S.Get("showPercent") == true and mode.percent ~= false
     return a, b
 end
 
@@ -219,7 +228,16 @@ local function LayRow(row, pane, i, g)
     row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", left, 0); row.icon:SetSize(iconSize, iconSize)
     row.icon:SetShown(g.showIcons)
     if g.showIcons then left = left + iconSize + ICON_GAP end
-    row.colB:ClearAllPoints(); row.colB:SetPoint("RIGHT", -TEXT_PAD, 0); row.colB:SetWidth(g.colWidth)
+    row.colP:ClearAllPoints(); row.colP:SetPoint("RIGHT", -TEXT_PAD, 0); row.colP:SetWidth(g.pctWidth)
+    row.colP:SetShown(pane.percent)
+    row.colP:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
+    row.colB:ClearAllPoints()
+    if pane.percent then
+        row.colB:SetPoint("RIGHT", row.colP, "LEFT", -COL_GAP, 0)
+    else
+        row.colB:SetPoint("RIGHT", -TEXT_PAD, 0)
+    end
+    row.colB:SetWidth(g.colWidth)
     row.colB:SetShown(pane.columns >= 1)
     row.colA:ClearAllPoints(); row.colA:SetPoint("RIGHT", row.colB, "LEFT", -COL_GAP, 0); row.colA:SetWidth(g.colWidth)
     row.colA:SetShown(pane.columns == 2)
@@ -228,6 +246,7 @@ local function LayRow(row, pane, i, g)
     Parts.HudFont(row.name, g.font, g.fontSize, g.outline)
     Parts.HudFont(row.colA, g.font, g.fontSize, g.outline)
     Parts.HudFont(row.colB, g.font, g.fontSize, g.outline)
+    Parts.HudFont(row.colP, g.font, g.fontSize, g.outline)
 end
 
 -- The column titles above a pane's rows at y: Name, and a title over each value column.
@@ -237,14 +256,22 @@ local function LayHeads(pane, g, y)
     pane.headName:SetShown(show)
     pane.headA:SetShown(show and pane.columns == 2)
     pane.headB:SetShown(show and pane.columns >= 1)
+    pane.headP:SetShown(show and pane.percent)
     if not show then return end
-    pane.headB:ClearAllPoints(); pane.headB:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + TEXT_PAD), y)
+    pane.headP:ClearAllPoints(); pane.headP:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + TEXT_PAD), y)
+    pane.headP:SetWidth(g.pctWidth)
+    pane.headB:ClearAllPoints()
+    if pane.percent then
+        pane.headB:SetPoint("TOPRIGHT", pane.headP, "TOPLEFT", -COL_GAP, 0)
+    else
+        pane.headB:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + TEXT_PAD), y)
+    end
     pane.headB:SetWidth(g.colWidth)
     pane.headA:ClearAllPoints(); pane.headA:SetPoint("TOPRIGHT", pane.headB, "TOPLEFT", -COL_GAP, 0)
     pane.headA:SetWidth(g.colWidth)
     pane.headName:ClearAllPoints()
     pane.headName:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + TEXT_PAD + (g.showRanks and RANK_W or 0), y)
-    for _, fs in ipairs({ pane.headName, pane.headA, pane.headB }) do
+    for _, fs in ipairs({ pane.headName, pane.headA, pane.headB, pane.headP }) do
         Parts.HudFont(fs, g.font, HEAD_SIZE, g.outline)
         fs:SetTextColor(f.columnColor.r, f.columnColor.g, f.columnColor.b)
     end
@@ -311,10 +338,14 @@ end
 local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     local a, b = Columns(pane, mode)
     pane.columns = (a and 1 or 0) + (b and 1 or 0)
+    pane.percent = pane.cols.p == true
     pane.valueWidth = pane.columns == 0 and 0 or pane.columns * g.colWidth + (pane.columns - 1) * COL_GAP
+    if pane.percent then
+        pane.valueWidth = pane.valueWidth + (pane.columns > 0 and COL_GAP or 0) + g.pctWidth
+    end
     first = math.max(0, math.min(first, total - capacity))
     local shown = math.min(total - first, capacity)
-    local paneKey = key .. "|" .. pane.columns .. "|" .. pane.top
+    local paneKey = key .. "|" .. pane.columns .. "|" .. tostring(pane.percent) .. "|" .. pane.top
     local fresh = pane.laidKey ~= paneKey
     if fresh then
         LayHeads(pane, g, headY)
@@ -324,6 +355,7 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     pane.headName:SetText(TEXT_NAME_HEAD)
     if a then pane.headA:SetText(ColumnTitle(mode, a)) end
     if b then pane.headB:SetText(ColumnTitle(mode, b)) end
+    pane.headP:SetText(TEXT_PERCENT_HEAD)
     local rows = pane.rows
     for i = 1, shown do
         local row = rows[i] or Look.Row(pane, i)
@@ -366,8 +398,9 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     local g = f.geo or {}
     f.geo = g
     g.w, g.bh, g.gap, g.headTop, g.fontSize = w, bh, gap, headTop, fontSize
-    g.showRanks, g.showIcons, g.showHead = S.Get("showRanks"), S.Get("showIcons"), showHead
+    g.showRanks, g.showIcons, g.showHead = S.Get("showRanks") and not f.detail, S.Get("showIcons"), showHead
     g.colWidth = math.floor(chars * CHAR_W * fontSize)
+    g.pctWidth = math.floor(PERCENT_CHARS * CHAR_W * fontSize)
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
     g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
     g.titleX, g.titleY = S.Get("titleX"), S.Get("titleY")
@@ -415,9 +448,19 @@ local function ValueOf(source, kind)
     return source.totalAmount
 end
 
-local function PaintValues(row, source, cols)
-    if cols.a then row.colA:SetText(Format(ValueOf(source, cols.a))) end
-    if cols.b then row.colB:SetText(Format(ValueOf(source, cols.b))) end
+-- A figure in its column, or nothing when there is none: a spell's per-second figure is not known in combat.
+local function PaintValue(fs, value)
+    if value == nil then fs:SetText("") else fs:SetText(Format(value)) end
+end
+
+-- The values of a row: the two figures, and its share of the list's total once both are plain numbers.
+local function PaintValues(row, source, cols, session)
+    if cols.a then PaintValue(row.colA, ValueOf(source, cols.a)) end
+    if cols.b then PaintValue(row.colB, ValueOf(source, cols.b)) end
+    if cols.p then
+        local percent = source.noPercent ~= true and DM.Percent(source.totalAmount, session.totalAmount)
+        row.colP:SetText(percent and PERCENT_TEXT:format(percent) or "")
+    end
 end
 
 -- The line under the title bar: the session's name, its total, the raid's per-second figure once both
@@ -438,26 +481,45 @@ function Look.PaintSummary(f, session, mode, name, seconds)
     f.summary:SetFormattedText(format, unpack(args))
 end
 
+-- A line that heads a section, such as Targets: its words, and no bar or figures.
+local function PaintHeading(row, source, f)
+    row:SetMinMaxValues(0, 1)
+    row:SetValue(0)
+    row.edge:SetColorTexture(0, 0, 0, 0)
+    row.rank:SetText("")
+    row.icon:Hide()
+    row.name:SetText(source.label)
+    row.name:SetTextColor(f.columnColor.r, f.columnColor.g, f.columnColor.b)
+    row.colA:SetText(""); row.colB:SetText(""); row.colP:SetText("")
+end
+
 local function PaintPane(pane, session, first, shown, mode, available)
     local sources = session.combatSources
     local alpha = S.Get("barAlpha")
     local own = S.Get("highlightPlayer")
     local classOnly = S.Get("iconStyle") == "class"
-    pane.empty:SetText(available and TEXT_EMPTY or TEXT_UNAVAILABLE)
+    local f, showIcons = pane.f, pane.f.geo.showIcons
+    pane.empty:SetText(session.emptyText or (available and TEXT_EMPTY or TEXT_UNAVAILABLE))
     pane.empty:SetShown(shown == 0)
     for i = 1, shown do
         local source, row = sources[first + i], pane.rows[i]
-        local c = Look.BarColor(source)
         row.source, row.modeKey = source, mode.key
-        row:SetStatusBarColor(c.r, c.g, c.b, alpha)
-        row:SetMinMaxValues(0, session.maxAmount)
-        row:SetValue(source.totalAmount)
-        local e = own and source.isLocalPlayer == true and Look.EdgeColor(source) or c
-        row.edge:SetColorTexture(e.r, e.g, e.b, 1)
-        row.rank:SetFormattedText(RANK_TEXT, session.rank or first + i)
-        row.icon:SetTexture(IconOf(source, classOnly))
-        row.name:SetText(DM.DisplayName(source))
-        PaintValues(row, source, pane.cols)
+        if source.isHeader then
+            PaintHeading(row, source, f)
+        else
+            local c = Look.BarColor(source)
+            row:SetStatusBarColor(c.r, c.g, c.b, alpha)
+            row:SetMinMaxValues(0, source.maxAmount or session.maxAmount)
+            row:SetValue(source.totalAmount)
+            local e = own and source.isLocalPlayer == true and Look.EdgeColor(source) or c
+            row.edge:SetColorTexture(e.r, e.g, e.b, 1)
+            row.rank:SetFormattedText(RANK_TEXT, session.rank or first + i)
+            row.icon:SetTexture(IconOf(source, classOnly))
+            row.icon:SetShown(showIcons and source.noIcon ~= true)
+            row.name:SetText(source.label or DM.DisplayName(source))
+            row.name:SetTextColor(f.nameColor.r, f.nameColor.g, f.nameColor.b)
+            PaintValues(row, source, pane.cols, session)
+        end
     end
 end
 

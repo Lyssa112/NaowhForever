@@ -16,7 +16,8 @@ local MODES = {
     { key = "absorbs", label = "Absorbs", type = "Absorbs", rate = true, total = "Absorbed", perSecond = "Per Sec" },
     { key = "interrupts", label = "Interrupts", type = "Interrupts", rate = false, total = "Interrupts" },
     { key = "dispels", label = "Dispels", type = "Dispels", rate = false, total = "Dispels" },
-    { key = "deaths", label = "Deaths", type = "Deaths", rate = false, spells = false, total = "Deaths" },
+    { key = "deaths", label = "Deaths", type = "Deaths", rate = false, spells = false, percent = false,
+      total = "Deaths" },
 }
 
 local byKey, labels, order = {}, {}, {}
@@ -34,6 +35,7 @@ ns.DamageMeter.C = {
     ROUND = 0.5,
     DEFAULT_MODE = "damage",
     BREAKDOWN_LINES = 8, TARGET_LINES = 5, REPORT_MAX = 10, FIGHTS_MAX = 10,
+    TEXT_SPELLS_COMBAT = "Spells show after combat.", TEXT_SPELLS_NONE = "No spell data.",
     ENEMY_COLOR = { r = 0.78, g = 0.2, b = 0.2 },
     COLUMN_HEAD = 16, COL_GAP = 6, SUMMARY_H = 16, LOWER_STRIP = 20, LOWER_GAP = 4,
     MIN_TITLE = 8, MAX_TITLE = 20,

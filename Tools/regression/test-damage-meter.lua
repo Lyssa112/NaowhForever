@@ -340,7 +340,7 @@ local function Boot(opts)
     }
     env._G = env
     env.UIParent.w = 1000
-    local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Numbers.lua", "Names.lua", "Report.lua",
+    local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Numbers.lua", "Spells.lua", "Names.lua", "Report.lua",
         "History.lua", "View/Meter.lua", "View/Breakdown.lua", "UI/History.lua", "UI/Menus.lua", "UI/Meter.lua",
         "UI/ImageHelp.lua", "UI/SettingsPage.lua" }
     for _, file in ipairs(files) do
@@ -2251,6 +2251,13 @@ do
     s.Hover(w, 2)
     check("a secret name goes to the text as it is", panel.rows[1].name.text == SECRET_TEXT)
     s.names = { [101] = "Fireball", [102] = "Pyroblast" }
+    s.Hover(w, 2)
+    check("the panel names the list and the session's length", panel.subtitle.text == "Damage Done (2:05)")
+    s.store.Set("mode", "interrupts"); s.Flush()
+    s.Hover(w, 2)
+    check("a list with no per-second figure: the amount and the share", panel.rows[1].value.text == "<600>  60.0%"
+        and panel.subtitle.text == "Interrupts (2:05)")
+    s.store.Set("mode", "damage"); s.Flush()
 
     s.combat = true
     s.Hover(w, 1)
@@ -2412,111 +2419,255 @@ do
     check("the sample has no spells to show", sample.Panel() == nil or sample.Panel().shown == false)
 end
 
--- a click on a row keeps its spells up, and each spell shows its tooltip
+-- a click on a name opens its spells in the window, with the enemies it hurt, and a click closes them
+do
+    local function Enemy(name, guid) return { name = name, sourceGUID = guid, sourceCreatureID = 100 } end
+    local function Hit(who, total) return { totalAmount = total, combatSpellDetails = { unitName = who } } end
+    local s = Boot({ settings = { enabled = true } })
+    s.duration = 120
+    s.byType = { [10] = { combatSources = { Enemy("Defias Cutpurse", "E-1"), Enemy("Defias Thug", "E-2") } } }
+    s.enemyData = {
+        ["E-1"] = { combatSpells = { Hit("You", 100), Hit("You", 20), Hit("Aldrin", 500) } },
+        ["E-2"] = { combatSpells = { Hit("You", 60) } },
+    }
+    s.Login()
+    local w = s.Window()
+    w.centerX = 100
+    s.session.combatSources[2].name = "You"
+    local spells = s.spells
+    local row = w.rows[2]
+    check("the list first: names, and no spells", w.rows[1].name.text == "Aldrin" and w.rows[2].name.text == "You")
+    row.scripts.OnMouseUp(row, "RightButton")
+    check("a right click on a row does nothing", w.rows[1].name.text == "Aldrin")
+    row.scripts.OnMouseUp(row, "LeftButton")
+    check("a left click opens its spells in the window: the title names the player and the list",
+        w.title.text == "You - Damage Done")
+    check("the rows are the spells, by their names, in the game's order", w.rows[1].name.text == "Fireball"
+        and w.rows[2].name.text == "Pyroblast" and w.rows[3].name.text == "Unknown" and w.rows[1].shown == true)
+    check("each a bar against the largest, in the player's own color", w.rows[2].barMax == 600
+        and w.rows[2].barValue == 300 and w.rows[1].color[1] == CLASS.ROGUE.r)
+    check("with the spell's icon", w.rows[1].icon.texture == 1101 and w.rows[1].icon.shown == true)
+    check("the amount and the per-second figure in the two columns", w.rows[1].colA.text == "<600>"
+        and w.rows[1].colB.text == "<5>" and w.rows[2].colB.text == "<2.5>")
+    check("no rank numbers on spells", w.rows[1].rank.shown == false)
+    check("then a Targets line, and the enemies the player hurt, biggest first", w.rows[4].name.text == "Targets"
+        and w.rows[5].name.text == "Defias Cutpurse" and w.rows[6].name.text == "Defias Thug"
+        and (w.rows[7] == nil or w.rows[7].shown == false))
+    check("the line has no bar, figures or icon", w.rows[4].barValue == 0 and w.rows[4].colA.text == ""
+        and w.rows[4].colB.text == "" and w.rows[4].icon.shown == false)
+    check("the enemies: what each took and per second, in the enemy's red, against the largest",
+        w.rows[5].colA.text == "<120>" and w.rows[5].colB.text == "<1>" and w.rows[6].colA.text == "<60>"
+        and w.rows[5].color[1] == 0.78 and w.rows[5].barMax == 120 and w.rows[6].barValue == 60
+        and w.rows[5].icon.shown == false)
+    local tint = w.rows[4].name.textColor
+    check("and the heading in the muted color", tint.r == THEME.muted.r and tint.g == THEME.muted.g
+        and tint.b == THEME.muted.b)
+    check("the second list is not drawn while it is open", w.lowerBar.shown == false)
+    check("the heading has no edge", w.rows[4].edge.solid[4] == 0)
+    s.store.Set("showPercent", true); s.Flush()
+    check("with the share on: each spell's, and none for the enemies", w.rows[1].colP.text == "60.0%"
+        and w.rows[2].colP.text == "30.0%" and w.rows[5].colP.text == "" and w.rows[4].colP.text == "")
+    s.store.Set("showPercent", false); s.Flush()
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    w.rows[4].colA.text, w.rows[4].colB.text, w.rows[4].colP.text = "stale", "stale", "stale"
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("a row that had figures is cleared when it becomes a heading", w.rows[4].name.text == "Targets"
+        and w.rows[4].colA.text == "" and w.rows[4].colB.text == "" and w.rows[4].colP.text == "")
+
+    w.rows[1].scripts.OnEnter(w.rows[1])
+    check("a spell: the game's tooltip for it, at the side away from the window", s.tip.shown == true
+        and s.tip.spell == 101 and s.tip.owner == w.rows[1] and s.tip.anchor == "ANCHOR_RIGHT"
+        and (s.Panel() == nil or s.Panel().shown == false))
+    w.rows[1].scripts.OnLeave(w.rows[1])
+    check("taken down when the mouse leaves", s.tip.shown == false)
+    w.rows[4].scripts.OnEnter(w.rows[4])
+    w.rows[5].scripts.OnEnter(w.rows[5])
+    check("the heading and an enemy have no tooltip", s.tip.shown == false)
+    w.rows[5].scripts.OnLeave(w.rows[5])
+    w.centerX = 900
+    w.rows[1].scripts.OnEnter(w.rows[1])
+    check("on the other side for a window on the right", s.tip.anchor == "ANCHOR_LEFT")
+    w.rows[1].scripts.OnLeave(w.rows[1])
+    spells.combatSpells[1].spellID = SECRET_NUMBER
+    s.names[SECRET_NUMBER] = "Hidden"
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    w.rows[1].scripts.OnEnter(w.rows[1])
+    check("a spell id the game keeps back is not asked for", s.tip.shown == false)
+    w.rows[1].scripts.OnLeave(w.rows[1])
+    s.names[SECRET_NUMBER] = nil
+    spells.combatSpells[1].spellID = 101
+    s.names[101] = nil
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    w.rows[1].scripts.OnEnter(w.rows[1])
+    check("nor one the game has no spell for", s.tip.shown == false)
+    w.rows[1].scripts.OnLeave(w.rows[1])
+    s.names[101] = "Fireball"
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    w.rows[1].scripts.OnEnter(w.rows[1])
+    check("shown again, on the row", s.tip.shown == true and s.tip.owner == w.rows[1])
+    s.tip.owner = Region("Frame")
+    w.rows[1].scripts.OnLeave(w.rows[1])
+    check("a tooltip that has become another thing's is left alone", s.tip.shown == true)
+    s.tip = nil
+
+    -- it follows the player, and updates
+    local sources = s.session.combatSources
+    sources[1], sources[2] = sources[2], sources[1]
+    spells.combatSpells = { Spell(101, 50) }
+    spells.maxAmount, spells.totalAmount = 50, 100
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("an update redraws it, still the same player", w.title.text == "You - Damage Done"
+        and w.rows[1].colA.text == "<50>" and w.rows[2].name.text == "Targets")
+    sources[1] = Source("You", "MAGE", "y", "y", true, "Player-1")
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("it is the live row it follows: the bars have its class", w.rows[1].color[1] == CLASS.MAGE.r)
+    spells.combatSpells = { Spell(101, SECRET_NUMBER) }
+    spells.maxAmount, spells.totalAmount = SECRET_NUMBER, SECRET_NUMBER
+    s.store.Set("showPercent", true)
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("an amount the game keeps back: no per-second figure and no share, and nothing made of it",
+        w.rows[1].colA.text == "<" .. SECRET_NUMBER .. ">" and w.rows[1].colB.text == "" and w.rows[1].colP.text == "")
+    s.store.Set("showPercent", false)
+    spells.combatSpells = { Spell(101, 50) }
+    spells.maxAmount, spells.totalAmount = 50, 100
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    check("a click on any row of it closes it: the list again, the player where they stand",
+        w.title.text == "Damage Done" and w.rows[1].name.text == "You" and w.rows[2].name.text == "Aldrin")
+    check("and the second list is back with the setting", w.lowerBar.shown == false)
+    sources[1], sources[2] = sources[2], sources[1]
+    sources[1] = Source("Aldrin", "MAGE", "a", "a", false, "Player-2")
+    sources[2] = Source("You", "ROGUE", "y", "y", true, "Player-1")
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    sources[1] = Source("Aldrin", "ROGUE", "a", "a", false, "Player-2")
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("another player is followed by their guid", w.title.text == "Aldrin - Damage Done"
+        and w.rows[1].color[1] == CLASS.ROGUE.r)
+    local secret = Source(SECRET_TEXT, "MAGE", "a", "a", false, "Player-2")
+    sources[1] = secret
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a name the game keeps back: the title is the list's", w.title.text == "Damage Done")
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    sources[1] = Source("Aldrin", "MAGE", "a", "a", false, "Player-2")
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+
+    -- the opened list, a click, and the data going
+    s.store.Set("lower", "healing"); s.Flush()
+    check("the second list shows", w.lowerBar.shown == true)
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("opening one hides it", w.lowerBar.shown == false and w.title.text == "You - Damage Done")
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    check("closing brings it back", w.lowerBar.shown == true and w.title.text == "Damage Done")
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    s.ns.PreviewDamageMeter()
+    check("the preview shows the sample, not the breakdown", w.title.text == "Damage Done"
+        and w.rows[1].name.text == "Aldrin")
+    s.Flush()
+    check("and the breakdown is there when it is over", w.title.text == "You - Damage Done")
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    local healing = { combatSources = { Source("Mira", "PRIEST", "H1", "h1", false, "Player-3") },
+        maxAmount = Amount("hmax"), totalAmount = Amount("htotal") }
+    s.byType[2] = healing
+    s.store.Set("showSummary", true); s.Flush()
+    w.rows2[1].scripts.OnMouseUp(w.rows2[1], "LeftButton")
+    check("a row of the second list opens its own list's spells: its name and list, asked for as that list",
+        w.title.text == "Mira - Healing Done" and s.spellCalls[#s.spellCalls].type == 2
+        and w.summary.text:find("htotal", 1, true) ~= nil)
+    healing.combatSources[1] = Source("Mira", "MAGE", "H1", "h1", false, "Player-3")
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("and it follows the live row of that list", w.rows[1].color[1] == CLASS.MAGE.r)
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    s.store.Set("showSummary", false)
+    s.store.Set("lower", ""); s.Flush()
+
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("a reset closes it", w.title.text == "Damage Done")
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    s.store.Set("breakdown", false); s.Flush()
+    check("Spell Breakdown off: the list", w.title.text == "Damage Done")
+    s.store.Set("breakdown", true); s.Flush()
+    check("and the click opens it again", w.rows[1].name.text ~= "Aldrin")
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    s.store.Set("breakdown", false)
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("with Spell Breakdown off a click opens nothing", w.title.text == "Damage Done")
+    s.store.Set("breakdown", true)
+
+    -- in combat the enemies are not asked for, and a row whose guid is kept back has no spells to open
+    s.combat = true
+    local asked = #s.enemyCalls
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("in combat: the spells, and the enemies are not asked for", w.rows[1].name.text == "Fireball"
+        and w.rows[4].shown == false and #s.enemyCalls == asked)
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    s.session.combatSources[1].sourceGUID = SECRET_TEXT
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    check("a row whose guid the game keeps back: no spells, and it says why", w.rows[1].shown == false
+        and w.panes[1].empty.shown == true and w.panes[1].empty.text == "Spells show after combat."
+        and w.title.text == "Aldrin - Damage Done")
+    check("the window takes the mouse while it is open, so that a click anywhere closes it", w.mouse == true)
+    w.scripts.OnMouseUp(w, "LeftButton")
+    check("and it does", w.title.text == "Damage Done" and w.rows[1].shown == true and w.mouse == false)
+    s.combat = false
+
+    -- not for lists without spells, or the sample
+    s.store.Set("mode", "deaths"); s.Flush()
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    check("Deaths has no spells to open", w.title.text == "Deaths")
+    s.store.Set("mode", "damage"); s.Flush()
+    s.ns.PreviewDamageMeter()
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("the sample has none either", w.title.text == "Damage Done")
+end
+
+-- a breakdown closed puts the list back at the top
+do
+    local s = Boot({ settings = { enabled = true, height = 70 } })
+    s.Login()
+    local w = s.Window()
+    w.rows[1].scripts.OnMouseWheel(w.rows[1], -1)
+    check("scrolled: the second player on top", w.rows[1].name.text == "You")
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    w.rows[1].scripts.OnMouseWheel(w.rows[1], -1)
+    check("the spells scroll on their own", w.rows[1].name.text == "Pyroblast")
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    check("closed: the list from its top", w.rows[1].name.text == "Aldrin")
+end
+
+-- the share of the total is a column of its own
 do
     local s = Boot({ settings = { enabled = true } })
     s.Login()
     local w = s.Window()
-    w.centerX = 100
-    local spells = s.spells
-    local row = w.rows[2]
-    row.scripts.OnMouseUp(row, "LeftButton")
-    local panel = s.Panel()
-    check("a click shows the spells", panel and panel.shown == true and panel.title.text == "You")
-    check("as a panel to use: the mouse on it and its spells, and a close button", panel.mouse == true
-        and panel.close.shown == true and panel.rows[1].mouse == true)
-    check("the list and the length of the session beside the name", panel.subtitle.text == "Damage Done (2:05)")
-    row.scripts.OnLeave(row)
-    check("leaving the row keeps it", panel.shown == true)
-    s.Hover(w, 1)
-    check("another row hovered does not change it", panel.title.text == "You")
-    w.rows[1].scripts.OnLeave(w.rows[1])
-    check("and leaving that one does not take it down", panel.shown == true)
-
-    panel.rows[1].scripts.OnEnter(panel.rows[1])
-    check("a spell: the game's tooltip for it, at the side away from the window", s.tip.shown == true
-        and s.tip.spell == 101 and s.tip.owner == panel.rows[1] and s.tip.anchor == "ANCHOR_RIGHT")
-    panel.rows[1].scripts.OnLeave(panel.rows[1])
-    check("taken down when the mouse leaves", s.tip.shown == false)
-    w.centerX = 900
-    s.Hover(w, 2)
-    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
-    panel.rows[1].scripts.OnEnter(panel.rows[1])
-    check("and on the other side for a window on the right", s.tip.anchor == "ANCHOR_LEFT")
-    panel.rows[1].scripts.OnLeave(panel.rows[1])
-    spells.combatSpells[1].spellID = SECRET_NUMBER
-    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
-    panel.rows[1].scripts.OnEnter(panel.rows[1])
-    check("a spell id the game keeps back is not asked for", s.tip.shown == false)
-    spells.combatSpells[1].spellID = 101
-    s.names[101] = nil
-    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
-    panel.rows[1].scripts.OnEnter(panel.rows[1])
-    check("nor one the game has no spell for", s.tip.shown == false)
-    s.names[101] = "Fireball"
-    local owner = Region("Frame")
-    owner.isSpellRow = nil
-    s.tip = { owner = owner, shown = true }
-
-    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
-    check("an update keeps it, and keeps the tooltip of another thing", panel.shown == true and s.tip.shown == true)
-    s.tip = nil
-
-    -- it follows the player, not the position
-    local sources = s.session.combatSources
-    sources[1], sources[2] = sources[2], sources[1]
-    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
-    check("the player moved up: the panel is on that row", panel.shown == true and panel.title.text == "You"
-        and panel.points[1][2] == w.rows[1])
-    sources[1], sources[2] = sources[2], sources[1]
-    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
-    check("and back", panel.points[1][2] == w.rows[2])
-
-    row.scripts.OnMouseUp(row, "LeftButton")
-    check("the same row again lets it go: the hover panel, nothing to use", panel.shown == true
-        and panel.mouse == false and panel.close.shown == false)
-    row.scripts.OnLeave(row)
-    check("and the mouse leaving takes it down", panel.shown == false)
-
-    row.scripts.OnMouseUp(row, "LeftButton")
-    panel.close.onClick()
-    check("the X lets it go", panel.shown == false)
-    row.scripts.OnMouseUp(row, "LeftButton")
-    row.scripts.OnMouseUp(row, "RightButton")
-    check("so does a right click", panel.shown == false)
-    row.scripts.OnLeave(row)
-
-    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
-    check("another player's row too", panel.shown == true and panel.title.text == "Aldrin")
-    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
-    check("and a click on another row moves it there", panel.title.text == "You" and panel.mouse == true)
-    table.remove(sources, 2)
-    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
-    check("a player who is not listed any more: it goes", panel.shown == false)
-    table.insert(sources, 2, Source("You", "ROGUE", "G2", "g2", true))
-
-    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
-    s.store.Set("enabled", false)
-    check("the meter off takes it with it", panel.shown == false)
-    s.store.Set("enabled", true); s.Flush()
-    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
-    check("and it does not come back", panel.shown == false)
-
-    s.store.Set("breakdown", false)
-    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
-    check("Spell Breakdown off: a click shows nothing", panel.shown == false)
-    s.store.Set("breakdown", true)
-    s.store.Set("mode", "interrupts"); s.Flush()
-    s.Hover(w, 2)
-    check("a list with no per-second figure: the amount and the share", panel.rows[1].value.text == "<600>  60.0%")
-    w.rows[2].scripts.OnLeave(w.rows[2])
+    s.session.totalAmount = 400
+    s.session.combatSources[1].totalAmount = 100
+    check("off by default", s.store.Get("showPercent") == false and w.rows[1].colP.shown == false
+        and w.panes[1].headP.shown == false)
+    check("the name's room as it was", w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 6 + 6))
+    s.store.Set("showPercent", true); s.Flush()
+    check("on: each one's share of what the list totals, at the right end", w.rows[1].colP.shown == true
+        and w.rows[1].colP.text == "25.0%" and w.rows[1].colP.points[1][1] == "RIGHT"
+        and w.rows[1].colP.points[1][2] == -6 and w.rows[1].colP.w == 40)
+    check("with a title over it", w.panes[1].headP.shown == true and w.panes[1].headP.text == "%")
+    check("a figure that is not plain has no share", w.rows[2].colP.text == "")
+    check("the other columns move left of it, and the name makes room", w.rows[1].colB.points[1][2] == w.rows[1].colP
+        and w.rows[1].colB.points[1][4] == -6 and w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 6 + 6 + 40 + 6))
+    check("the titles too", w.panes[1].headB.points[1][2] == w.panes[1].headP)
+    s.store.Set("showTotal", false); s.store.Set("showRate", false); s.Flush()
+    check("alone: the name's room is the share's", w.rows[1].colP.shown == true and w.rows[1].colA.shown == false
+        and w.rows[1].colB.shown == false and w.rows[1].name.points[2][2] == -(6 + 40 + 6))
+    s.store.Set("showTotal", true); s.store.Set("showRate", true)
     s.store.Set("mode", "deaths"); s.Flush()
-    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
-    check("Deaths has no spells to keep", panel.shown == false)
+    check("Deaths has no share", w.rows[1].colP.shown == false and w.panes[1].headP.shown == false)
     s.store.Set("mode", "damage"); s.Flush()
-    s.ns.PreviewDamageMeter()
-    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
-    check("the sample has none either", panel.shown == false)
+    s.session.combatSources[1].totalAmount = 100
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    check("an open breakdown has the share of each spell, and none for an enemy",
+        w.rows[1].colP.text == "60.0%" and w.rows[2].colP.text == "30.0%")
 end
 
 -- the title bar: the buttons, and the menu on a right click
@@ -2532,19 +2683,26 @@ do
     w.header.scripts.OnMouseUp(w.header, "RightButton")
     check("a right click opens the window menu on it", s.menu and s.menu.owner == w.header
         and s.menu:Find("List") ~= nil and s.menu:Find("Session") ~= nil and s.menu:Find("Report To") ~= nil)
-    s.store.Set("width", 170); s.Flush()
-    check("a narrow window: the buttons leave no room for the time", w.time.shown == false)
+    s.store.Set("timeX", -10); s.store.Set("titleX", 20); s.Flush()
+    local titleX, timeX, timeShown = w.title.points[1][4], w.time.points[1][4], w.time.shown
     s.store.Set("showButtons", false); s.Flush()
     check("Show Buttons off: the session button and ... go", w.session.shown == false and w.more.shown == false)
-    check("the time sits at the bar's own end, with the room the buttons had", w.time.shown == true
-        and w.time.points[1][2] == w.header and w.time.points[1][1] == "RIGHT" and w.time.points[1][4] == -6)
+    check("and nothing else moves: the title and the time, offsets and all, are where they were",
+        w.title.points[1][4] == titleX and w.time.points[1][4] == timeX and w.time.shown == timeShown
+        and w.time.points[1][2] == w.session and timeX == -14 and titleX == 28)
+    s.store.Set("width", 198); s.Flush()
+    check("and the room for the time is the same", w.time.shown == true)
+    s.store.Set("width", 197); s.Flush()
+    check("to the pixel", w.time.shown == false)
+    s.store.Set("width", 300); s.Flush()
     s.menu = nil
     w.header.scripts.OnMouseUp(w.header, "RightButton")
-    check("and the menu is still on a right click", s.menu and s.menu:Find("Session") ~= nil)
-    s.store.Set("timeX", -10); s.Flush()
-    check("the time's offset still moves it", w.time.points[1][4] == -16)
-    s.store.Set("showButtons", true); s.store.Set("timeX", 0); s.Flush()
-    check("on again: they are back", w.session.shown == true and w.more.shown == true and w.time.shown == false)
+    check("the menu is still on a right click", s.menu and s.menu:Find("Session") ~= nil)
+    s.store.Set("timeX", 80); s.Flush()
+    check("the time's offset takes it to where the buttons were", w.time.points[1][4] == 76)
+    s.store.Set("showButtons", true); s.store.Set("timeX", 0); s.store.Set("titleX", 0); s.Flush()
+    check("on again: they are back", w.session.shown == true and w.more.shown == true and w.time.shown == true
+        and w.time.points[1][4] == -4 and w.title.points[1][4] == 8)
     local row = RowOf(s.page, "showButtons")
     check("a toggle on the Title Bar card", row and row.toggle == true and row.label == "Show Buttons"
         and CardOf(s.page, "header") ~= nil and s.store.Get("showButtons") == true)

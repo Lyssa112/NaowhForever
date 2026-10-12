@@ -18,6 +18,7 @@ NaowhForever_DamageMeter/
     Samples.lua                  the sample group the preview and Unlock Mode show (DM.SAMPLE)
   Source.lua                     reading the game's sessions, fights and spells (DM.Session, DM.Fights, DM.SourceSpells)
   Numbers.lua                    how a number is written, and the sums over plain numbers (DM.Format, DM.Clock, DM.Percent)
+  Spells.lua                     a source's spells and the enemies it hurt, as rows of a session (DM.SpellSession)
   Names.lua                      a player's name as written: first, last, initials (DM.DisplayName, DM.ScanRoster)
   Report.lua                     the lines a report sends, and where it can go (DM.Report, DM.Channels)
   History.lua                    a summary of each fight, kept when it ends (DM.History)
@@ -101,7 +102,21 @@ NaowhForever_DamageMeter/
   back on it.
 - A spell panel asks the game for a source by guid, and in combat the game takes a plain guid only:
   your own row's (`UnitGUID("player")`) or one whose guid is not secret. Any other row says its spells
-  show after combat. The share is shown only when the amount and the total are plain numbers.
+  show after combat. The share and the per-second figure are shown only when the amounts are plain
+  numbers.
+- A click on a row opens its source's breakdown in the window itself, in place of the list, and a click
+  on it (or anywhere in the window, which takes the mouse while it is open) closes it. It is a session
+  built from the source's spells (`DM.SpellSession`), then a Targets line and the enemies it hurt, so the
+  same rows, bars and columns draw it: a spell row has `label`, `icon` and `isSpell`, an enemy `color` and
+  its own `maxAmount`, and the heading `isHeader`. It is a field of the window (`detail`), found again in
+  each update by your own row or its guid, so it follows the player when the order changes. A hovered
+  spell shows the game's own tooltip (`SetSpellByID`) on the side away from the window, not for an id the
+  game keeps back in combat. The hover panel is as before, with the per-second figure added.
+- The share (Show Percent) is a column of its own at the right end, made from the row's amount and the
+  list's total once both are plain numbers, so it is empty in combat. Deaths has none.
+- The title bar's menu: the list and the session are in the window's ... menu, which a right click on the
+  bar opens too. The session and ... buttons can be hidden (Show Buttons); the room they take is kept, so
+  nothing else moves.
 - Targets (the enemies a player hurt) come from the game's Enemy Damage Taken list: each enemy's data is
   by attacker and spell, so a player's share is the sum of that player's spells over the enemies. That
   is arithmetic over many amounts and a comparison of names, so it is done after combat only, from
