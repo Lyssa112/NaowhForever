@@ -46,7 +46,7 @@ function DM.ReportLines(session, mode, sessionName, count, withRate)
     for i = 1, #sources do
         if #lines > count then break end
         local source = sources[i]
-        local name, total, rate = source.name, source.totalAmount, source.amountPerSecond
+        local name, total, rate = DM.DisplayName(source), source.totalAmount, source.amountPerSecond
         if Plain(name, "string") and Plain(total, "number") then
             local value = Format(total)
             if withRate and mode.rate and Plain(rate, "number") then value = LINE_RATE:format(value, Format(rate)) end

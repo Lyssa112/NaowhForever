@@ -15,7 +15,7 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     fontSize = 11, font = "", outline = "OUTLINE", texture = "",
     hideGameMeter = true, breakdown = true, reportLines = 5, showTime = true,
     showBorder = true, iconStyle = "spec",
-    showColumnHeaders = true, numberUnits = "game", numberDecimals = 1,
+    showColumnHeaders = true, numberUnits = "game", numberDecimals = 1, nameFormat = "full",
     barCustomColor = false, trackColor = false, edgeColor = false,
     nameColor = false, valueColor = false, rankColor = false, columnColor = false, titleColor = false,
     timeColor = false,

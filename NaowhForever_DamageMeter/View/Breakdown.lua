@@ -131,7 +131,7 @@ end
 function Breakdown.Show(row, source, data, toRight, inCombat)
     if not panel then Build() end
     Style()
-    panel.title:SetText(source.name)
+    panel.title:SetText(DM.DisplayName(source))
     local lines = data and math.min(C.BREAKDOWN_LINES, #data.combatSpells) or 0
     local color, alpha = Look.BarColor(source), S.Get("barAlpha")
     for i = 1, C.BREAKDOWN_LINES do

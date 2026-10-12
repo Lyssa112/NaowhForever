@@ -31,6 +31,7 @@ local BAR_COLOR = { { class = "Class Colors", accent = "Theme Accent", custom = 
     { "class", "accent", "custom" } }
 local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "class" } }
 local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
+local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
 local DECIMALS_RANGE = { 0, C.NUMBER_DECIMALS_MAX, 1 }
 
 local function Enabled() return DM.On() and true or false end
@@ -182,6 +183,9 @@ page:Card({
         { key = "showIcons", label = "Icons", toggle = true, needs = Enabled, why = OFF },
         { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
         { key = "showRanks", label = "Rank Numbers", toggle = true, needs = Enabled, why = OFF },
+        { key = "nameFormat", label = "Name Format", choice = NAME_FORMAT, needs = Enabled, why = OFF,
+          help = "How a player's name is written. In combat the game hides other players' names, so those "
+              .. "are found by class and left whole when two players share one." },
         { key = "highlightPlayer", label = "Highlight Your Row", toggle = true, needs = Enabled, why = OFF },
         Settings.Look("", { text = true, size = TEXT_RANGE, bar = "Naowh Gradient", needs = Enabled, why = OFF }),
         { key = "barAlpha", label = "Bar Opacity", slider = BAR_ALPHA_RANGE, unit = "%", scale = TO_FRACTION,

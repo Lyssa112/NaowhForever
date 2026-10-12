@@ -165,6 +165,28 @@ local function Boot(opts)
         IsInInstance = function() return s.instance == true end,
         LE_PARTY_CATEGORY_INSTANCE = 2,
         UnitGUID = function(unit) if unit == "player" then return "Player-1" end end,
+        UnitName = function(unit)
+            if unit == "player" then return s.ownName or "You", s.ownSurname end
+            local u = s.units and s.units[unit]
+            if u then return u.name, u.surname end
+        end,
+        UnitClass = function(unit)
+            if unit == "player" then return "Rogue", s.ownClass or "ROGUE" end
+            local u = s.units and s.units[unit]
+            if u then return u.class, u.class end
+        end,
+        UnitExists = function(unit) return unit == "player" or (s.units ~= nil and s.units[unit] ~= nil) end,
+        UnitIsPlayer = function(unit) return not (s.units and s.units[unit] and s.units[unit].npc) end,
+        UnitIsUnit = function(a, b)
+            if a == b then return true end
+            local u = s.units and s.units[a]
+            return u ~= nil and u.self == true and b == "player"
+        end,
+        GetNumGroupMembers = function() return s.members or 1 end,
+        Ambiguate = function(name) return (name:gsub("%-.+$", "")) end,
+        Constants = opts.separator and { CharacterNameSeparatorConsts = {
+            CHARACTERNAME_SURNAME_SEPARATOR = opts.separator } } or nil,
+        C_PlayerInfo = opts.forever and { ShouldDisplaySurname = function() return s.showSurname ~= false end } or nil,
         SendChatMessage = function(text, channel) s.sent[#s.sent + 1] = { text = text, channel = channel } end,
         issecretvalue = function(v)
             return (type(v) == "table" and v.secret == true) or v == SECRET_NUMBER or v == SECRET_TEXT
@@ -241,7 +263,8 @@ local function Boot(opts)
     }
     env._G = env
     env.UIParent.w = 1000
-    local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Report.lua", "View/Meter.lua",
+    local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Names.lua", "Report.lua",
+        "View/Meter.lua",
         "View/Breakdown.lua", "UI/Menus.lua", "UI/Meter.lua", "UI/SettingsPage.lua" }
     for _, file in ipairs(files) do
         local chunk = assert(loadfile("NaowhForever_DamageMeter/" .. file))
@@ -497,6 +520,134 @@ do
     check("a past fight: its own length", w.time.text == "1:01" and w.time.shown == true)
     s.ns.PreviewDamageMeter()
     check("the sample has a length too", w.time.text == "3:25")
+end
+
+-- names: full, first, last, initials, and found by class in combat
+do
+    local s = Boot({ settings = { enabled = true } })
+    local DM = s.DM
+    local function Show(name, format, class)
+        s.store.Set("nameFormat", format)
+        return DM.DisplayName({ name = name, classFilename = class or "MAGE" })
+    end
+    check("full: both words, the realm dropped", Show("Aldrin Stormwind-Draenor", "full") == "Aldrin Stormwind")
+    check("first: the first word", Show("Aldrin Stormwind-Draenor", "first") == "Aldrin")
+    check("last: the last word", Show("Aldrin Stormwind-Draenor", "last") == "Stormwind")
+    check("initials: the first letter of each word", Show("Aldrin Stormwind", "initials") == "A.S.")
+    check("first name and the last name's initial", Show("Aldrin Stormwind", "firstInitial") == "Aldrin S.")
+    check("a one-word name stays one word", Show("Cara", "first") == "Cara" and Show("Cara", "last") == "Cara"
+        and Show("Cara", "initials") == "C." and Show("Cara", "firstInitial") == "Cara")
+    check("a realm alone is dropped", Show("Cara-Draenor", "full") == "Cara")
+    check("letters beyond ASCII are whole characters", Show("\195\137dith \195\150rn", "initials")
+        == "\195\137.\195\150.")
+    check("a name that is not a player's is left as it is", DM.DisplayName({ name = "Boar Dog", classFilename = "",
+        sourceCreatureID = 5 }) == "Boar Dog")
+    for i = 1, 300 do Show("Name" .. i .. " Last", "first") end
+    check("the cache wipes itself and still answers", Show("Name1 Last", "first") == "Name1"
+        and Show("Zed Last", "first") == "Zed")
+
+    s.store.Set("nameFormat", "first")
+    check("your own row comes from your unit", DM.DisplayName({ name = s.session.combatSources[1].name,
+        classFilename = "ROGUE", isLocalPlayer = true }) == "You")
+    s.ownName = "Rowan"
+    check("not from the name the row carries, which is secret in combat", DM.DisplayName({ name = SECRET_TEXT,
+        classFilename = "ROGUE", isLocalPlayer = true }) == "Rowan")
+
+    s.units = { party1 = { name = "Brenna Ashdown", surname = nil, class = "WARLOCK" },
+        party2 = { name = "Corvus Reed", class = "HUNTER" }, party3 = { name = "Dara Vale", class = "HUNTER" } }
+    s.group = true
+    s.members = 4
+    DM.ScanRoster()
+    local function Secret(class) return { name = SECRET_TEXT, classFilename = class } end
+    check("in combat a secret name is found by its class, then written", DM.DisplayName(Secret("WARLOCK")) == "Brenna")
+    s.store.Set("nameFormat", "initials")
+    check("in the format chosen", DM.DisplayName(Secret("WARLOCK")) == "B.A.")
+    check("a class two players share stays as it is, whole", DM.DisplayName(Secret("HUNTER")) == SECRET_TEXT)
+    check("so does one that is not in the group", DM.DisplayName(Secret("PRIEST")) == SECRET_TEXT)
+    s.units.party2 = nil
+    DM.ScanRoster()
+    check("a new scan: the hunter is alone now", DM.DisplayName(Secret("HUNTER")) == "D.V.")
+    s.group = false
+    DM.ScanRoster()
+    check("alone, nobody to find", DM.DisplayName(Secret("HUNTER")) == SECRET_TEXT)
+    s.raid = true
+    s.group = true
+    s.members = 2
+    s.units = { raid1 = { name = "You", class = "ROGUE", self = true }, raid2 = { name = "Eira Moss", class = "DRUID" } }
+    DM.ScanRoster()
+    check("in a raid: raid units, and you not twice", DM.DisplayName(Secret("DRUID")) == "E.M."
+        and DM.DisplayName({ name = SECRET_TEXT, classFilename = "ROGUE" }) == "R.")
+    s.units.raid2.name = SECRET_TEXT
+    DM.ScanRoster()
+    check("a secret name in the group is not used", DM.DisplayName(Secret("DRUID")) == SECRET_TEXT)
+end
+
+-- a surname separator other than a space
+do
+    local s = Boot({ settings = { enabled = true }, separator = "_" })
+    local DM = s.DM
+    local function Show(name, format)
+        s.store.Set("nameFormat", format)
+        return DM.DisplayName({ name = name, classFilename = "MAGE" })
+    end
+    check("words are cut at the separator too", Show("Aldrin_Stormwind", "first") == "Aldrin"
+        and Show("Aldrin_Stormwind", "last") == "Stormwind" and Show("Aldrin_Stormwind", "initials") == "A.S."
+        and Show("Aldrin_Stormwind", "full") == "Aldrin Stormwind")
+end
+
+-- surnames on a client that has them
+do
+    local s = Boot({ settings = { enabled = true, nameFormat = "full" }, forever = true })
+    local DM = s.DM
+    s.ownName, s.ownSurname = "Rowan", "Thorne"
+    local own = { name = SECRET_TEXT, classFilename = "ROGUE", isLocalPlayer = true }
+    check("your name with its surname", DM.DisplayName(own) == "Rowan Thorne")
+    s.store.Set("nameFormat", "last")
+    check("and its last name", DM.DisplayName(own) == "Thorne")
+    s.showSurname = false
+    s.store.Set("nameFormat", "full")
+    check("Blizzard's show-surname setting leaves yours off", DM.DisplayName(own) == "Rowan")
+    s.showSurname = true
+    s.ownSurname = ""
+    check("an empty surname adds nothing", DM.DisplayName(own) == "Rowan")
+    s.ownSurname = "Thorne"
+    s.units = { party1 = { name = "Brenna", surname = "Ashdown", class = "WARLOCK" } }
+    s.group = true
+    DM.ScanRoster()
+    check("a group member's too", DM.DisplayName({ name = SECRET_TEXT, classFilename = "WARLOCK" }) == "Brenna Ashdown")
+    s.units.party1 = { name = "Brenna Ashdown", surname = "Ashdown", class = "WARLOCK" }
+    DM.ScanRoster()
+    check("a name that already carries it is not doubled",
+        DM.DisplayName({ name = SECRET_TEXT, classFilename = "WARLOCK" }) == "Brenna Ashdown")
+end
+
+-- the window and the roster follow the group
+do
+    local s = Boot({ settings = { enabled = true, nameFormat = "first" } })
+    s.units = { party1 = { name = "Aldrin Hale", class = "MAGE" } }
+    s.group = true
+    s.members = 2
+    s.session.combatSources[1].name = SECRET_TEXT
+    s.Login()
+    local w = s.Window()
+    check("the rows write the names the way chosen", w.rows[1].name.text == "Aldrin" and w.rows[2].name.text == "You"
+        and w.rows[3].name.text == "Cara")
+    s.units.party1 = nil
+    s.Fire("GROUP_ROSTER_UPDATE"); s.Flush()
+    check("a roster change is scanned again", w.rows[1].name.text == SECRET_TEXT)
+    s.units.party1 = { name = "Aldrin Hale", class = "MAGE" }
+    s.Fire("PLAYER_REGEN_ENABLED"); s.Flush()
+    check("and after combat", w.rows[1].name.text == "Aldrin")
+    s.Hover(w, 1)
+    check("the spell panel is titled the same way", s.Panel().title.text == "Aldrin")
+    s.units.party1 = { name = "Aldrin Hale", class = "WARLOCK" }
+    s.Fire("PLAYER_ENTERING_WORLD"); s.Flush()
+    check("and on entering the world", w.rows[1].name.text == SECRET_TEXT)
+    s.apiResult = { combatSources = { { name = "Aldrin Hale", classFilename = "MAGE", totalAmount = 100,
+        amountPerSecond = 10 } }, maxAmount = 100, totalAmount = 100 }
+    s.printed = {}
+    s.DM.Report("SELF", "damage", "current", nil)
+    check("and a report", s.printed[2] == "1. Aldrin  <100> (<10>)")
 end
 
 -- the columns and their titles

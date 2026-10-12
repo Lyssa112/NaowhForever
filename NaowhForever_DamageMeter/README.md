@@ -17,6 +17,7 @@ NaowhForever_DamageMeter/
   Data/
     Samples.lua                  the sample group the preview and Unlock Mode show (DM.SAMPLE)
   Source.lua                     reading the game's sessions, fights and spells (DM.Session, DM.Fights, DM.SourceSpells)
+  Names.lua                      a player's name as written: first, last, initials (DM.DisplayName, DM.ScanRoster)
   Report.lua                     the lines a report sends, and where it can go (DM.Report, DM.Channels)
   View/
     Meter.lua                    a window's look and layout (DM.Look)
@@ -57,6 +58,11 @@ NaowhForever_DamageMeter/
   which takes a secret and returns a string made from it, so K / M / B, a chosen number of decimals,
   ten-thousands (by the client's locale) and full numbers all work in combat. A client without it
   falls back to `AbbreviateLargeNumbers`.
+- A name is written by cutting its words at spaces and the client's surname separator, and its realm is
+  dropped. In combat a source's name is secret and cannot be cut, but its class is not: the group is
+  read from unit tokens, which stay plain, and a row is matched to the one member of its class. Your
+  own row always comes from your unit. A class two members share, or one not in the group, shows the
+  name whole, as the game gives it.
 - Interrupts, Dispels and Deaths have no per-second figure, so Show Per Second skips them. Deaths has
   no spells either.
 - Windows 2 and 3 use the first window's keys with their number added (`mode2`, `width3`,

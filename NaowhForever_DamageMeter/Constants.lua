@@ -36,6 +36,9 @@ ns.DamageMeter.C = {
     NUMBER_UNITS = { game = "Game Default", latin = "K, M, B", asian = "Ten-thousands", full = "Full Numbers" },
     NUMBER_UNITS_ORDER = { "game", "latin", "asian", "full" },
     NUMBER_DECIMALS_MAX = 2,
+    NAME_FORMATS = { full = "Full Name", first = "First Name", last = "Last Name", initials = "Initials",
+        firstInitial = "First Name and Initial" },
+    NAME_FORMATS_ORDER = { "full", "first", "last", "initials", "firstInitial" },
     -- Ten-thousand grouping: the glyphs of thousand, ten-thousand and hundred-million, by locale (UTF-8).
     ASIAN_GLYPHS = {
         zhCN = { "\229\141\131", "\228\184\135", "\228\186\191" },

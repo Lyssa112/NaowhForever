@@ -293,8 +293,11 @@ local function OnEvent(_, event)
         preview = false
     elseif event == "PLAYER_REGEN_ENABLED" then
         GameMeter(DM.On() and S.Get("hideGameMeter"))
+        DM.ScanRoster()
     elseif event == "DAMAGE_METER_RESET" then
         ForgetFights()
+    elseif event == "PLAYER_ENTERING_WORLD" or event == "GROUP_ROSTER_UPDATE" then
+        DM.ScanRoster()
     end
     RequestUpdate()
 end
@@ -319,7 +322,7 @@ local function Apply()
             w.frame.mover:SetShown(unlocked == true)
         end
     end
-    if DM.On() then Listen() end
+    if DM.On() then Listen(); DM.ScanRoster() end
     Update()
 end
 

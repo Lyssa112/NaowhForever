@@ -281,7 +281,7 @@ function Look.Paint(f, session, first, shown, _, available)
         row.edge:SetColorTexture(e.r, e.g, e.b, 1)
         row.rank:SetFormattedText(RANK_TEXT, first + i)
         row.icon:SetTexture(IconOf(source, classOnly))
-        row.name:SetText(source.name)
+        row.name:SetText(DM.DisplayName(source))
         PaintValues(row, source, f.cols)
     end
 end
