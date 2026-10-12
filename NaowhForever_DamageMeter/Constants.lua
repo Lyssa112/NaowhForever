@@ -110,7 +110,7 @@ ns.DamageMeter.C = {
         { key = "summaryColor", label = "Summary Color", group = "Text", token = "muted" },
         { key = "windowColor", label = "Window Background", group = "Window", token = "bg" },
         { key = "headerColor", label = "Title Bar Color", group = "Window", token = "panel" },
-        { key = "borderColor", label = "Border", group = "Window", token = "line" },
+        { key = "borderColor", label = "Border Color", group = "Window", token = "line" },
     },
     OWN_LOOK = {},
     MODES = MODES, MODE_BY_KEY = byKey, MODE_LABELS = labels, MODE_ORDER = order,

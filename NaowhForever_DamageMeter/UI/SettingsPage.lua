@@ -1,4 +1,6 @@
--- SettingsPage.lua: the Damage Meter's settings page, declared as cards.
+-- SettingsPage.lua: the Damage Meter's settings page, declared as a few cards. What a part has beyond its
+-- switch or its first control (a text's size and font, a picture's tiling, the classes' colors) is behind
+-- the cog of the row that owns it, and a row that means something only for one choice shows with it.
 local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
@@ -10,24 +12,24 @@ if not Settings then return end
 local Group = Settings.Group
 
 local OFF = "Turn on the Damage Meter"
-local OFF_CUSTOM_BARS = "Set Bar Color to Custom Color"
 local OFF_OWN_CUSTOM = "Set Your Bar to Custom Color"
 local OFF_EDGE_CUSTOM = "Set Your Row Edge to Custom Color"
 local OFF_HIGHLIGHT = "Turn on Highlight Your Row"
-local OFF_ABBREVIATING = "Number Format is Game Default or Full Numbers"
 local OFF_CLASS = "Set Bar Color to Class Colors"
 local OFF_IMAGE = "Pick a Background Image"
-local OFF_COMBAT = "Set Where to In Combat"
 local OFF_TILE = "Turn on Tile Image"
 local OFF_OWN = "Pick Your Own Picture in Image"
+local OFF_TIME = "Turn on Show Fight Time"
 local OFF_BOTH = "Turn on Show Total and Show Per Second"
 local OFF_FADE = "Set Out of Combat Opacity below 100%"
-local OFF_TRACK = "Turn on Bar Track"
+local OFF_SUMMARY = "Turn on Summary Line"
+local OFF_LOCKED = "Turn on Lock Window"
+local OFF_OWN_SIZE, OFF_OWN_FONT = "Turn on its Own Size", "Turn on its Own Font"
+local OFF_OWN_LOOK = "Turn on Own Look"
 local TEXT_LOOK_NAME, TEXT_LOOK_EXPORT, TEXT_LOOK_IMPORT = "Name this look", "Look", "Paste a look"
 local TEXT_LOOKS_FULL = "There is room for twelve looks. Delete one first."
 local TEXT_LOOK_NO_NAME, TEXT_LOOK_BAD = "A look needs a name.", "That is not a look."
 local TEXT_LOOK_DELETE = "Delete the look %s?"
-local OFF_LOCKED = "Turn on Lock Window"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local SCALE_RANGE = { C.MIN_SCALE, C.MAX_SCALE, 5 }
@@ -73,18 +75,17 @@ local PANEL_SIDE = { C.PANEL_SIDES, C.PANEL_SIDES_ORDER }
 local COLUMN_ORDER = { C.COLUMN_ORDERS, C.COLUMN_ORDERS_ORDER }
 local ICON_SIDE = { C.ICON_SIDES, C.ICON_SIDES_ORDER }
 local TITLE_TEXT = { C.TITLE_TEXTS, C.TITLE_TEXTS_ORDER }
+local OUTLINE = ns.Shared.Parts.HUD_OUTLINES
 
 local function Enabled() return DM.On() and true or false end
-local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
+local function On(key) return function() return DM.On() and S.Get(key) == true end end
 local function ClassBars() return DM.On() and S.Get("barColor") == "class" end
 local function Highlighting() return DM.On() and S.Get("highlightPlayer") == true end
 local function OwnCustom() return DM.On() and S.Get("ownBarStyle") == "custom" end
 local function EdgeCustom()
     return DM.On() and S.Get("highlightPlayer") == true and S.Get("edgeStyle") == "custom"
 end
-local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
 local function BothFigures() return DM.On() and S.Get("showTotal") == true and S.Get("showRate") == true end
-local function Tracking() return DM.On() and S.Get("barTrack") == true end
 local function Fading() return DM.On() and S.Get("idleAlpha") < 1 end
 local function Locked() return DM.On() and S.Get("locked") == true end
 -- Custom Image is for the choice of Image that is your own picture, and a picture is there when that has a
@@ -98,9 +99,16 @@ local function HasImage()
     return picked ~= "" and not C.HIDDEN_BACKGROUNDS[picked]
 end
 local function TilesImage() return HasImage() and S.Get("imageTile") == true end
-local function Abbreviating()
+local function OwnSized(element) return On(element .. "OwnSize") end
+local function OwnFonted(element) return On(element .. "OwnFont") end
+
+-- Rows that mean something for one choice only are left off the page for the others.
+local function NotCombat() return S.Get("visibility") ~= "combat" end
+local function NotCustomBars() return S.Get("barColor") ~= "custom" end
+local function NotTracking() return S.Get("barTrack") ~= true end
+local function NotAbbreviating()
     local units = S.Get("numberUnits")
-    return DM.On() and (units == "latin" or units == "asian")
+    return units ~= "latin" and units ~= "asian"
 end
 
 local function Headline()
@@ -128,40 +136,47 @@ local function WindowSummary(store)
     return text
 end
 
-local function RowsSummary(store)
+local function BarsSummary(store)
     return ("%d px rows, %d px apart"):format(store.Get("barHeight"), store.Get("barSpacing"))
 end
 
-local function NumbersSummary(store)
-    return C.NUMBER_UNITS[store.Get("numberUnits")] or ""
+local function RowSummary(store)
+    local icons = store.Get("showIcons") and (C.ICON_SIDES[store.Get("iconSide")] or ""):lower() or "off"
+    return ("Icons %s, ranks %s"):format(icons, store.Get("showRanks") and "on" or "off")
 end
 
 local function FiguresSummary(store)
-    return C.COLUMN_ORDERS[store.Get("columnOrder")] or ""
+    return ("%s, %s"):format(C.COLUMN_ORDERS[store.Get("columnOrder")] or "",
+        C.NUMBER_UNITS[store.Get("numberUnits")] or "")
 end
 
-local function NamesSummary(store)
-    return C.NAME_FORMATS[store.Get("nameFormat")] or ""
+local function HeaderSummary(store)
+    return ("%s, buttons %s"):format(C.TITLE_TEXTS[store.Get("titleText")] or "",
+        store.Get("showButtons") and "on" or "off")
 end
 
--- What a text's card says when it is closed: the size the text has, and whether its font is its own.
-local function StyleSummary(element)
+local function HoverSummary(store)
+    return ("Spells %s, reports of %d lines"):format(store.Get("breakdown") and "on" or "off",
+        store.Get("reportLines"))
+end
+
+local function DataSummary(store)
+    local text = ("%d of %d fights kept"):format(#DM.History.List(), store.Get("keepFights"))
+    local rule = store.Get("resetOn")
+    if rule ~= "never" then text = text .. ", reset " .. (C.RESET_ON[rule] or ""):lower() end
+    return text
+end
+
+local function LooksSummary()
+    local count = #DM.LookNames()
+    return count == 0 and "None kept" or ("%d kept"):format(count)
+end
+
+local function WindowNSummary(index)
     return function(store)
-        local _, _, size = DM.Look.TextStyle(element, store.Get("fontSize"))
-        local text = ("Size %d"):format(size)
-        if store.Get(element .. "OwnFont") == true then text = text .. ", own font" end
-        return text
+        return ("%s, %d by %d"):format(DM.Mode(store.Get(DM.Key("mode", index))).label,
+            store.Get(DM.Key("width", index)), store.Get(DM.Key("height", index)))
     end
-end
-
-local TEXTS = { "name", "value", "rank", "title", "time", "summary", "head" }
-
-local function FontSummary(store)
-    local own = 0
-    for _, element in ipairs(TEXTS) do
-        if store.Get(element .. "OwnFont") == true then own = own + 1 end
-    end
-    return own == 0 and "All the same" or ("%d with their own"):format(own)
 end
 
 -- The settings that leave only the title and the bars: no titles over the columns, no buttons, no rank
@@ -174,89 +189,6 @@ local TEXT_CLEAN_ASK = "Hide the column titles, buttons, rank numbers, backgroun
 local function ApplyCleanLook()
     for key, value in pairs(CLEAN_LOOK) do S.Set(key, value) end
     if ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
-end
-
-local function HeaderSummary(store)
-    return ("%s, buttons %s"):format(C.TITLE_TEXTS[store.Get("titleText")] or "",
-        store.Get("showButtons") and "on" or "off")
-end
-
-local function DataSummary(store)
-    local text = C.RESET_ON[store.Get("resetOn")] or ""
-    if store.Get("overallOutOfCombat") then text = text .. ", overall out of combat" end
-    return text
-end
-
-local function SpacingSummary(store)
-    return ("Padding %d px, columns %d px apart"):format(store.Get("textPad"), store.Get("colGap"))
-end
-
-local function IconsSummary(store)
-    local size = store.Get("iconSize")
-    return ("Icon %s, %s"):format(size > 0 and size .. " px" or "fitted",
-        (C.ICON_SIDES[store.Get("iconSide")] or ""):lower())
-end
-
-local function LooksSummary()
-    local count = #DM.LookNames()
-    return count == 0 and "None kept" or ("%d kept"):format(count)
-end
-
-local function SummarySummary(store)
-    if not store.Get("showSummary") then return "Off" end
-    local pieces = 0
-    for _, key in ipairs({ "summaryName", "summaryTotal", "summaryRate", "summaryRank" }) do
-        if store.Get(key) then pieces = pieces + 1 end
-    end
-    return ("%d of 4 pieces"):format(pieces)
-end
-
-local function FadeSummary(store)
-    local idle = store.Get("idleAlpha")
-    local text = idle < 1 and ("%d%% out of combat"):format(math.floor(idle * 100 + 0.5)) or "No fade"
-    if store.Get("clickThrough") and store.Get("locked") then text = text .. ", mouse passes through" end
-    return text
-end
-
-local function TimeSummary(store)
-    if not store.Get("showTime") then return "Off" end
-    return store.Get("timeBrackets") and "On, in brackets" or "On"
-end
-
-local function HoverSummary(store)
-    return ("Spells %s, reports of %d lines"):format(store.Get("breakdown") and "on" or "off",
-        store.Get("reportLines"))
-end
-
-local function HistorySummary(store)
-    return ("%d of %d fights kept"):format(#DM.History.List(), store.Get("keepFights"))
-end
-
-local function BarColorsSummary(store)
-    return C.BAR_COLORS[store.Get("barColor")] or ""
-end
-
-local function PickedSummary(keys)
-    return function(store)
-        local picked = 0
-        for _, key in ipairs(keys) do
-            if type(store.Get(key)) == "table" then picked = picked + 1 end
-        end
-        return picked == 0 and "Theme" or picked .. " picked"
-    end
-end
-
-local function ClassesSummary(store)
-    local picked = 0
-    for _ in pairs(store.Get("classColors") or {}) do picked = picked + 1 end
-    return picked == 0 and "The game's" or picked .. " picked"
-end
-
-local function WindowNSummary(index)
-    return function(store)
-        return ("%s, %d by %d"):format(DM.Mode(store.Get(DM.Key("mode", index))).label,
-            store.Get(DM.Key("width", index)), store.Get(DM.Key("height", index)))
-    end
 end
 
 -- ---- colors
@@ -273,10 +205,8 @@ local function PickedSet(key)
     return function(r, g, b) S.Set(key, { r = r, g = g, b = b }) end
 end
 
-local COLOR_NEEDS = { barCustomColor = CustomBars, ownBarColor = OwnCustom, edgeColor = EdgeCustom,
-    trackColor = Tracking }
-local COLOR_WHY = { barCustomColor = OFF_CUSTOM_BARS, ownBarColor = OFF_OWN_CUSTOM, edgeColor = OFF_EDGE_CUSTOM,
-    trackColor = OFF_TRACK }
+local COLOR_NEEDS = { ownBarColor = OwnCustom, edgeColor = EdgeCustom }
+local COLOR_WHY = { ownBarColor = OFF_OWN_CUSTOM, edgeColor = OFF_EDGE_CUSTOM }
 local COLOR_HELP = {
     barCustomColor = "The bars' color when Bar Color is Custom Color.",
     ownBarColor = "The color of your own bar when Your Bar is Custom Color.",
@@ -291,6 +221,12 @@ local function ColorRow(key)
     local entry = colorEntry[key]
     return { key = key, label = entry.label, colour = true, get = PickedGet(key), set = PickedSet(key),
         needs = COLOR_NEEDS[key] or Enabled, why = COLOR_WHY[key] or OFF, help = COLOR_HELP[key] }
+end
+
+-- A row that is left off the page while hidden() says so.
+local function HiddenWhen(row, hidden)
+    row.hidden = hidden
+    return row
 end
 
 -- The classes the game has, in its own order, each with a picker for its bar color.
@@ -353,37 +289,7 @@ local function ImageChoices()
     return values, order
 end
 
--- ---- the texts: each has a size and a font of its own, behind a switch each, and a color
-
-local OUTLINE = ns.Shared.Parts.HUD_OUTLINES
-local OFF_OWN_SIZE, OFF_OWN_FONT = "Turn on Own Size", "Turn on Own Font"
-
-local function OwnSized(element)
-    return function() return DM.On() and S.Get(element .. "OwnSize") == true end
-end
-
-local function OwnFonted(element)
-    return function() return DM.On() and S.Get(element .. "OwnFont") == true end
-end
-
--- A text's size: a switch, and the size it gives the text.
-local function SizeRows(element, key, range, help)
-    return {
-        { key = element .. "OwnSize", label = "Own Size", toggle = true, needs = Enabled, why = OFF, help = help },
-        { key = key, label = "Size", slider = range, needs = OwnSized(element), why = OFF_OWN_SIZE },
-    }
-end
-
--- A text's font and outline: a switch, and what it gives the text.
-local function FontRows(element)
-    return {
-        { key = element .. "OwnFont", label = "Own Font", toggle = true, needs = Enabled, why = OFF,
-          help = "Off: the font and outline of the Font and Outline card." },
-        { key = element .. "Font", label = "Font", font = true, needs = OwnFonted(element), why = OFF_OWN_FONT },
-        { key = element .. "Outline", label = "Outline", choice = OUTLINE, needs = OwnFonted(element),
-          why = OFF_OWN_FONT },
-    }
-end
+-- ---- building blocks
 
 -- The parts of a card's rows, rows and lists of rows, as one list.
 local function Join(...)
@@ -398,12 +304,37 @@ local function Join(...)
     return rows
 end
 
+-- A row with a cog, and the rows behind it: they are left off the page and shown in the cog's panel.
+local function Under(owner, title, tip, rows)
+    owner.cog = { title = title, tip = tip }
+    for _, row in ipairs(rows[1] ~= nil and rows or { rows }) do row.under = owner.label end
+    return Join(owner, rows)
+end
+
+-- A text's size and font, behind a switch each: with a switch off the text has the usual size, and the
+-- window's font and outline. noun is what its rows call it ("Rank": Own Rank Size, Rank Size, ...).
+local function TextRows(noun, element, sizeKey, range, help)
+    return {
+        { key = element .. "OwnSize", label = "Own " .. noun .. " Size", toggle = true, needs = Enabled, why = OFF,
+          help = help },
+        { key = sizeKey, label = noun .. " Size", slider = range, needs = OwnSized(element), why = OFF_OWN_SIZE },
+        { key = element .. "OwnFont", label = "Own " .. noun .. " Font", toggle = true, needs = Enabled, why = OFF,
+          help = "Off: the font and outline of Window." },
+        { key = element .. "Font", label = noun .. " Font", font = true, needs = OwnFonted(element),
+          why = OFF_OWN_FONT },
+        { key = element .. "Outline", label = noun .. " Outline", choice = OUTLINE, needs = OwnFonted(element),
+          why = OFF_OWN_FONT },
+    }
+end
+
 local page = Settings.Page(C.PAGE, S)
 
 page:Window({
     headline = Headline,
     detail = Detail,
 })
+
+-- ---- what the window lists, and when
 
 page:Card({
     id = "lists", name = "Lists", order = 10,
@@ -425,8 +356,8 @@ page:Card({
           help = "Turns the game's own damage meter off while this one is on." },
         { key = "visibility", label = "Where", choice = SHOW, needs = Enabled, why = OFF,
           help = "In Combat shows it while you fight and a while after. A key binding shows or hides it." },
-        { key = "hideDelay", label = "Hide After", slider = DELAY_RANGE, unit = "s", needs = HidesAfterCombat,
-          why = OFF_COMBAT },
+        HiddenWhen({ key = "hideDelay", label = "Hide After", slider = DELAY_RANGE, unit = "s", needs = Enabled,
+            why = OFF }, NotCombat),
         { key = "hideInPvP", label = "Hide in Battlegrounds", toggle = true, needs = Enabled, why = OFF,
           help = "Hides the windows in battlegrounds and arenas, whatever Where says." },
         { key = "raidMode", label = "Raid Mode", toggle = true, needs = Enabled, why = OFF,
@@ -438,60 +369,64 @@ page:Card({
     },
 })
 
+-- ---- the window: its size, its background, its picture, its fade and the font its texts have
+
 page:Card({
     id = "window", name = "Window", order = 20,
-    help = "Its size, its background and its picture. Move it in the HUD Editor.",
+    help = "Its size, background, picture and fade, and the font every text has unless it has its own.",
     summary = WindowSummary,
-    rows = {
+    rows = Join(
         Group("Size"),
         { key = "width", label = "Width", slider = WIDTH_RANGE, needs = Enabled, why = OFF },
         { key = "height", label = "Height", slider = HEIGHT_RANGE, needs = Enabled, why = OFF },
         { key = "scale", label = "Scale", slider = SCALE_RANGE, unit = "%", scale = TO_FRACTION, needs = Enabled,
           why = OFF, help = "Makes the whole window larger or smaller, text and all." },
-        { key = "locked", label = "Lock Window", toggle = true, needs = Enabled, why = OFF,
-          help = "Off: drag the title bar to move it and the corner to resize it, in combat too." },
+        Under({ key = "locked", label = "Lock Window", toggle = true, needs = Enabled, why = OFF,
+            help = "Off: drag the title bar to move it and the corner to resize it, in combat too." },
+            "Lock Window", "What the mouse does while the window is locked.",
+            { key = "clickThrough", label = "Mouse Passes Through", toggle = true, needs = Locked, why = OFF_LOCKED,
+              help = "While the window is locked, clicks and the mouse go through it to the game. The spell "
+                  .. "panel and clicking a name do not work then." }),
         Group("Background"),
-        { key = "backgroundAlpha", label = "Opacity", slider = BACKGROUND_RANGE, unit = "%",
+        { key = "backgroundAlpha", label = "Window Opacity", slider = BACKGROUND_RANGE, unit = "%",
           scale = TO_FRACTION, needs = Enabled, why = OFF },
+        ColorRow("windowColor"),
         { key = "showBorder", label = "Border", toggle = true, needs = Enabled, why = OFF },
-        Group("Picture"),
-        { key = "backgroundImage", label = "Image", choice = ImageChoices, needs = Enabled, why = OFF,
-          help = "None, your own picture, or one from a shared media add-on." },
-        { key = "backgroundPath", label = "Custom Image", text = true, wide = true, needs = PicturePath,
-          why = OFF_OWN, help = "The path of your own picture. Used when Image is Your Own Picture." },
-        { label = "Adding a Picture", buttonText = "Show How", needs = Enabled, why = OFF,
-          button = function() DM.ShowImageHelp() end,
-          help = "A window that says where to put a picture and what to type." },
-        { key = "imageAlpha", label = "Image Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION,
-          needs = HasImage, why = OFF_IMAGE },
-        { key = "imageTile", label = "Tile Image", toggle = true, needs = HasImage, why = OFF_IMAGE,
-          help = "Repeats the picture in place of stretching it, for patterns." },
-        { key = "imageTileSize", label = "Tile Size", slider = TILE_RANGE, unit = "px", needs = TilesImage,
-          why = OFF_TILE, help = "How wide each repeat is, in pixels." },
-    },
+        ColorRow("borderColor"),
+        Under({ key = "backgroundImage", label = "Image", choice = ImageChoices, needs = Enabled, why = OFF,
+            help = "None, your own picture, or one from a shared media add-on." },
+            "Picture", "Your own picture's path, and how the picture is drawn.", {
+            { key = "backgroundPath", label = "Custom Image", text = true, wide = true, needs = PicturePath,
+              why = OFF_OWN, help = "The path of your own picture. Used when Image is Your Own Picture." },
+            { label = "Adding a Picture", buttonText = "Show How", needs = Enabled, why = OFF,
+              button = function() DM.ShowImageHelp() end,
+              help = "A window that says where to put a picture and what to type." },
+            { key = "imageAlpha", label = "Image Opacity", slider = BACKGROUND_RANGE, unit = "%",
+              scale = TO_FRACTION, needs = HasImage, why = OFF_IMAGE },
+            { key = "imageTile", label = "Tile Image", toggle = true, needs = HasImage, why = OFF_IMAGE,
+              help = "Repeats the picture in place of stretching it, for patterns." },
+            { key = "imageTileSize", label = "Tile Size", slider = TILE_RANGE, unit = "px", needs = TilesImage,
+              why = OFF_TILE, help = "How wide each repeat is, in pixels." } }),
+        Under({ key = "idleAlpha", label = "Out of Combat Opacity", slider = BACKGROUND_RANGE, unit = "%",
+            scale = TO_FRACTION, needs = Enabled, why = OFF,
+            help = "How opaque the whole window is when you are not in combat. In combat it is full." },
+            "Fade", "What the fade does with the mouse.",
+            { key = "hoverFull", label = "Full While Hovered", toggle = true, needs = Fading, why = OFF_FADE,
+              help = "The window is fully opaque while the mouse is over it." }),
+        Group("Text"),
+        { key = "font", label = "Font", font = true, needs = Enabled, why = OFF },
+        { key = "outline", label = "Outline", choice = OUTLINE, needs = Enabled, why = OFF,
+          help = "None, the soft shadow, a thin outline or a thick one." }
+    ),
 })
 
-page:Card({
-    id = "fade", name = "Fade and Mouse", order = 22,
-    help = "How see-through the window is out of combat, and whether the mouse goes through it.",
-    summary = FadeSummary,
-    rows = {
-        { key = "idleAlpha", label = "Out of Combat Opacity", slider = BACKGROUND_RANGE, unit = "%",
-          scale = TO_FRACTION, needs = Enabled, why = OFF,
-          help = "How opaque the whole window is when you are not in combat. In combat it is full." },
-        { key = "hoverFull", label = "Full While Hovered", toggle = true, needs = Fading, why = OFF_FADE,
-          help = "The window is fully opaque while the mouse is over it." },
-        { key = "clickThrough", label = "Mouse Passes Through", toggle = true, needs = Locked, why = OFF_LOCKED,
-          help = "While the window is locked, clicks and the mouse go through it to the game. The spell "
-              .. "panel and clicking a name do not work then." },
-    },
-})
+-- ---- the bars: how they stand, their color and texture, and yours
 
 page:Card({
-    id = "rows", name = "Bars and Rows", order = 30,
-    help = "How tall the bars are, their texture and track, and which row is yours.",
-    summary = RowsSummary,
-    rows = {
+    id = "bars", name = "Bars", order = 30,
+    help = "How tall the bars are, their color, texture and track, and how your own row stands out.",
+    summary = BarsSummary,
+    rows = Join(
         Group("Bars"),
         { key = "barHeight", label = "Row Height", slider = BAR_RANGE, needs = Enabled, why = OFF },
         { key = "barSpacing", label = "Row Spacing", slider = SPACING_RANGE, needs = Enabled, why = OFF },
@@ -503,66 +438,54 @@ page:Card({
           help = "Each bar grows from its right end toward the left." },
         { key = "barScale", label = "Bars Compare To", choice = BAR_SCALE, needs = Enabled, why = OFF,
           help = "Top Player: the biggest bar is full. List Total: each bar is its share of the whole list." },
-        Group("Texture"),
+        Group("Color"),
+        Under({ key = "barColor", label = "Bar Color", choice = BAR_COLOR, needs = Enabled, why = OFF,
+            help = "Class Colors: each player's class. Theme Accent: every bar in your theme's Accent. Custom "
+                .. "Color: every bar in the one you pick." },
+            "Class Colors", "The color of each class's bars, when Bar Color is Class Colors.", ClassRows()),
+        HiddenWhen(ColorRow("barCustomColor"), NotCustomBars),
         { key = "texture", label = "Bar Texture", texture = "Naowh Gradient", needs = Enabled, why = OFF },
         { key = "barTrack", label = "Bar Track", toggle = true, needs = Enabled, why = OFF,
           help = "A color behind each bar, where it is not filled." },
-        ColorRow("trackColor"),
+        HiddenWhen(ColorRow("trackColor"), NotTracking),
         Group("Your Row"),
-        { key = "highlightPlayer", label = "Highlight Your Row", toggle = true, needs = Enabled, why = OFF },
+        Under({ key = "highlightPlayer", label = "Highlight Your Row", toggle = true, needs = Enabled, why = OFF },
+            "Your Row", "Your bar's color, and the strip on the left of your row.", {
+            { key = "ownBarStyle", label = "Your Bar", choice = OWN_BAR, needs = Enabled, why = OFF,
+              help = "Your own bar: the same as the others, in your class's color, or in a color of its own." },
+            ColorRow("ownBarColor"),
+            { key = "edgeStyle", label = "Your Row Edge", choice = EDGE, needs = Highlighting, why = OFF_HIGHLIGHT,
+              help = "The strip on the left of your row: the theme's Accent, your class's color, or one of your "
+                  .. "own." },
+            ColorRow("edgeColor"),
+            { key = "edgeWidth", label = "Edge Width", slider = EDGE_RANGE, unit = "px", needs = Enabled,
+              why = OFF, help = "The strip on the left of a row, which shows your row in your edge color." } }),
         { key = "pinSelf", label = "Always Show My Row", toggle = true, needs = Enabled, why = OFF,
-          help = "When you are not among the rows shown, the last row is yours, with your rank." },
-    },
-})
-
-page:Card({
-    id = "spacing", name = "Spacing", order = 32,
-    help = "The room at the ends of a row and between its columns, and the strip that marks your row.",
-    summary = SpacingSummary,
-    rows = {
-        { key = "textPad", label = "Text Padding", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "The room at the ends of a row, before the first text and after the last." },
-        { key = "colGap", label = "Column Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "The room between the columns of figures." },
-        { key = "edgeWidth", label = "Edge Width", slider = EDGE_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "The strip on the left of a row, which shows your row in your edge color." },
-    },
-})
-
-page:Card({
-    id = "icons", name = "Icons", order = 34, switch = "showIcons",
-    help = "The icon on each row: its size, side and crop. The switch shows or hides it.",
-    summary = IconsSummary,
-    rows = {
-        { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
-        { key = "iconSize", label = "Icon Size", slider = ICON_SIZE_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "Zero fits the icon to the row." },
-        { key = "iconSide", label = "Icon Side", choice = ICON_SIDE, needs = Enabled, why = OFF },
-        { key = "iconZoom", label = "Icon Crop", slider = ICON_ZOOM_RANGE, unit = "%", needs = Enabled, why = OFF,
-          help = "How much of the icon's edge is cut off, so the frame in it does not show." },
-        { key = "iconGap", label = "Icon Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "The room between the icon and the name." },
-    },
-})
-
-page:Card({
-    id = "ranks", name = "Rank Numbers", order = 36, switch = "showRanks",
-    help = "The number before each name. The switch shows or hides it.",
-    summary = StyleSummary("rank"),
-    rows = Join(
-        Group("Text"),
-        SizeRows("rank", "rankSize", TEXT_RANGE, "Off: the usual size."),
-        FontRows("rank"),
-        ColorRow("rankColor")
+          help = "When you are not among the rows shown, the last row is yours, with your rank." }
     ),
 })
 
+-- ---- a row: its icon, rank and name, and the room between them
+
 page:Card({
-    id = "names", name = "Names", order = 40,
-    help = "How a player's name is written and how long, its size, font and color.",
-    summary = NamesSummary,
+    id = "row", name = "Row", order = 40,
+    help = "What each row has before its figures: icon, rank and name, each with its own text settings.",
+    summary = RowSummary,
     rows = Join(
-        Group("Writing"),
+        Under({ key = "showIcons", label = "Icons", toggle = true, needs = Enabled, why = OFF },
+            "Icon", "The icon's style, size, side and crop.", {
+            { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
+            { key = "iconSize", label = "Icon Size", slider = ICON_SIZE_RANGE, unit = "px", needs = Enabled,
+              why = OFF, help = "Zero fits the icon to the row, as tall as the bar when it stands before it." },
+            { key = "iconSide", label = "Icon Side", choice = ICON_SIDE, needs = Enabled, why = OFF,
+              help = "Before the Bar puts it outside the bar, at its left end." },
+            { key = "iconZoom", label = "Icon Crop", slider = ICON_ZOOM_RANGE, unit = "%", needs = Enabled,
+              why = OFF, help = "How much of the icon's edge is cut off, so the frame in it does not show." },
+            { key = "iconGap", label = "Icon Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
+              help = "The room between the icon and the name." } }),
+        Under({ key = "showRanks", label = "Rank Numbers", toggle = true, needs = Enabled, why = OFF },
+            "Rank Text", "The rank's size, font and color.",
+            Join(TextRows("Rank", "rank", "rankSize", TEXT_RANGE, "Off: the usual size."), ColorRow("rankColor"))),
         { key = "nameFormat", label = "Name Format", choice = NAME_FORMAT, needs = Enabled, why = OFF,
           help = "How a player's name is written. In combat the game hides other players' names, so those "
               .. "are found by class and left whole when two players share one." },
@@ -570,20 +493,28 @@ page:Card({
           help = "Your own row says You in place of your name." },
         { key = "nameMaxLetters", label = "Name Length", slider = LETTERS_RANGE, needs = Enabled, why = OFF,
           help = "Cuts a name to this many letters, with ... after it. Zero leaves names whole." },
-        Group("Text"),
-        { key = "fontSize", label = "Name Size", slider = TEXT_RANGE, needs = Enabled, why = OFF,
-          help = "The names' size. The figures follow it unless they have a size of their own." },
-        FontRows("name"),
-        Group("Color"),
-        { key = "nameClassColor", label = "Class Colored Names", toggle = true, needs = Enabled, why = OFF,
-          help = "Each name in its class's color, in place of the Name Color." },
-        ColorRow("nameColor")
+        Under(ColorRow("nameColor"), "Name Text", "The name's size, font and color.", {
+            { key = "fontSize", label = "Name Size", slider = TEXT_RANGE, needs = Enabled, why = OFF,
+              help = "The names' size. The figures follow it unless they have a size of their own." },
+            { key = "nameOwnFont", label = "Own Name Font", toggle = true, needs = Enabled, why = OFF,
+              help = "Off: the font and outline of Window." },
+            { key = "nameFont", label = "Name Font", font = true, needs = OwnFonted("name"), why = OFF_OWN_FONT },
+            { key = "nameOutline", label = "Name Outline", choice = OUTLINE, needs = OwnFonted("name"),
+              why = OFF_OWN_FONT },
+            { key = "nameClassColor", label = "Class Colored Names", toggle = true, needs = Enabled, why = OFF,
+              help = "Each name in its class's color, in place of the Name Color." } }),
+        { key = "textPad", label = "Text Padding", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "The room at the ends of a row, before the first text and after the last." },
+        { key = "colGap", label = "Column Gap", slider = PAD_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "The room between the columns of figures." }
     ),
 })
 
+-- ---- the figures: which columns, in what order, how they are written
+
 page:Card({
-    id = "figures", name = "Figures", order = 42,
-    help = "The columns of figures: which there are, in what order, and their text.",
+    id = "figures", name = "Figures", order = 50,
+    help = "The columns of figures, in what order, and how numbers, shares and per-second figures are written.",
     summary = FiguresSummary,
     rows = Join(
         Group("Columns"),
@@ -598,155 +529,120 @@ page:Card({
         { key = "columnOrder", label = "Column Order", choice = COLUMN_ORDER, needs = Enabled, why = OFF,
           help = "Which way round the figures go, and where the share stands. As the Game Has It leads with "
               .. "the per-second figure in the DPS and HPS lists." },
-        Group("Text"),
-        SizeRows("value", "valueFontSize", TEXT_RANGE, "Off: the same size as the names."),
-        FontRows("value"),
-        Group("Color"),
-        { key = "valueClassColor", label = "Class Colored Figures", toggle = true, needs = Enabled, why = OFF,
-          help = "Each amount in its class's color, in place of the Figure Color." },
-        ColorRow("valueColor")
-    ),
-})
-
-page:Card({
-    id = "numbers", name = "Number Format", order = 44,
-    help = "How big numbers, shares and per-second figures are written.",
-    summary = NumbersSummary,
-    rows = {
+        Under(ColorRow("valueColor"), "Figure Text", "The figures' size, font and color.", Join(
+            TextRows("Figure", "value", "valueFontSize", TEXT_RANGE, "Off: the same size as the names."),
+            { key = "valueClassColor", label = "Class Colored Figures", toggle = true, needs = Enabled, why = OFF,
+              help = "Each amount in its class's color, in place of the Figure Color." })),
+        Group("Writing"),
         { key = "numberUnits", label = "Number Format", choice = NUMBER_UNITS, needs = Enabled, why = OFF,
           help = "How big numbers are written. Ten-thousands groups by ten-thousands and hundred-millions." },
-        { key = "numberDecimals", label = "Decimals", slider = DECIMALS_RANGE, needs = Abbreviating,
-          why = OFF_ABBREVIATING },
+        HiddenWhen({ key = "numberDecimals", label = "Decimals", slider = DECIMALS_RANGE, needs = Enabled,
+            why = OFF }, NotAbbreviating),
         { key = "percentDecimals", label = "Percent Decimals", slider = PERCENT_DECIMALS_RANGE, needs = Enabled,
           why = OFF },
         { key = "rateSuffix", label = "Per-Second Suffix", toggle = true, needs = Enabled, why = OFF,
-          help = "Writes the per-second figure with /s after it." },
-    },
-})
-
-page:Card({
-    id = "heads", name = "Column Titles", order = 46, switch = "showColumnHeaders",
-    help = "The line of titles above the rows: Name and what each column shows. The switch shows or hides it.",
-    summary = StyleSummary("head"),
-    rows = Join(
-        Group("Text"),
-        SizeRows("head", "headSize", TEXT_RANGE, "Off: the usual size."),
-        FontRows("head"),
-        ColorRow("columnColor")
+          help = "Writes the per-second figure with /s after it." }
     ),
 })
 
+-- ---- the title bar, and the lines under it
+
 page:Card({
-    id = "header", name = "Title Bar", order = 50,
-    help = "The title and the bar it sits on, with its buttons.",
+    id = "header", name = "Title Bar", order = 60,
+    help = "The title, the fight time and the buttons, and the column titles and summary line under the bar.",
     summary = HeaderSummary,
     rows = Join(
         Group("Title"),
         { key = "titleText", label = "Title Shows", choice = TITLE_TEXT, needs = Enabled, why = OFF,
           help = "The list's name, the name the game gave the fight, or both. A fight with no name yet "
               .. "shows the list's." },
-        { key = "titleX", label = "Title X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "Moves the title right, or left below zero. The second list's title moves with it." },
-        { key = "titleY", label = "Title Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = Enabled, why = OFF,
-          help = "Moves the title up, or down below zero." },
-        Group("Text"),
-        SizeRows("title", "titleSize", TITLE_RANGE, "Off: the usual size."),
-        FontRows("title"),
-        ColorRow("titleColor"),
-        Group("Bar"),
-        { key = "headerAlpha", label = "Title Bar Opacity", slider = BACKGROUND_RANGE, unit = "%",
-          scale = TO_FRACTION, needs = Enabled, why = OFF,
-          help = "At zero the title bar and the line under it are not drawn, only its words." },
+        Under(ColorRow("titleColor"), "Title Text", "The title's size, font, color and place.", Join(
+            TextRows("Title", "title", "titleSize", TITLE_RANGE, "Off: the usual size."),
+            { key = "titleX", label = "Title X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = Enabled,
+              why = OFF, help = "Moves the title right, or left below zero. The second list's title moves "
+                  .. "with it." },
+            { key = "titleY", label = "Title Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = Enabled,
+              why = OFF, help = "Moves the title up, or down below zero." })),
         { key = "showButtons", label = "Show Buttons", toggle = true, needs = Enabled, why = OFF,
           help = "The session button and the ... menu at the right of the bar. Off: right-click the bar "
               .. "for the same menu." },
-        ColorRow("headerColor")
+        { key = "headerAlpha", label = "Title Bar Opacity", slider = BACKGROUND_RANGE, unit = "%",
+          scale = TO_FRACTION, needs = Enabled, why = OFF,
+          help = "At zero the title bar and the line under it are not drawn, only its words." },
+        ColorRow("headerColor"),
+        Group("Fight Time"),
+        Under({ key = "showTime", label = "Show Fight Time", toggle = true, needs = Enabled, why = OFF,
+            help = "How long the shown session has run, when there is room beside the title." },
+            "Fight Time", "Where the time sits, and its size, font and color.", Join(
+            { key = "timeBrackets", label = "Time in Brackets", toggle = true, needs = On("showTime"),
+              why = OFF_TIME, help = "Writes the time as (0:05)." },
+            { key = "timeByTitle", label = "Time Next to Title", toggle = true, needs = On("showTime"),
+              why = OFF_TIME, help = "Puts the time right after the title, in place of beside the buttons." },
+            { key = "timeX", label = "Time X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = On("showTime"),
+              why = OFF_TIME, help = "Moves the time right, or left below zero, from where it sits." },
+            { key = "timeY", label = "Time Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = On("showTime"),
+              why = OFF_TIME, help = "Moves the time up, or down below zero." },
+            TextRows("Time", "time", "timeSize", TITLE_RANGE, "Off: the usual size."),
+            ColorRow("timeColor"))),
+        Group("Under the Bar"),
+        Under({ key = "showColumnHeaders", label = "Column Titles", toggle = true, needs = Enabled, why = OFF,
+            help = "A line of titles above the rows: Name and what each column shows." },
+            "Column Title Text", "The column titles' size, font and color.",
+            Join(TextRows("Column Title", "head", "headSize", TEXT_RANGE, "Off: the usual size."),
+                ColorRow("columnColor"))),
+        Under({ key = "showSummary", label = "Summary Line", toggle = true, needs = Enabled, why = OFF,
+            help = "Under the title bar: the session, its total, the raid's per-second figure once the fight "
+                .. "is over, and your rank." },
+            "Summary Line", "What the line says, and its size, font and color.", Join(
+            { key = "summaryName", label = "Session Name", toggle = true, needs = On("showSummary"),
+              why = OFF_SUMMARY },
+            { key = "summaryTotal", label = "Total", toggle = true, needs = On("showSummary"), why = OFF_SUMMARY },
+            { key = "summaryRate", label = "Raid Per Second", toggle = true, needs = On("showSummary"),
+              why = OFF_SUMMARY, help = "The raid's figure per second, once the fight is over." },
+            { key = "summaryRank", label = "Your Rank", toggle = true, needs = On("showSummary"),
+              why = OFF_SUMMARY },
+            TextRows("Summary", "summary", "summarySize", TEXT_RANGE, "Off: the usual size."),
+            ColorRow("summaryColor")))
     ),
 })
 
-page:Card({
-    id = "summary", name = "Summary Line", order = 53, switch = "showSummary",
-    help = "A line under the title bar: the session, its total, the raid's figure per second, and your rank.",
-    summary = SummarySummary,
-    rows = Join(
-        Group("Pieces"),
-        { key = "summaryName", label = "Session Name", toggle = true, needs = Enabled, why = OFF },
-        { key = "summaryTotal", label = "Total", toggle = true, needs = Enabled, why = OFF },
-        { key = "summaryRate", label = "Raid Per Second", toggle = true, needs = Enabled, why = OFF,
-          help = "The raid's figure per second, once the fight is over." },
-        { key = "summaryRank", label = "Your Rank", toggle = true, needs = Enabled, why = OFF },
-        Group("Text"),
-        SizeRows("summary", "summarySize", TEXT_RANGE, "Off: the usual size."),
-        FontRows("summary"),
-        ColorRow("summaryColor")
-    ),
-})
+-- ---- what hovering a row shows, and what a report sends
 
 page:Card({
-    id = "time", name = "Fight Time", order = 55, switch = "showTime",
-    help = "How long the shown session has run, when there is room beside the title.",
-    summary = TimeSummary,
-    rows = Join(
-        Group("Place"),
-        { key = "timeBrackets", label = "Time in Brackets", toggle = true, needs = Enabled, why = OFF,
-          help = "Writes the time as (0:05)." },
-        { key = "timeByTitle", label = "Time Next to Title", toggle = true, needs = Enabled, why = OFF,
-          help = "Puts the time right after the title, in place of beside the buttons." },
-        { key = "timeX", label = "Time X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = Enabled,
-          why = OFF, help = "Moves the time right, or left below zero, from where it sits." },
-        { key = "timeY", label = "Time Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = Enabled,
-          why = OFF, help = "Moves the time up, or down below zero." },
-        Group("Text"),
-        SizeRows("time", "timeSize", TITLE_RANGE, "Off: the usual size."),
-        FontRows("time"),
-        ColorRow("timeColor")
-    ),
-})
-
-page:Card({
-    id = "text", name = "Font and Outline", order = 60,
-    help = "The font and outline every text has, unless it has its own on its own card.",
-    summary = FontSummary,
-    rows = {
-        { key = "font", label = "Font", font = true, needs = Enabled, why = OFF },
-        { key = "outline", label = "Outline", choice = OUTLINE, needs = Enabled, why = OFF,
-          help = "None, the soft shadow, a thin outline or a thick one." },
-    },
-})
-
-page:Card({
-    id = "hover", name = "Hover and Report", order = 70,
-    help = "The spells behind a row, and what Report To sends.",
+    id = "hover", name = "Spells and Reports", order = 70,
+    help = "The spells behind a row, on hover or in the window, and what Report To sends.",
     summary = HoverSummary,
-    rows = {
-        Group("Spells"),
-        { key = "breakdown", label = "Spell Breakdown", toggle = true, needs = Enabled, why = OFF,
-          help = "Hover a row to see its spells, or click it to see them in the window, and click again to go "
-              .. "back. In combat only your own row and rows the game lets through show spells." },
-        Group("Panel"),
-        { key = "panelLines", label = "Spells Shown", slider = PANEL_LINES_RANGE, needs = Enabled, why = OFF,
-          help = "How many spells the panel lists, the biggest first." },
-        { key = "targetLines", label = "Enemies Shown", slider = TARGET_LINES_RANGE, needs = Enabled, why = OFF,
-          help = "How many enemies it lists under the spells, in the panel and in a player's breakdown." },
-        { key = "panelWidth", label = "Panel Width", slider = PANEL_WIDTH_RANGE, unit = "px", needs = Enabled,
-          why = OFF },
-        { key = "panelScale", label = "Panel Scale", slider = PANEL_SCALE_RANGE, unit = "%", scale = TO_FRACTION,
-          needs = Enabled, why = OFF },
-        { key = "panelAlpha", label = "Panel Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION,
-          needs = Enabled, why = OFF },
-        { key = "panelSide", label = "Panel Side", choice = PANEL_SIDE, needs = Enabled, why = OFF,
-          help = "By the window's side on the screen puts it on the side that has room." },
-        Group("Report"),
+    rows = Join(
+        Under({ key = "breakdown", label = "Spell Breakdown", toggle = true, needs = Enabled, why = OFF,
+            help = "Hover a row to see its spells, or click it to see them in the window, and click again to go "
+                .. "back. In combat only your own row and rows the game lets through show spells." },
+            "Spell Panel", "How many it lists, how wide it is, and which side it opens on.", {
+            { key = "panelLines", label = "Spells Shown", slider = PANEL_LINES_RANGE, needs = Enabled, why = OFF,
+              help = "How many spells the panel lists, the biggest first." },
+            { key = "targetLines", label = "Enemies Shown", slider = TARGET_LINES_RANGE, needs = Enabled,
+              why = OFF, help = "How many enemies it lists under the spells, in the panel and in a player's "
+                  .. "breakdown." },
+            { key = "panelWidth", label = "Panel Width", slider = PANEL_WIDTH_RANGE, unit = "px", needs = Enabled,
+              why = OFF },
+            { key = "panelScale", label = "Panel Scale", slider = PANEL_SCALE_RANGE, unit = "%",
+              scale = TO_FRACTION, needs = Enabled, why = OFF },
+            { key = "panelAlpha", label = "Panel Opacity", slider = BACKGROUND_RANGE, unit = "%",
+              scale = TO_FRACTION, needs = Enabled, why = OFF },
+            { key = "panelSide", label = "Panel Side", choice = PANEL_SIDE, needs = Enabled, why = OFF,
+              help = "By the window's side on the screen puts it on the side that has room." } }),
         { key = "reportLines", label = "Report Lines", slider = REPORT_RANGE, needs = Enabled, why = OFF,
-          help = "How many rows Report To sends, out of combat only. Reset has a key binding under Naowh Forever." },
-    },
+          help = "How many rows Report To sends, out of combat only. Reset has a key binding under Naowh Forever." }
+    ),
 })
 
+-- ---- the fights kept, and when the data is cleared
+
 page:Card({
-    id = "history", name = "Fight History", order = 80,
-    help = "A summary of each fight, kept when it ends, with your figures and the raid's.",
-    summary = HistorySummary,
+    id = "data", name = "Fights and Data", order = 80,
+    help = "The fights kept, when the game's figures are cleared, and the way back to the defaults.",
+    summary = DataSummary,
     rows = {
+        Group("Fights"),
         { key = "keepFights", label = "Fights Kept", slider = KEEP_RANGE, needs = Enabled, why = OFF },
         { key = "fightsShown", label = "Past Fights Offered", slider = FIGHTS_RANGE, needs = Enabled, why = OFF,
           help = "How many of the game's past fights the Session menu lists, the newest first." },
@@ -755,14 +651,7 @@ page:Card({
           help = "The fights kept: when, which, how long, and the per-second figures." },
         { label = "Clear Fight History", buttonText = "Clear", needs = Enabled, why = OFF,
           button = function() DM.HistoryWindow.AskClear() end },
-    },
-})
-
-page:Card({
-    id = "data", name = "Data and Reset", order = 85,
-    help = "When the game's figures are cleared, and which session the window shows out of combat.",
-    summary = DataSummary,
-    rows = {
+        Group("Reset"),
         { key = "resetOn", label = "Reset on", choice = RESET_ON, needs = Enabled, why = OFF,
           help = "Clears the data when you enter a new instance, or asks first. A login or a reload does "
               .. "not count, and nothing is cleared in combat." },
@@ -783,6 +672,8 @@ page:Card({
               .. "fights kept stay." },
     },
 })
+
+-- ---- looks: clean, kept by name, copied to the other windows, and shared as text
 
 -- Saving, sharing and applying looks: the buttons, then a row to apply and one to delete for each look kept.
 local function LookRows()
@@ -845,64 +736,17 @@ local function LookRows()
 end
 
 page:Card({
-    id = "looks", name = "Looks", order = 87,
+    id = "looks", name = "Looks", order = 90,
     help = "Clean it up, keep the way the meter looks under a name, copy it to the other windows or share it.",
     summary = LooksSummary,
     rows = LookRows,
 })
 
-page:Card({
-    id = "barColors", name = "Bar Colors", order = 90,
-    help = "The bars: for everyone, and for you and the strip beside your row.",
-    summary = BarColorsSummary,
-    rows = {
-        Group("Everyone"),
-        { key = "barColor", label = "Bar Color", choice = BAR_COLOR, needs = Enabled, why = OFF,
-          help = "Class Colors: each player's class. Theme Accent: every bar in your theme's Accent. Custom "
-              .. "Color: every bar in the one you pick." },
-        ColorRow("barCustomColor"),
-        Group("You"),
-        { key = "ownBarStyle", label = "Your Bar", choice = OWN_BAR, needs = Enabled, why = OFF,
-          help = "Your own bar: the same as the others, in your class's color, or in a color of its own." },
-        ColorRow("ownBarColor"),
-        { key = "edgeStyle", label = "Your Row Edge", choice = EDGE, needs = Highlighting, why = OFF_HIGHLIGHT,
-          help = "The strip on the left of your row: the theme's Accent, your class's color, or one of your "
-              .. "own." },
-        ColorRow("edgeColor"),
-    },
-})
+-- ---- a second and a third window: their own list, session and size, and a look of their own
 
-page:Card({
-    id = "windowColors", name = "Window Colors", order = 110,
-    help = "The window's background and its border. Until you pick one, it follows your theme.",
-    summary = PickedSummary({ "windowColor", "borderColor" }),
-    rows = { ColorRow("windowColor"), ColorRow("borderColor") },
-})
-
-page:Card({
-    id = "classColors", name = "Class Colors", order = 120,
-    help = "The color of each class's bars, when Bar Color is Class Colors.",
-    summary = ClassesSummary,
-    rows = ClassRows(),
-})
-
-page:Card({
-    id = "window2", name = "Second Window", order = 130, switch = "window2",
-    help = "A second window, with its own list, session and size.",
-    summary = WindowNSummary(2),
-    rows = {
-        { key = "mode2", label = "Show", choice = MODE, needs = Enabled, why = OFF },
-        { key = "lower2", label = "Second List", choice = LOWER, needs = Enabled, why = OFF },
-        { key = "session2", label = "Session", choice = SESSION, needs = Enabled, why = OFF },
-        { key = "width2", label = "Width", slider = WIDTH_RANGE, needs = Enabled, why = OFF },
-        { key = "height2", label = "Height", slider = HEIGHT_RANGE, needs = Enabled, why = OFF },
-        { key = "scale2", label = "Scale", slider = SCALE_RANGE, unit = "%", scale = TO_FRACTION, needs = Enabled,
-          why = OFF },
-    },
-})
-
--- The rows of a window's own look: the settings of the Rows, Window and Title Bar cards that it may have
--- of its own, under its number.
+-- The rows of a window's own look: the settings of the Bars, Row, Figures, Window and Title Bar cards that
+-- it may have of its own, under its number. columns says which of the two sets: the bars and the window, or
+-- the columns.
 local function OwnLookRows(index, columns)
     local specs = {
         barHeight = { label = "Row Height", slider = BAR_RANGE },
@@ -926,7 +770,7 @@ local function OwnLookRows(index, columns)
     local rows = {}
     for _, key in ipairs(C.OWN_LOOK_ORDER) do
         if (C.OWN_LOOK_COLUMNS[key] == true) == columns then
-            local row = { key = key .. index, needs = Enabled, why = OFF }
+            local row = { key = key .. index, needs = On("ownLook" .. index), why = OFF_OWN_LOOK }
             for field, value in pairs(specs[key]) do row[field] = value end
             rows[#rows + 1] = row
         end
@@ -934,60 +778,37 @@ local function OwnLookRows(index, columns)
     return rows
 end
 
-local function OwnLookSummary(index)
-    return function(store)
-        if not store.Get("ownLook" .. index) then return "Same as the first" end
-        return ("Rows %d px, text %d"):format(store.Get("barHeight" .. index), store.Get("fontSize" .. index))
+-- A window's card: its list, session and size, then a look of its own behind a switch, and the columns of
+-- its own behind the column order. spec is the card's id, name and order, and the window's index.
+local function WindowCard(spec)
+    local index = spec.index
+    local own = "ownLook" .. index
+    local columns = OwnLookRows(index, true)
+    local columnOrder = "columnOrder" .. index
+    local owner, rest = nil, {}
+    for _, row in ipairs(columns) do
+        if row.key == columnOrder then owner = row else rest[#rest + 1] = row end
     end
+    spec.switch = "window" .. index
+    spec.help = "A window of its own, with its own list, session and size, and a look of its own if you want one."
+    spec.summary = WindowNSummary(index)
+    spec.rows = Join(
+        { key = DM.Key("mode", index), label = "Show", choice = MODE, needs = Enabled, why = OFF },
+        { key = DM.Key("lower", index), label = "Second List", choice = LOWER, needs = Enabled, why = OFF },
+        { key = DM.Key("session", index), label = "Session", choice = SESSION, needs = Enabled, why = OFF },
+        { key = DM.Key("width", index), label = "Width", slider = WIDTH_RANGE, needs = Enabled, why = OFF },
+        { key = DM.Key("height", index), label = "Height", slider = HEIGHT_RANGE, needs = Enabled, why = OFF },
+        { key = DM.Key("scale", index), label = "Scale", slider = SCALE_RANGE, unit = "%", scale = TO_FRACTION,
+          needs = Enabled, why = OFF },
+        Under({ key = own, label = "Own Look", toggle = true, needs = Enabled, why = OFF,
+            help = "Off: it looks as the first window does. On: the rows, opacities and more behind the "
+                .. "cog are its own, starting as the first window's." },
+            "Look of This Window", "Its own row height, text size, opacities and more.",
+            OwnLookRows(index, false)),
+        Under(owner, "Columns of This Window", "What it shows in a row.", rest)
+    )
+    page:Card(spec)
 end
 
-local function OwnColumnsSummary(index)
-    return function(store)
-        if not store.Get("ownLook" .. index) then return "Same as the first" end
-        return C.COLUMN_ORDERS[store.Get("columnOrder" .. index)] or ""
-    end
-end
-
-page:Card({
-    id = "look2", name = "Second Window Look", order = 131, switch = "ownLook2",
-    help = "Its own row height, text size, opacities and more. Off: it looks as the first window does.",
-    summary = OwnLookSummary(2),
-    rows = OwnLookRows(2, false),
-})
-
-page:Card({
-    id = "columns2", name = "Second Window Columns", order = 132, switch = "ownLook2",
-    help = "What it shows in a row and which way round. Off: as the first window does.",
-    summary = OwnColumnsSummary(2),
-    rows = OwnLookRows(2, true),
-})
-
-page:Card({
-    id = "window3", name = "Third Window", order = 140, switch = "window3",
-    help = "A third window, with its own list, session and size.",
-    summary = WindowNSummary(3),
-    rows = {
-        { key = "mode3", label = "Show", choice = MODE, needs = Enabled, why = OFF },
-        { key = "lower3", label = "Second List", choice = LOWER, needs = Enabled, why = OFF },
-        { key = "session3", label = "Session", choice = SESSION, needs = Enabled, why = OFF },
-        { key = "width3", label = "Width", slider = WIDTH_RANGE, needs = Enabled, why = OFF },
-        { key = "height3", label = "Height", slider = HEIGHT_RANGE, needs = Enabled, why = OFF },
-        { key = "scale3", label = "Scale", slider = SCALE_RANGE, unit = "%", scale = TO_FRACTION, needs = Enabled,
-          why = OFF },
-    },
-})
-
-page:Card({
-    id = "look3", name = "Third Window Look", order = 141, switch = "ownLook3",
-    help = "Its own row height, text size, opacities and more. Off: it looks as the first window does.",
-    summary = OwnLookSummary(3),
-    rows = OwnLookRows(3, false),
-})
-
-page:Card({
-    id = "columns3", name = "Third Window Columns", order = 142, switch = "ownLook3",
-    help = "What it shows in a row and which way round. Off: as the first window does.",
-    summary = OwnColumnsSummary(3),
-    rows = OwnLookRows(3, true),
-})
-
+WindowCard({ index = 2, id = "window2", name = "Second Window", order = 100 })
+WindowCard({ index = 3, id = "window3", name = "Third Window", order = 110 })

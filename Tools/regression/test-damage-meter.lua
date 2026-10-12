@@ -709,46 +709,54 @@ do
         and u.Window().title.fontSize == 12)
 end
 
--- a card for each text: its size and its font behind a switch each, its color, and what it shows
+-- each text: its size and its font behind a switch each, and its color, behind the cog of its row
 do
     local s = Boot({ settings = { enabled = true } })
-    local texts = { { "rank", "rankSize", "ranks", "rankColor", "showRanks" },
-        { "value", "valueFontSize", "figures", "valueColor" }, { "head", "headSize", "heads", "columnColor",
-            "showColumnHeaders" },
-        { "title", "titleSize", "header", "titleColor" }, { "time", "timeSize", "time", "timeColor", "showTime" },
-        { "summary", "summarySize", "summary", "summaryColor", "showSummary" } }
+    local texts = {
+        { "rank", "Rank", "Rank Numbers", "row", "rankSize", "rankColor" },
+        { "value", "Figure", "Figure Color", "figures", "valueFontSize", "valueColor" },
+        { "head", "Column Title", "Column Titles", "header", "headSize", "columnColor" },
+        { "title", "Title", "Title Color", "header", "titleSize", "titleColor" },
+        { "time", "Time", "Show Fight Time", "header", "timeSize", "timeColor" },
+        { "summary", "Summary", "Summary Line", "header", "summarySize", "summaryColor" },
+    }
     for _, t in ipairs(texts) do
-        local element, sizeKey, cardId, colorKey, switch = t[1], t[2], t[3], t[4], t[5]
+        local element, noun, owner, cardId, sizeKey, colorKey = t[1], t[2], t[3], t[4], t[5], t[6]
         local own, card = RowOf(s.page, element .. "OwnSize")
-        local size = RowOf(s.page, sizeKey)
-        check(element .. ": a switch and a size on its card", own and own.toggle == true and card.id == cardId
-            and size and size.slider ~= nil and select(2, RowOf(s.page, sizeKey)) == card
-            and select(2, RowOf(s.page, colorKey)) == card and card.switch == switch)
-        local heading = false
-        for _, row in ipairs(card.rows) do
-            if row.group == "Text" then heading = true end
-        end
-        check(element .. ": its text rows are under a heading", heading)
-        check(element .. ": the size waits for its switch, and says so", size.needs() == false
-            and size.why == "Turn on Own Size")
-        s.store.Set(element .. "OwnSize", true)
-        check(element .. ": and is on with it", size.needs() == true)
+        local size, color = RowOf(s.page, sizeKey), RowOf(s.page, colorKey)
         local ownFont, font, outline = RowOf(s.page, element .. "OwnFont"), RowOf(s.page, element .. "Font"),
             RowOf(s.page, element .. "Outline")
-        check(element .. ": a switch for the font, and the font and outline waiting for it",
-            ownFont and ownFont.toggle == true and select(2, RowOf(s.page, element .. "Font")) == card
-            and font.font == true and outline.choice ~= nil and font.needs() == false
-            and outline.needs() == false and font.why == "Turn on Own Font" and outline.why == "Turn on Own Font")
+        local ownerRow
+        for _, row in ipairs(card.rows) do
+            if row.label == owner then ownerRow = row end
+        end
+        check(noun .. ": the row that owns its settings has a cog, on the " .. cardId .. " card", card.id == cardId
+            and ownerRow ~= nil and ownerRow.cog ~= nil)
+        check(noun .. ": its size, font, outline and color are behind that cog", own.under == owner
+            and size.under == owner and ownFont.under == owner and font.under == owner and outline.under == owner
+            and (color.under == owner or color == ownerRow))
+        check(noun .. ": the rows are named for it", own.label == "Own " .. noun .. " Size" and own.toggle == true
+            and size.label == noun .. " Size" and size.slider ~= nil and ownFont.label == "Own " .. noun .. " Font"
+            and ownFont.toggle == true and font.label == noun .. " Font" and font.font == true
+            and outline.label == noun .. " Outline" and outline.choice ~= nil)
+        check(noun .. ": the size waits for its switch, and says so", size.needs() == false
+            and size.why == "Turn on its Own Size")
+        s.store.Set(element .. "OwnSize", true)
+        check(noun .. ": and is on with it", size.needs() == true)
+        check(noun .. ": the font and outline wait for theirs", font.needs() == false and outline.needs() == false
+            and font.why == "Turn on its Own Font" and outline.why == "Turn on its Own Font")
         s.store.Set(element .. "OwnFont", true)
-        check(element .. ": and on with it", font.needs() == true and outline.needs() == true)
+        check(noun .. ": and are on with it", font.needs() == true and outline.needs() == true)
     end
     local name, card = RowOf(s.page, "fontSize")
-    check("the names have a size with no switch, which the figures follow", card.id == "names"
-        and card.switch == nil and name.needs() == true and RowOf(s.page, "nameOwnFont") ~= nil
-        and RowOf(s.page, "nameOwnSize") == nil)
+    check("the names: a size with no switch, which the figures follow, and a font behind a switch",
+        card.id == "row" and name.label == "Name Size" and name.under == "Name Color" and name.needs() == true
+        and RowOf(s.page, "nameOwnFont").under == "Name Color" and RowOf(s.page, "nameOwnSize") == nil
+        and RowOf(s.page, "nameFont").needs() == false)
     local base = RowOf(s.page, "font")
-    check("the window's own font and outline are on the Font and Outline card", base.font == true
-        and select(2, RowOf(s.page, "font")).id == "text" and select(2, RowOf(s.page, "outline")).id == "text")
+    check("the window's own font and outline are on the Window card", base.font == true
+        and select(2, RowOf(s.page, "font")).id == "window" and select(2, RowOf(s.page, "outline")).id == "window"
+        and base.under == nil)
 end
 
 -- the fight time in the title bar
@@ -881,10 +889,14 @@ do
         and s.store.Get("timeX") == 0 and s.store.Get("timeY") == 0)
     check("and they are in the title bar card, with no position choices left", card and #card.rows >= 9
         and RowOf(page, "titleAlign") == nil and RowOf(page, "timePlace") == nil)
-    local time = CardOf(page, "time")
-    check("the time's offsets are on the Fight Time card, which Show Fight Time switches", time.switch == "showTime"
-        and RowOf(page, "showTime") == nil and mx.needs() == true and my.needs() == true
-        and select(2, RowOf(page, "timeX")) == time)
+    local time = RowOf(page, "showTime")
+    check("the time's offsets are behind the cog of Show Fight Time, on the Title Bar card", time.toggle == true
+        and time.cog ~= nil and mx.under == "Show Fight Time" and my.under == "Show Fight Time"
+        and select(2, RowOf(page, "timeX")) == card and mx.needs() == true and my.needs() == true)
+    s.store.Set("showTime", false)
+    check("and wait for the time, and say so", mx.needs() == false and my.needs() == false
+        and mx.why == "Turn on Show Fight Time")
+    s.store.Set("showTime", true)
 end
 
 -- names: full, first, last, initials, and found by class in combat
@@ -1703,7 +1715,7 @@ do
     local page = Boot({ settings = { enabled = true } })
     page.account.damageMeterFights = { ["Player-1"] = { Entry(1, "a"), Entry(2, "b"), Entry(3, "c") } }
     page.Login()
-    check("Fight History says how many", CardOf(page.page, "history").summary(page.store) == "3 of 30 fights kept")
+    check("Fights and Data says how many", CardOf(page.page, "data").summary(page.store) == "3 of 30 fights kept")
 end
 
 -- settings from before are tidied once, at login
@@ -1918,13 +1930,15 @@ do
     s.Flush()
 
     local page = s.page
-    local rows = CardOf(page, "classColors").rows
+    local rows = CardOf(page, "bars").rows
     local classRows = {}
     for _, r in ipairs(rows) do
         if r.key == "classColors" then classRows[#classRows + 1] = r end
     end
     check("a color row per class, in the game's order", #classRows == 2 and classRows[1].field == "ROGUE"
         and classRows[2].field == "MAGE" and classRows[2].label == "Mage")
+    check("behind the cog of Bar Color", classRows[1].under == "Bar Color" and classRows[2].under == "Bar Color"
+        and RowOf(page, "barColor").cog ~= nil)
     local r, g, b = classRows[2].get()
     check("it shows the game's color until one is picked", r == CLASS.MAGE.r and g == CLASS.MAGE.g and b == CLASS.MAGE.b)
     classRows[2].set(0.2, 0.3, 0.4)
@@ -2286,10 +2300,14 @@ do
     s.ns.HideUnlockMode(); s.Flush()
     s.store.Set("locked", false); s.Flush()
     check("unlocked: it takes the mouse", w.rows[1].mouse == true and w.header.mouse == true and w.grip.shown == true)
-    check("the card says what it does", CardOf(s.page, "fade").summary(s.store) == "No fade")
+    local fade, hover, through = RowOf(s.page, "idleAlpha"), RowOf(s.page, "hoverFull"), RowOf(s.page, "clickThrough")
+    check("the fade and the mouse are behind cogs, on the Window card", fade.cog ~= nil and hover.under == fade.label
+        and through.under == "Lock Window" and RowOf(s.page, "locked").cog ~= nil
+        and select(2, RowOf(s.page, "idleAlpha")).id == "window")
+    check("they wait for a fade and for a lock, and say so", hover.needs() == false and through.needs() == false
+        and hover.why == "Set Out of Combat Opacity below 100%" and through.why == "Turn on Lock Window")
     s.store.Set("idleAlpha", 0.4); s.store.Set("locked", true)
-    check("with a fade and the mouse let through", CardOf(s.page, "fade").summary(s.store)
-        == "40% out of combat, mouse passes through")
+    check("and are on with them", hover.needs() == true and through.needs() == true)
 end
 
 -- the icon's size, side and crop, the room around the texts, the edge and a track behind the bars
@@ -2384,23 +2402,29 @@ do
         and tw.rows[4].track.shown == false and tw.rows[5].name.text == "Mob" and tw.rows[5].track.shown == true)
 
     local colorRow = RowOf(s.page, "trackColor")
-    check("the color waits for the track, and says so", colorRow.needs() == false
-        and colorRow.why == "Turn on Bar Track" and RowOf(s.page, "barTrack").needs() == true)
-    local _, card = RowOf(s.page, "iconSize")
-    check("the icon's settings are on the Icons card, which Icons switches", card.id == "icons"
-        and card.switch == "showIcons" and #card.rows <= 15 and RowOf(s.page, "showIcons") == nil
+    check("the track's color is left off the page until there is a track", colorRow.hidden() == true
+        and RowOf(s.page, "barTrack").needs() == true)
+    s.store.Set("barTrack", true)
+    check("and is there with it", colorRow.hidden() == false)
+    s.store.Set("barTrack", false)
+    local icons, card = RowOf(s.page, "showIcons")
+    check("Icons is a toggle with a cog on the Row card, and the icon's settings are behind it", icons.toggle == true
+        and icons.cog ~= nil and card.id == "row" and select(2, RowOf(s.page, "iconSize")) == card
+        and RowOf(s.page, "iconSize").under == "Icons" and RowOf(s.page, "iconSide").under == "Icons"
         and RowOf(s.page, "iconSide").choice[2][2] == "right")
-    check("the room around the texts is on the Spacing card", select(2, RowOf(s.page, "edgeWidth")).id == "spacing"
-        and select(2, RowOf(s.page, "textPad")).id == "spacing")
-    check("its summary", CardOf(s.page, "icons").summary(s.store) == "Icon fitted, left")
-    s.store.Set("iconSize", 14); s.store.Set("iconSide", "right")
-    check("and with them set", CardOf(s.page, "icons").summary(s.store) == "Icon 14 px, right")
+    check("the room around the texts is on the Row card, the edge's width behind Highlight Your Row",
+        select(2, RowOf(s.page, "textPad")) == card and select(2, RowOf(s.page, "colGap")) == card
+        and RowOf(s.page, "edgeWidth").under == "Highlight Your Row")
+    check("its summary", CardOf(s.page, "row").summary(s.store) == "Icons left, ranks on")
+    s.store.Set("iconSide", "right")
+    check("and with the side set", CardOf(s.page, "row").summary(s.store) == "Icons right, ranks on")
     s.store.Set("iconSide", "before")
-    check("before the bar", CardOf(s.page, "icons").summary(s.store) == "Icon 14 px, before the bar"
+    check("before the bar", CardOf(s.page, "row").summary(s.store) == "Icons before the bar, ranks on"
         and RowOf(s.page, "iconSide").choice[2][3] == "before"
         and RowOf(s.page, "iconSide").choice[1].before == "Before the Bar")
-    check("the spacing says its padding", CardOf(s.page, "spacing").summary(s.store)
-        == "Padding 6 px, columns 6 px apart")
+    s.store.Set("showIcons", false); s.store.Set("showRanks", false)
+    check("and with both off", CardOf(s.page, "row").summary(s.store) == "Icons off, ranks off")
+    s.store.Set("showIcons", true); s.store.Set("showRanks", true); s.store.Set("iconSide", "left")
 end
 
 -- class colored names and figures, sizes of their own, and how names and numbers are written
@@ -2505,8 +2529,8 @@ do
     local _, ranks = RowOf(s.page, "rankSize")
     local _, numbers = RowOf(s.page, "rateSuffix")
     local _, colors = RowOf(s.page, "nameClassColor")
-    check("each on the card of its text", figures.id == "figures" and ranks.id == "ranks" and numbers.id == "numbers"
-        and colors.id == "names")
+    check("each on the card of its text", figures.id == "figures" and ranks.id == "row" and numbers.id == "figures"
+        and colors.id == "row")
 end
 
 -- Always Show My Row: yours is the last row when it is not among the rows shown
@@ -2642,9 +2666,8 @@ do
     local w = s.Window()
     check("an old setting to hide the names does nothing", w.rows[1].name.shown == true and w.rows[2].name.shown == true
         and w.panes[1].headName.shown == true)
-    local card = CardOf(s.page, "names")
-    check("the Names card has no switch, and no row for it", card.switch == nil and RowOf(s.page, "showName") == nil
-        and #card.rows <= 15)
+    check("there is no row for it, and no card of names", RowOf(s.page, "showName") == nil
+        and CardOf(s.page, "names") == nil)
     local inLook = false
     for _, list in ipairs({ s.DM.C.LOOK_KEYS, s.DM.C.OWN_LOOK_ORDER }) do
         for _, key in ipairs(list) do
@@ -2865,23 +2888,29 @@ do
     s.store.Set("ownLook2", true); s.Flush()
     check("on again, from the shared look once more", s.store.Get("barHeight2") == 20)
 
-    -- the page
-    local card, other = CardOf(s.page, "look2"), CardOf(s.page, "look3")
-    check("a card for each, with a switch of its own", card and other and card.switch == "ownLook2"
-        and other.switch == "ownLook3" and #card.rows == 11 and #other.rows == 11)
+    -- the page: the look and the columns are behind cogs on the window's card
+    local card, other = CardOf(s.page, "window2"), CardOf(s.page, "window3")
+    local own = RowOf(s.page, "ownLook2")
+    check("Own Look is a toggle with a cog, on each window's card", own.toggle == true and own.cog ~= nil
+        and select(2, RowOf(s.page, "ownLook2")) == card and select(2, RowOf(s.page, "ownLook3")) == other
+        and card.switch == "window2" and other.switch == "window3")
     local got = {}
-    for _, row in ipairs(card.rows) do got[#got + 1] = row.key end
-    check("with the settings a window may have", table.concat(got, ",") == "barHeight2,barSpacing2,barAlpha2,growUp2,"
-        .. "fontSize2,showIcons2,showRanks2,backgroundAlpha2,headerAlpha2,showBorder2,barColor2")
-    local columns = CardOf(s.page, "columns2")
+    for _, row in ipairs(card.rows) do
+        if row.under == "Own Look" then got[#got + 1] = row.key end
+    end
+    check("with the settings a window may have behind it", table.concat(got, ",") == "barHeight2,barSpacing2,"
+        .. "barAlpha2,growUp2,fontSize2,showIcons2,showRanks2,backgroundAlpha2,headerAlpha2,showBorder2,barColor2")
     got = {}
-    for _, row in ipairs(columns.rows) do got[#got + 1] = row.key end
-    check("and a card for its columns, with the same switch", columns.switch == "ownLook2" and table.concat(got, ",")
-        == "showTotal2,showRate2,showPercent2,showDivider2,columnOrder2,showColumnHeaders2"
-        and CardOf(s.page, "columns3").switch == "ownLook3")
-    check("their summaries", card.summary(s.store) == "Rows 20 px, text 11" and other.summary(s.store) == "Same as the first")
+    for _, row in ipairs(card.rows) do
+        if row.under == "Column Order" then got[#got + 1] = row.key end
+    end
+    check("and its columns behind the column order", RowOf(s.page, "columnOrder2").cog ~= nil
+        and table.concat(got, ",") == "showTotal2,showRate2,showPercent2,showDivider2,showColumnHeaders2")
+    check("they wait for the look, and say so", RowOf(s.page, "barHeight2").needs() == true
+        and RowOf(s.page, "barHeight3").needs() == false and RowOf(s.page, "barHeight3").why == "Turn on Own Look"
+        and RowOf(s.page, "columnOrder3").needs() == false)
     s.store.Set("ownLook3", true)
-    check("a third one's own", s.store.Get("barHeight3") == 20 and other.summary(s.store) == "Rows 20 px, text 11")
+    check("a third one's own", s.store.Get("barHeight3") == 20 and RowOf(s.page, "barHeight3").needs() == true)
 end
 
 -- each window has its own scale, and a change keeps its corner where it was
@@ -3606,10 +3635,10 @@ do
         and RowOf(page.page, "resetOn").choice[2][1] == "never" and RowOf(page.page, "resetOnLeave").toggle == true
         and RowOf(page.page, "overallOutOfCombat").toggle == true and RowOf(page.page, "hideInPvP").toggle == true
         and RowOf(page.page, "visibility").choice[2][4] == "raid")
-    check("its summary", CardOf(page.page, "data").summary(page.store) == "Never")
-    page.store.Set("resetOn", "ask"); page.store.Set("overallOutOfCombat", true)
-    check("and with them set", CardOf(page.page, "data").summary(page.store)
-        == "Ask When Entering an Instance, overall out of combat")
+    check("its summary", CardOf(page.page, "data").summary(page.store) == "0 of 30 fights kept")
+    page.store.Set("resetOn", "ask")
+    check("and with a rule set", CardOf(page.page, "data").summary(page.store)
+        == "0 of 30 fights kept, reset ask when entering an instance")
 end
 
 -- the summary line's pieces and size, and the short names of the lists
@@ -3637,13 +3666,14 @@ do
     check("Summary Size", w.summary.fontSize == 15)
     s.store.Set("summarySize", 11)
 
-    local _, card = RowOf(s.page, "summaryName")
-    check("a card of its own, which Summary Line switches", card.id == "summary" and card.switch == "showSummary"
-        and RowOf(s.page, "showSummary") == nil and RowOf(s.page, "summaryRank").needs() == true)
+    local line, card = RowOf(s.page, "showSummary")
+    check("Summary Line is a toggle with a cog on the Title Bar card, holding its pieces", line.toggle == true
+        and line.cog ~= nil and card.id == "header" and RowOf(s.page, "summaryName").under == "Summary Line"
+        and RowOf(s.page, "summaryRank").under == "Summary Line" and RowOf(s.page, "summaryRank").needs() == true)
     s.store.Set("showSummary", false)
-    check("its summary", card.summary(s.store) == "Off")
+    check("the pieces wait for the line, and say so", RowOf(s.page, "summaryRank").needs() == false
+        and RowOf(s.page, "summaryRank").why == "Turn on Summary Line")
     s.store.Set("showSummary", true); s.store.Set("summaryRate", false)
-    check("with the pieces counted", card.summary(s.store) == "3 of 4 pieces")
 
     -- short names
     check("the full name by default", w.title.text == "Damage Done")
@@ -4074,14 +4104,17 @@ do
     check("off again: by the buttons, from the right", w.time.points[1][2] == w.session and w.time.justify == "RIGHT"
         and w.time.text == "2:05")
 
-    local heads = CardOf(s.page, "heads")
-    check("Column Titles is the switch of a card of its own", heads.switch == "showColumnHeaders"
-        and RowOf(s.page, "showColumnHeaders") == nil and select(2, RowOf(s.page, "headSize")) == heads)
+    local heads = RowOf(s.page, "showColumnHeaders")
+    check("Column Titles is a toggle with a cog, holding the titles' text", heads.toggle == true and heads.cog ~= nil
+        and RowOf(s.page, "headSize").under == "Column Titles")
     local brackets, byTitle = RowOf(s.page, "timeBrackets"), RowOf(s.page, "timeByTitle")
-    local _, timeCard = RowOf(s.page, "timeBrackets")
-    check("and the time's choices on a card of their own, which Show Fight Time switches", timeCard.id == "time"
-        and timeCard.switch == "showTime" and brackets.needs() == true and byTitle.needs() == true
+    check("and the time's choices are behind the cog of Show Fight Time", brackets.under == "Show Fight Time"
+        and byTitle.under == "Show Fight Time" and brackets.needs() == true and byTitle.needs() == true
         and RowOf(s.page, "headerAlpha").needs() == true)
+    s.store.Set("showTime", false)
+    check("which wait for Show Fight Time, and say so", brackets.needs() == false and byTitle.needs() == false
+        and brackets.why == "Turn on Show Fight Time" and byTitle.why == "Turn on Show Fight Time")
+    s.store.Set("showTime", true)
 
     local look
     for _, c in ipairs(s.page.cards) do
@@ -4242,10 +4275,8 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("a card for each kind of text, in their order", table.concat(ids, ",") == "lists,window,fade,rows,spacing,"
-        .. "icons,ranks,names,figures,numbers,heads,header,summary,time,text,hover,history,data,looks,barColors,"
-        .. "windowColors,classColors,window2,look2,columns2,window3,look3,columns3"
-        and page.window ~= nil)
+    check("eleven cards, in their order", table.concat(ids, ",") == "lists,window,bars,row,figures,header,hover,"
+        .. "data,looks,window2,window3" and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end
     local sorted = true
@@ -4271,7 +4302,32 @@ do
         for _, row in ipairs(card.rows) do
             check((row.label or row.key or "?") .. ": its help wraps", Wraps(row.help))
         end
-        check(card.id .. ": no more than fifteen entries", #card.rows <= 15)
+        -- a cog is found by the label of its row: each label is the only one of its name on the card, and a
+        -- row behind a cog has the row that owns it
+        local labels, cogs = {}, {}
+        for _, row in ipairs(card.rows) do
+            if row.label then
+                check(card.id .. ": " .. row.label .. " is the only row of that name", labels[row.label] == nil)
+                labels[row.label] = true
+                if row.cog then
+                    cogs[row.label] = true
+                    check(card.id .. ": " .. row.label .. " has a title and a tip for its cog",
+                        type(row.cog.title) == "string" and row.cog.title ~= "" and #row.cog.title < 30
+                        and type(row.cog.tip) == "string" and row.cog.tip ~= "" and Wraps(row.cog.tip))
+                end
+            end
+        end
+        for _, row in ipairs(card.rows) do
+            if row.under then
+                check(card.id .. ": " .. tostring(row.label) .. " is behind a cog that is there", cogs[row.under] == true)
+            end
+        end
+        -- what is on the page: the rows that are not behind a cog (a row left off for a choice counts)
+        local visible = 0
+        for _, row in ipairs(card.rows) do
+            if row.under == nil then visible = visible + 1 end
+        end
+        check(card.id .. ": no more than sixteen entries on the page", visible <= 16)
         for _, row in ipairs(card.rows) do
             if row.key then
                 keys[#keys + 1] = row.key
@@ -4302,49 +4358,18 @@ do
     s.store.Set("locked", true)
     check("Window, locked", CardOf(page, "window").summary(s.store) == "300 by 206, locked")
     s.store.Set("locked", false)
-    check("Rows", CardOf(page, "rows").summary(s.store) == "20 px rows, 2 px apart")
-    check("Number Format", CardOf(page, "numbers").summary(s.store) == "Game Default")
-    check("Figures", CardOf(page, "figures").summary(s.store) == "As the Game Has It")
-    check("Names", CardOf(page, "names").summary(s.store) == "Full Name")
-    check("a text's card says its size", CardOf(page, "ranks").summary(s.store) == "Size 10"
-        and CardOf(page, "heads").summary(s.store) == "Size 10")
-    s.store.Set("rankOwnSize", true); s.store.Set("rankSize", 14); s.store.Set("rankOwnFont", true)
-    check("and when its font is its own", CardOf(page, "ranks").summary(s.store) == "Size 14, own font")
-    s.store.Set("rankOwnSize", false); s.store.Set("rankOwnFont", false)
+    check("Bars", CardOf(page, "bars").summary(s.store) == "20 px rows, 2 px apart")
+    check("Row", CardOf(page, "row").summary(s.store) == "Icons left, ranks on")
+    check("Figures", CardOf(page, "figures").summary(s.store) == "As the Game Has It, Game Default")
     check("Title Bar", CardOf(page, "header").summary(s.store) == "List Name, buttons on")
     s.store.Set("showButtons", false)
     check("Title Bar, no buttons", CardOf(page, "header").summary(s.store) == "List Name, buttons off")
     s.store.Set("showButtons", true)
-    check("Fight Time", CardOf(page, "time").summary(s.store) == "On")
-    s.store.Set("timeBrackets", true)
-    check("Fight Time, in brackets", CardOf(page, "time").summary(s.store) == "On, in brackets")
-    s.store.Set("timeBrackets", false)
-    s.store.Set("showTime", false)
-    check("Fight Time, off", CardOf(page, "time").summary(s.store) == "Off")
-    s.store.Set("showTime", true)
-    check("Font and Outline", CardOf(page, "text").summary(s.store) == "All the same")
-    s.store.Set("nameOwnFont", true); s.store.Set("timeOwnFont", true)
-    check("Font and Outline counts the texts with their own", CardOf(page, "text").summary(s.store)
-        == "2 with their own")
-    s.store.Set("nameOwnFont", false); s.store.Set("timeOwnFont", false)
-    check("Hover and Report", CardOf(page, "hover").summary(s.store) == "Spells on, reports of 5 lines")
-    check("Fight History", CardOf(page, "history").summary(s.store) == "0 of 30 fights kept")
+    check("Spells and Reports", CardOf(page, "hover").summary(s.store) == "Spells on, reports of 5 lines")
+    check("Fights and Data", CardOf(page, "data").summary(s.store) == "0 of 30 fights kept")
     s.account.damageMeterFights = { ["Player-1"] = { {}, {} } }
-    check("Fight History counts them", CardOf(page, "history").summary(s.store) == "2 of 30 fights kept")
+    check("Fights and Data counts them", CardOf(page, "data").summary(s.store) == "2 of 30 fights kept")
     s.account.damageMeterFights = nil
-    check("Bar Colors", CardOf(page, "barColors").summary(s.store) == "Class Colors")
-    check("Window Colors", CardOf(page, "windowColors").summary(s.store) == "Theme")
-    s.store.Set("nameColor", { r = 1, g = 1, b = 1 })
-    s.store.Set("borderColor", { r = 1, g = 1, b = 1 })
-    check("and counts what was picked, of its own colors", CardOf(page, "windowColors").summary(s.store) == "1 picked")
-    s.store.Set("windowColor", { r = 1, g = 1, b = 1 })
-    check("each", CardOf(page, "windowColors").summary(s.store) == "2 picked")
-    s.store.Set("nameColor", false); s.store.Set("windowColor", false); s.store.Set("borderColor", false)
-    check("Class Colors", CardOf(page, "classColors").summary(s.store) == "The game's")
-    s.store.Set("classColors", { MAGE = { r = 1, g = 0, b = 0 } })
-    check("Class Colors counted", CardOf(page, "classColors").summary(s.store) == "1 picked")
-    s.store.Set("classColors", {})
-
     -- every color is a picker that shows the theme's until one is picked
     for _, entry in ipairs(C.COLORS) do
         local row = RowOf(page, entry.key)
@@ -4365,16 +4390,16 @@ do
         local _, card = RowOf(page, entry.key)
         where[entry.key] = card.id
     end
-    check("each text's color sits on the card of its text", where.nameColor == "names" and where.valueColor == "figures"
-        and where.rankColor == "ranks" and where.columnColor == "heads" and where.titleColor == "header"
-        and where.timeColor == "time" and where.summaryColor == "summary")
-    check("the bars' on the bars' cards, the window's on its", where.windowColor == "windowColors"
-        and where.borderColor == "windowColors" and where.headerColor == "header" and where.trackColor == "rows"
-        and where.barCustomColor == "barColors" and where.ownBarColor == "barColors" and where.edgeColor == "barColors")
+    check("each text's color sits on the card of its text", where.nameColor == "row" and where.valueColor == "figures"
+        and where.rankColor == "row" and where.columnColor == "header" and where.titleColor == "header"
+        and where.timeColor == "header" and where.summaryColor == "header")
+    check("the bars' on the Bars card, the window's on the Window card", where.windowColor == "window"
+        and where.borderColor == "window" and where.headerColor == "header" and where.trackColor == "bars"
+        and where.barCustomColor == "bars" and where.ownBarColor == "bars" and where.edgeColor == "bars")
 
-    check("the custom bar color needs Custom Color", RowOf(page, "barCustomColor").needs() == false)
+    check("the custom bar color is left off the page until Custom Color", RowOf(page, "barCustomColor").hidden() == true)
     s.store.Set("barColor", "custom")
-    check("which turns it on", RowOf(page, "barCustomColor").needs() == true)
+    check("which puts it there", RowOf(page, "barCustomColor").hidden() == false)
     s.store.Set("barColor", "class")
     check("the edge color needs Custom Color for the edge", RowOf(page, "edgeColor").needs() == false)
     s.store.Set("edgeStyle", "custom")
@@ -4393,9 +4418,11 @@ do
         local card = CardOf(page, "window" .. n)
         check("window" .. n .. ": a switch on its own setting", card.switch == "window" .. n)
         local got = {}
-        for _, row in ipairs(card.rows) do got[#got + 1] = row.key end
-        check("window" .. n .. ": its own list, second list, session and size", table.concat(got, ",")
-            == ("mode%d,lower%d,session%d,width%d,height%d,scale%d"):format(n, n, n, n, n, n))
+        for _, row in ipairs(card.rows) do
+            if row.under == nil then got[#got + 1] = row.key end
+        end
+        check("window" .. n .. ": its own list, second list, session, size, and the look and columns", table.concat(got, ",")
+            == ("mode%d,lower%d,session%d,width%d,height%d,scale%d,ownLook%d,columnOrder%d"):format(n, n, n, n, n, n, n, n))
     end
     s.store.Set("mode2", "healing")
     check("a second window reads its own list and size", CardOf(page, "window2").summary(s.store)
@@ -4404,14 +4431,18 @@ do
 
     -- the time of the fight, and Hide After
     local delay = RowOf(page, "hideDelay")
-    check("Hide After needs Where on In Combat", delay.needs() == false)
+    check("Hide After is left off the page unless Where is In Combat", delay.hidden() == true)
     s.store.Set("visibility", "combat")
-    check("which turns it on", delay.needs() == true)
+    check("which puts it there", delay.hidden() == false)
     s.store.Set("visibility", "always")
     local decimals = RowOf(page, "numberDecimals")
-    check("Decimals need a format that abbreviates", decimals.needs() == false)
+    check("Decimals are left off for a format that does not abbreviate", decimals.hidden() == true)
     s.store.Set("numberUnits", "latin")
-    check("which Ten-thousands and K, M, B are", decimals.needs() == true)
+    check("which K, M, B do", decimals.hidden() == false)
+    s.store.Set("numberUnits", "asian")
+    check("and Ten-thousands", decimals.hidden() == false)
+    s.store.Set("numberUnits", "full")
+    check("but not Full Numbers", decimals.hidden() == true)
     s.store.Set("numberUnits", "game")
     local tileSize = RowOf(page, "imageTileSize")
     s.store.Set("backgroundImage", "Marble")

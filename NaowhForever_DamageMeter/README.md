@@ -31,7 +31,7 @@ NaowhForever_DamageMeter/
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
-    SettingsPage.lua             its settings page: a small card for each kind of text and part
+    SettingsPage.lua             its settings page: eleven cards, the detail behind cogs
   README.md                      this file
 ```
 
@@ -70,7 +70,7 @@ NaowhForever_DamageMeter/
   The game's plain backgrounds (Solid, Blizzard Tooltip, Out of Control, Low Health) are left out of the
   list and read as none. At login (`Tidy`) a pick of one is cleared, and a path typed before Image had a
   choice for it, or behind the switch there once was, is made that choice. A dialog, opened by a button in
-  the Window card, says how to add a picture: a .png, .tga or .blp in a folder of the player's own under
+  the Window card's Picture cog, says how to add a picture: a .png, .tga or .blp in a folder of the player's own under
   `AddOns`, and its path with the extension. A .png loads on this client as it does for other add-ons
   here; a .jpg is not known to. The tooltip is a fixed-width card, so a help text must not hold a long
   word with no spaces, such as a path: it is cut short, which is why the example lives in the dialog.
@@ -87,13 +87,19 @@ NaowhForever_DamageMeter/
   figure, your rank), each a setting, joined by `SetFormattedText`; Summary Size is its font size. Short
   List Names (`DM.ModeLabel`) swaps a list's label for its short one in the title, the second list's
   strip and the spell panel, and leaves the menus and the reports with the full names.
-- The settings page has a card for each part and each text, and what shows or hides a part is the switch of
-  its card (`switch = "showRanks"`, `showIcons`, `showColumnHeaders`, `showSummary`, `showTime`),
-  which turns the card's rows off with it. The names, figures, rank, column titles, title, fight time and
-  summary line each have a card with their own size, font and outline behind a switch each, and their color;
-  Font and Outline holds the window's. Clean Look is on the Looks card, with the other ways to set the look
-  at once.
-- Reset All Settings (Data and Reset card, asks first) clears every key of the module's settings but
+- The settings page is eleven cards: Lists, Window, Bars, Row, Figures, Title Bar, Spells and Reports,
+  Fights and Data, Looks, and a Second and a Third Window. A card shows what is used most, in two columns,
+  and keeps the rest behind the cog of the row it belongs to (`cog` on the row, `under = <its label>` on the
+  rows behind it, which the framework leaves off the page, searches and resets with the card): the icon's
+  style, size, side and crop behind Icons; a text's size, font, outline and color behind the row of its
+  color or its switch (Name Color, Figure Color, Rank Numbers, Title Color, Show Fight Time, Column Titles,
+  Summary Line); the picture's path and tiling behind Image; the classes' colors behind Bar Color; the spell
+  panel behind Spell Breakdown; a window's own look and columns behind Own Look and Column Order. A row that
+  means something for one choice only (`hidden` as a function) is left off while another is picked: Hide
+  After, Custom Bar Color, Track Color and Decimals. A row's label is the only one of its name on its card,
+  because a cog is found by the label of the row that owns it. The window's own font and outline are on the
+  Window card; Clean Look is on the Looks card.
+- Reset All Settings (Fights and Data card, asks first) clears every key of the module's settings but
   `enabled` and the windows' places (`meterPos*`), so each setting reads its default again. The looks kept
   by name and the fights kept are on the account, not in the settings, and stay.
 - The spell panel's pool is as many rows as the settings can ask for (`BREAKDOWN_MAX`, `TARGET_MAX`) and
@@ -124,13 +130,13 @@ NaowhForever_DamageMeter/
 - A second or third window may have a look of its own (`ownLook2`, `ownLook3`): seventeen of the look
   settings (`DM.C.OWN_LOOK_ORDER`: row height and spacing, bar opacity and color, grow direction, text
   size, icons, ranks, window and title bar opacity, border, and the columns: total, per second,
-  share, divider, order and their titles; two cards each) have a copy under the
+  share, divider, order and their titles; behind two cogs of the window's card) have a copy under the
   window's number (`barHeight2`). `DM.Setting(index, key)` reads a look setting for a window, which is the
   copy when the window has its own look and the shared one otherwise, and `DM.LookKey` is the key to
   write, which the window menu's Bar Color uses. Turning a window's look on copies the shared values into
   its keys, so it starts as it was, and turning it off keeps them. The rest of the look (fonts, colors,
   name and number formats) is shared by every window.
-- The room in a row is settings now (Icons, and Spacing): the icon's size (zero fits the row, never taller
+- The room in a row is settings now (Icons, and the Row card): the icon's size (zero fits the row, never taller
   than it), side, crop and gap, the padding at the ends, the gap between columns and the edge's width.
   An icon on the right takes room from the figures (`rightInset`, which the titles over them follow),
   and the name's right end is the figures' left less that. An icon before the bar (`iconSide = "before"`)
@@ -217,7 +223,7 @@ NaowhForever_DamageMeter/
   buttons, rank numbers, backgrounds or border (the title bar and the window at zero opacity: `headerAlpha`
   and `backgroundAlpha` draw nothing, the line under the bar included), the column divider, and the time in
   brackets after the title (`timeBrackets`, `timeByTitle`). It sets plain settings, each of which has a control of its
-  own, and asks first. The fifteen-entry limit of a card is why Fight Time has a card of its own.
+  own, and asks first.
 - The title bar's menu: the list and the session are in the window's ... menu, which a right click on the
   bar opens too. The session and ... buttons can be hidden (Show Buttons); the room they take is kept, so
   nothing else moves.
