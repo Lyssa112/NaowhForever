@@ -105,6 +105,12 @@ NaowhForever_DamageMeter/
   long one (a wide font, a big text size) from being cut short and lowered a line, as a title with a width
   of its own and wrapping on was. The DPS and HPS lists lead with the per-second figure unless the order
   says which way round.
+- A column is as wide as its widest text once every figure shown is known (`FitColumns`, measured on a
+  hidden FontString of the figures' font, since a FontString given a width reports no more than it), so the
+  name has all the room the figures leave. A figure the game keeps back in combat cannot be measured, and
+  the columns keep the width of the longest figure the settings would write (`pane.fit` is nil); the share
+  is always known, and fits once it is there. The title has the room to the bar's end less its margin when
+  the buttons are hidden, and to the buttons when they are shown, from where its offset puts it.
 - A look is the visual settings (`DM.C.LOOK_KEYS`: not places, lists, rules or behaviour). Looks are kept
   on the account by name (`damageMeterLooks`, twelve at most), applied key by key with `DM.ApplyLook`, and
   written as one line, `NFDM1|key=value|...`, each value with its kind in front (`n` number, `b` boolean,

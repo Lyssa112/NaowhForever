@@ -3859,16 +3859,16 @@ do
     s.store.Set("showPercent", true); s.Flush()
     check("on: each one's share of what the list totals, at the right end", w.rows[1].colP.shown == true
         and w.rows[1].colP.text == "25.0%" and w.rows[1].colP.points[1][1] == "RIGHT"
-        and w.rows[1].colP.points[1][2] == -6 and w.rows[1].colP.w == 40)
+        and w.rows[1].colP.points[1][2] == -6 and w.rows[1].colP.w == 42)
     check("with a title over it", w.panes[1].headP.shown == true and w.panes[1].headP.text == "%")
     check("a figure that is not plain has no share", w.rows[2].colP.text == "")
     check("the other columns move left of it, and the name makes room", w.rows[1].colB.points[1][2] == w.rows[1].colP
-        and w.rows[1].colB.points[1][4] == -6 and w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 6 + 6 + 40 + 6))
+        and w.rows[1].colB.points[1][4] == -6 and w.rows[1].name.points[2][2] == -(6 + 2 * 47 + 6 + 6 + 42 + 6))
     check("the titles too: each at the right end of its column", w.panes[1].headP.points[1][4] == -12
-        and w.panes[1].headB.points[1][4] == -(12 + 40 + 6) and w.panes[1].headA.points[1][4] == -(12 + 40 + 6 + 47 + 6))
+        and w.panes[1].headB.points[1][4] == -(12 + 42 + 6) and w.panes[1].headA.points[1][4] == -(12 + 42 + 6 + 47 + 6))
     s.store.Set("showTotal", false); s.store.Set("showRate", false); s.Flush()
     check("alone: the name's room is the share's", w.rows[1].colP.shown == true and w.rows[1].colA.shown == false
-        and w.rows[1].colB.shown == false and w.rows[1].name.points[2][2] == -(6 + 40 + 6))
+        and w.rows[1].colB.shown == false and w.rows[1].name.points[2][2] == -(6 + 42 + 6))
     s.store.Set("showTotal", true); s.store.Set("showRate", true)
     s.store.Set("mode", "deaths"); s.Flush()
     check("Deaths has no share", w.rows[1].colP.shown == false and w.panes[1].headP.shown == false)
@@ -3877,6 +3877,81 @@ do
     w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
     check("an open breakdown has the share of each spell, and none for an enemy",
         w.rows[1].colP.text == "60.0%" and w.rows[2].colP.text == "30.0%")
+end
+
+-- the columns of figures are as wide as their texts when all of them are known, so the name has the rest
+do
+    local s = Boot({ settings = { enabled = true } })
+    for i, source in ipairs(s.session.combatSources) do
+        source.totalAmount = 1000 * i
+        source.amountPerSecond = 10 * i
+    end
+    s.Login()
+    local w = s.Window()
+    local pane, row = w.panes[1], w.rows[1]
+    check("known figures: each column as wide as its text, and two more", row.colA.w == 42 and row.colB.w == 42)
+    check("the name's room is what they leave", row.name.points[2][2] == -(6 + 42 + 6 + 42 + 6))
+    check("and the titles are at the ends of the columns", pane.headB.points[1][4] == -12
+        and pane.headA.points[1][4] == -(12 + 42 + 6))
+    pane.ruler.GetStringWidth = function(self) return #self.text * 7 end
+    s.store.Set("fontSize", 12); s.Flush()
+    local widthA, widthB = 0, 0
+    for i = 1, 2 do
+        widthA = math.max(widthA, #w.rows[i].colA.text * 7)
+        widthB = math.max(widthB, #w.rows[i].colB.text * 7)
+    end
+    check("measured in the figures' font", pane.ruler.font == row.colA.font and pane.ruler.fontSize == 12
+        and pane.ruler.outline == row.colA.outline)
+    check("the widest text of a column is its width, for every row", widthA ~= widthB and row.colA.w == widthA + 2
+        and w.rows[2].colA.w == widthA + 2 and row.colB.w == widthB + 2 and w.rows[2].colB.w == widthB + 2)
+    s.session.combatSources[2].totalAmount = SECRET_NUMBER
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    local reserve = math.floor(7 * 0.62 * 12)
+    check("a figure that is kept back: the columns are as wide as the longest figure could be", row.colA.w == reserve
+        and row.colB.w == reserve and row.name.points[2][2] == -(6 + reserve + 6 + reserve + 6))
+    s.session.combatSources[2].totalAmount = 2000
+    s.session.combatSources[2].amountPerSecond = SECRET_NUMBER
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("the same when only the per-second figure is", row.colA.w == reserve and row.colB.w == reserve)
+    s.session.combatSources[2].amountPerSecond = 20
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("and they are fitted again when it is known", row.colA.w == widthA + 2 and row.colB.w == widthB + 2)
+    s.store.Set("showPercent", true)
+    s.session.totalAmount = SECRET_NUMBER
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a share that is not known yet keeps its room", row.colP.text == "" and row.colP.w == math.floor(6 * 0.62 * 12))
+    s.session.totalAmount = 30000
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    local widthP = 0
+    for _, shown in ipairs(w.rows) do
+        if shown.shown then widthP = math.max(widthP, #shown.colP.text * 7) end
+    end
+    check("and is fitted once it is", row.colP.text ~= "" and widthP > 0 and widthP + 2 < math.floor(6 * 0.62 * 12)
+        and row.colP.w == widthP + 2)
+    s.store.Set("showPercent", false)
+    s.store.Set("showDivider", true); s.Flush()
+    check("one text with a bar between: the whole text is the width", row.colB.w == #row.colB.text * 7 + 2
+        and row.colB.shown == true and row.colA.shown == false)
+end
+
+-- the title has the room to the bar's end when there are no buttons, and leaves them theirs when there are
+do
+    local s = Boot({ settings = { enabled = true, width = 200 } })
+    s.Login()
+    local w = s.Window()
+    w.title.stringWidth = 190
+    s.store.Set("width", 201); s.store.Set("width", 200); s.Flush()
+    check("with the buttons: cut to the room before them", w.title.w == 200 - 8 - 98)
+    s.store.Set("showButtons", false); s.Flush()
+    check("without them: the room to the bar's end, less its margin", w.title.w == 200 - 8 - 8)
+    s.store.Set("width", 170); s.Flush()
+    check("less of it in a narrow window, with the margin kept", w.title.w == 170 - 8 - 8)
+    s.store.Set("titleX", 20); s.Flush()
+    check("a title moved right has that much less", w.title.w == 170 - 28 - 8)
+    s.store.Set("titleX", -20); s.store.Set("width", 200); s.Flush()
+    check("and that much more when moved left, to the text's own width", w.title.w == 190)
+    s.store.Set("titleX", 300); s.store.Set("width", 170); s.Flush()
+    check("moved past the bar's end it has no room, not a negative one", w.title.w == 0)
 end
 
 -- the title bar: the buttons, and the menu on a right click
@@ -3899,9 +3974,9 @@ do
     check("and nothing else moves: the title and the time, offsets and all, are where they were",
         w.title.points[1][4] == titleX and w.time.points[1][4] == timeX and w.time.shown == timeShown
         and w.time.points[1][2] == w.session and timeX == -14 and titleX == 28)
-    s.store.Set("width", 198); s.Flush()
-    check("and the room for the time is the same", w.time.shown == true)
-    s.store.Set("width", 197); s.Flush()
+    s.store.Set("width", 218); s.Flush()
+    check("and the room for the time is the same, from where the title starts", w.time.shown == true)
+    s.store.Set("width", 217); s.Flush()
     check("to the pixel", w.time.shown == false)
     s.store.Set("width", 300); s.Flush()
     s.menu = nil
@@ -3999,8 +4074,8 @@ do
     check("nor do the figures wrap", row.colA.wrap == false and row.colB.wrap == false and row.colP.wrap == false)
     check("the titles on one line, at the right end of their columns", pane.headA.points[1][5] == pane.headB.points[1][5]
         and pane.headB.points[1][5] == pane.headP.points[1][5] and pane.headB.points[1][5] == pane.headName.points[1][5]
-        and pane.headP.points[1][4] == -12 and pane.headB.points[1][4] == -(12 + 40 + 6)
-        and pane.headA.points[1][4] == -(12 + 40 + 6 + 47 + 6))
+        and pane.headP.points[1][4] == -12 and pane.headB.points[1][4] == -(12 + 42 + 6)
+        and pane.headA.points[1][4] == -(12 + 42 + 6 + 47 + 6))
 
     check("the usual order: the total, the per-second figure, the share", s.store.Get("columnOrder") == "auto"
         and row.colA.text == "<100>" and row.colB.text == "<a>" and row.colB.points[1][2] == row.colP
@@ -4010,7 +4085,7 @@ do
     s.store.Set("columnOrder", "percent,total,rate"); s.Flush()
     check("the share first: the figures at the right end, the share left of them", row.colB.points[1][2] == -6
         and row.colA.points[1][2] == row.colB and row.colP.points[1][2] == row.colA
-        and row.name.points[2][2] == -(6 + 47 + 6 + 47 + 6 + 40 + 6))
+        and row.name.points[2][2] == -(6 + 47 + 6 + 47 + 6 + 42 + 6))
     check("and its title", pane.headB.points[1][4] == -12 and pane.headA.points[1][4] == -(12 + 47 + 6)
         and pane.headP.points[1][4] == -(12 + 47 + 6 + 47 + 6))
     -- the share between
@@ -4018,7 +4093,7 @@ do
     check("the share between: the second figure at the end, the share, the first", row.colB.points[1][2] == -6
         and row.colP.points[1][2] == row.colB and row.colA.points[1][2] == row.colP)
     check("and its titles", pane.headB.points[1][4] == -12 and pane.headP.points[1][4] == -(12 + 47 + 6)
-        and pane.headA.points[1][4] == -(12 + 47 + 6 + 40 + 6))
+        and pane.headA.points[1][4] == -(12 + 47 + 6 + 42 + 6))
     -- the figures the other way round
     s.store.Set("columnOrder", "rate,total,percent"); s.Flush()
     check("the per-second figure first", row.colA.text == "<a>" and row.colB.text == "<100>"

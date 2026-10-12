@@ -105,10 +105,15 @@ local function PaintTitleBar(frame, mode, seconds, fightName, text)
     title:SetWidth(0)
     title:SetText(text or TitleText(mode, fightName))
     local textWidth, timeWidth = math.ceil(title:GetStringWidth()), Look.TimeWidth()
-    local room = frame:GetWidth() - BAR_BUTTONS - TITLE_X
-    local shown = seconds ~= nil and S.Get("showTime") == true and textWidth + BUTTON_GAP + timeWidth <= room
-    local drawn = math.min(textWidth, room)
     local x = TITLE_X + S.Get("titleX")
+    -- The room from the title's start to the bar's end, less what stands at the end: the buttons, or only
+    -- the margin when they are not shown. The time by the buttons stays where they would be, so a title
+    -- that is to leave it room leaves it that of the buttons.
+    local reach = frame:GetWidth() - x
+    local room = reach - (buttons and BAR_BUTTONS or TITLE_X)
+    local timeRoom = S.Get("timeByTitle") == true and room or reach - BAR_BUTTONS
+    local shown = seconds ~= nil and S.Get("showTime") == true and textWidth + BUTTON_GAP + timeWidth <= timeRoom
+    local drawn = math.max(0, math.min(textWidth, room))
     title:ClearAllPoints()
     title:SetPoint("LEFT", header, "LEFT", x, S.Get("titleY"))
     title:SetWidth(drawn)

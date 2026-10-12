@@ -19,6 +19,7 @@ local NAME_GAP, TRACK_ALPHA = 6, 0.6
 local RANK_W, RANK_SIZE = 18, 10
 local COL_CHARS, COL_CHARS_FULL, CHAR_W = 7, 10, 0.62
 local PERCENT_CHARS, DIVIDER_CHARS = 6, 3
+local FIT_PAD, FIT_CELLS = 2, { "A", "B", "P" }
 local EMPTY_SIZE = 12
 local TITLE_X = C.TITLE_X
 local TITLE_SIZE, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 11, 10, 3, 11
@@ -266,10 +267,33 @@ local function CellsOf(pane)
     return cells
 end
 
+-- The width of a column of figures: what its texts need once they are known (pane.fit), else what the
+-- longest figure of the settings would need.
 local function CellWidth(g, pane, cell)
+    local fit = pane.fit and pane.fit[cell]
+    if fit then return fit end
     if cell == "P" then return g.pctWidth end
     if cell == "B" and pane.cols.merged then return g.mergedWidth end
     return g.colWidth
+end
+
+-- How much room the pane's figures take, with the gaps between them.
+local function ValueWidth(pane, g)
+    local width = 0
+    for k, cell in ipairs(pane.cells) do
+        width = width + CellWidth(g, pane, cell) + (k > 1 and g.colGap or 0)
+    end
+    return width
+end
+
+-- Sets a row's figures to the widths of their columns, and its name's right end to the room they leave.
+local function SizeCells(row, pane, g)
+    for _, cell in ipairs(pane.cells) do
+        row["col" .. cell]:SetWidth(CellWidth(g, pane, cell))
+    end
+    row.name:ClearAllPoints()
+    row.name:SetPoint("LEFT", row.nameLeft, 0)
+    row.name:SetPoint("RIGHT", -g.rightInset - pane.valueWidth - NAME_GAP, 0)
 end
 
 local function ColumnTitle(mode, kind)
@@ -317,12 +341,11 @@ local function LayRow(row, pane, i, g)
         else
             cell:SetPoint("RIGHT", -g.rightInset, 0)
         end
-        cell:SetWidth(CellWidth(g, pane, pane.cells[k]))
         cell:SetShown(true)
         after = cell
     end
-    row.name:ClearAllPoints(); row.name:SetPoint("LEFT", left, 0)
-    row.name:SetPoint("RIGHT", -g.rightInset - pane.valueWidth - NAME_GAP, 0)
+    row.nameLeft = left
+    SizeCells(row, pane, g)
     Parts.HudFont(row.rank, g.rankFont, g.rankSize, g.rankOutline)
     Parts.HudFont(row.name, g.nameFont, g.fontSize, g.nameOutline)
     Parts.HudFont(row.colA, g.valueFont, g.valueSize, g.valueOutline)
@@ -423,15 +446,13 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     pane.capacity = capacity
     pane.merged = pane.cols.merged == true
     pane.cells = CellsOf(pane)
-    pane.valueWidth = 0
-    for k, cell in ipairs(pane.cells) do
-        pane.valueWidth = pane.valueWidth + CellWidth(g, pane, cell) + (k > 1 and g.colGap or 0)
-    end
     first = math.max(0, math.min(first, total - capacity))
     local shown = math.min(total - first, capacity)
     local paneKey = key .. "|" .. table.concat(pane.cells) .. "|" .. tostring(pane.merged) .. "|" .. capacity
         .. "|" .. pane.top
     local fresh = pane.laidKey ~= paneKey
+    pane.valueWidth = ValueWidth(pane, g)
+    pane.headY = headY
     if fresh then
         LayHeads(pane, g, headY)
         pane.empty:ClearAllPoints()
@@ -648,6 +669,56 @@ local function NameOf(source, you, letters)
     return name
 end
 
+-- Whether a source's figures are known to the addon, which is when they can be measured.
+local function Known(source)
+    return DM.Plain(source.totalAmount, "number")
+        and (source.amountPerSecond == nil or DM.Plain(source.amountPerSecond, "number"))
+end
+
+-- Sizes the columns of figures to the widest text in each, so that the name has the room they leave. A
+-- figure the game keeps back (in combat) cannot be measured, and its columns keep the width the settings'
+-- longest figure needs; a share is always known. plain is whether every figure shown is known.
+local function FitColumns(pane, shown, plain)
+    local g = pane.f.geo
+    local ruler = pane.ruler
+    if not ruler then
+        ruler = ns.Font(pane.f, g.valueSize, g.valueOutline, T.fg)
+        pane.ruler = ruler
+    end
+    if pane.rulerKey ~= g.key then
+        Parts.HudFont(ruler, g.valueFont, g.valueSize, g.valueOutline)
+        pane.rulerKey = g.key
+    end
+    local fit
+    for _, cell in ipairs(pane.cells) do
+        if cell == "P" or plain then
+            local widest = 0
+            for i = 1, shown do
+                local text = pane.rows[i]["col" .. cell]:GetText()
+                if text and text ~= "" then
+                    ruler:SetText(text)
+                    widest = math.max(widest, ruler:GetStringWidth())
+                end
+            end
+            if widest > 0 then
+                fit = fit or {}
+                fit[cell] = math.ceil(widest) + FIT_PAD
+            end
+        end
+    end
+    local changed = false
+    for _, cell in ipairs(FIT_CELLS) do
+        if (fit and fit[cell]) ~= (pane.fit and pane.fit[cell]) then changed = true end
+    end
+    if not changed then return end
+    pane.fit = fit
+    pane.valueWidth = ValueWidth(pane, g)
+    LayHeads(pane, g, pane.headY)
+    for _, row in ipairs(pane.rows) do
+        if row.nameLeft then SizeCells(row, pane, g) end
+    end
+end
+
 local function PaintPane(pane, session, first, shown, mode, available)
     local sources = session.combatSources
     local you, letters = S.Get("youLabel") == true, S.Get("nameMaxLetters")
@@ -657,6 +728,7 @@ local function PaintPane(pane, session, first, shown, mode, available)
     local classOnly = S.Get("iconStyle") == "class"
     local byTotal = S.Get("barScale") == "total"
     local f, showIcons = pane.f, pane.f.geo.showIcons
+    local plain = true
     pane.empty:SetText(session.emptyText or (available and TEXT_EMPTY or TEXT_UNAVAILABLE))
     pane.empty:SetShown(shown == 0)
     -- With Always Show My Row, the last row is yours when yours is not among the rows shown.
@@ -673,6 +745,7 @@ local function PaintPane(pane, session, first, shown, mode, available)
         if source.isHeader then
             PaintHeading(row, source, f)
         else
+            if not Known(source) then plain = false end
             local c = Look.BarColor(source, f.index)
             row:SetStatusBarColor(c.r, c.g, c.b, alpha)
             row:SetMinMaxValues(0, source.maxAmount or (byTotal and session.totalAmount or session.maxAmount))
@@ -695,6 +768,7 @@ local function PaintPane(pane, session, first, shown, mode, available)
             PaintValues(row, source, pane.cols, session)
         end
     end
+    FitColumns(pane, shown, plain)
 end
 
 function Look.Paint(f, session, first, shown, mode, available)
