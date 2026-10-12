@@ -68,9 +68,8 @@ NaowhForever_DamageMeter/
   `LayImage` from the window's size and a Tile Size setting, with a repeating wrap, since a picture's own
   size is not known to the add-on and the engine's own tile flags need the picture to be a power of two.
   The game's plain backgrounds (Solid, Blizzard Tooltip, Out of Control, Low Health) are left out of the
-  list and read as none. At login (`Tidy`) a pick of one is cleared, and a path typed before Image had a
-  choice for it, or behind the switch there once was, is made that choice. A dialog, opened by a button in
-  the Window card's Picture cog, says how to add a picture: a .png, .tga or .blp in a folder of the player's own under
+  list and read as none. A dialog, opened by a button in the Window card's Picture cog, says how to add a
+  picture: a .png, .tga or .blp in a folder of the player's own under
   `AddOns`, and its path with the extension. A .png loads on this client as it does for other add-ons
   here; a .jpg is not known to. The tooltip is a fixed-width card, so a help text must not hold a long
   word with no spaces, such as a path: it is cut short, which is why the example lives in the dialog.
@@ -78,8 +77,7 @@ NaowhForever_DamageMeter/
   page's Image already has one.
 - The fights kept are on the account under the character (`damageMeterFights`, by `UnitGUID("player")`),
   not in the profile, so a profile that is switched, reset or imported does not take them and they are
-  not in the strings a profile is shared by. A list the profile kept before is moved to the first
-  character to ask for it, once. Fights Kept, which is a setting, trims it.
+  not in the strings a profile is shared by. Fights Kept, which is a setting, trims it.
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
@@ -122,8 +120,7 @@ NaowhForever_DamageMeter/
   six Column rows on the Figures card. A kind is once and the name is always there; a kind picked that is in
   another slot trades places with it (`DM.SetColumnSlot`). "auto" is the name, the total and the per-second
   figure, with the per-second figure first in the DPS and HPS lists, as the game's meter has it; the first
-  change makes it a list. `DM.ColumnSlots` reads it; the old showTotal, showRate, showPercent and
-  columnOrder become it once, at login (`DM.LegacyColumns`).
+  change makes it a list. `DM.ColumnSlots` reads it.
   A row is its cells, `Columns` giving each its id: A the first figure, B the second (or the only one, or
   both with the divider, at the place of the first), P the share and X1 to X5 the totals of other lists.
   The cells before the name are anchored from the left end, each to the right of the one before it, and the
@@ -175,8 +172,8 @@ NaowhForever_DamageMeter/
   the window's font and outline and its usual size, with it on it takes `<text>Font`, `<text>Outline` and
   its size key. `Look.TextStyle` answers for one text and `Look.Layout` collects them all into the geometry,
   so the figures' columns and the time's room are sized by their own text. Every setting change throws the
-  layout's memory away (`Look.Invalidate`), so a font or a size is applied at once, with no reload. A size
-  set before the switches existed turns its switch on at login.
+  layout's memory away (`Look.Invalidate`), so it is laid out again at once; the game does not always show
+  a new font or icon until a reload, which the page says.
 - Always Show My Row: when your row (found by `isLocalPlayer`, never secret) is outside the rows shown
   (above them after scrolling, or below), the last row shown is yours, with your rank, so the list
   still scrolls through the others. It is the same source table, so hovering and clicking it work.

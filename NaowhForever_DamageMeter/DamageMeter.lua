@@ -159,27 +159,6 @@ function DM.HasColumn(index, kind)
     return false
 end
 
--- The columns setting that says what showTotal, showRate, showPercent and columnOrder said before there was
--- one, or nil when they said what "auto" says.
-function DM.LegacyColumns(total, rate, percent, order)
-    total, rate, percent = total ~= false, rate ~= false, percent == true
-    if total and rate and not percent and (order == nil or order == "auto") then return nil end
-    local kinds = { "name" }
-    local seen = {}
-    local function Add(kind)
-        local shown = kind == "total" and total or kind == "rate" and rate or kind == "percent" and percent
-        if shown and not seen[kind] then
-            seen[kind] = true
-            kinds[#kinds + 1] = kind
-        end
-    end
-    if type(order) == "string" and order ~= "auto" then
-        for kind in order:gmatch("[^,]+") do Add(kind) end
-    end
-    Add("total"); Add("rate"); Add("percent")
-    return table.concat(kinds, ",")
-end
-
 function DM.Key(base, index)
     return index and index > 1 and base .. index or base
 end

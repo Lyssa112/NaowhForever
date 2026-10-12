@@ -691,28 +691,6 @@ do
     check("and the next paint lays it again", row.laidKey ~= nil and w.laidKey ~= nil)
 end
 
--- a size set before each text had a switch for it keeps working
-do
-    local s = Boot({ settings = { enabled = true, titleSize = 14, timeSize = 11, rankSize = 13, valueFontSize = 0,
-        summarySize = 9 } })
-    s.Login()
-    local w = s.Window()
-    check("a size that was not the usual: its switch is turned on", s.store.Get("titleOwnSize") == true
-        and s.store.Get("rankOwnSize") == true and s.store.Get("summaryOwnSize") == true
-        and w.title.fontSize == 14 and w.rows[1].rank.fontSize == 13)
-    check("one that was the usual: left off", s.store.Get("timeOwnSize") == false and s.settings.timeOwnSize == nil)
-    check("and the figures' zero, which meant the names' size, is cleared", s.settings.valueFontSize == nil
-        and s.settings.valueOwnSize == nil and w.rows[1].colA.fontSize == 11)
-    local t = Boot({ settings = { enabled = true, valueFontSize = 16 } })
-    t.Login()
-    check("a figures' size set: switched on", t.store.Get("valueOwnSize") == true
-        and t.Window().rows[1].colA.fontSize == 16)
-    local u = Boot({ settings = { enabled = true, titleSize = 14, titleOwnSize = false } })
-    u.Login()
-    check("a switch left off on purpose is not turned on", u.store.Get("titleOwnSize") == false
-        and u.Window().title.fontSize == 12)
-end
-
 -- each text: its size on the card beside its row, and its size switch, font and color behind the row's cog
 do
     local s = Boot({ settings = { enabled = true } })
@@ -1696,7 +1674,6 @@ do
 
     -- a fight that ends is kept there, and not in the profile
     s.apiResult = nil
-    local before = #s.DM.History.List()
     s.DM.History.Clear()
     check("clearing empties this character's list", #s.DM.History.List() == 0
         and #s.account.damageMeterFights["Player-1"] == 0)
@@ -1718,53 +1695,11 @@ do
     check("the profile cleared: the fights are there", #kept.DM.History.List() == 1
         and kept.DM.History.List()[1].place == "Elwynn Forest")
 
-    -- the list the profile kept before is taken once, by the first character to ask
-    local old = Boot({ settings = { enabled = true, history = { Entry(3000, "Duskwood"), Entry(2500, "Redridge") } } })
-    old.Login()
-    check("the profile's list moves to the account", #old.DM.History.List() == 2
-        and old.DM.History.List()[1].place == "Duskwood" and old.settings.history == nil
-        and old.account.damageMeterFights["Player-1"][2].place == "Redridge")
-    old.playerGUID = "Player-9"
-    check("and not to a second character", #old.DM.History.List() == 0)
-
     -- the page counts this character's
     local page = Boot({ settings = { enabled = true } })
     page.account.damageMeterFights = { ["Player-1"] = { Entry(1, "a"), Entry(2, "b"), Entry(3, "c") } }
     page.Login()
     check("Fights and Data says how many", CardOf(page.page, "data").summary(page.store) == "3 of 30 fights kept")
-end
-
--- settings from before are tidied once, at login
-do
-    local s = Boot({ settings = { enabled = true, backgroundImage = "Solid" } })
-    s.Login()
-    check("a background the page no longer lists is none", s.store.Get("backgroundImage") == "")
-    local called = Boot({ settings = { enabled = true, backgroundImage = "None" } })
-    called.Login()
-    check("so is the media's None, by name", called.store.Get("backgroundImage") == "")
-    local both = Boot({ settings = { enabled = true, backgroundImage = "Solid", backgroundPath = "Interface\\x" } })
-    both.Login()
-    check("one it no longer lists beside a typed path is your own picture", both.store.Get("backgroundImage") == "@own")
-    local typed =Boot({ settings = { enabled = true, backgroundPath = "Interface\\x" } })
-    typed.Login()
-    check("a path typed with Image on None is your own picture", typed.store.Get("backgroundImage") == "@own")
-    local switched = Boot({ settings = { enabled = true, backgroundPath = "Interface\\x", customImage = true } })
-    switched.Login()
-    check("the switch there was for it becomes the choice", switched.store.Get("backgroundImage") == "@own"
-        and switched.settings.customImage == false)
-    local off = Boot({ settings = { enabled = true, backgroundPath = "Interface\\x", customImage = false } })
-    off.Login()
-    check("a switch left off on purpose leaves it alone", off.store.Get("backgroundImage") == "")
-    local named = Boot({ settings = { enabled = true, backgroundPath = "Interface\\x", backgroundImage = "Marble" } })
-    named.Login()
-    check("a picture picked by name is not taken over by a path", named.store.Get("backgroundImage") == "Marble")
-    local plain = Boot({ settings = { enabled = true, backgroundImage = "Marble" } })
-    plain.Login()
-    check("nothing to tidy: nothing changed", plain.settings.customImage == nil
-        and plain.store.Get("backgroundImage") == "Marble")
-    local none = Boot({ settings = { enabled = true } })
-    none.Login()
-    check("and nothing set that was not", none.settings.customImage == nil and none.settings.backgroundImage == nil)
 end
 
 -- Raid Mode: your row alone
@@ -2611,7 +2546,7 @@ do
         and w.rows[2].name.text == "Pyroblast")
     w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
     local row = RowOf(s.page, "pinSelf")
-    check("a toggle on the Rows card", row and row.toggle == true and row.label == "Always Show My Row")
+    check("a toggle on the Bars card", row and row.toggle == true and row.label == "Always Show My Row")
 
     -- you are not in the list
     s.session.combatSources = {
@@ -2651,7 +2586,7 @@ do
     s.store.Set("barScale", "top"); s.Flush()
     check("and the top player again", w.rows[1].barMax == s.session.maxAmount)
     local grow, fill, scale = RowOf(s.page, "growUp"), RowOf(s.page, "reverseFill"), RowOf(s.page, "barScale")
-    check("the three are on the Rows card", grow and fill and scale and grow.toggle and fill.toggle
+    check("the three are on the Bars card", grow and fill and scale and grow.toggle and fill.toggle
         and scale.choice[1].top == "Top Player" and scale.choice[1].total == "List Total")
 end
 
@@ -4036,6 +3971,7 @@ do
     check("and the titles are at the ends of the columns", pane.headB.points[1][4] == -12
         and pane.headA.points[1][4] == -(12 + 42 + 6))
     pane.ruler.GetStringWidth = function(self) return #self.text * 7 end
+    pane.headRuler.stringWidth = 10
     s.store.Set("fontSize", 12); s.Flush()
     local widthA, widthB = 0, 0
     for i = 1, 2 do
@@ -4074,6 +4010,24 @@ do
     s.store.Set("showDivider", true); s.Flush()
     check("one text with a bar between: the whole text is the width", row.colB.w == #row.colB.text * 7 + 2
         and row.colB.shown == true and row.colA.shown == false)
+    s.store.Set("showDivider", false); s.Flush()
+    -- a title wider than its figures
+    pane.headRuler.stringWidth = 70
+    s.store.Set("fontSize", 11); s.Flush()
+    check("a column is never narrower than its title", row.colA.w == 70 and row.colB.w == 70
+        and pane.headB.points[1][4] == -12 and pane.headA.points[1][4] == -(12 + 70 + 6))
+    check("and the name makes room for it", row.name.points[2][2] == -(6 + 70 + 6 + 70 + 6))
+    s.store.Set("showColumnHeaders", false); s.Flush()
+    check("with no titles shown, the columns are their figures' width", row.colA.w == widthA + 2
+        and row.colB.w == widthB + 2)
+    s.store.Set("showColumnHeaders", true); s.Flush()
+    s.store.Set("columns", "total,rate,name"); s.Flush()
+    check("a title at the left end stays in the window: its left end is at the row's", pane.headA.points[1][4] - 70 == 12
+        and pane.headB.points[1][4] - 70 == 12 + 70 + 6)
+    s.store.Set("columns", "auto"); s.Flush()
+    pane.headRuler.stringWidth = 10
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a short title leaves the column its figures' width", row.colA.w == widthA + 2 and row.colB.w == widthB + 2)
 end
 
 -- the title has the room to the bar's end when there are no buttons, and leaves them theirs when there are
@@ -4344,19 +4298,6 @@ do
     check("a slot can be made free", s.store.Get("columns") == "total,deaths,none,name,none,none")
     check("what the columns have", DM.HasColumn(1, "deaths") == true and DM.HasColumn(1, "rate") == false)
     s.store.Set("columns", "auto")
-
-    -- the settings from before were four: they become one, once
-    local old = Boot({ settings = { enabled = true, window2 = true, showTotal = false, showPercent = true,
-        columnOrder = "percent,total,rate", showRate2 = false, columnOrder2 = "rate,total,percent" } })
-    old.Login()
-    check("showTotal, showRate, showPercent and columnOrder become the columns", old.store.Get("columns")
-        == "name,percent,rate" and old.store.Get("columns2") == "name,total"
-        and old.settings.showTotal == nil and old.settings.columnOrder == nil and old.settings.showRate2 == nil
-        and old.settings.columns3 == nil)
-    local plain = Boot({ settings = { enabled = true, columnOrder = "auto", showTotal = true } })
-    plain.Login()
-    check("what said what auto says stays auto", plain.store.Get("columns") == "auto"
-        and plain.settings.columns == nil and plain.settings.showTotal == nil)
 
     -- a window's own
     local t = Boot({ settings = { enabled = true, window2 = true } })

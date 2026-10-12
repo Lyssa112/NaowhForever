@@ -731,56 +731,6 @@ hooksecurefunc(ns, "Apply", Apply)
 hooksecurefunc(ns, "ShowUnlockMode", OnUnlock)
 hooksecurefunc(ns, "HideUnlockMode", OnLock)
 
--- Settings from before: a background the page no longer lists is none, and a path typed when Image had no
--- choice for it, or behind a switch, is your own picture.
--- A text's size set before it had a switch of its own keeps working: the switch is turned on for it.
-local OWN_SIZE_KEYS = { value = "valueFontSize", rank = "rankSize", title = "titleSize", time = "timeSize",
-    summary = "summarySize" }
-
-local function TidySizes()
-    if not S.Raw then return end
-    for element, key in pairs(OWN_SIZE_KEYS) do
-        local raw = S.Raw(key)
-        if S.Raw(element .. "OwnSize") == nil and type(raw) == "number" then
-            if raw > 0 and raw ~= S.Default(key) then S.Set(element .. "OwnSize", true) end
-            if raw <= 0 then S.Set(key, nil) end
-        end
-    end
-end
-
--- The columns a window had before there was a setting for them (showTotal, showRate, showPercent and
--- columnOrder, with a number for the other windows) become that setting, and the old ones are let go.
-local LEGACY_COLUMNS = { "showTotal", "showRate", "showPercent", "columnOrder" }
-
-local function TidyColumns()
-    if not S.Raw then return end
-    for index = 1, DM.MAX_WINDOWS do
-        local old = {}
-        for i, key in ipairs(LEGACY_COLUMNS) do old[i] = S.Raw(DM.Key(key, index)) end
-        if old[1] ~= nil or old[2] ~= nil or old[3] ~= nil or old[4] ~= nil then
-            local key = DM.Key("columns", index)
-            if S.Raw(key) == nil then S.Set(key, DM.LegacyColumns(old[1], old[2], old[3], old[4])) end
-            for _, legacy in ipairs(LEGACY_COLUMNS) do S.Set(DM.Key(legacy, index), nil) end
-        end
-    end
-end
-
-local function Tidy()
-    TidySizes()
-    TidyColumns()
-    local picked = S.Get("backgroundImage")
-    if C.HIDDEN_BACKGROUNDS[picked] then S.Set("backgroundImage", ""); picked = "" end
-    if not S.Raw then return end
-    local switch = S.Raw("customImage")
-    if switch == true or (switch == nil and picked == "" and S.Get("backgroundPath") ~= "") then
-        S.Set("backgroundImage", C.OWN_PICTURE)
-        S.Set("customImage", false)
-    end
-end
-
 local boot = CreateFrame("Frame")
 boot:RegisterEvent("PLAYER_LOGIN")
-boot:SetScript("OnEvent", function()
-    Tidy()
-    Apply()
-end)
+boot:SetScript("OnEvent", function() Apply() end)

@@ -76,20 +76,12 @@ local function Kept()
     return all, UnitGUID("player") or UNKNOWN_WHO
 end
 
--- The list the profile kept before, taken by the first character to ask, once.
-local function Adopt()
-    local old = S.Raw("history")
-    if type(old) ~= "table" then return {} end
-    S.Set("history", nil)
-    return old
-end
-
 -- This character's fights, newest first.
 function History.List()
     local all, who = Kept()
     local list = all[who]
     if type(list) ~= "table" then
-        list = Adopt()
+        list = {}
         all[who] = list
     end
     return list

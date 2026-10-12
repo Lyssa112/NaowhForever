@@ -158,7 +158,7 @@ end
 -- A pane is a list of rows with its column titles. A window has one, and a second below it on request.
 local function NewPane(f, n)
     local pane = { f = f, n = n, rows = {}, cols = { x = {} }, order = {}, cells = {}, before = {}, after = {},
-        beforeWidth = 0, afterWidth = 0, top = 0 }
+        titleWidths = {}, beforeWidth = 0, afterWidth = 0, top = 0 }
     pane.headName = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
     pane.headName:SetJustifyH("LEFT"); pane.headName:SetWordWrap(false); pane.headName:SetText(TEXT_NAME_HEAD)
     for _, id in ipairs(CELLS) do
@@ -290,13 +290,20 @@ local function Columns(pane, mode)
 end
 
 -- The width of a column of figures: what its texts need once they are known (pane.fit), else what the
--- longest figure of the settings would need.
+-- longest figure of the settings would need, and never less than its title needs.
 local function CellWidth(g, pane, cell)
-    local fit = pane.fit and pane.fit[cell]
-    if fit then return fit end
-    if cell == "P" then return g.pctWidth end
-    if cell == "B" and pane.cols.merged then return g.mergedWidth end
-    return g.colWidth
+    local width = pane.fit and pane.fit[cell]
+    if not width then
+        if cell == "P" then
+            width = g.pctWidth
+        elseif cell == "B" and pane.cols.merged then
+            width = g.mergedWidth
+        else
+            width = g.colWidth
+        end
+    end
+    local title = pane.titleWidths[cell]
+    return title and title > width and title or width
 end
 
 -- How much room cells take: their widths, and the gaps between them.
@@ -346,6 +353,31 @@ end
 local function ColumnTitle(mode, kind)
     if kind == "rate" then return mode.perSecond or TEXT_RATE end
     return mode.total or TEXT_TOTAL
+end
+
+-- The room the titles over the cells take, as the settings write them: a column is never narrower than
+-- its words, which a title put by its right end would otherwise carry out of the window. Returns the widths
+-- as one text, for the layout's key.
+local function TitleWidths(pane, g)
+    local widths = pane.titleWidths
+    for id in pairs(widths) do widths[id] = nil end
+    if not g.showHead then return "" end
+    local ruler = pane.headRuler
+    if not ruler then
+        ruler = ns.Font(pane.f, g.headSize, g.headOutline, T.fg)
+        pane.headRuler = ruler
+    end
+    if pane.headRulerKey ~= g.key then
+        Parts.HudFont(ruler, g.headFont, g.headSize, g.headOutline)
+        pane.headRulerKey = g.key
+    end
+    local key = {}
+    for _, id in ipairs(pane.cells) do
+        ruler:SetText(pane["head" .. id]:GetText())
+        widths[id] = math.ceil(ruler:GetStringWidth())
+        key[#key + 1] = widths[id]
+    end
+    return table.concat(key, ",")
 end
 
 -- The words over a cell: the title of the figure it has, both with a divider, the share, or the other list.
@@ -521,10 +553,13 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     Columns(pane, mode)
     pane.capacity = capacity
     pane.merged = pane.cols.merged == true
+    pane.headName:SetText(TEXT_NAME_HEAD)
+    for _, id in ipairs(pane.cells) do pane["head" .. id]:SetText(HeadText(pane, mode, id)) end
+    local titles = TitleWidths(pane, g)
     first = math.max(0, math.min(first, total - capacity))
     local shown = math.min(total - first, capacity)
     local paneKey = key .. "|" .. table.concat(pane.order, ",") .. "|" .. tostring(pane.merged) .. "|" .. capacity
-        .. "|" .. pane.top
+        .. "|" .. pane.top .. "|" .. titles
     local fresh = pane.laidKey ~= paneKey
     Measure(pane, g)
     pane.headY = headY
@@ -533,8 +568,6 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
         pane.empty:ClearAllPoints()
         pane.empty:SetPoint("TOP", pane.f, "TOPLEFT", g.w / 2, -pane.top - INSET)
     end
-    pane.headName:SetText(TEXT_NAME_HEAD)
-    for _, id in ipairs(pane.cells) do pane["head" .. id]:SetText(HeadText(pane, mode, id)) end
     local rows = pane.rows
     for i = 1, shown do
         local row = rows[i] or Look.Row(pane, i)
