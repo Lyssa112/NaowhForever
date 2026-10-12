@@ -20,6 +20,7 @@ local OFF_IMAGE = "Pick a Background Image"
 local OFF_COMBAT = "Set Where to In Combat"
 local OFF_TILE = "Turn on Tile Image"
 local OFF_OWN = "Pick Your Own Picture in Image"
+local OFF_TIME = "Turn on Show Fight Time"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local BAR_RANGE, SPACING_RANGE = { C.MIN_BAR, C.MAX_BAR, 1 }, { 0, C.MAX_SPACING, 1 }
@@ -50,6 +51,9 @@ local EDGE = { C.EDGE_STYLES, C.EDGE_STYLES_ORDER }
 local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "class" } }
 local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
+local TITLE_TEXT = { C.TITLE_TEXTS, C.TITLE_TEXTS_ORDER }
+local TITLE_ALIGN = { C.TITLE_ALIGNS, C.TITLE_ALIGNS_ORDER }
+local TIME_PLACE = { C.TIME_PLACES, C.TIME_PLACES_ORDER }
 
 local function Enabled() return DM.On() and true or false end
 local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
@@ -60,6 +64,7 @@ local function EdgeCustom()
     return DM.On() and S.Get("highlightPlayer") == true and S.Get("edgeStyle") == "custom"
 end
 local function HidesAfterCombat() return DM.On() and S.Get("visibility") == "combat" end
+local function ShowingTime() return DM.On() and S.Get("showTime") == true end
 -- Custom Image is for the choice of Image that is your own picture, and a picture is there when that has a
 -- path or another choice is a picture.
 local function OwnPicture() return S.Get("backgroundImage") == C.OWN_PICTURE end
@@ -117,8 +122,8 @@ local function NumbersSummary(store)
 end
 
 local function HeaderSummary(store)
-    return ("Time %s, summary %s"):format(store.Get("showTime") and "on" or "off",
-        store.Get("showSummary") and "on" or "off")
+    local place = store.Get("showTime") and (C.TIME_PLACES[store.Get("timePlace")] or ""):lower() or "off"
+    return ("%s, time %s"):format(C.TITLE_TEXTS[store.Get("titleText")] or "", place)
 end
 
 local function TextSummary(store)
@@ -391,15 +396,23 @@ page:Card({
 
 page:Card({
     id = "header", name = "Title Bar", order = 50,
-    help = "The list's name, the length of the fight and the line under them.",
+    help = "The title, the length of the fight and the line under them.",
     summary = HeaderSummary,
     rows = {
+        Group("Title"),
+        { key = "titleText", label = "Title Shows", choice = TITLE_TEXT, needs = Enabled, why = OFF,
+          help = "The list's name, the name the game gave the fight, or both. A fight with no name yet "
+              .. "shows the list's." },
+        { key = "titleAlign", label = "Title Position", choice = TITLE_ALIGN, needs = Enabled, why = OFF,
+          help = "Where the title sits in the bar. The second list's title follows it." },
+        { key = "titleSize", label = "Title Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
         Group("Fight Time"),
         { key = "showTime", label = "Show Fight Time", toggle = true, needs = Enabled, why = OFF,
           help = "How long the shown session has run, when there is room beside the title." },
+        { key = "timePlace", label = "Time Position", choice = TIME_PLACE, needs = ShowingTime, why = OFF_TIME,
+          help = "By the buttons, at the left edge of the bar, or right after the title." },
         { key = "timeSize", label = "Fight Time Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
-        Group("Title"),
-        { key = "titleSize", label = "Title Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
+        Group("Under the Bar"),
         { key = "showSummary", label = "Summary Line", toggle = true, needs = Enabled, why = OFF,
           help = "Under the title bar: the session, its total, the raid's per-second figure once the fight "
               .. "is over, and your rank." },

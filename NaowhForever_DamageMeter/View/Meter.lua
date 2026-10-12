@@ -19,7 +19,9 @@ local TEXT_PAD, NAME_GAP, EDGE_W = 6, 6, 2
 local RANK_W, RANK_SIZE = 18, 10
 local COL_CHARS, COL_CHARS_FULL, CHAR_W = 7, 10, 0.62
 local EMPTY_SIZE = 12
-local TITLE_SIZE, TITLE_X, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 8, 11, 10, 3, 11
+local TITLE_X = C.TITLE_X
+local TITLE_SIZE, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 11, 10, 3, 11
+local JUSTIFY = { left = "LEFT", center = "CENTER", right = "RIGHT" }
 
 local TEXT_EMPTY = "No data yet"
 local TEXT_UNAVAILABLE = "The damage meter is not available"
@@ -132,7 +134,7 @@ function Look.New(frame, index)
     frame.image:SetAllPoints()
     frame.image:Hide()
     frame.title = ns.Font(frame.header, TITLE_SIZE, "OUTLINE", T.fg)
-    frame.title:SetPoint("LEFT", TITLE_X, 0); frame.title:SetJustifyH("LEFT"); frame.title:SetWordWrap(false)
+    frame.title:SetJustifyH("LEFT"); frame.title:SetWordWrap(false)
     frame.time = ns.Font(frame.header, TIME_SIZE, "OUTLINE", T.muted)
     frame.time:SetJustifyH("RIGHT")
     frame.summary = ns.Font(frame, SUMMARY_SIZE, "OUTLINE", T.muted)
@@ -147,7 +149,7 @@ function Look.New(frame, index)
     frame.lowerBackground = ns.Solid(frame.lowerBar, "BACKGROUND", T.panel, 1)
     frame.lowerBackground:SetAllPoints()
     frame.lowerTitle = ns.Font(frame.lowerBar, TITLE_SIZE, "OUTLINE", T.fg)
-    frame.lowerTitle:SetPoint("LEFT", TITLE_X, 0); frame.lowerTitle:SetJustifyH("LEFT"); frame.lowerTitle:SetWordWrap(false)
+    frame.lowerTitle:SetWordWrap(false)
     frame.lowerBar:Hide()
 end
 
@@ -258,6 +260,9 @@ local function LayFrame(f, g)
     Parts.HudFont(f.lowerTitle, g.font, g.titleSize, g.outline)
     Parts.HudFont(f.time, g.font, g.timeSize, g.outline)
     f.time:SetWidth(Look.TimeWidth())
+    f.lowerTitle:ClearAllPoints()
+    f.lowerTitle:SetPoint("LEFT", TITLE_X, 0); f.lowerTitle:SetPoint("RIGHT", -TITLE_X, 0)
+    f.lowerTitle:SetJustifyH(JUSTIFY[g.align] or JUSTIFY.left)
 end
 
 -- The picture behind the rows: stretched over the window, or repeated with each repeat tileSize wide.
@@ -364,13 +369,13 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.showRanks, g.showIcons, g.showHead = S.Get("showRanks"), S.Get("showIcons"), showHead
     g.colWidth = math.floor(chars * CHAR_W * fontSize)
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
-    g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
+    g.titleSize, g.timeSize, g.align = S.Get("titleSize"), S.Get("timeSize"), S.Get("titleAlign")
     g.image, g.path, g.tile = S.Get("backgroundImage"), S.Get("backgroundPath"), S.Get("imageTile") == true
     g.tileSize = math.max(C.MIN_TILE, S.Get("imageTileSize"))
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
+        headTop, g.titleSize, g.timeSize, g.align, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
         name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
     g.key = key
     if f.laidKey ~= key then LayFrame(f, g) end

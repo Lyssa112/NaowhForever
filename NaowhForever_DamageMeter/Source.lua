@@ -117,6 +117,17 @@ function DM.Duration(sessionKey, fightID)
     return nil
 end
 
+-- The name a title can use for a session: Overall, a past fight's own name, or the newest fight's for
+-- Current. Nil when there is none: in combat the newest fight listed is not the one running.
+function DM.FightName(sessionKey, fightID)
+    if fightID == nil and sessionKey == "overall" then return C.SESSION_LABELS.overall end
+    if fightID == nil and InCombatLockdown() then return nil end
+    for _, fight in ipairs(DM.Fights()) do
+        if fightID == nil or fight.id == fightID then return fight.name end
+    end
+    return nil
+end
+
 -- Where the local player stands in a session's sources, and how many there are: the game sorts them.
 function DM.Rank(session)
     local sources = session.combatSources

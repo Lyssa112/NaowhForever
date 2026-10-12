@@ -33,7 +33,13 @@ local function Region(kind, parent)
     function r:SetTextColor(rr, g, b) self.textColor = { r = rr, g = g, b = b } end
     function r:GetText() return self.text end
     function r:SetFormattedText(fmt, ...) self.text = fmt:format(...) end
-    function r:GetStringWidth() return 40 end
+    -- the width the text takes, held to the width the region was given
+    function r:GetStringWidth()
+        local natural = self.stringWidth or 40
+        if self.w > 0 then return math.min(natural, self.w) end
+        return natural
+    end
+    function r:SetJustifyH(j) self.justify = j end
     function r:SetFrameLevel(l) self.level = l end
     function r:GetFrameLevel() return self.level end
     function r:SetMinMaxValues(lo, hi) self.barMin, self.barMax = lo, hi end
@@ -593,6 +599,113 @@ do
     check("a past fight: its own length", w.time.text == "1:01" and w.time.shown == true)
     s.ns.PreviewDamageMeter()
     check("the sample has a length too", w.time.text == "3:25")
+end
+
+-- the title bar: what the title says, and where it and the time sit
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.fights = { { sessionID = 3, name = "Fyrakk", durationSeconds = 61 } }
+    s.Login()
+    local w = s.Window()
+    local function At(fs) return fs.points[1][4] end
+    check("by default the list's name, at the left, with the time by the buttons", w.title.text == "Damage Done"
+        and w.title.points[1][1] == "LEFT" and At(w.title) == 8 and w.title.w == 40
+        and w.time.points[1][2] == w.session and w.time.points[1][4] == -4 and w.time.justify == "RIGHT")
+    check("and the list button over the title", w.modeButton.points[1][4] == 0 and w.modeButton.w == 56)
+
+    s.store.Set("titleText", "fight"); s.Flush()
+    check("Title Shows the fight: its name", w.title.text == "Fyrakk")
+    s.store.Set("titleText", "both"); s.Flush()
+    check("both: the list and the fight", w.title.text == "Damage Done - Fyrakk")
+    s.fights = { { sessionID = 3, durationSeconds = 61 } }
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a fight with no name: the list's", w.title.text == "Damage Done")
+    s.fights = { { sessionID = 3, name = "Fyrakk", durationSeconds = 61 } }
+    s.combat = true
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("in combat the newest fight is not the one running: the list's", w.title.text == "Damage Done")
+    s.combat = false
+    s.store.Set("titleText", "fight")
+    s.store.Set("session", "overall"); s.Flush()
+    check("Overall is its own name", w.title.text == "Overall")
+    s.store.Set("session", "current"); s.Flush()
+    s.store.Set("lower", "healing"); s.Flush()
+    check("the second list keeps its own name", w.lowerTitle.text == "Healing Done")
+    s.store.Set("lower", "")
+    s.fights = { { sessionID = 4, name = "Wolves", durationSeconds = 30 },
+        { sessionID = 3, name = "Fyrakk", durationSeconds = 61 } }
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("Current: the newest fight's name", w.title.text == "Wolves")
+    w.session.onClick()
+    s.menu:Find("Fyrakk (1:01)").set()
+    s.Flush()
+    check("a past fight: its own name, not the newest's", w.title.text == "Fyrakk")
+    s.store.Set("session", "current")
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    s.ns.PreviewDamageMeter()
+    check("the preview names a fight too", w.title.text == "Training Dummy")
+    s.ns.HideUnlockMode()
+    s.store.Set("titleText", "list"); s.Flush()
+
+    -- the bar is 300 wide: the buttons take 98, so the title and time share 8 to 202
+    s.store.Set("titleAlign", "center"); s.Flush()
+    check("centered between the left edge and the time", At(w.title) == 8 + math.floor((202 - 52 - 8 - 40) / 2))
+    check("the list button follows it", w.modeButton.points[1][4] == At(w.title) - 8)
+    s.store.Set("titleAlign", "right"); s.Flush()
+    check("at the right: against the time", At(w.title) == 202 - 52 - 40)
+    s.store.Set("timePlace", "left"); s.Flush()
+    check("the time at the left edge, the title at the right end", At(w.time) == 8 and w.time.points[1][1] == "LEFT"
+        and w.time.justify == "LEFT" and At(w.title) == 202 - 40)
+    s.store.Set("titleAlign", "left"); s.Flush()
+    check("and the title left of what is left", At(w.title) == 8 + 48 + 4)
+    s.store.Set("timePlace", "title"); s.Flush()
+    check("the time after the title", At(w.title) == 8 and w.time.points[1][2] == w.title
+        and w.time.points[1][3] == "RIGHT" and w.time.points[1][4] == 4 and w.time.justify == "LEFT")
+    s.store.Set("titleAlign", "center"); s.Flush()
+    check("the two as one: centered together", At(w.title) == 8 + math.floor((194 - (40 + 4 + 48)) / 2))
+    s.store.Set("titleAlign", "right"); s.Flush()
+    check("and at the right together", At(w.title) == 202 - (40 + 4 + 48))
+    s.store.Set("showTime", false); s.Flush()
+    check("with no time the title is alone", w.time.shown == false and At(w.title) == 202 - 40)
+    s.store.Set("showTime", true); s.store.Set("titleAlign", "left"); s.store.Set("timePlace", "buttons")
+    s.store.Set("width", 198); s.Flush()
+    check("the time fits with nothing to spare", w.time.shown == true)
+    s.store.Set("width", 197); s.Flush()
+    check("and not a pixel less", w.time.shown == false)
+    w.title.stringWidth = 100
+    s.store.Set("width", 300); s.Flush()
+    check("a title that grew is measured whole, not by the width it had", w.title.w == 100)
+    w.title.stringWidth = nil
+    s.store.Set("width", 170); s.Flush()
+    check("no room for both: the time goes, the title stays", w.time.shown == false and At(w.title) == 8
+        and w.title.w == 40)
+    w.title.stringWidth = 500
+    s.store.Set("width", 300); s.Flush()
+    check("a long title is cut to the room, and the time gives way", w.title.w == 194 and w.time.shown == false)
+    check("and the list button is as wide", w.modeButton.w == 194 + 16)
+    s.store.Set("lower", "healing"); s.store.Set("titleAlign", "center"); s.Flush()
+    check("the second title follows the position, across its strip", w.lowerTitle.justify == "CENTER"
+        and w.lowerTitle.points[1][1] == "LEFT" and w.lowerTitle.points[2][1] == "RIGHT")
+    s.store.Set("titleAlign", "right"); s.Flush()
+    check("and right", w.lowerTitle.justify == "RIGHT")
+
+    local page = s.page
+    local card = CardOf(page, "header")
+    local says, align, place = RowOf(page, "titleText"), RowOf(page, "titleAlign"), RowOf(page, "timePlace")
+    check("the Title Bar card has the three choices", says and align and place and says.choice and align.choice
+        and place.choice)
+    local values, order = says.choice[1], says.choice[2]
+    check("Title Shows: list, fight, both", values.list == "List Name" and values.fight == "Fight Name"
+        and values.both == "List and Fight" and #order == 3 and order[1] == "list")
+    values, order = place.choice[1], place.choice[2]
+    check("Time Position: by the buttons, the left edge, after the title", values.buttons == "By the Buttons"
+        and values.left == "Left Edge" and values.title == "After the Title" and order[1] == "buttons")
+    check("each is in the title bar card", card and #card.rows >= 8)
+    s.store.Set("showTime", false)
+    check("Time Position waits for the time", place.needs() == false and place.why == "Turn on Show Fight Time"
+        and says.needs() == true and align.needs() == true)
+    s.store.Set("showTime", true)
+    check("and is on with it", place.needs() == true)
 end
 
 -- names: full, first, last, initials, and found by class in combat
@@ -2274,7 +2387,10 @@ do
     s.store.Set("locked", false)
     check("Rows", CardOf(page, "rows").summary(s.store) == "20 px rows, 2 px apart")
     check("Numbers and Names", CardOf(page, "numbers").summary(s.store) == "Game Default, Full Name")
-    check("Title Bar", CardOf(page, "header").summary(s.store) == "Time on, summary off")
+    check("Title Bar", CardOf(page, "header").summary(s.store) == "List Name, time by the buttons")
+    s.store.Set("showTime", false)
+    check("Title Bar, no time", CardOf(page, "header").summary(s.store) == "List Name, time off")
+    s.store.Set("showTime", true)
     check("Text and Bars", CardOf(page, "text").summary(s.store) == "Size 11")
     check("Hover and Report", CardOf(page, "hover").summary(s.store) == "Spells on, reports of 5 lines")
     check("Fight History", CardOf(page, "history").summary(s.store) == "0 of 30 fights kept")

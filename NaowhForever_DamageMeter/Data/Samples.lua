@@ -5,6 +5,7 @@ local OWN = 2
 
 ns.DamageMeter.SAMPLE = {
     durationSeconds = 205,
+    fightName = "Training Dummy",
     maxAmount = 100,
     totalAmount = 660,
     combatSources = {

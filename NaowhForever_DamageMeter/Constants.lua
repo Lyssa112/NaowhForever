@@ -30,7 +30,7 @@ ns.DamageMeter.C = {
     PAGE = "Damage Meter/Settings",
     MIN_WIDTH = 170, MIN_HEIGHT = 70, MAX_WIDTH = 600, MAX_HEIGHT = 700,
     MIN_BAR = 12, MAX_BAR = 40, MAX_SPACING = 12, MIN_FONT = 8, MAX_FONT = 20,
-    INSET = 6, HEADER = 26,
+    INSET = 6, HEADER = 26, TITLE_X = 8,
     ROUND = 0.5,
     DEFAULT_MODE = "damage",
     BREAKDOWN_LINES = 8, TARGET_LINES = 5, REPORT_MAX = 10, FIGHTS_MAX = 10,
@@ -54,6 +54,13 @@ ns.DamageMeter.C = {
     NAME_FORMATS = { full = "Full Name", first = "First Name", last = "Last Name", initials = "Initials",
         firstInitial = "First Name and Initial" },
     NAME_FORMATS_ORDER = { "full", "first", "last", "initials", "firstInitial" },
+    -- What the title says and where it and the fight time sit in the title bar.
+    TITLE_TEXTS = { list = "List Name", fight = "Fight Name", both = "List and Fight" },
+    TITLE_TEXTS_ORDER = { "list", "fight", "both" },
+    TITLE_ALIGNS = { left = "Left", center = "Center", right = "Right" },
+    TITLE_ALIGNS_ORDER = { "left", "center", "right" },
+    TIME_PLACES = { buttons = "By the Buttons", left = "Left Edge", title = "After the Title" },
+    TIME_PLACES_ORDER = { "buttons", "left", "title" },
     -- Ten-thousand grouping: the glyphs of thousand, ten-thousand and hundred-million, by locale (UTF-8).
     ASIAN_GLYPHS = {
         zhCN = { "\229\141\131", "\228\184\135", "\228\186\191" },

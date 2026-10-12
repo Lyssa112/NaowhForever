@@ -11,8 +11,10 @@ local PREVIEW_SECONDS = 10
 local INSET, HEADER, ROUND = C.INSET, C.HEADER, C.ROUND
 local MIN_WIDTH, MAX_WIDTH, MAX_HEIGHT = C.MIN_WIDTH, C.MAX_WIDTH, C.MAX_HEIGHT
 local BUTTON_H, MORE_W, SESSION_W, BUTTON_GAP, BUTTON_RIGHT = 18, 22, 62, 4, -6
-local TITLE_PAD = 8
-local TIME_ROOM = 2 * TITLE_PAD + SESSION_W + MORE_W + BUTTON_GAP - BUTTON_RIGHT
+local TITLE_X = C.TITLE_X
+local TITLE_JOIN = " - "
+-- What the buttons take of the title bar's right end, from the edge to the session button's left.
+local BAR_BUTTONS = BUTTON_GAP + SESSION_W + BUTTON_GAP + MORE_W - BUTTON_RIGHT
 local GRIP_SIZE, GRIP_INSET, GRIP_LEVEL, GRIP_LOCKED_ALPHA = 20, 2, 20, 0.4
 local HOME_X, HOME_Y = -24, 210
 local FRAME_NAME = "NaowhForeverDamageMeter"
@@ -65,7 +67,6 @@ local function Layout(w, session)
     return shown, mode
 end
 
--- seconds is how long the session has run, or nil; it is shown when the title bar has room for it.
 -- Raid Mode: the session as it would be with only you in it, still ranked as you are.
 local function OwnOnly(session)
     local rank = DM.Rank(session)
@@ -74,7 +75,58 @@ local function OwnOnly(session)
     return { combatSources = sources, maxAmount = session.maxAmount, totalAmount = session.totalAmount, rank = rank }
 end
 
-local function Render(w, session, available, seconds, lowerSession)
+-- The title's words: the list's name, the fight's, or both when there is a fight's name to give.
+local function TitleText(mode, fightName)
+    local says = S.Get("titleText")
+    if says == "list" or not fightName then return mode.label end
+    if says == "fight" then return fightName end
+    return mode.label .. TITLE_JOIN .. fightName
+end
+
+-- Puts the title and the fight time in the bar where the settings say. The buttons hold its right end and
+-- the two share the rest: the time goes when both do not fit, and a long title is cut to what is there.
+local function PaintTitleBar(frame, mode, seconds, fightName)
+    local title, time, header = frame.title, frame.time, frame.header
+    title:SetWidth(0)
+    title:SetText(TitleText(mode, fightName))
+    local textWidth, timeWidth = math.ceil(title:GetStringWidth()), Look.TimeWidth()
+    local low, high = TITLE_X, frame:GetWidth() - BAR_BUTTONS
+    local shown = seconds ~= nil and S.Get("showTime") == true and textWidth + BUTTON_GAP + timeWidth <= high - low
+    local place = S.Get("timePlace")
+    local first, last = low, high
+    if shown and place == "left" then first = low + timeWidth + BUTTON_GAP end
+    if shown and place == "buttons" then last = high - timeWidth - BUTTON_GAP end
+    local drawn = math.min(textWidth, last - first)
+    local group = drawn
+    if shown and place == "title" then group = drawn + BUTTON_GAP + timeWidth end
+    local x, align = first, S.Get("titleAlign")
+    if align == "center" then
+        x = first + math.floor((last - first - group) / 2)
+    elseif align == "right" then
+        x = last - group
+    end
+    title:ClearAllPoints()
+    title:SetPoint("LEFT", header, "LEFT", x, 0)
+    title:SetWidth(drawn)
+    time:ClearAllPoints()
+    if place == "title" then
+        time:SetPoint("LEFT", title, "RIGHT", BUTTON_GAP, 0); time:SetJustifyH("LEFT")
+    elseif place == "left" then
+        time:SetPoint("LEFT", header, "LEFT", low, 0); time:SetJustifyH("LEFT")
+    else
+        time:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP, 0); time:SetJustifyH("RIGHT")
+    end
+    time:SetText(shown and DM.Clock(seconds) or "")
+    time:SetShown(shown)
+    local left = math.max(0, x - TITLE_X)
+    frame.modeButton:ClearAllPoints()
+    frame.modeButton:SetPoint("TOPLEFT", header, "TOPLEFT", left, 0)
+    frame.modeButton:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", left, 0)
+    frame.modeButton:SetWidth(drawn + 2 * TITLE_X)
+end
+
+-- seconds is how long the session has run, or nil; fightName is what the game calls the fight, or nil.
+local function Render(w, session, available, seconds, lowerSession, fightName)
     local frame = w.frame
     local raid = S.Get("raidMode")
     local view = raid and OwnOnly(session) or session
@@ -97,13 +149,7 @@ local function Render(w, session, available, seconds, lowerSession)
     if summary then
         Look.PaintSummary(frame, session, mode, DM.SessionName(Get(w, "session"), w.fight), seconds)
     end
-    frame.title:SetText(mode.label)
-    local titleWidth = frame.title:GetStringWidth()
-    frame.modeButton:SetWidth(titleWidth + 2 * TITLE_PAD)
-    local fits = seconds ~= nil and S.Get("showTime")
-        and frame:GetWidth() >= titleWidth + TIME_ROOM + Look.TimeWidth()
-    frame.time:SetText(fits and DM.Clock(seconds) or "")
-    frame.time:SetShown(fits == true)
+    PaintTitleBar(frame, mode, seconds, fightName)
     ns.SetButtonText(frame.session, w.fight and TEXT_FIGHT or C.SESSION_LABELS[Get(w, "session")]
         or C.SESSION_LABELS.current)
 end
@@ -205,10 +251,8 @@ local function NewButtons(w)
     ns.Tooltip(frame.more, "Menu", TEXT_MORE_TIP)
     frame.session = ns.Button(header, "", SESSION_W, BUTTON_H, function() Menus.Session(w, frame.session) end)
     frame.session:SetPoint("RIGHT", frame.more, "LEFT", -BUTTON_GAP, 0)
-    frame.time:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP, 0)
     ns.Tooltip(frame.session, "Session", TEXT_SESSION_TIP)
     frame.modeButton = CreateFrame("Button", nil, header)
-    frame.modeButton:SetPoint("TOPLEFT"); frame.modeButton:SetPoint("BOTTOMLEFT")
     frame.modeButton:SetScript("OnClick", function() Menus.List(w, frame.modeButton) end)
     ns.Tooltip(frame.modeButton, "List", TEXT_LIST_TIP)
     frame.lowerButton = CreateFrame("Button", nil, frame)
@@ -303,16 +347,18 @@ local function HideAll()
     OnRowLeave()
 end
 
-local function Draw(w, sample)
-    w.sample = sample
+local function Draw(w, asSample)
+    w.sample = asSample
     local lowerKey = Get(w, "lower")
-    if sample then
+    if asSample then
         local sample = DM.Sample()
-        Render(w, sample, true, sample.durationSeconds, lowerKey ~= "" and sample or nil)
+        Render(w, sample, true, sample.durationSeconds, lowerKey ~= "" and sample or nil, sample.fightName)
     else
         local session, fight = Get(w, "session"), w.fight
         local lower = lowerKey ~= "" and DM.Session(lowerKey, session, fight) or nil
-        Render(w, DM.Session(Get(w, "mode"), session, fight), DM.Available(), DM.Duration(session, fight), lower)
+        local name = S.Get("titleText") ~= "list" and DM.FightName(session, fight) or nil
+        Render(w, DM.Session(Get(w, "mode"), session, fight), DM.Available(), DM.Duration(session, fight), lower,
+            name)
     end
     w.frame:Show()
 end
