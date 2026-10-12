@@ -2786,6 +2786,74 @@ do
         and CardOf(s.page, "header") ~= nil and s.store.Get("showButtons") == true)
 end
 
+-- the title bar can be see-through, the time can be in brackets after the title, and the clean look is
+-- all of it at once
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    check("the title bar is drawn by default", w.headerBackground.alpha == 1 and w.headerRule.alpha == 1
+        and w.lowerBackground.alpha == 1)
+    s.store.Set("headerAlpha", 0); s.Flush()
+    check("Title Bar Opacity at zero: the bar, its line and the second list's strip are not drawn",
+        w.headerBackground.alpha == 0 and w.headerRule.alpha == 0 and w.lowerBackground.alpha == 0
+        and w.title.shown == true)
+    s.store.Set("headerAlpha", 0.5); s.Flush()
+    check("and half", w.headerBackground.alpha == 0.5 and w.headerRule.alpha == 0.5
+        and w.lowerBackground.alpha == 0.5)
+    s.store.Set("headerAlpha", 1)
+
+    s.store.Set("timeBrackets", true); s.Flush()
+    check("Time in Brackets: (2:05), with room for the brackets", w.time.text == "(2:05)"
+        and w.time.w == math.ceil(9 * 0.62 * 11))
+    s.store.Set("width", 205); s.Flush()
+    check("which needs more room", w.time.shown == false)
+    s.store.Set("width", 300); s.Flush()
+    s.store.Set("timeByTitle", true); s.Flush()
+    check("Time Next to Title: right after it, reading from the left", w.time.points[1][2] == w.title
+        and w.time.points[1][1] == "LEFT" and w.time.points[1][3] == "RIGHT" and w.time.points[1][4] == 4
+        and w.time.justify == "LEFT" and w.time.shown == true)
+    s.store.Set("titleX", 30); s.store.Set("timeX", 10); s.Flush()
+    check("it moves with the title, and by its own offset", w.title.points[1][4] == 38 and w.time.points[1][2] == w.title
+        and w.time.points[1][4] == 14)
+    s.store.Set("titleX", 0); s.store.Set("timeX", 0)
+    s.store.Set("timeByTitle", false); s.store.Set("timeBrackets", false); s.Flush()
+    check("off again: by the buttons, from the right", w.time.points[1][2] == w.session and w.time.justify == "RIGHT"
+        and w.time.text == "2:05")
+
+    local row, card = RowOf(s.page, "showColumnHeaders")
+    check("Column Titles are on the Title Bar card, where the lines under the bar are", card and card.id == "header")
+    local brackets, byTitle = RowOf(s.page, "timeBrackets"), RowOf(s.page, "timeByTitle")
+    local _, timeCard = RowOf(s.page, "timeBrackets")
+    check("and the time's choices on a card of their own, waiting for the time", timeCard.id == "time"
+        and brackets.needs() == true and byTitle.needs() == true)
+    s.store.Set("showTime", false)
+    check("which wait for Show Fight Time, and say so", brackets.needs() == false and byTitle.needs() == false
+        and brackets.why == "Turn on Show Fight Time" and byTitle.why == "Turn on Show Fight Time"
+        and RowOf(s.page, "headerAlpha").needs() == true)
+    s.store.Set("showTime", true)
+
+    local look
+    for _, c in ipairs(s.page.cards) do
+        for _, r in ipairs(c.rows) do
+            if r.label == "Clean Look" then look = r end
+        end
+    end
+    check("a Clean Look button on the Title Bar card", look and look.buttonText == "Apply")
+    look.button()
+    check("it asks first, and changes nothing yet", #s.confirms >= 1 and w.session.shown == true
+        and s.store.Get("showColumnHeaders") == true)
+    s.confirms[#s.confirms].yes(); s.Flush()
+    check("then the column titles, buttons, ranks, backgrounds and border go", s.store.Get("showColumnHeaders") == false
+        and s.store.Get("showButtons") == false and s.store.Get("showRanks") == false
+        and s.store.Get("showBorder") == false and s.store.Get("headerAlpha") == 0
+        and s.store.Get("backgroundAlpha") == 0 and w.panes[1].headName.shown == false and w.session.shown == false
+        and w.more.shown == false and w.rows[1].rank.shown == false and w.headerBackground.alpha == 0
+        and w.background.alpha == 0)
+    check("and the time is in brackets after the title", w.time.text == "(2:05)" and w.time.points[1][2] == w.title)
+    check("the rows start under the title bar, with nothing between", w.rows[1].points[1][5] == -26 - 6)
+end
+
 -- the page
 do
     local s = Boot()
@@ -2793,8 +2861,8 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("fourteen cards, in their order", table.concat(ids, ",") == "lists,window,rows,numbers,header,text,hover,"
-        .. "history,barColors,textColors,windowColors,classColors,window2,window3" and page.window ~= nil)
+    check("fifteen cards, in their order", table.concat(ids, ",") == "lists,window,rows,numbers,header,time,text,"
+        .. "hover,history,barColors,textColors,windowColors,classColors,window2,window3" and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end
     local sorted = true
@@ -2853,9 +2921,16 @@ do
     s.store.Set("locked", false)
     check("Rows", CardOf(page, "rows").summary(s.store) == "20 px rows, 2 px apart")
     check("Numbers and Names", CardOf(page, "numbers").summary(s.store) == "Game Default, Full Name")
-    check("Title Bar", CardOf(page, "header").summary(s.store) == "List Name, time on")
+    check("Title Bar", CardOf(page, "header").summary(s.store) == "List Name, buttons on")
+    s.store.Set("showButtons", false)
+    check("Title Bar, no buttons", CardOf(page, "header").summary(s.store) == "List Name, buttons off")
+    s.store.Set("showButtons", true)
+    check("Fight Time", CardOf(page, "time").summary(s.store) == "On")
+    s.store.Set("timeBrackets", true)
+    check("Fight Time, in brackets", CardOf(page, "time").summary(s.store) == "On, in brackets")
+    s.store.Set("timeBrackets", false)
     s.store.Set("showTime", false)
-    check("Title Bar, no time", CardOf(page, "header").summary(s.store) == "List Name, time off")
+    check("Fight Time, off", CardOf(page, "time").summary(s.store) == "Off")
     s.store.Set("showTime", true)
     check("Text and Bars", CardOf(page, "text").summary(s.store) == "Size 11")
     check("Hover and Report", CardOf(page, "hover").summary(s.store) == "Spells on, reports of 5 lines")

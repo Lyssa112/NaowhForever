@@ -106,7 +106,8 @@ end
 
 -- How wide the fight time is at the size the settings give it.
 function Look.TimeWidth()
-    return math.ceil(TIME_CHARS * CHAR_W * S.Get("timeSize"))
+    local chars = TIME_CHARS + (S.Get("timeBrackets") == true and 2 or 0)
+    return math.ceil(chars * CHAR_W * S.Get("timeSize"))
 end
 
 -- A pane is a list of rows with its column titles. A window has one, and a second below it on request.
@@ -133,8 +134,9 @@ function Look.New(frame, index)
     frame.header:SetPoint("TOPLEFT"); frame.header:SetPoint("TOPRIGHT"); frame.header:SetHeight(HEADER)
     frame.headerBackground = ns.Solid(frame.header, "BACKGROUND", T.panel, 1)
     frame.headerBackground:SetAllPoints()
-    local rule = ns.Solid(frame.header, "OVERLAY", T.line, 1)
-    rule:SetPoint("BOTTOMLEFT"); rule:SetPoint("BOTTOMRIGHT"); rule:SetHeight(1)
+    frame.headerRule = ns.Solid(frame.header, "OVERLAY", T.line, 1)
+    frame.headerRule:SetPoint("BOTTOMLEFT"); frame.headerRule:SetPoint("BOTTOMRIGHT")
+    frame.headerRule:SetHeight(1)
     frame.image = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
     frame.image:SetAllPoints()
     frame.image:Hide()
@@ -323,8 +325,12 @@ local function PaintFrame(f)
     f.image:SetAlpha(S.Get("imageAlpha"))
     f.background:SetColorTexture(window.r, window.g, window.b, 1)
     f.background:SetAlpha(alpha)
+    local headerAlpha = S.Get("headerAlpha")
     f.headerBackground:SetColorTexture(header.r, header.g, header.b, 1)
+    f.headerBackground:SetAlpha(headerAlpha)
     f.lowerBackground:SetColorTexture(header.r, header.g, header.b, 1)
+    f.lowerBackground:SetAlpha(headerAlpha)
+    f.headerRule:SetAlpha(headerAlpha)
     f.border:SetColor(border.r, border.g, border.b, 1)
     f.border._frame:SetShown(S.Get("showBorder"))
     f.border._frame:SetAlpha(alpha)
@@ -409,7 +415,7 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, g.titleX, g.titleY, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
+        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
         name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
     g.key = key
     if f.laidKey ~= key then LayFrame(f, g) end

@@ -30,7 +30,7 @@ NaowhForever_DamageMeter/
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
-    SettingsPage.lua             its settings page: fourteen small cards
+    SettingsPage.lua             its settings page: fifteen small cards
   README.md                      this file
 ```
 
@@ -118,6 +118,11 @@ NaowhForever_DamageMeter/
   game keeps back in combat. The hover panel is as before, with the per-second figure added.
 - The share (Show Percent) is a column of its own at the right end, made from the row's amount and the
   list's total once both are plain numbers, so it is empty in combat. Deaths has none.
+- Clean Look is one button for what makes the window as plain as the game's own bars: no column titles,
+  buttons, rank numbers, backgrounds or border (the title bar and the window at zero opacity: `headerAlpha`
+  and `backgroundAlpha` draw nothing, the line under the bar included), and the time in brackets after
+  the title (`timeBrackets`, `timeByTitle`). It sets plain settings, each of which has a control of its
+  own, and asks first. The fifteen-entry limit of a card is why Fight Time has a card of its own.
 - The title bar's menu: the list and the session are in the window's ... menu, which a right click on the
   bar opens too. The session and ... buttons can be hidden (Show Buttons); the room they take is kept, so
   nothing else moves.

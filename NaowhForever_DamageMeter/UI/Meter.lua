@@ -13,6 +13,7 @@ local MIN_WIDTH, MAX_WIDTH, MAX_HEIGHT = C.MIN_WIDTH, C.MAX_WIDTH, C.MAX_HEIGHT
 local BUTTON_H, MORE_W, SESSION_W, BUTTON_GAP, BUTTON_RIGHT = 18, 22, 62, 4, -6
 local TITLE_X = C.TITLE_X
 local TITLE_JOIN = " - "
+local TIME_BRACKETS = "(%s)"
 -- What the buttons take of the title bar's right end, from the edge to the session button's left. The room
 -- is kept when they are hidden, so that nothing moves.
 local BAR_BUTTONS = BUTTON_GAP + SESSION_W + BUTTON_GAP + MORE_W - BUTTON_RIGHT
@@ -83,7 +84,8 @@ local function TitleText(mode, fightName)
 end
 
 -- Puts the title and the fight time in the bar. The title starts at the left and the time sits by the
--- buttons, each moved by its own offsets, and the same whether the buttons are shown or not. The time
+-- buttons, or right after the title, each moved by its own offsets, and the same whether the buttons are
+-- shown or not. The time
 -- goes when both do not fit side by side, and a long title is cut to the room there is. text is the
 -- title's words when it is not the usual.
 local function PaintTitleBar(frame, mode, seconds, fightName, text)
@@ -103,8 +105,16 @@ local function PaintTitleBar(frame, mode, seconds, fightName, text)
     title:SetPoint("LEFT", header, "LEFT", x, S.Get("titleY"))
     title:SetWidth(drawn)
     clock:ClearAllPoints()
-    clock:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP + S.Get("timeX"), S.Get("timeY"))
-    clock:SetText(shown and DM.Clock(seconds) or "")
+    if S.Get("timeByTitle") == true then
+        clock:SetPoint("LEFT", title, "RIGHT", BUTTON_GAP + S.Get("timeX"), S.Get("timeY"))
+        clock:SetJustifyH("LEFT")
+    else
+        clock:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP + S.Get("timeX"), S.Get("timeY"))
+        clock:SetJustifyH("RIGHT")
+    end
+    local text = shown and DM.Clock(seconds) or ""
+    if shown and S.Get("timeBrackets") == true then text = TIME_BRACKETS:format(text) end
+    clock:SetText(text)
     clock:SetShown(shown)
 end
 

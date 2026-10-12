@@ -113,8 +113,25 @@ local function NumbersSummary(store)
     return ("%s, %s"):format(C.NUMBER_UNITS[store.Get("numberUnits")] or "", C.NAME_FORMATS[store.Get("nameFormat")] or "")
 end
 
+-- The settings that leave only the title and the bars: no titles over the columns, no buttons, no rank
+-- numbers, nothing behind or around, and the time in brackets after the title.
+local CLEAN_LOOK = { showColumnHeaders = false, showButtons = false, showSummary = false, showRanks = false,
+    showBorder = false, headerAlpha = 0, backgroundAlpha = 0, timeBrackets = true, timeByTitle = true }
+local TEXT_CLEAN_ASK = "Hide the column titles, buttons, rank numbers, backgrounds and border?"
+
+local function ApplyCleanLook()
+    for key, value in pairs(CLEAN_LOOK) do S.Set(key, value) end
+    if ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
+end
+
 local function HeaderSummary(store)
-    return ("%s, time %s"):format(C.TITLE_TEXTS[store.Get("titleText")] or "", store.Get("showTime") and "on" or "off")
+    return ("%s, buttons %s"):format(C.TITLE_TEXTS[store.Get("titleText")] or "",
+        store.Get("showButtons") and "on" or "off")
+end
+
+local function TimeSummary(store)
+    if not store.Get("showTime") then return "Off" end
+    return store.Get("timeBrackets") and "On, in brackets" or "On"
 end
 
 local function TextSummary(store)
@@ -352,8 +369,6 @@ page:Card({
         { key = "showPercent", label = "Show Percent", toggle = true, needs = Enabled, why = OFF,
           help = "Each one's share of what the list totals, in a column of its own. The game hides the figures "
               .. "in combat, so it fills in after the fight." },
-        { key = "showColumnHeaders", label = "Column Titles", toggle = true, needs = Enabled, why = OFF,
-          help = "A line of titles above the rows: Name and what each column shows." },
         Group("Writing"),
         { key = "numberUnits", label = "Number Format", choice = NUMBER_UNITS, needs = Enabled, why = OFF,
           help = "How big numbers are written. Ten-thousands groups by ten-thousands and hundred-millions." },
@@ -367,7 +382,7 @@ page:Card({
 
 page:Card({
     id = "header", name = "Title Bar", order = 50,
-    help = "The title, the length of the fight and the line under them.",
+    help = "The title, the buttons and the lines under them. Clean Look leaves only the title and the bars.",
     summary = HeaderSummary,
     rows = {
         Group("Title"),
@@ -379,22 +394,43 @@ page:Card({
         { key = "titleY", label = "Title Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = Enabled, why = OFF,
           help = "Moves the title up, or down below zero." },
         { key = "titleSize", label = "Title Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
-        Group("Fight Time"),
-        { key = "showTime", label = "Show Fight Time", toggle = true, needs = Enabled, why = OFF,
-          help = "How long the shown session has run, when there is room beside the title." },
-        { key = "timeX", label = "Time X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = ShowingTime,
-          why = OFF_TIME, help = "Moves the time right, or left below zero, from beside the buttons." },
-        { key = "timeY", label = "Time Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = ShowingTime,
-          why = OFF_TIME, help = "Moves the time up, or down below zero." },
-        { key = "timeSize", label = "Fight Time Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
-        Group("Buttons"),
+        Group("Bar"),
+        { key = "headerAlpha", label = "Title Bar Opacity", slider = BACKGROUND_RANGE, unit = "%",
+          scale = TO_FRACTION, needs = Enabled, why = OFF,
+          help = "At zero the title bar and the line under it are not drawn, only its words." },
         { key = "showButtons", label = "Show Buttons", toggle = true, needs = Enabled, why = OFF,
           help = "The session button and the ... menu at the right of the bar. Off: right-click the bar "
               .. "for the same menu." },
         Group("Under the Bar"),
+        { key = "showColumnHeaders", label = "Column Titles", toggle = true, needs = Enabled, why = OFF,
+          help = "A line of titles above the rows: Name and what each column shows." },
         { key = "showSummary", label = "Summary Line", toggle = true, needs = Enabled, why = OFF,
           help = "Under the title bar: the session, its total, the raid's per-second figure once the fight "
               .. "is over, and your rank." },
+        Group("Look"),
+        { label = "Clean Look", buttonText = "Apply", needs = Enabled, why = OFF,
+          button = function() ns.Confirm(TEXT_CLEAN_ASK, ApplyCleanLook) end,
+          help = "Only the title and the bars: no column titles, buttons, rank numbers, backgrounds or "
+              .. "border, and the time in brackets after the title." },
+    },
+})
+
+page:Card({
+    id = "time", name = "Fight Time", order = 55,
+    help = "How long the shown session has run, and where it sits in the title bar.",
+    summary = TimeSummary,
+    rows = {
+        { key = "showTime", label = "Show Fight Time", toggle = true, needs = Enabled, why = OFF,
+          help = "How long the shown session has run, when there is room beside the title." },
+        { key = "timeBrackets", label = "Time in Brackets", toggle = true, needs = ShowingTime, why = OFF_TIME,
+          help = "Writes the time as (0:05)." },
+        { key = "timeByTitle", label = "Time Next to Title", toggle = true, needs = ShowingTime, why = OFF_TIME,
+          help = "Puts the time right after the title, in place of beside the buttons." },
+        { key = "timeX", label = "Time X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = ShowingTime,
+          why = OFF_TIME, help = "Moves the time right, or left below zero, from where it sits." },
+        { key = "timeY", label = "Time Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = ShowingTime,
+          why = OFF_TIME, help = "Moves the time up, or down below zero." },
+        { key = "timeSize", label = "Fight Time Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
     },
 })
 
