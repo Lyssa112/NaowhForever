@@ -13,7 +13,7 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     showTotal = true, showRate = true, showIcons = true, showRanks = true, highlightPlayer = true,
     barColor = "class", barAlpha = 0.85, backgroundAlpha = 0.9,
     fontSize = 11, font = "", outline = "OUTLINE", texture = "",
-    hideGameMeter = true, breakdown = true, reportLines = 5, showTime = true,
+    hideGameMeter = true, breakdown = true, reportLines = 5, showTime = true, textColor = false,
     mode = "damage", session = "current", width = 300, height = 190,
     meterPos = { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -24, y = 210 },
     window2 = false, mode2 = "healing", session2 = "current", width2 = 300, height2 = 190,

@@ -45,6 +45,20 @@ local function IconOf(source)
     return UNKNOWN_ICON
 end
 
+-- The text color: the one picked, or the theme's foreground.
+function Look.TextColor()
+    local c = S.Get("textColor")
+    if type(c) == "table" then return c end
+    return T.fg
+end
+
+-- Ranks, the fight time and notes: the picked color too, or the theme's muted one.
+function Look.QuietColor()
+    local c = S.Get("textColor")
+    if type(c) == "table" then return c end
+    return T.muted
+end
+
 function Look.New(frame, index)
     frame.rows = {}
     frame.index = index
@@ -98,6 +112,9 @@ local function LayRow(row, f, i, bh, gap, w, fontSize, showRanks, showIcons, val
     local left = TEXT_PAD
     row.rank:ClearAllPoints(); row.rank:SetPoint("LEFT", left, 0); row.rank:SetWidth(RANK_W)
     row.rank:SetShown(showRanks)
+    row.rank:SetTextColor(f.quietColor.r, f.quietColor.g, f.quietColor.b)
+    row.name:SetTextColor(f.textColor.r, f.textColor.g, f.textColor.b)
+    row.value:SetTextColor(f.textColor.r, f.textColor.g, f.textColor.b)
     if showRanks then left = left + RANK_W end
     local iconSize = math.min(ICON_MAX, bh - ICON_PAD)
     row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", left, 0); row.icon:SetSize(iconSize, iconSize)
@@ -124,8 +141,13 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     local chars = columns == 2 and VALUE_CHARS_BOTH or columns == 1 and VALUE_CHARS_ONE or 0
     local valueWidth = math.floor(chars * CHAR_W * fontSize)
     local texture, font, outline = S.Get("texture"), S.Get("font"), S.Get("outline")
+    local text, quiet = Look.TextColor(), Look.QuietColor()
+    f.textColor, f.quietColor = text, quiet
+    f.title:SetTextColor(text.r, text.g, text.b)
+    f.time:SetTextColor(quiet.r, quiet.g, quiet.b)
+    f.empty:SetTextColor(quiet.r, quiet.g, quiet.b)
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(showRanks), tostring(showIcons), valueWidth,
-        texture, font, outline }, "|")
+        texture, font, outline, text.r, text.g, text.b, quiet.r, quiet.g, quiet.b }, "|")
     local rows = f.rows
     for i = 1, shown do
         local row = rows[i] or Look.Row(f, i)

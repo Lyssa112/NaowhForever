@@ -42,6 +42,8 @@ NaowhForever_DamageMeter/
 - The game's meter is the `damageMeterEnabled` setting. It is turned off while this one is on and put
   back as it was after, kept on the account so it survives a reload. It is left alone in combat and
   done again when combat ends.
+- Text Color is `false` until one is picked, and then every text follows the theme's foreground, and
+  the ranks, the fight time and the notes its muted one. A picked color is used for all of them.
 - Interrupts, Dispels and Deaths have no per-second figure, so Show Per Second skips them. Deaths has
   no spells either.
 - Windows 2 and 3 use the first window's keys with their number added (`mode2`, `width3`,

@@ -30,6 +30,7 @@ local function Region(kind, parent)
     function r:GetCenter() return self.centerX end
     function r:SetAlpha(a) self.alpha = a end
     function r:SetText(t) self.text = t end
+    function r:SetTextColor(rr, g, b) self.textColor = { r = rr, g = g, b = b } end
     function r:GetText() return self.text end
     function r:SetFormattedText(fmt, ...) self.text = fmt:format(...) end
     function r:GetStringWidth() return 40 end
@@ -482,6 +483,41 @@ do
     check("a past fight: its own length", w.time.text == "1:01" and w.time.shown == true)
     s.ns.PreviewDamageMeter()
     check("the sample has a length too", w.time.text == "3:25")
+end
+
+-- the text color
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    local row = w.rows[1]
+    check("text follows the theme by default", row.name.textColor.r == THEME.fg.r and row.value.textColor.g == THEME.fg.g
+        and w.title.textColor.b == THEME.fg.b)
+    check("ranks, the time and the empty line are the muted color", row.rank.textColor.r == THEME.muted.r
+        and w.time.textColor.r == THEME.muted.r and w.empty.textColor.r == THEME.muted.r)
+    s.store.Set("textColor", { r = 1, g = 0.2, b = 0.1 })
+    s.Flush()
+    check("a picked color goes to names, amounts and the title", row.name.textColor.r == 1 and row.name.textColor.g == 0.2
+        and row.value.textColor.b == 0.1 and w.title.textColor.g == 0.2)
+    check("and to the rank, the time and the empty line", row.rank.textColor.g == 0.2 and w.time.textColor.g == 0.2
+        and w.empty.textColor.g == 0.2)
+    check("every row, not the first alone", w.rows[3].name.textColor.r == 1 and w.rows[3].rank.textColor.g == 0.2)
+    s.store.Set("textColor", false)
+    s.Flush()
+    check("back to the theme", row.name.textColor.r == THEME.fg.r and row.rank.textColor.r == THEME.muted.r
+        and w.title.textColor.r == THEME.fg.r)
+
+    s.store.Set("textColor", { r = 0, g = 1, b = 0 })
+    s.Flush()
+    s.Hover(w, 2)
+    local panel = s.Panel()
+    check("the spell panel takes it", panel.title.textColor.g == 1 and panel.rows[1].name.textColor.g == 1
+        and panel.rows[1].value.textColor.g == 1)
+    s.store.Set("textColor", false)
+    s.spellsResult = { combatSpells = {} }
+    s.Hover(w, 2)
+    check("and the theme's colors without one", panel.title.textColor.r == THEME.fg.r
+        and panel.note.textColor.r == THEME.muted.r)
 end
 
 -- the menus: the list, the session, and the rest
@@ -947,6 +983,19 @@ do
     end
     check("the rows cover the windows, the rows, the hover and the colors", #keys >= 28)
     check("one short help sentence on each card", #page.cards[1].help < 120 and #page.cards[2].help < 120)
+    local pick
+    for _, r in ipairs(page.cards[1].rows) do
+        if r.key == "textColor" then pick = r end
+    end
+    check("a Text Color row, a color picker", pick and pick.colour == true and pick.label == "Text Color")
+    local pr, pg, pb = pick.get()
+    check("it shows the theme's foreground until one is picked", pr == THEME.fg.r and pg == THEME.fg.g and pb == THEME.fg.b)
+    pick.set(0.1, 0.2, 0.3)
+    local c = s.store.Get("textColor")
+    check("picking stores the color", type(c) == "table" and c.r == 0.1 and c.g == 0.2 and c.b == 0.3)
+    pr, pg, pb = pick.get()
+    check("and the picker shows it", pr == 0.1 and pg == 0.2 and pb == 0.3)
+    s.store.Set("textColor", false)
     check("the first card's summary reads window one", page.cards[1].summary(s.store) == "Damage Done, 300 by 190")
     check("the closed windows say off", page.cards[2].summary(s.store) == "Second: Off, Third: Off")
     s.store.Set("window2", true)

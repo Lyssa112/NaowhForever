@@ -28,6 +28,16 @@ local BAR_COLOR = { { class = "Class Colors", accent = "Theme Accent" }, { "clas
 
 local function Enabled() return DM.On() and true or false end
 
+-- The picker shows the color in use, the theme's until one is picked.
+local function TextColorGet()
+    local c = DM.Look.TextColor()
+    return c.r, c.g, c.b, 1
+end
+
+local function TextColorSet(r, g, b)
+    S.Set("textColor", { r = r, g = g, b = b })
+end
+
 local function Headline()
     if not DM.On() then return "Damage Meter is off" end
     return DM.Mode(S.Get("mode")).label
@@ -126,6 +136,9 @@ page:Card({
         Group("Colors"),
         { key = "barColor", label = "Bar Color", choice = BAR_COLOR, needs = Enabled, why = OFF,
           help = "Class Colors: each player's class. Theme Accent: every bar in your theme's Accent." },
+        { key = "textColor", label = "Text Color", colour = true, get = TextColorGet, set = TextColorSet,
+          needs = Enabled, why = OFF,
+          help = "Names, amounts, ranks and the title. Reset it to follow your theme." },
         { label = "Show It on Screen", buttonText = "Preview", needs = Enabled, why = OFF,
           button = function() ns.PreviewDamageMeter() end,
           help = "Shows the meter with sample bars where it sits on your screen, for ten seconds. Out of "

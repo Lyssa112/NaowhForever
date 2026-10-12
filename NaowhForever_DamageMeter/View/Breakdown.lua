@@ -96,12 +96,19 @@ local function PaintRow(row, spell, data, color, alpha)
     row:Show()
 end
 
-local function Fonts(font, outline)
+-- The font, outline and text colors the meter's settings ask for.
+local function Style()
+    local font, outline = S.Get("font"), S.Get("outline")
+    local text, quiet = Look.TextColor(), Look.QuietColor()
     Parts.HudFont(panel.title, font, TITLE_SIZE, outline)
+    panel.title:SetTextColor(text.r, text.g, text.b)
     Parts.HudFont(panel.note, font, TEXT_SIZE, outline)
+    panel.note:SetTextColor(quiet.r, quiet.g, quiet.b)
     for _, row in ipairs(panel.rows) do
         Parts.HudFont(row.name, font, TEXT_SIZE, outline)
         Parts.HudFont(row.value, font, TEXT_SIZE, outline)
+        row.name:SetTextColor(text.r, text.g, text.b)
+        row.value:SetTextColor(text.r, text.g, text.b)
     end
 end
 
@@ -117,7 +124,7 @@ end
 -- Shows source's spells beside row. data is the game's answer for the source, or nil: then the panel says why.
 function Breakdown.Show(row, source, data, toRight, inCombat)
     if not panel then Build() end
-    Fonts(S.Get("font"), S.Get("outline"))
+    Style()
     panel.title:SetText(source.name)
     local lines = data and math.min(C.BREAKDOWN_LINES, #data.combatSpells) or 0
     local color, alpha = Look.Color(source), S.Get("barAlpha")
