@@ -714,14 +714,15 @@ do
     local s = Boot({ settings = { enabled = true } })
     local texts = {
         { "rank", "Rank", "Rank Numbers", "row", "rankSize", "rankColor", 10 },
-        { "value", "Figure", "Figure Color", "figures", "valueFontSize", "valueColor", 11 },
+        { "value", "Figure", "Figure Settings", "figures", "valueFontSize", "valueColor", 11, true },
         { "head", "Column Title", "Column Titles", "header", "headSize", "columnColor", 10 },
-        { "title", "Title", "Title Color", "header", "titleSize", "titleColor", 12 },
+        { "title", "Title", "Title Settings", "header", "titleSize", "titleColor", 12, true },
         { "time", "Time", "Show Fight Time", "header", "timeSize", "timeColor", 11 },
         { "summary", "Summary", "Summary Line", "header", "summarySize", "summaryColor", 11 },
     }
     for _, t in ipairs(texts) do
         local element, noun, owner, cardId, sizeKey, colorKey, usual = t[1], t[2], t[3], t[4], t[5], t[6], t[7]
+        local inside = t[8] == true
         local own, card = RowOf(s.page, element .. "OwnSize")
         local size, color = RowOf(s.page, sizeKey), RowOf(s.page, colorKey)
         local ownFont, font, outline = RowOf(s.page, element .. "OwnFont"), RowOf(s.page, element .. "Font"),
@@ -735,7 +736,8 @@ do
         check(noun .. ": its size switch, font, outline and color are behind that cog", own.under == owner
             and ownFont.under == owner and font.under == owner and outline.under == owner
             and (color.under == owner or color == ownerRow))
-        check(noun .. ": its size is on the card, in sight", size.under == nil and size.label == noun .. " Size"
+        check(noun .. ": its size is " .. (inside and "behind the cog of its settings" or "on the card, in sight"),
+            (inside and size.under == owner or not inside and size.under == nil) and size.label == noun .. " Size"
             and size.slider ~= nil and select(2, RowOf(s.page, sizeKey)) == card and size.needs() == true)
         check(noun .. ": the rows are named for it", own.label == "Own " .. noun .. " Size" and own.toggle == true
             and ownFont.label == "Own " .. noun .. " Font" and ownFont.toggle == true
@@ -757,9 +759,10 @@ do
     s.store.Set("fontSize", 13); s.store.Set("valueOwnSize", false)
     check("the figures' usual size is the names'", RowOf(s.page, "valueFontSize").get() == 13)
     local name, card = RowOf(s.page, "fontSize")
-    check("the names: a size in sight with no switch, which the figures follow, and a font behind a switch",
-        card.id == "row" and name.label == "Name Size" and name.under == nil and name.needs() == true
-        and RowOf(s.page, "nameOwnFont").under == "Name Color" and RowOf(s.page, "nameOwnSize") == nil
+    check("the names: a size with no switch, which the figures follow, behind Name Settings with the font",
+        card.id == "row" and name.label == "Name Size" and name.under == "Name Settings" and name.needs() == true
+        and RowOf(s.page, "nameColor").label == "Name Settings" and RowOf(s.page, "nameColor").cog ~= nil
+        and RowOf(s.page, "nameOwnFont").under == "Name Settings" and RowOf(s.page, "nameOwnSize") == nil
         and RowOf(s.page, "nameFont").needs() == false)
     local base = RowOf(s.page, "font")
     check("the window's own font and outline are on the Window card", base.font == true
@@ -4381,7 +4384,11 @@ do
     -- every color is a picker that shows the theme's until one is picked
     for _, entry in ipairs(C.COLORS) do
         local row = RowOf(page, entry.key)
-        check(entry.key .. ": a color row, labeled", row and row.colour == true and row.label == entry.label)
+        -- the pickers of the texts with a cog are called what the cog holds, and found by the color's name
+        local called = ({ nameColor = "Name Settings", valueColor = "Figure Settings",
+            titleColor = "Title Settings" })[entry.key]
+        check(entry.key .. ": a color row, labeled", row and row.colour == true and row.label == (called or entry.label)
+            and (called == nil or row.search == entry.label:lower()))
         local token = THEME[entry.token]
         local r, g, b = row.get()
         check(entry.key .. ": shows the theme's " .. entry.token .. " until one is picked",

@@ -222,6 +222,15 @@ local function ColorRow(key)
         needs = COLOR_NEEDS[key] or Enabled, why = COLOR_WHY[key] or OFF, help = COLOR_HELP[key] }
 end
 
+-- A text's color picker as the row of the text's settings: it is called what its cog holds, and is still
+-- found by the color's name.
+local function SettingsRow(key, label, help)
+    local row = ColorRow(key)
+    row.search = row.label:lower()
+    row.label, row.help = label, help
+    return row
+end
+
 -- A row that is left off the page while hidden() says so.
 local function HiddenWhen(row, hidden)
     row.hidden = hidden
@@ -501,16 +510,18 @@ page:Card({
             "Rank Text", "The rank's size switch, font and color.",
             Join(TextRows("Rank", "rank", "Off: the usual size."), ColorRow("rankColor"))),
         SizeRow("Rank", "rank", "rankSize", TEXT_RANGE),
-        Under(ColorRow("nameColor"), "Name Text", "The name's font and color.", {
+        Under(SettingsRow("nameColor", "Name Settings", "The names' color. Their size, font and class colors "
+                .. "are behind the cog."),
+            "Name Settings", "The name's size, font and color.", {
+            { key = "fontSize", label = "Name Size", slider = TEXT_RANGE, needs = Enabled, why = OFF,
+              help = "The names' size. The figures follow it unless they have a size of their own." },
             { key = "nameOwnFont", label = "Own Name Font", toggle = true, needs = Enabled, why = OFF,
               help = "Off: the font and outline of Window." },
             { key = "nameFont", label = "Name Font", font = true, needs = OwnFonted("name"), why = OFF_OWN_FONT },
             { key = "nameOutline", label = "Name Outline", choice = OUTLINE, needs = OwnFonted("name"),
               why = OFF_OWN_FONT },
             { key = "nameClassColor", label = "Class Colored Names", toggle = true, needs = Enabled, why = OFF,
-              help = "Each name in its class's color, in place of the Name Color." } }),
-        { key = "fontSize", label = "Name Size", slider = TEXT_RANGE, needs = Enabled, why = OFF,
-          help = "The names' size. The figures follow it unless they have a size of their own." },
+              help = "Each name in its class's color, in place of the name's color." } }),
         { key = "nameFormat", label = "Name Format", choice = NAME_FORMAT, needs = Enabled, why = OFF,
           help = "How a player's name is written. In combat the game hides other players' names, so those "
               .. "are found by class and left whole when two players share one." },
@@ -544,11 +555,13 @@ page:Card({
         { key = "columnOrder", label = "Column Order", choice = COLUMN_ORDER, needs = Enabled, why = OFF,
           help = "Which way round the figures go, and where the share stands. As the Game Has It leads with "
               .. "the per-second figure in the DPS and HPS lists." },
-        Under(ColorRow("valueColor"), "Figure Text", "The figures' size switch, font and color.", Join(
+        Under(SettingsRow("valueColor", "Figure Settings", "The figures' color. Their size, font and class "
+                .. "colors are behind the cog."),
+            "Figure Settings", "The figures' size, font and color.", Join(
+            SizeRow("Figure", "value", "valueFontSize", TEXT_RANGE),
             TextRows("Figure", "value", "Off: the same size as the names."),
             { key = "valueClassColor", label = "Class Colored Figures", toggle = true, needs = Enabled, why = OFF,
-              help = "Each amount in its class's color, in place of the Figure Color." })),
-        SizeRow("Figure", "value", "valueFontSize", TEXT_RANGE),
+              help = "Each amount in its class's color, in place of the figures' color." })),
         Group("Writing"),
         { key = "numberUnits", label = "Number Format", choice = NUMBER_UNITS, needs = Enabled, why = OFF,
           help = "How big numbers are written. Ten-thousands groups by ten-thousands and hundred-millions." },
@@ -572,14 +585,16 @@ page:Card({
         { key = "titleText", label = "Title Shows", choice = TITLE_TEXT, needs = Enabled, why = OFF,
           help = "The list's name, the name the game gave the fight, or both. A fight with no name yet "
               .. "shows the list's." },
-        Under(ColorRow("titleColor"), "Title Text", "The title's size switch, font, color and place.", Join(
+        Under(SettingsRow("titleColor", "Title Settings", "The title's color. Its size, font and place are "
+                .. "behind the cog."),
+            "Title Settings", "The title's size, font, color and place.", Join(
+            SizeRow("Title", "title", "titleSize", TITLE_RANGE),
             TextRows("Title", "title", "Off: the usual size."),
             { key = "titleX", label = "Title X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = Enabled,
               why = OFF, help = "Moves the title right, or left below zero. The second list's title moves "
                   .. "with it." },
             { key = "titleY", label = "Title Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = Enabled,
               why = OFF, help = "Moves the title up, or down below zero." })),
-        SizeRow("Title", "title", "titleSize", TITLE_RANGE),
         { key = "showButtons", label = "Show Buttons", toggle = true, needs = Enabled, why = OFF,
           help = "The session button and the ... menu at the right of the bar. Off: right-click the bar "
               .. "for the same menu." },
