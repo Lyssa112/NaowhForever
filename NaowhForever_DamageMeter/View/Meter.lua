@@ -258,12 +258,27 @@ local function LayFrame(f, g)
     Parts.HudFont(f.lowerTitle, g.font, g.titleSize, g.outline)
     Parts.HudFont(f.time, g.font, g.timeSize, g.outline)
     f.time:SetWidth(Look.TimeWidth())
+end
+
+-- The picture behind the rows: stretched over the window, or repeated with each repeat tileSize wide.
+-- The repeat is worked out here from the window's size, since a picture's own size is not known.
+local function LayImage(f, g, w, h)
     local path = ImagePath(g.image, g.path)
-    if path then
-        f.image:SetTexture(path, g.tile and "REPEAT" or nil, g.tile and "REPEAT" or nil)
-        f.image:SetHorizTile(g.tile); f.image:SetVertTile(g.tile)
-    end
     f.image:SetShown(path ~= nil)
+    if not path then
+        f.imageKey = nil
+        return
+    end
+    local key = table.concat({ path, g.tileSize, g.tile and w or 0, g.tile and h or 0 }, "|")
+    if f.imageKey == key then return end
+    f.imageKey = key
+    if g.tile then
+        f.image:SetTexture(path, "REPEAT", "REPEAT")
+        f.image:SetTexCoord(0, w / g.tileSize, 0, h / g.tileSize)
+    else
+        f.image:SetTexture(path)
+        f.image:SetTexCoord(0, 1, 0, 1)
+    end
 end
 
 -- The window's own colors: the frame, the title bar and its texts.
@@ -351,14 +366,16 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
     g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
     g.image, g.path, g.tile = S.Get("backgroundImage"), S.Get("backgroundPath"), S.Get("imageTile") == true
+    g.tileSize = math.max(C.MIN_TILE, S.Get("imageTileSize"))
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, g.image, g.path, tostring(g.tile), g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
+        headTop, g.titleSize, g.timeSize, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
         name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
     g.key = key
     if f.laidKey ~= key then LayFrame(f, g) end
     f.laidKey = key
+    LayImage(f, g, w, h)
     local pane = f.panes[1]
     pane.top = top
     return LayPane(pane, mode, total, first, n1, g, key, -headTop - HEAD_PAD)

@@ -39,7 +39,7 @@ ns.DamageMeter.C = {
     MIN_TITLE = 8, MAX_TITLE = 20,
     NUMBER_UNITS = { game = "Game Default", latin = "K, M, B", asian = "Ten-thousands", full = "Full Numbers" },
     NUMBER_UNITS_ORDER = { "game", "latin", "asian", "full" },
-    NUMBER_DECIMALS_MAX = 2, MAX_HIDE_DELAY = 60, MIN_KEEP = 5, MAX_KEEP = 100,
+    NUMBER_DECIMALS_MAX = 2, MAX_HIDE_DELAY = 60, MIN_KEEP = 5, MAX_KEEP = 100, MIN_TILE = 16, MAX_TILE = 512,
     -- Pictures the shared media lists that are not backgrounds worth putting behind a meter.
     HIDDEN_BACKGROUNDS = { ["Solid"] = true, ["Blizzard Tooltip"] = true, ["Blizzard Out of Control"] = true,
         ["Blizzard Low Health"] = true },

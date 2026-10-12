@@ -18,6 +18,7 @@ local OFF_ABBREVIATING = "Number Format is Game Default or Full Numbers"
 local OFF_CLASS = "Set Bar Color to Class Colors"
 local OFF_IMAGE = "Pick a Background Image"
 local OFF_COMBAT = "Set Where to In Combat"
+local OFF_TILE = "Turn on Tile Image"
 local Style = ns.Shared.Style
 local WIDTH_RANGE, HEIGHT_RANGE = { C.MIN_WIDTH, C.MAX_WIDTH, 1 }, { C.MIN_HEIGHT, C.MAX_HEIGHT, 1 }
 local BAR_RANGE, SPACING_RANGE = { C.MIN_BAR, C.MAX_BAR, 1 }, { 0, C.MAX_SPACING, 1 }
@@ -29,6 +30,7 @@ local DELAY_RANGE = { 0, C.MAX_HIDE_DELAY, 1 }
 local DECIMALS_RANGE = { 0, C.NUMBER_DECIMALS_MAX, 1 }
 local TITLE_RANGE = { C.MIN_TITLE, C.MAX_TITLE, 1 }
 local KEEP_RANGE = { C.MIN_KEEP, C.MAX_KEEP, 1 }
+local TILE_RANGE = { C.MIN_TILE, C.MAX_TILE, 8 }
 
 local MODE = { C.MODE_LABELS, C.MODE_ORDER }
 local SESSION = { C.SESSION_LABELS, C.SESSION_ORDER }
@@ -61,6 +63,7 @@ local function HasImage()
     local picked = S.Get("backgroundImage")
     return DM.On() and (S.Get("backgroundPath") ~= "" or (picked ~= "" and not C.HIDDEN_BACKGROUNDS[picked]))
 end
+local function TilesImage() return HasImage() and S.Get("imageTile") == true end
 local function Abbreviating()
     local units = S.Get("numberUnits")
     return DM.On() and (units == "latin" or units == "asian")
@@ -83,6 +86,13 @@ local function ListsSummary(store)
     local lower = store.Get("lower")
     if lower ~= "" then text = text .. " over " .. DM.Mode(lower).label end
     return ("%s, %s"):format(text, (C.SESSION_LABELS[store.Get("session")] or C.SESSION_LABELS.current):lower())
+end
+
+local function ImageSummary(store)
+    if store.Get("backgroundPath") ~= "" then return "Your own picture" end
+    local picked = store.Get("backgroundImage")
+    if picked == "" or C.HIDDEN_BACKGROUNDS[picked] then return "None" end
+    return picked
 end
 
 local function WindowSummary(store)
@@ -274,7 +284,7 @@ page:Card({
 
 page:Card({
     id = "window", name = "Window", order = 20,
-    help = "Its size, its background and the game's own meter. Move it in the HUD Editor.",
+    help = "Its size, its look and the game's own meter. Move it in the HUD Editor.",
     summary = WindowSummary,
     rows = {
         Group("Size"),
@@ -286,14 +296,6 @@ page:Card({
         { key = "backgroundAlpha", label = "Opacity", slider = BACKGROUND_RANGE, unit = "%",
           scale = TO_FRACTION, needs = Enabled, why = OFF },
         { key = "showBorder", label = "Border", toggle = true, needs = Enabled, why = OFF },
-        { key = "backgroundImage", label = "Image", choice = ImageChoices, needs = Enabled, why = OFF,
-          help = "A picture behind the rows, from a shared media add-on. For your own, see Add Your Own Image." },
-        { key = "backgroundPath", label = "Custom Image", text = true, wide = true, needs = Enabled, why = OFF,
-          help = "The path of a picture you added. It takes the place of Image. See Add Your Own Image." },
-        { key = "imageAlpha", label = "Image Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION,
-          needs = HasImage, why = OFF_IMAGE },
-        { key = "imageTile", label = "Tile Image", toggle = true, needs = HasImage, why = OFF_IMAGE,
-          help = "Repeats the picture in place of stretching it, for patterns." },
         Group("Game's Meter"),
         { key = "hideGameMeter", label = "Replace the Game's Meter", toggle = true, needs = Enabled, why = OFF,
           help = "Turns the game's own damage meter off while this one is on." },
@@ -305,19 +307,39 @@ page:Card({
     },
 })
 
+page:Card({
+    id = "image", name = "Background Image", order = 22,
+    help = "A picture behind the rows. To use your own, see Add Your Own Image.",
+    summary = ImageSummary,
+    rows = {
+        Group("Picture"),
+        { key = "backgroundImage", label = "Image", choice = ImageChoices, needs = Enabled, why = OFF,
+          help = "From a shared media add-on." },
+        { key = "backgroundPath", label = "Custom Image", text = true, wide = true, needs = Enabled, why = OFF,
+          help = "The path of a picture you added. It takes the place of Image." },
+        Group("Look"),
+        { key = "imageAlpha", label = "Image Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION,
+          needs = HasImage, why = OFF_IMAGE },
+        { key = "imageTile", label = "Tile Image", toggle = true, needs = HasImage, why = OFF_IMAGE,
+          help = "Repeats the picture in place of stretching it, for patterns." },
+        { key = "imageTileSize", label = "Tile Size", slider = TILE_RANGE, unit = "px", needs = TilesImage,
+          why = OFF_TILE, help = "How wide each repeat is, in pixels." },
+    },
+})
+
 page:Info({
     id = "images", name = "Add Your Own Image", order = 25,
     summary = "Where to put a picture, and what to type",
     lines = {
         { title = "The picture", text = "A .png, .tga or .blp file. Make its width and height powers of two, "
             .. "such as 128, 256, 512 or 1024, to be safe; a small one, 128 or 256, is good for a pattern that "
-            .. "is repeated with Tile Image. A .jpg is most likely not read by the game: open it and save it "
-            .. "as a .png first." },
+            .. "is repeated with Tile Image, and Tile Size says how wide each repeat is. A .jpg is most "
+            .. "likely not read by the game: open it and save it as a .png first." },
         { title = "Where it goes", text = "In the game's Interface\\AddOns folder make a folder of your own, "
             .. "such as MyBackgrounds, and put the file in it, for instance MyBackgrounds\\panel.png. A folder "
             .. "of your own is not touched when add-ons are updated. Restart the game once so it finds "
             .. "the file." },
-        { title = "What to type", text = "In Custom Image, under Window, write the path from Interface, with "
+        { title = "What to type", text = "In Custom Image, under Background Image, write the path from Interface, with "
             .. "backslashes and with the file's extension: Interface\\AddOns\\MyBackgrounds\\panel.png. It "
             .. "takes the place of Image. Empty it to go back." },
         { title = "If it is a green square", text = "The game did not find the file. Check the folder name, "

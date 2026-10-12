@@ -59,7 +59,9 @@ NaowhForever_DamageMeter/
 - Class Colors can be changed class by class (`classColors`, class to color), kept apart from the
   theme tokens since the game gives every class its own. A background image is a name from the shared
   media's `background` list, or a path typed in Custom Image, which wins; it is drawn above the
-  window's color and below the rows, stretched or tiled. The game's plain backgrounds (Solid, Blizzard
+  window's color and below the rows, stretched or tiled. Tiling is worked out in `LayImage` from the
+  window's size and a Tile Size setting, with a repeating wrap, since a picture's own size is not known
+  to the add-on and the engine's own tile flags need the picture to be a power of two. The game's plain backgrounds (Solid, Blizzard
   Tooltip, Out of Control, Low Health) are left out of the list and read as none. An info card on the
   page says how to add a picture: a .png, .tga or .blp in a folder of the player's own under `AddOns`,
   and its path with the extension. A .png loads on this client as it does for other add-ons here; a

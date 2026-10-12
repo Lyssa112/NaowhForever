@@ -42,6 +42,7 @@ local function Region(kind, parent)
     function r:SetStatusBarTexture(t) self.barTexture = t end
     function r:SetColorTexture(rr, g, b, a) self.solid = { rr, g, b, a } end
     function r:SetTexture(t, h, v) self.texture = t; self.wrap = { h, v } end
+    function r:SetTexCoord(a, b, c, d) self.texCoord = { a, b, c, d } end
     function r:CreateTexture() return Region("Texture", self) end
     function r:GetLeft() return 100 end
     function r:GetTop() return 300 end
@@ -1431,6 +1432,19 @@ do
     s.store.Set("backgroundImage", "Dots"); s.store.Set("imageTile", true); s.Flush()
     check("another, tiled", w.image.shown == true and w.image.texture == "Media\\Dots"
         and w.image.wrap[1] == "REPEAT" and w.image.wrap[2] == "REPEAT")
+    check("repeated at the tile size across the window, whatever the picture's own size",
+        w.image.texCoord[2] == 300 / 128 and w.image.texCoord[4] == 206 / 128 and w.image.texCoord[1] == 0)
+    s.store.Set("imageTileSize", 64); s.Flush()
+    check("a smaller tile repeats more", w.image.texCoord[2] == 300 / 64 and w.image.texCoord[4] == 206 / 64)
+    s.store.Set("width", 400); s.Flush()
+    check("a wider window repeats it further", w.image.texCoord[2] == 400 / 64)
+    s.store.Set("imageTileSize", 0); s.Flush()
+    check("a tile size of nothing is kept to the smallest", w.image.texCoord[2] == 400 / 16)
+    s.store.Set("width", 300); s.store.Set("imageTileSize", 128)
+    s.store.Set("imageTile", false); s.Flush()
+    check("not tiled: the whole picture, stretched", w.image.texCoord[2] == 1 and w.image.texCoord[4] == 1
+        and w.image.wrap[1] == nil)
+    s.store.Set("imageTile", true); s.Flush()
     s.store.Set("backgroundImage", ""); s.Flush()
     check("none again", w.image.shown == false)
 
@@ -2134,7 +2148,7 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("fourteen cards, in their order", table.concat(ids, ",") == "lists,window,rows,numbers,header,text,hover,"
+    check("fifteen cards, in their order", table.concat(ids, ",") == "lists,window,image,rows,numbers,header,text,hover,"
         .. "history,barColors,textColors,windowColors,classColors,window2,window3" and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end
@@ -2192,6 +2206,14 @@ do
     s.store.Set("locked", true)
     check("Window, locked", CardOf(page, "window").summary(s.store) == "300 by 206, locked")
     s.store.Set("locked", false)
+    check("Background Image", CardOf(page, "image").summary(s.store) == "None")
+    s.store.Set("backgroundImage", "Marble")
+    check("Background Image names it", CardOf(page, "image").summary(s.store) == "Marble")
+    s.store.Set("backgroundImage", "Solid")
+    check("one the page leaves out reads as none", CardOf(page, "image").summary(s.store) == "None")
+    s.store.Set("backgroundImage", ""); s.store.Set("backgroundPath", "Interface\\x")
+    check("a path typed", CardOf(page, "image").summary(s.store) == "Your own picture")
+    s.store.Set("backgroundPath", "")
     check("Rows", CardOf(page, "rows").summary(s.store) == "20 px rows, 2 px apart")
     check("Numbers and Names", CardOf(page, "numbers").summary(s.store) == "Game Default, Full Name")
     check("Title Bar", CardOf(page, "header").summary(s.store) == "Time on, summary off")
@@ -2280,6 +2302,12 @@ do
     s.store.Set("numberUnits", "latin")
     check("which Ten-thousands and K, M, B are", decimals.needs() == true)
     s.store.Set("numberUnits", "game")
+    local tileSize = RowOf(page, "imageTileSize")
+    s.store.Set("backgroundImage", "Marble")
+    check("Tile Size needs a picture that is tiled", tileSize.needs() == false)
+    s.store.Set("imageTile", true)
+    check("which it is", tileSize.needs() == true)
+    s.store.Set("imageTile", false); s.store.Set("backgroundImage", "")
     local image = RowOf(page, "imageAlpha")
     check("the image rows need an image", image.needs() == false and RowOf(page, "imageTile").needs() == false)
     s.store.Set("backgroundImage", "Marble")
