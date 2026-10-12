@@ -620,7 +620,7 @@ do
     check("the sample has a length too", w.time.text == "3:25")
 end
 
--- the title bar: what the title says, and where it and the time sit
+-- the title bar: what the title says, and how far the title and the time are moved
 do
     local s = Boot({ settings = { enabled = true } })
     s.fights = { { sessionID = 3, name = "Fyrakk", durationSeconds = 61 } }
@@ -666,27 +666,25 @@ do
     s.ns.HideUnlockMode()
     s.store.Set("titleText", "list"); s.Flush()
 
-    -- the bar is 300 wide: the buttons take 98, so the title and time share 8 to 202
-    s.store.Set("titleAlign", "center"); s.Flush()
-    check("centered between the left edge and the time", At(w.title) == 8 + math.floor((202 - 52 - 8 - 40) / 2))
-    check("the list button follows it", w.modeButton.points[1][4] == At(w.title) - 8)
-    s.store.Set("titleAlign", "right"); s.Flush()
-    check("at the right: against the time", At(w.title) == 202 - 52 - 40)
-    s.store.Set("timePlace", "left"); s.Flush()
-    check("the time at the left edge, the title at the right end", At(w.time) == 8 and w.time.points[1][1] == "LEFT"
-        and w.time.justify == "LEFT" and At(w.title) == 202 - 40)
-    s.store.Set("titleAlign", "left"); s.Flush()
-    check("and the title left of what is left", At(w.title) == 8 + 48 + 4)
-    s.store.Set("timePlace", "title"); s.Flush()
-    check("the time after the title", At(w.title) == 8 and w.time.points[1][2] == w.title
-        and w.time.points[1][3] == "RIGHT" and w.time.points[1][4] == 4 and w.time.justify == "LEFT")
-    s.store.Set("titleAlign", "center"); s.Flush()
-    check("the two as one: centered together", At(w.title) == 8 + math.floor((194 - (40 + 4 + 48)) / 2))
-    s.store.Set("titleAlign", "right"); s.Flush()
-    check("and at the right together", At(w.title) == 202 - (40 + 4 + 48))
+    -- the bar is 300 wide: the buttons take 98, so the title has 8 to 202, and the time is beside the buttons
+    s.store.Set("titleX", 50); s.Flush()
+    check("X Offset moves the title right", At(w.title) == 58 and w.title.points[1][5] == 0)
+    check("and the list button with it", w.modeButton.points[1][4] == 50)
+    s.store.Set("titleX", -6); s.Flush()
+    check("or left, the list button stopping at the bar's edge", At(w.title) == 2 and w.modeButton.points[1][4] == 0)
+    s.store.Set("titleX", 0); s.store.Set("titleY", 5); s.Flush()
+    check("Y Offset moves it up", w.title.points[1][5] == 5 and At(w.title) == 8)
+    s.store.Set("titleY", -5); s.Flush()
+    check("or down", w.title.points[1][5] == -5)
+    s.store.Set("titleY", 0)
+    s.store.Set("timeX", -30); s.store.Set("timeY", 3); s.Flush()
+    check("the time moves from the buttons, in both directions", w.time.points[1][2] == w.session
+        and w.time.points[1][4] == -4 - 30 and w.time.points[1][5] == 3 and w.time.justify == "RIGHT")
+    check("and the title stays", At(w.title) == 8 and w.title.points[1][5] == 0 and w.time.shown == true)
+    s.store.Set("timeX", 0); s.store.Set("timeY", 0)
     s.store.Set("showTime", false); s.Flush()
-    check("with no time the title is alone", w.time.shown == false and At(w.title) == 202 - 40)
-    s.store.Set("showTime", true); s.store.Set("titleAlign", "left"); s.store.Set("timePlace", "buttons")
+    check("with no time the title keeps its place", w.time.shown == false and At(w.title) == 8)
+    s.store.Set("showTime", true)
     s.store.Set("width", 198); s.Flush()
     check("the time fits with nothing to spare", w.time.shown == true)
     s.store.Set("width", 197); s.Flush()
@@ -702,29 +700,35 @@ do
     s.store.Set("width", 300); s.Flush()
     check("a long title is cut to the room, and the time gives way", w.title.w == 194 and w.time.shown == false)
     check("and the list button is as wide", w.modeButton.w == 194 + 16)
-    s.store.Set("lower", "healing"); s.store.Set("titleAlign", "center"); s.Flush()
-    check("the second title follows the position, across its strip", w.lowerTitle.justify == "CENTER"
-        and w.lowerTitle.points[1][1] == "LEFT" and w.lowerTitle.points[2][1] == "RIGHT")
-    s.store.Set("titleAlign", "right"); s.Flush()
-    check("and right", w.lowerTitle.justify == "RIGHT")
+    w.title.stringWidth = nil
+    s.store.Set("lower", "healing"); s.store.Set("titleX", 30); s.store.Set("titleY", 4); s.Flush()
+    check("the second title moves with the first, across its strip", w.lowerTitle.points[1][1] == "LEFT"
+        and w.lowerTitle.points[1][2] == 38 and w.lowerTitle.points[1][3] == 4
+        and w.lowerTitle.points[2][1] == "RIGHT" and w.lowerTitle.points[2][2] == -8
+        and w.lowerTitle.points[2][3] == 4)
+    s.store.Set("titleX", 0); s.store.Set("titleY", 0); s.Flush()
+    check("and back", w.lowerTitle.points[1][2] == 8 and w.lowerTitle.points[1][3] == 0)
 
     local page = s.page
     local card = CardOf(page, "header")
-    local says, align, place = RowOf(page, "titleText"), RowOf(page, "titleAlign"), RowOf(page, "timePlace")
-    check("the Title Bar card has the three choices", says and align and place and says.choice and align.choice
-        and place.choice)
+    local says = RowOf(page, "titleText")
+    local tx, ty, mx, my = RowOf(page, "titleX"), RowOf(page, "titleY"), RowOf(page, "timeX"), RowOf(page, "timeY")
     local values, order = says.choice[1], says.choice[2]
     check("Title Shows: list, fight, both", values.list == "List Name" and values.fight == "Fight Name"
         and values.both == "List and Fight" and #order == 3 and order[1] == "list")
-    values, order = place.choice[1], place.choice[2]
-    check("Time Position: by the buttons, the left edge, after the title", values.buttons == "By the Buttons"
-        and values.left == "Left Edge" and values.title == "After the Title" and order[1] == "buttons")
-    check("each is in the title bar card", card and #card.rows >= 8)
+    check("four offsets, from below zero to above", tx and ty and mx and my and tx.label == "Title X Offset"
+        and ty.label == "Title Y Offset" and mx.label == "Time X Offset" and my.label == "Time Y Offset"
+        and tx.slider[1] == -300 and tx.slider[2] == 300 and mx.slider[1] == -300
+        and ty.slider[1] == -20 and ty.slider[2] == 20 and my.slider[2] == 20)
+    check("they start at zero", s.store.Get("titleX") == 0 and s.store.Get("titleY") == 0
+        and s.store.Get("timeX") == 0 and s.store.Get("timeY") == 0)
+    check("and they are in the title bar card, with no position choices left", card and #card.rows >= 9
+        and RowOf(page, "titleAlign") == nil and RowOf(page, "timePlace") == nil)
     s.store.Set("showTime", false)
-    check("Time Position waits for the time", place.needs() == false and place.why == "Turn on Show Fight Time"
-        and says.needs() == true and align.needs() == true)
+    check("the time's offsets wait for the time", mx.needs() == false and my.needs() == false
+        and mx.why == "Turn on Show Fight Time" and tx.needs() == true and ty.needs() == true)
     s.store.Set("showTime", true)
-    check("and is on with it", place.needs() == true)
+    check("and are on with it", mx.needs() == true and my.needs() == true)
 end
 
 -- names: full, first, last, initials, and found by class in combat
@@ -2464,7 +2468,7 @@ do
     s.store.Set("locked", false)
     check("Rows", CardOf(page, "rows").summary(s.store) == "20 px rows, 2 px apart")
     check("Numbers and Names", CardOf(page, "numbers").summary(s.store) == "Game Default, Full Name")
-    check("Title Bar", CardOf(page, "header").summary(s.store) == "List Name, time by the buttons")
+    check("Title Bar", CardOf(page, "header").summary(s.store) == "List Name, time on")
     s.store.Set("showTime", false)
     check("Title Bar, no time", CardOf(page, "header").summary(s.store) == "List Name, time off")
     s.store.Set("showTime", true)

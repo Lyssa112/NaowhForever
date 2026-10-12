@@ -31,6 +31,7 @@ local REPORT_RANGE = { 1, C.REPORT_MAX, 1 }
 local DELAY_RANGE = { 0, C.MAX_HIDE_DELAY, 1 }
 local DECIMALS_RANGE = { 0, C.NUMBER_DECIMALS_MAX, 1 }
 local TITLE_RANGE = { C.MIN_TITLE, C.MAX_TITLE, 1 }
+local OFFSET_X_RANGE, OFFSET_Y_RANGE = { -C.MAX_OFFSET_X, C.MAX_OFFSET_X, 1 }, { -C.MAX_OFFSET_Y, C.MAX_OFFSET_Y, 1 }
 local KEEP_RANGE = { C.MIN_KEEP, C.MAX_KEEP, 1 }
 local TILE_RANGE = { C.MIN_TILE, C.MAX_TILE, 8 }
 
@@ -52,8 +53,6 @@ local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "cl
 local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
 local TITLE_TEXT = { C.TITLE_TEXTS, C.TITLE_TEXTS_ORDER }
-local TITLE_ALIGN = { C.TITLE_ALIGNS, C.TITLE_ALIGNS_ORDER }
-local TIME_PLACE = { C.TIME_PLACES, C.TIME_PLACES_ORDER }
 
 local function Enabled() return DM.On() and true or false end
 local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
@@ -115,8 +114,7 @@ local function NumbersSummary(store)
 end
 
 local function HeaderSummary(store)
-    local place = store.Get("showTime") and (C.TIME_PLACES[store.Get("timePlace")] or ""):lower() or "off"
-    return ("%s, time %s"):format(C.TITLE_TEXTS[store.Get("titleText")] or "", place)
+    return ("%s, time %s"):format(C.TITLE_TEXTS[store.Get("titleText")] or "", store.Get("showTime") and "on" or "off")
 end
 
 local function TextSummary(store)
@@ -373,14 +371,18 @@ page:Card({
         { key = "titleText", label = "Title Shows", choice = TITLE_TEXT, needs = Enabled, why = OFF,
           help = "The list's name, the name the game gave the fight, or both. A fight with no name yet "
               .. "shows the list's." },
-        { key = "titleAlign", label = "Title Position", choice = TITLE_ALIGN, needs = Enabled, why = OFF,
-          help = "Where the title sits in the bar. The second list's title follows it." },
+        { key = "titleX", label = "Title X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "Moves the title right, or left below zero. The second list's title moves with it." },
+        { key = "titleY", label = "Title Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = Enabled, why = OFF,
+          help = "Moves the title up, or down below zero." },
         { key = "titleSize", label = "Title Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
         Group("Fight Time"),
         { key = "showTime", label = "Show Fight Time", toggle = true, needs = Enabled, why = OFF,
           help = "How long the shown session has run, when there is room beside the title." },
-        { key = "timePlace", label = "Time Position", choice = TIME_PLACE, needs = ShowingTime, why = OFF_TIME,
-          help = "By the buttons, at the left edge of the bar, or right after the title." },
+        { key = "timeX", label = "Time X Offset", slider = OFFSET_X_RANGE, unit = "px", needs = ShowingTime,
+          why = OFF_TIME, help = "Moves the time right, or left below zero, from beside the buttons." },
+        { key = "timeY", label = "Time Y Offset", slider = OFFSET_Y_RANGE, unit = "px", needs = ShowingTime,
+          why = OFF_TIME, help = "Moves the time up, or down below zero." },
         { key = "timeSize", label = "Fight Time Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
         Group("Under the Bar"),
         { key = "showSummary", label = "Summary Line", toggle = true, needs = Enabled, why = OFF,

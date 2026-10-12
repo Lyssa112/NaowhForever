@@ -55,13 +55,10 @@ ns.DamageMeter.C = {
     NAME_FORMATS = { full = "Full Name", first = "First Name", last = "Last Name", initials = "Initials",
         firstInitial = "First Name and Initial" },
     NAME_FORMATS_ORDER = { "full", "first", "last", "initials", "firstInitial" },
-    -- What the title says and where it and the fight time sit in the title bar.
+    -- What the title says, and how far the title and the fight time may be moved from where they sit.
     TITLE_TEXTS = { list = "List Name", fight = "Fight Name", both = "List and Fight" },
     TITLE_TEXTS_ORDER = { "list", "fight", "both" },
-    TITLE_ALIGNS = { left = "Left", center = "Center", right = "Right" },
-    TITLE_ALIGNS_ORDER = { "left", "center", "right" },
-    TIME_PLACES = { buttons = "By the Buttons", left = "Left Edge", title = "After the Title" },
-    TIME_PLACES_ORDER = { "buttons", "left", "title" },
+    MAX_OFFSET_X = 300, MAX_OFFSET_Y = 20,
     -- Ten-thousand grouping: the glyphs of thousand, ten-thousand and hundred-million, by locale (UTF-8).
     ASIAN_GLYPHS = {
         zhCN = { "\229\141\131", "\228\184\135", "\228\186\191" },

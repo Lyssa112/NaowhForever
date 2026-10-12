@@ -119,13 +119,14 @@ NaowhForever_DamageMeter/
 - The fight time in the title bar is the shown session's own length from the game
   (`GetSessionDurationSeconds`, or a past fight's from `GetAvailableCombatSessions`), read through
   `DM.Duration` and shown only as a plain number and only when the bar has room beside the title.
-- The title bar's right end is the buttons; the title and the time share the rest, as Title Position and
-  Time Position say (`PaintTitleBar`, from the window's width and the title's measured width, so a
-  resize or a longer title moves them). A title too long for the room is cut. What the title says is
-  the list's name, the fight's, or both: the fight's name is the game's own for a past fight, the
+- The title bar's right end is the buttons. The title starts at the left and the time sits beside the
+  buttons, and each has an X and a Y offset to move it from there (`PaintTitleBar`, from the window's
+  width and the title's measured width, so a resize or a longer title is allowed for). The time goes when
+  the title and it do not fit side by side, and a title too long for the room is cut. What the title says
+  is the list's name, the fight's, or both: the fight's name is the game's own for a past fight, the
   newest one's for Current, and Overall for Overall (`DM.FightName`). In combat the newest fight listed
   is not the one running, so the title falls back to the list's name then, as it does for a fight the
-  game has not named.
+  game has not named. The second list's title takes the title's offsets.
 - Avoidable Damage is the game's own list of damage taken from avoidable abilities.
 - There is no combat timer or cast history here: the QoL module already has a Combat Timer and a GCD
   Tracker.

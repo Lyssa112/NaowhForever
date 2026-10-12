@@ -83,40 +83,24 @@ local function TitleText(mode, fightName)
     return mode.label .. TITLE_JOIN .. fightName
 end
 
--- Puts the title and the fight time in the bar where the settings say. The buttons hold its right end and
--- the two share the rest: the time goes when both do not fit, and a long title is cut to what is there.
+-- Puts the title and the fight time in the bar. The title starts at the left and the time sits by the
+-- buttons, each moved by its own offsets. The time goes when both do not fit side by side, and a long
+-- title is cut to the room there is.
 local function PaintTitleBar(frame, mode, seconds, fightName)
     local title, header = frame.title, frame.header
     local clock = frame.time
     title:SetWidth(0)
     title:SetText(TitleText(mode, fightName))
     local textWidth, timeWidth = math.ceil(title:GetStringWidth()), Look.TimeWidth()
-    local low, high = TITLE_X, frame:GetWidth() - BAR_BUTTONS
-    local shown = seconds ~= nil and S.Get("showTime") == true and textWidth + BUTTON_GAP + timeWidth <= high - low
-    local place = S.Get("timePlace")
-    local first, last = low, high
-    if shown and place == "left" then first = low + timeWidth + BUTTON_GAP end
-    if shown and place == "buttons" then last = high - timeWidth - BUTTON_GAP end
-    local drawn = math.min(textWidth, last - first)
-    local group = drawn
-    if shown and place == "title" then group = drawn + BUTTON_GAP + timeWidth end
-    local x, align = first, S.Get("titleAlign")
-    if align == "center" then
-        x = first + math.floor((last - first - group) / 2)
-    elseif align == "right" then
-        x = last - group
-    end
+    local room = frame:GetWidth() - BAR_BUTTONS - TITLE_X
+    local shown = seconds ~= nil and S.Get("showTime") == true and textWidth + BUTTON_GAP + timeWidth <= room
+    local drawn = math.min(textWidth, room)
+    local x = TITLE_X + S.Get("titleX")
     title:ClearAllPoints()
-    title:SetPoint("LEFT", header, "LEFT", x, 0)
+    title:SetPoint("LEFT", header, "LEFT", x, S.Get("titleY"))
     title:SetWidth(drawn)
     clock:ClearAllPoints()
-    if place == "title" then
-        clock:SetPoint("LEFT", title, "RIGHT", BUTTON_GAP, 0); clock:SetJustifyH("LEFT")
-    elseif place == "left" then
-        clock:SetPoint("LEFT", header, "LEFT", low, 0); clock:SetJustifyH("LEFT")
-    else
-        clock:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP, 0); clock:SetJustifyH("RIGHT")
-    end
+    clock:SetPoint("RIGHT", frame.session, "LEFT", -BUTTON_GAP + S.Get("timeX"), S.Get("timeY"))
     clock:SetText(shown and DM.Clock(seconds) or "")
     clock:SetShown(shown)
     local left = math.max(0, x - TITLE_X)
