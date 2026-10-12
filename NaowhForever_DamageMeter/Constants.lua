@@ -55,6 +55,9 @@ ns.DamageMeter.C = {
     RESET_ON_ORDER = { "never", "instance", "ask" },
     ICON_SIDES = { left = "Left", right = "Right" },
     ICON_SIDES_ORDER = { "left", "right" },
+    -- The look settings a second or third window may have of its own (barHeight2, barHeight3, ...).
+    OWN_LOOK_ORDER = { "barHeight", "barSpacing", "barAlpha", "growUp", "fontSize", "showIcons", "showRanks",
+        "showColumnHeaders", "showPercent", "backgroundAlpha", "headerAlpha", "showBorder", "barColor" },
     BAR_SCALES = { top = "Top Player", total = "List Total" },
     BAR_SCALES_ORDER = { "top", "total" },
     OWN_BAR_STYLES = { bar = "Same as Bar Color", class = "Class Color", custom = "Custom Color" },
@@ -92,6 +95,7 @@ ns.DamageMeter.C = {
         { key = "headerColor", label = "Title Bar", group = "Window", token = "panel" },
         { key = "borderColor", label = "Border", group = "Window", token = "line" },
     },
+    OWN_LOOK = {},
     MODES = MODES, MODE_BY_KEY = byKey, MODE_LABELS = labels, MODE_ORDER = order,
     SESSION_LABELS = { current = "Current", overall = "Overall" },
     SESSION_ORDER = { "current", "overall" },
@@ -99,3 +103,5 @@ ns.DamageMeter.C = {
     GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight",
     GRIP_DOWN = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down",
 }
+
+for _, key in ipairs(ns.DamageMeter.C.OWN_LOOK_ORDER) do ns.DamageMeter.C.OWN_LOOK[key] = true end

@@ -96,9 +96,10 @@ function Menus.Window(w, owner)
         if free then root:CreateButton(TEXT_ADD, function() S.Set(Key("window", free), true) end) end
         if w.index > 1 then root:CreateButton(TEXT_CLOSE, function() S.Set(Key("window", w.index), false) end) end
         local bars = root:CreateButton(TEXT_BAR_COLOR)
+        local setting = DM.LookKey(w.index, "barColor")
         for _, key in ipairs(C.BAR_COLORS_ORDER) do
-            bars:CreateRadio(C.BAR_COLORS[key], function() return S.Get("barColor") == key end,
-                function() S.Set("barColor", key) end)
+            bars:CreateRadio(C.BAR_COLORS[key], function() return S.Get(setting) == key end,
+                function() S.Set(setting, key) end)
         end
         root:CreateCheckbox(TEXT_RAID, function() return S.Get("raidMode") == true end,
             function() S.Set("raidMode", not S.Get("raidMode")) end)

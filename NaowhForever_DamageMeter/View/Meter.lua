@@ -83,14 +83,14 @@ end
 
 -- A source's bar color: your own as Your Bar says, else its class, the theme's Accent for everyone, or
 -- the one picked for everyone.
-function Look.BarColor(source)
+function Look.BarColor(source, index)
     if source.color then return source.color end
     if source.isLocalPlayer == true then
         local style = S.Get("ownBarStyle")
         if style == "custom" then return Look.Color("ownBarColor") end
         if style == "class" then return ClassColor(source.classFilename) end
     end
-    local choice = S.Get("barColor")
+    local choice = DM.Setting(index, "barColor")
     if choice == "accent" then return T.accent end
     if choice == "custom" then return Look.Color("barCustomColor") end
     return ClassColor(source.classFilename)
@@ -205,7 +205,7 @@ local function Columns(pane, mode)
     if (second == "total" and not total) or (second == "rate" and not rate) then b = nil end
     if a and not b then a, b = nil, a end
     pane.cols.a, pane.cols.b = a, b
-    pane.cols.p = S.Get("showPercent") == true and mode.percent ~= false
+    pane.cols.p = DM.Setting(pane.f.index, "showPercent") == true and mode.percent ~= false
     pane.cols.merged = a ~= nil and b ~= nil and S.Get("showDivider") == true
     return a, b
 end
@@ -335,19 +335,19 @@ local function PaintFrame(f)
     local window, header, border = Look.Color("windowColor"), Look.Color("headerColor"), Look.Color("borderColor")
     local title, time, rank = Look.Color("titleColor"), Look.Color("timeColor"), Look.Color("rankColor")
     local summary = Look.Color("summaryColor")
-    local alpha = S.Get("backgroundAlpha")
+    local alpha = DM.Setting(f.index, "backgroundAlpha")
     f.summary:SetTextColor(summary.r, summary.g, summary.b)
     f.image:SetAlpha(S.Get("imageAlpha"))
     f.background:SetColorTexture(window.r, window.g, window.b, 1)
     f.background:SetAlpha(alpha)
-    local headerAlpha = S.Get("headerAlpha")
+    local headerAlpha = DM.Setting(f.index, "headerAlpha")
     f.headerBackground:SetColorTexture(header.r, header.g, header.b, 1)
     f.headerBackground:SetAlpha(headerAlpha)
     f.lowerBackground:SetColorTexture(header.r, header.g, header.b, 1)
     f.lowerBackground:SetAlpha(headerAlpha)
     f.headerRule:SetAlpha(headerAlpha)
     f.border:SetColor(border.r, border.g, border.b, 1)
-    f.border._frame:SetShown(S.Get("showBorder"))
+    f.border._frame:SetShown(DM.Setting(f.index, "showBorder"))
     f.border._frame:SetAlpha(alpha)
     f.title:SetTextColor(title.r, title.g, title.b)
     f.lowerTitle:SetTextColor(title.r, title.g, title.b)
@@ -410,7 +410,7 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     local minHeight = math.max(C.MIN_HEIGHT, HEADER + 2 * INSET + bh)
     local h = math.max(minHeight, S.Get(Key("height", f.index)))
     if not f.sizing then f:SetSize(w, h) else w, h = f:GetWidth(), f:GetHeight() end
-    local showHead, showSummary = S.Get("showColumnHeaders") == true, S.Get("showSummary") == true
+    local showHead, showSummary = DM.Setting(f.index, "showColumnHeaders") == true, S.Get("showSummary") == true
     local headTop = HEADER + (showSummary and SUMMARY_H or 0)
     local top = headTop + (showHead and COLUMN_HEAD or 0)
     local lower = f.lowerOn == true
@@ -430,7 +430,8 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     local g = f.geo or {}
     f.geo = g
     g.w, g.bh, g.gap, g.headTop, g.fontSize = w, bh, gap, headTop, fontSize
-    g.showRanks, g.showIcons, g.showHead = S.Get("showRanks") and not f.detail, S.Get("showIcons"), showHead
+    g.showRanks = DM.Setting(f.index, "showRanks") and not f.detail
+    g.showIcons, g.showHead = DM.Setting(f.index, "showIcons"), showHead
     g.textPad, g.iconGap, g.edgeWidth, g.colGap = S.Get("textPad"), S.Get("iconGap"), S.Get("edgeWidth"), S.Get("colGap")
     g.iconSide, g.iconCrop = S.Get("iconSide"), S.Get("iconZoom") / 100
     local iconSetting = S.Get("iconSize")
@@ -449,7 +450,7 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
     g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
     g.titleX, g.titleY = S.Get("titleX"), S.Get("titleY")
-    g.growUp, g.reverseFill = S.Get("growUp") == true, S.Get("reverseFill") == true
+    g.growUp, g.reverseFill = DM.Setting(f.index, "growUp") == true, S.Get("reverseFill") == true
     g.image, g.path, g.tile = S.Get("backgroundImage"), S.Get("backgroundPath"), S.Get("imageTile") == true
     g.tileSize = math.max(C.MIN_TILE, S.Get("imageTileSize"))
     g.n1, g.n2 = n1, n2
@@ -587,7 +588,7 @@ local function PaintPane(pane, session, first, shown, mode, available)
     local sources = session.combatSources
     local you, letters = S.Get("youLabel") == true, S.Get("nameMaxLetters")
     local classNames, classValues = S.Get("nameClassColor") == true, S.Get("valueClassColor") == true
-    local alpha = S.Get("barAlpha")
+    local alpha = DM.Setting(pane.f.index, "barAlpha")
     local own = S.Get("highlightPlayer")
     local classOnly = S.Get("iconStyle") == "class"
     local byTotal = S.Get("barScale") == "total"
@@ -608,7 +609,7 @@ local function PaintPane(pane, session, first, shown, mode, available)
         if source.isHeader then
             PaintHeading(row, source, f)
         else
-            local c = Look.BarColor(source)
+            local c = Look.BarColor(source, f.index)
             row:SetStatusBarColor(c.r, c.g, c.b, alpha)
             row:SetMinMaxValues(0, source.maxAmount or (byTotal and session.totalAmount or session.maxAmount))
             row:SetValue(source.totalAmount)

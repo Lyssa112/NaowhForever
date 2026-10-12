@@ -62,7 +62,9 @@ end
 
 local function Layout(w, session, modeKey)
     local frame = w.frame
-    local bh, gap, fontSize = S.Get("barHeight"), S.Get("barSpacing"), S.Get("fontSize")
+    local index = w.index
+    local bh, gap, fontSize = DM.Setting(index, "barHeight"), DM.Setting(index, "barSpacing"),
+        DM.Setting(index, "fontSize")
     frame:SetResizeBounds(MIN_WIDTH, math.max(C.MIN_HEIGHT, HEADER + 2 * INSET + bh), MAX_WIDTH, MAX_HEIGHT)
     local mode = DM.Mode(modeKey or Get(w, "mode"))
     local shown
@@ -301,7 +303,7 @@ local function ShowBreakdown(w, row)
     end
     local x = w.frame:GetCenter()
     Breakdown.Show(row, source, data, { toRight = x ~= nil and x < UIParent:GetWidth() / 2, inCombat = inCombat,
-        targets = targets, seconds = seconds, rate = mode.rate, label = mode.label })
+        targets = targets, seconds = seconds, rate = mode.rate, label = mode.label, index = w.index })
 end
 
 local function OnRowEnter(w, row)
@@ -689,8 +691,15 @@ function NaowhForever_ResetDamageMeter()
     ns.Print(TEXT_RESET_DONE)
 end
 
+-- A window that takes its own look starts from the look every window has.
+local function CopyLook(index)
+    for _, key in ipairs(C.OWN_LOOK_ORDER) do S.Set(key .. index, S.Get(key)) end
+end
+
 local function OnSet(key)
     if key:find("^meterPos") then return end
+    local own = key:match("^ownLook(%d)$")
+    if own and S.Get(key) == true then CopyLook(tonumber(own)) end
     if key == "overallOutOfCombat" and S.Get("overallOutOfCombat") then ShowOverall(not InCombatLockdown()) end
     if key == "enabled" or key == "hideGameMeter" or key:find("^window%d$") then
         previewGeneration = previewGeneration + 1

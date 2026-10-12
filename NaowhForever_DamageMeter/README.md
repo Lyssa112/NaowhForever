@@ -30,7 +30,7 @@ NaowhForever_DamageMeter/
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
-    SettingsPage.lua             its settings page: eighteen small cards
+    SettingsPage.lua             its settings page: twenty small cards
   README.md                      this file
 ```
 
@@ -82,6 +82,14 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- A second or third window may have a look of its own (`ownLook2`, `ownLook3`): thirteen of the look
+  settings (`DM.C.OWN_LOOK_ORDER`: row height and spacing, bar opacity and color, grow direction, text
+  size, icons, ranks, column titles, share, window and title bar opacity, border) have a copy under the
+  window's number (`barHeight2`). `DM.Setting(index, key)` reads a look setting for a window, which is the
+  copy when the window has its own look and the shared one otherwise, and `DM.LookKey` is the key to
+  write, which the window menu's Bar Color uses. Turning a window's look on copies the shared values into
+  its keys, so it starts as it was, and turning it off keeps them. The rest of the look (fonts, colors,
+  name and number formats) is shared by every window.
 - The room in a row is settings now (Icons and Spacing): the icon's size (zero fits the row, never taller
   than it), side, crop and gap, the padding at the ends, the gap between columns and the edge's width.
   An icon on the right takes room from the figures (`rightInset`, which the titles over them follow),

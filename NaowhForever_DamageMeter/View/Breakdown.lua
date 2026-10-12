@@ -171,7 +171,7 @@ function Breakdown.Show(row, source, data, view)
     panel.subtitle:SetText(view.seconds and TEXT_SESSION:format(view.label, DM.Clock(view.seconds)) or view.label)
     panel.title:SetText(DM.DisplayName(source))
     local lines = data and math.min(C.BREAKDOWN_LINES, #data.combatSpells) or 0
-    local color, alpha = Look.BarColor(source), S.Get("barAlpha")
+    local color, alpha = Look.BarColor(source, view.index), DM.Setting(view.index, "barAlpha")
     local seconds = view.rate and view.seconds or nil
     for i = 1, C.BREAKDOWN_LINES do
         local spellRow = panel.rows[i]

@@ -31,6 +31,10 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     nameColor = false, valueColor = false, rankColor = false, columnColor = false, titleColor = false,
     timeColor = false, summaryColor = false,
     windowColor = false, headerColor = false, borderColor = false,
+    ownLook2 = false, ownLook3 = false,
+    barHeight2 = 20, barHeight3 = 20, barSpacing2 = 2, barSpacing3 = 2, barAlpha2 = 0.85, barAlpha3 = 0.85, growUp2 = false, growUp3 = false,
+    fontSize2 = 11, fontSize3 = 11, showIcons2 = true, showIcons3 = true, showRanks2 = true, showRanks3 = true, showColumnHeaders2 = true, showColumnHeaders3 = true,
+    showPercent2 = false, showPercent3 = false, backgroundAlpha2 = 0.9, backgroundAlpha3 = 0.9, headerAlpha2 = 1, headerAlpha3 = 1, showBorder2 = true, showBorder3 = true, barColor2 = "class", barColor3 = "class",
     mode = "damage", session = "current", width = 300, height = 206, lower = "", scale = 1,
     meterPos = { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -24, y = 210 },
     window2 = false, mode2 = "healing", session2 = "current", width2 = 300, height2 = 206, lower2 = "", scale2 = 1,
@@ -42,6 +46,19 @@ ns.DamageMeterSettings = S
 
 local DM = { Settings = S, TITLE = TITLE, MAX_WINDOWS = MAX_WINDOWS }
 ns.DamageMeter = DM
+
+-- The key a look setting of a window is read and written under: its own (barHeight2) when the window has
+-- its own look, else the one every window shares.
+function DM.LookKey(index, key)
+    if index and DM.C.OWN_LOOK[key] and S.Get("ownLook" .. index) == true then
+        return key .. index
+    end
+    return key
+end
+
+function DM.Setting(index, key)
+    return S.Get(DM.LookKey(index, key))
+end
 
 function DM.Key(base, index)
     return index and index > 1 and base .. index or base

@@ -2437,6 +2437,91 @@ do
         and scale.choice[1].top == "Top Player" and scale.choice[1].total == "List Total")
 end
 
+-- a window may have a look of its own: row height, text, opacities and more
+do
+    local s = Boot({ settings = { enabled = true, window2 = true, window3 = true } })
+    s.Login()
+    local one, two, three = s.Window(), s.Window(2), s.Window(3)
+    local function Is(c, t) return c and c.r == t.r and c.g == t.g and c.b == t.b end
+    check("the same look by default", one.rows[1].h == 20 and two.rows[1].h == 20 and three.rows[1].h == 20
+        and s.store.Get("ownLook2") == false)
+    s.store.Set("barHeight2", 33); s.Flush()
+    check("a value kept for the second is not used until it takes its own look", two.rows[1].h == 20)
+    s.store.Set("ownLook2", true); s.Flush()
+    check("a window that takes its own look starts from the shared one", s.store.Get("barHeight2") == 20
+        and s.store.Get("fontSize2") == 11 and s.store.Get("backgroundAlpha2") == 0.9
+        and s.store.Get("showBorder2") == true and s.store.Get("barColor2") == "class")
+    s.store.Set("barHeight2", 30); s.store.Set("fontSize2", 15); s.Flush()
+    check("then rows 30 tall and text 15 there, and the first untouched", two.rows[1].h == 30
+        and two.rows[1].name.fontSize == 15 and one.rows[1].h == 20 and one.rows[1].name.fontSize == 11
+        and three.rows[1].h == 20)
+    s.store.Set("barHeight", 24); s.Flush()
+    check("the shared look moves the others, not the one with its own", one.rows[1].h == 24 and three.rows[1].h == 24
+        and two.rows[1].h == 30)
+    s.store.Set("barHeight", 20)
+    s.store.Set("backgroundAlpha2", 0.2); s.store.Set("headerAlpha2", 0.5); s.store.Set("showBorder2", false); s.Flush()
+    check("its opacities and border", two.background.alpha == 0.2 and two.headerBackground.alpha == 0.5
+        and two.border._frame.shown == false and one.background.alpha == 0.9 and one.headerBackground.alpha == 1
+        and one.border._frame.shown == true)
+    s.store.Set("barAlpha2", 0.4); s.store.Set("barColor2", "accent"); s.Flush()
+    check("its bars: opacity and color", two.rows[1].color[4] == 0.4 and Is({ r = two.rows[1].color[1],
+        g = two.rows[1].color[2], b = two.rows[1].color[3] }, THEME.accent) and one.rows[1].color[4] == 0.85
+        and one.rows[1].color[1] == CLASS.MAGE.r)
+    s.store.Set("showColumnHeaders2", false); s.store.Set("showPercent2", true); s.Flush()
+    check("its column titles and share", two.panes[1].headName.shown == false and one.panes[1].headName.shown == true
+        and two.rows[1].colP.shown == true and one.rows[1].colP.shown == false)
+    s.store.Set("showRanks2", false); s.store.Set("showIcons2", false); s.Flush()
+    check("its ranks and icons", two.rows[1].rank.shown == false and two.rows[1].icon.shown == false
+        and one.rows[1].rank.shown == true and one.rows[1].icon.shown == true)
+    s.store.Set("growUp2", true); s.Flush()
+    check("which way it grows", two.rows[1].points[1][5] ~= two.rows[2].points[1][5]
+        and two.rows[1].points[1][5] < two.rows[2].points[1][5] and one.rows[1].points[1][5] > one.rows[2].points[1][5])
+    s.Hover(two, 2)
+    check("the spell panel is in that window's bar color and opacity too", s.Panel().rows[1].color[1] == THEME.accent.r
+        and s.Panel().rows[1].color[4] == 0.4)
+    two.rows[2].scripts.OnLeave(two.rows[2])
+    s.Hover(one, 2)
+    check("and the first's in its own", s.Panel().rows[1].color[4] == 0.85)
+    one.rows[2].scripts.OnLeave(one.rows[2])
+    s.store.Set("barSpacing2", 6); s.Flush()
+    check("the spacing between its rows", math.abs(two.rows[1].points[1][5] - two.rows[2].points[1][5]) == 30 + 6
+        and math.abs(one.rows[1].points[1][5] - one.rows[2].points[1][5]) == 20 + 2)
+    check("a setting that is not a look has no key of its own", s.DM.LookKey(2, "titleSize") == "titleSize"
+        and s.DM.LookKey(2, "barHeight") == "barHeight2" and s.DM.LookKey(1, "barHeight") == "barHeight")
+
+    -- its menu writes its own
+    two.more.onClick()
+    s.menu:Find("Bar Color"):Find("Custom Color").set()
+    check("the menu's Bar Color is its own", s.store.Get("barColor2") == "custom" and s.store.Get("barColor") == "class")
+    s.Flush()
+    check("and the other window's menu the shared one", (function()
+        one.more.onClick()
+        s.menu:Find("Bar Color"):Find("Theme Accent").set()
+        return s.store.Get("barColor") == "accent" and s.store.Get("barColor2") == "custom"
+    end)())
+    s.store.Set("barColor", "class")
+
+    s.store.Set("ownLook2", false); s.Flush()
+    check("off: it looks as the first again", two.rows[1].h == 20 and two.background.alpha == 0.9
+        and two.panes[1].headName.shown == true and two.rows[1].rank.shown == true)
+    check("and its keys are kept, for when it is on again", s.store.Get("barHeight2") == 30)
+    s.store.Set("ownLook2", true); s.Flush()
+    check("on again, from the shared look once more", s.store.Get("barHeight2") == 20)
+
+    -- the page
+    local card, other = CardOf(s.page, "look2"), CardOf(s.page, "look3")
+    check("a card for each, with a switch of its own", card and other and card.switch == "ownLook2"
+        and other.switch == "ownLook3" and #card.rows == 13 and #other.rows == 13)
+    local got = {}
+    for _, row in ipairs(card.rows) do got[#got + 1] = row.key end
+    check("with the settings a window may have", table.concat(got, ",") == "barHeight2,barSpacing2,barAlpha2,growUp2,"
+        .. "fontSize2,showIcons2,showRanks2,showColumnHeaders2,showPercent2,backgroundAlpha2,headerAlpha2,showBorder2,"
+        .. "barColor2")
+    check("their summaries", card.summary(s.store) == "Rows 20 px, text 11" and other.summary(s.store) == "Same as the first")
+    s.store.Set("ownLook3", true)
+    check("a third one's own", s.store.Get("barHeight3") == 20 and other.summary(s.store) == "Rows 20 px, text 11")
+end
+
 -- each window has its own scale, and a change keeps its corner where it was
 do
     local s = Boot({ settings = { enabled = true, window2 = true,
@@ -3477,8 +3562,8 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("eighteen cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,spacing,numbers,header,"
-        .. "time,text,hover,history,data,barColors,textColors,windowColors,classColors,window2,window3"
+    check("twenty cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,spacing,numbers,header,"
+        .. "time,text,hover,history,data,barColors,textColors,windowColors,classColors,window2,look2,window3,look3"
         and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end

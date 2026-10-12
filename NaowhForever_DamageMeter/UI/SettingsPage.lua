@@ -672,6 +672,47 @@ page:Card({
     },
 })
 
+-- The rows of a window's own look: the settings of the Rows, Window and Title Bar cards that it may have
+-- of its own, under its number.
+local function OwnLookRows(index)
+    local specs = {
+        barHeight = { label = "Row Height", slider = BAR_RANGE },
+        barSpacing = { label = "Row Spacing", slider = SPACING_RANGE },
+        barAlpha = { label = "Bar Opacity", slider = BAR_ALPHA_RANGE, unit = "%", scale = TO_FRACTION },
+        growUp = { label = "Grow Upward", toggle = true },
+        fontSize = { label = "Text Size", slider = TEXT_RANGE },
+        showIcons = { label = "Icons", toggle = true },
+        showRanks = { label = "Rank Numbers", toggle = true },
+        showColumnHeaders = { label = "Column Titles", toggle = true },
+        showPercent = { label = "Show Percent", toggle = true },
+        backgroundAlpha = { label = "Window Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION },
+        headerAlpha = { label = "Title Bar Opacity", slider = BACKGROUND_RANGE, unit = "%", scale = TO_FRACTION },
+        showBorder = { label = "Border", toggle = true },
+        barColor = { label = "Bar Color", choice = BAR_COLOR },
+    }
+    local rows = {}
+    for _, key in ipairs(C.OWN_LOOK_ORDER) do
+        local row = { key = key .. index, needs = Enabled, why = OFF }
+        for field, value in pairs(specs[key]) do row[field] = value end
+        rows[#rows + 1] = row
+    end
+    return rows
+end
+
+local function OwnLookSummary(index)
+    return function(store)
+        if not store.Get("ownLook" .. index) then return "Same as the first" end
+        return ("Rows %d px, text %d"):format(store.Get("barHeight" .. index), store.Get("fontSize" .. index))
+    end
+end
+
+page:Card({
+    id = "look2", name = "Second Window Look", order = 131, switch = "ownLook2",
+    help = "Its own row height, text size, opacities and more. Off: it looks as the first window does.",
+    summary = OwnLookSummary(2),
+    rows = OwnLookRows(2),
+})
+
 page:Card({
     id = "window3", name = "Third Window", order = 140, switch = "window3",
     help = "A third window, with its own list, session and size.",
@@ -685,4 +726,11 @@ page:Card({
         { key = "scale3", label = "Scale", slider = SCALE_RANGE, unit = "%", scale = TO_FRACTION, needs = Enabled,
           why = OFF },
     },
+})
+
+page:Card({
+    id = "look3", name = "Third Window Look", order = 141, switch = "ownLook3",
+    help = "Its own row height, text size, opacities and more. Off: it looks as the first window does.",
+    summary = OwnLookSummary(3),
+    rows = OwnLookRows(3),
 })
