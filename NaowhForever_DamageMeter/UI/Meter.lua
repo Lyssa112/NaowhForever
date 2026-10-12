@@ -12,6 +12,7 @@ local INSET, HEADER, ROUND = C.INSET, C.HEADER, C.ROUND
 local MIN_WIDTH, MAX_WIDTH, MAX_HEIGHT = C.MIN_WIDTH, C.MAX_WIDTH, C.MAX_HEIGHT
 local BUTTON_H, MORE_W, SESSION_W, BUTTON_GAP, BUTTON_RIGHT = 18, 22, 62, 4, -6
 local TITLE_X = C.TITLE_X
+local INSTANCE_ID_RESULT, ENCOUNTER_NAME_ARG = 8, 2
 local TITLE_JOIN = " - "
 local TIME_BRACKETS = "(%s)"
 local BAR_BUTTONS = BUTTON_GAP + SESSION_W + BUTTON_GAP + MORE_W - BUTTON_RIGHT
@@ -533,7 +534,7 @@ end
 
 local function InstanceID()
     if not IsInInstance() then return nil end
-    return select(8, GetInstanceInfo())
+    return select(INSTANCE_ID_RESULT, GetInstanceInfo())
 end
 
 local function OnEnterWorld(isLogin, isReload)
@@ -580,7 +581,7 @@ local function OnEvent(_, event, ...)
         if S.Get("overallOutOfCombat") then ShowOverall(false) end
         DM.History.OnCombatStart()
     elseif event == "ENCOUNTER_END" then
-        DM.History.OnEncounterEnd((select(2, ...)))
+        DM.History.OnEncounterEnd((select(ENCOUNTER_NAME_ARG, ...)))
     elseif event == "PLAYER_REGEN_ENABLED" then
         if S.Get("overallOutOfCombat") then ShowOverall(true) end
         DM.History.Arm()

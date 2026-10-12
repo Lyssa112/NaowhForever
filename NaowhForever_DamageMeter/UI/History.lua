@@ -18,14 +18,16 @@ local TEXT_TITLE, TEXT_CLEAR, TEXT_CLOSE = "Fight History", "Clear", "X"
 local TEXT_EMPTY = "No fights kept yet"
 local TEXT_ASK = "Clear the fight history?"
 
+local WHEN_W, FIGHT_W, LENGTH_W, FIGURE_W, RAID_FIGURE_W = 84, 150, 50, 66, 70
+
 local COLUMNS = {
-    { key = "when", title = "Time", width = 84, left = true },
-    { key = "name", title = "Fight", width = 150, left = true },
-    { key = "length", title = "Length", width = 50 },
-    { key = "dps", title = "DPS", width = 66 },
-    { key = "raidDps", title = "Raid DPS", width = 70 },
-    { key = "hps", title = "HPS", width = 66 },
-    { key = "raidHps", title = "Raid HPS", width = 70 },
+    { key = "when", title = "Time", width = WHEN_W, left = true },
+    { key = "name", title = "Fight", width = FIGHT_W, left = true },
+    { key = "length", title = "Length", width = LENGTH_W },
+    { key = "dps", title = "DPS", width = FIGURE_W },
+    { key = "raidDps", title = "Raid DPS", width = RAID_FIGURE_W },
+    { key = "hps", title = "HPS", width = FIGURE_W },
+    { key = "raidHps", title = "Raid HPS", width = RAID_FIGURE_W },
 }
 local WIDTH = 2 * PAD
 for _, column in ipairs(COLUMNS) do WIDTH = WIDTH + column.width + GAP end

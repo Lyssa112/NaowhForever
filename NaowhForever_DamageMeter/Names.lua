@@ -2,6 +2,7 @@
 local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
+local CLASS_FILE_RESULT = 2
 local S = DM.Settings
 
 local CACHE_MAX = 256
@@ -72,7 +73,7 @@ function DM.ScanRoster()
     local function Add(unit)
         if not (UnitExists(unit) and UnitIsPlayer(unit)) then return end
         if unit ~= "player" and UnitIsUnit(unit, "player") then return end
-        local class = select(2, UnitClass(unit))
+        local class = select(CLASS_FILE_RESULT, UnitClass(unit))
         local name, surname = UnitName(unit)
         if type(class) ~= "string" or type(name) ~= "string" or DM.IsSecret(name) then return end
         local full = WithSurname(name, surname, unit == "player")

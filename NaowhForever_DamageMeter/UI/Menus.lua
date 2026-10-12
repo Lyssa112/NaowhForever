@@ -64,7 +64,7 @@ local function TakeScreenshot()
 end
 
 local function FirstClosed()
-    for i = 2, DM.MAX_WINDOWS do
+    for i = DM.C.FIRST_OTHER_WINDOW, DM.MAX_WINDOWS do
         if not DM.WindowOn(i) then return i end
     end
 end

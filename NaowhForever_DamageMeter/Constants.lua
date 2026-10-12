@@ -118,6 +118,7 @@ do
         "imageAlpha", "imageTile", "imageTileSize", "classColors" }
     for _, entry in ipairs(C.COLORS) do C.LOOK_KEYS[#C.LOOK_KEYS + 1] = entry.key end
     C.MAX_LOOKS, C.LOOK_NAME_MAX, C.LOOK_TEXT_MAX = 12, 24, 20000
+    C.SECONDS_PER_MINUTE, C.SECONDS_PER_HOUR, C.PERCENT, C.FIRST_OTHER_WINDOW = 60, 3600, 100, 2
 
     C.COLUMN_SLOTS = 6
     C.COLUMN_EXTRAS = {}

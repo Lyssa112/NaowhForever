@@ -101,7 +101,7 @@ function DM.DeleteLook(name)
 end
 
 function DM.CopyLookToWindows()
-    for index = 2, DM.MAX_WINDOWS do
+    for index = DM.C.FIRST_OTHER_WINDOW, DM.MAX_WINDOWS do
         S.Set("ownLook" .. index, true)
     end
 end

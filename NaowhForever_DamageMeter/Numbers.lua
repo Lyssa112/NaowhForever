@@ -5,21 +5,27 @@ local DM = ns.DamageMeter
 local S = DM.Settings
 local C, Plain = DM.C, DM.Plain
 
+local DECIMAL_BASE = 10
+local THOUSAND, TEN_THOUSAND, MILLION, HUNDRED_MILLION, BILLION = 1e3, 1e4, 1e6, 1e8, 1e9
+local MINUTE, HOUR = C.SECONDS_PER_MINUTE, C.SECONDS_PER_HOUR
+
 local PLAIN_TIER = { breakpoint = 1, abbreviation = "", significandDivisor = 1, fractionDivisor = 1,
     abbreviationIsGlobal = false }
 
 local function Tier(base, glyph, decimals)
-    local d = 10 ^ decimals
+    local d = DECIMAL_BASE ^ decimals
     return { breakpoint = base, abbreviation = glyph, significandDivisor = base / d, fractionDivisor = d,
         abbreviationIsGlobal = false }
 end
 
 local function Tiers(units, decimals)
     if units == "latin" then
-        return { Tier(1e9, "B", decimals), Tier(1e6, "M", decimals), Tier(1e3, "K", decimals), PLAIN_TIER }
+        return { Tier(BILLION, "B", decimals), Tier(MILLION, "M", decimals), Tier(THOUSAND, "K", decimals),
+            PLAIN_TIER }
     elseif units == "asian" then
         local g = C.ASIAN_GLYPHS[GetLocale and GetLocale()] or C.ASIAN_GLYPHS.zhCN
-        return { Tier(1e8, g[3], decimals), Tier(1e4, g[2], decimals), Tier(1e3, g[1], decimals), PLAIN_TIER }
+        return { Tier(HUNDRED_MILLION, g[3], decimals), Tier(TEN_THOUSAND, g[2], decimals),
+            Tier(THOUSAND, g[1], decimals), PLAIN_TIER }
     end
     return { PLAIN_TIER }
 end
@@ -53,10 +59,11 @@ end
 
 function DM.Clock(seconds)
     seconds = math.floor(seconds)
-    if seconds >= 3600 then
-        return ("%d:%02d:%02d"):format(math.floor(seconds / 3600), math.floor(seconds % 3600 / 60), seconds % 60)
+    if seconds >= HOUR then
+        return ("%d:%02d:%02d"):format(math.floor(seconds / HOUR), math.floor(seconds % HOUR / MINUTE),
+            seconds % MINUTE)
     end
-    return ("%d:%02d"):format(math.floor(seconds / 60), seconds % 60)
+    return ("%d:%02d"):format(math.floor(seconds / MINUTE), seconds % MINUTE)
 end
 
 function DM.PerSecond(total, seconds)
@@ -66,5 +73,5 @@ end
 
 function DM.Percent(amount, total)
     if not (Plain(amount, "number") and Plain(total, "number")) or total <= 0 then return nil end
-    return amount / total * 100
+    return amount / total * C.PERCENT
 end

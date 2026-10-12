@@ -570,7 +570,7 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.showRanks = DM.Setting(f.index, "showRanks") and not f.detail
     g.showIcons, g.showHead = DM.Setting(f.index, "showIcons"), showHead
     g.textPad, g.iconGap, g.edgeWidth, g.colGap = S.Get("textPad"), S.Get("iconGap"), S.Get("edgeWidth"), S.Get("colGap")
-    g.iconSide, g.iconCrop = S.Get("iconSide"), S.Get("iconZoom") / 100
+    g.iconSide, g.iconCrop = S.Get("iconSide"), S.Get("iconZoom") / C.PERCENT
     local iconSetting, before = S.Get("iconSize"), g.iconSide == "before"
     g.iconSize = iconSetting > 0 and math.min(iconSetting, C.MAX_ICON)
         or math.min(ICON_MAX, before and bh or bh - ICON_PAD)

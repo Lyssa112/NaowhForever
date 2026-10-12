@@ -87,7 +87,8 @@ end
 function DM.FightLabel(fight)
     local label = fight.name or ("Fight " .. fight.id)
     if fight.seconds then
-        label = ("%s (%d:%02d)"):format(label, math.floor(fight.seconds / 60), math.floor(fight.seconds % 60))
+        label = ("%s (%d:%02d)"):format(label, math.floor(fight.seconds / C.SECONDS_PER_MINUTE),
+            math.floor(fight.seconds % C.SECONDS_PER_MINUTE))
     end
     return label
 end
