@@ -48,8 +48,9 @@ for _, key in ipairs(C.MODE_ORDER) do
     LOWER_ORDER[#LOWER_ORDER + 1] = key
 end
 local LOWER = { LOWER_LABELS, LOWER_ORDER }
-local SHOW = { { always = "Always", instance = "In Instances", group = "In a Group", combat = "In Combat" },
-    { "always", "instance", "group", "combat" } }
+local SHOW = { { always = "Always", instance = "In Instances", group = "In a Group", raid = "In a Raid",
+    combat = "In Combat" }, { "always", "instance", "group", "raid", "combat" } }
+local RESET_ON = { C.RESET_ON, C.RESET_ON_ORDER }
 local BAR_COLOR = { C.BAR_COLORS, C.BAR_COLORS_ORDER }
 local OWN_BAR = { C.OWN_BAR_STYLES, C.OWN_BAR_STYLES_ORDER }
 local EDGE = { C.EDGE_STYLES, C.EDGE_STYLES_ORDER }
@@ -136,6 +137,12 @@ end
 local function HeaderSummary(store)
     return ("%s, buttons %s"):format(C.TITLE_TEXTS[store.Get("titleText")] or "",
         store.Get("showButtons") and "on" or "off")
+end
+
+local function DataSummary(store)
+    local text = C.RESET_ON[store.Get("resetOn")] or ""
+    if store.Get("overallOutOfCombat") then text = text .. ", overall out of combat" end
+    return text
 end
 
 local function FadeSummary(store)
@@ -315,6 +322,8 @@ page:Card({
           help = "In Combat shows it while you fight and a while after. A key binding shows or hides it." },
         { key = "hideDelay", label = "Hide After", slider = DELAY_RANGE, unit = "s", needs = HidesAfterCombat,
           why = OFF_COMBAT },
+        { key = "hideInPvP", label = "Hide in Battlegrounds", toggle = true, needs = Enabled, why = OFF,
+          help = "Hides the windows in battlegrounds and arenas, whatever Where says." },
         { key = "raidMode", label = "Raid Mode", toggle = true, needs = Enabled, why = OFF,
           help = "Only your own row, with your rank, in place of the whole group." },
         { label = "Show It on Screen", buttonText = "Preview", needs = Enabled, why = OFF,
@@ -511,6 +520,23 @@ page:Card({
           help = "The fights kept: when, which, how long, and the per-second figures." },
         { label = "Clear Fight History", buttonText = "Clear", needs = Enabled, why = OFF,
           button = function() DM.HistoryWindow.AskClear() end },
+    },
+})
+
+page:Card({
+    id = "data", name = "Data and Reset", order = 85,
+    help = "When the game's figures are cleared, and which session the window shows out of combat.",
+    summary = DataSummary,
+    rows = {
+        { key = "resetOn", label = "Reset on", choice = RESET_ON, needs = Enabled, why = OFF,
+          help = "Clears the data when you enter a new instance, or asks first. A login or a reload does "
+              .. "not count, and nothing is cleared in combat." },
+        { key = "resetOnLeave", label = "Reset When You Leave a Group", toggle = true, needs = Enabled, why = OFF },
+        { key = "overallOutOfCombat", label = "Show Overall Out of Combat", toggle = true, needs = Enabled,
+          why = OFF, help = "Each window shows Overall when combat ends and the current fight when it begins." },
+        { label = "Reset Data Now", buttonText = "Reset", needs = Enabled, why = OFF,
+          button = function() ns.Confirm(C.TEXT_RESET_ASK, DM.Reset) end,
+          help = "Clears the game's damage meter data, as Reset Data in the window's menu does." },
     },
 })
 

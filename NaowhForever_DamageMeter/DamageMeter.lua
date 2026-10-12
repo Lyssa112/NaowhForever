@@ -14,6 +14,7 @@ local S = ns.UI.ModuleSettings("damageMeter", {
     barColor = "class", barAlpha = 0.85, backgroundAlpha = 0.9,
     fontSize = 11, font = "", outline = "OUTLINE", texture = "",
     hideGameMeter = true, breakdown = true, reportLines = 5, showTime = true,
+    hideInPvP = false, resetOn = "never", resetOnLeave = false, overallOutOfCombat = false,
     showBorder = true, iconStyle = "spec",
     showColumnHeaders = true, numberUnits = "game", numberDecimals = 1, nameFormat = "full",
     showSummary = false, titleSize = 12, timeSize = 11,

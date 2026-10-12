@@ -219,7 +219,7 @@ local function Boot(opts)
         IsInGroup = function(category) if category == 2 then return s.instanceGroup == true end return s.group == true end,
         IsInRaid = function() return s.raid == true end,
         IsInGuild = function() return s.guild == true end,
-        IsInInstance = function() return s.instance == true end,
+        IsInInstance = function() return s.instance == true, s.instanceType end,
         LE_PARTY_CATEGORY_INSTANCE = 2,
         UnitGUID = function(unit) if unit == "player" then return s.playerGUID or "Player-1" end end,
         UnitName = function(unit)
@@ -259,7 +259,7 @@ local function Boot(opts)
         GetTime = function() return s.now or 0 end,
         time = function() return s.clock or 1700000000 end,
         date = os.date,
-        GetInstanceInfo = function() return s.instanceName end,
+        GetInstanceInfo = function() return s.instanceName, nil, nil, nil, nil, nil, nil, s.instanceID end,
         GetZoneText = function() return s.zone or "Plains" end,
         Screenshot = function() s.shots = (s.shots or 0) + 1 end,
         CLASS_SORT_ORDER = opts.classes,
@@ -2671,6 +2671,148 @@ do
     check("the sample has no spells to show", sample.Panel() == nil or sample.Panel().shown == false)
 end
 
+-- more rules for when it shows, and when the data is cleared
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    s.store.Set("visibility", "raid"); s.Flush()
+    check("In a Raid: not in a party", w.shown == false)
+    s.raid = true
+    s.Fire("GROUP_ROSTER_UPDATE"); s.Flush()
+    check("and shown in a raid", w.shown == true)
+    s.raid = false
+    s.store.Set("visibility", "always"); s.Flush()
+    check("always again", w.shown == true)
+
+    s.instance, s.instanceType = true, "pvp"
+    s.store.Set("hideInPvP", true); s.Flush()
+    check("Hide in Battlegrounds: hidden in one", w.shown == false)
+    s.instanceType = "arena"
+    s.Fire("PLAYER_ENTERING_WORLD", false, false); s.Flush()
+    check("and in an arena", w.shown == false)
+    s.instanceType = "party"
+    s.Fire("PLAYER_ENTERING_WORLD", false, false); s.Flush()
+    check("not in a dungeon", w.shown == true)
+    s.instanceType = "pvp"
+    s.store.Set("hideInPvP", false); s.Flush()
+    check("and not when it is off", w.shown == true)
+    s.instance, s.instanceType = false, nil
+
+    -- clearing the data on entering an instance
+    local r = Boot({ settings = { enabled = true } })
+    r.Login()
+    r.instance, r.instanceType, r.instanceID = true, "party", 100
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    check("never, by default", (r.resets or 0) == 0 and #r.confirms == 0)
+    r.store.Set("resetOn", "instance")
+    r.instance, r.instanceID = false, nil
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    r.instance, r.instanceID = true, 200
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    check("entering an instance clears it, and says so", r.resets == 1 and r.printed[#r.printed] == "Damage meter data reset.")
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    check("a zone change inside the same one does not", r.resets == 1)
+    r.instance, r.instanceID = false, nil
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    check("nor leaving it", r.resets == 1)
+    r.instance, r.instanceID = true, 200
+    r.Fire("PLAYER_ENTERING_WORLD", true, false)
+    check("a login is not entering", r.resets == 1)
+    r.instance, r.instanceID = false, nil
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    r.instance, r.instanceID = true, 300
+    r.Fire("PLAYER_ENTERING_WORLD", false, true)
+    check("nor is a reload", r.resets == 1)
+    r.instance, r.instanceID = false, nil
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    r.combat = true
+    r.instance, r.instanceID = true, 400
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    check("nothing is cleared in combat", r.resets == 1)
+    r.combat = false
+    r.instance, r.instanceID = false, nil
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    r.store.Set("resetOn", "ask")
+    r.combat = true
+    r.instance, r.instanceID = true, 450
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    check("and nothing is asked in combat", #r.confirms == 0)
+    r.combat = false
+    r.instance, r.instanceID = false, nil
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    r.instance, r.instanceID = true, 500
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    check("Ask: a question first, and nothing yet", #r.confirms == 1 and r.resets == 1
+        and r.confirms[1].text:find("Reset the damage meter data", 1, true) ~= nil)
+    r.confirms[1].yes()
+    check("a yes clears it", r.resets == 2)
+    r.instance, r.instanceID = false, nil
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    r.store.Set("resetOn", "never")
+    r.instance, r.instanceID = true, 600
+    r.Fire("PLAYER_ENTERING_WORLD", false, false)
+    check("never again", r.resets == 2 and #r.confirms == 1)
+
+    -- leaving a group
+    local g = Boot({ settings = { enabled = true, resetOnLeave = true } })
+    g.group = true
+    g.Login()
+    g.Fire("GROUP_ROSTER_UPDATE")
+    check("the first sight of a group clears nothing", (g.resets or 0) == 0)
+    g.group = false
+    g.Fire("GROUP_ROSTER_UPDATE")
+    check("leaving it does", g.resets == 1)
+    g.Fire("GROUP_ROSTER_UPDATE")
+    check("and once", g.resets == 1)
+    g.store.Set("resetOnLeave", false)
+    g.group = true
+    g.Fire("GROUP_ROSTER_UPDATE")
+    g.group = false
+    g.Fire("GROUP_ROSTER_UPDATE")
+    check("off: leaving clears nothing", g.resets == 1)
+    g.store.Set("resetOnLeave", true)
+    g.group = true
+    g.Fire("GROUP_ROSTER_UPDATE")
+    g.combat = true
+    g.group = false
+    g.Fire("GROUP_ROSTER_UPDATE")
+    check("nor in combat", g.resets == 1)
+
+    -- the whole of the data out of combat
+    local o = Boot({ settings = { enabled = true, window2 = true, session2 = "overall" } })
+    o.fights = { { sessionID = 3, durationSeconds = 61 } }
+    o.Login()
+    o.Window().session.onClick()
+    o.menu:Find("Fight 3 (1:01)").set(); o.Flush()
+    check("a past fight picked", o.Window().session.label == "Fight")
+    o.store.Set("overallOutOfCombat", true); o.Flush()
+    check("a window that is off keeps its own", o.store.Get("session3") == "current")
+    check("on: it shows Overall at once, out of combat, and the past fight is let go", o.store.Get("session") == "overall"
+        and o.Window().session.label == "Overall")
+    o.combat = true
+    o.Fire("PLAYER_REGEN_DISABLED"); o.Flush()
+    check("and the current fight in combat, in every window", o.store.Get("session") == "current"
+        and o.store.Get("session2") == "current" and o.Window().session.label == "Current")
+    o.combat = false
+    o.Fire("PLAYER_REGEN_ENABLED"); o.Flush()
+    check("and Overall again after", o.store.Get("session") == "overall" and o.store.Get("session2") == "overall")
+    o.store.Set("overallOutOfCombat", false)
+    o.combat = true
+    o.Fire("PLAYER_REGEN_DISABLED"); o.Flush()
+    check("off: nothing changes", o.store.Get("session") == "overall")
+
+    local page = Boot()
+    check("the card: when to reset and the rest", CardOf(page.page, "data") ~= nil
+        and RowOf(page.page, "resetOn").choice[2][1] == "never" and RowOf(page.page, "resetOnLeave").toggle == true
+        and RowOf(page.page, "overallOutOfCombat").toggle == true and RowOf(page.page, "hideInPvP").toggle == true
+        and RowOf(page.page, "visibility").choice[2][4] == "raid")
+    check("its summary", CardOf(page.page, "data").summary(page.store) == "Never")
+    page.store.Set("resetOn", "ask"); page.store.Set("overallOutOfCombat", true)
+    check("and with them set", CardOf(page.page, "data").summary(page.store)
+        == "Ask When Entering an Instance, overall out of combat")
+end
+
 -- a click on a name opens its spells in the window, with the enemies it hurt, and a click closes them
 do
     local function Enemy(name, guid) return { name = name, sourceGUID = guid, sourceCreatureID = 100 } end
@@ -3078,8 +3220,9 @@ do
     local C = s.DM.C
     local ids = {}
     for _, card in ipairs(page.cards) do ids[#ids + 1] = card.id end
-    check("sixteen cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,numbers,header,time,text,"
-        .. "hover,history,barColors,textColors,windowColors,classColors,window2,window3" and page.window ~= nil)
+    check("seventeen cards, in their order", table.concat(ids, ",") == "lists,window,fade,rows,numbers,header,time,"
+        .. "text,hover,history,data,barColors,textColors,windowColors,classColors,window2,window3"
+        and page.window ~= nil)
     local orders = {}
     for i, card in ipairs(page.cards) do orders[i] = card.order end
     local sorted = true

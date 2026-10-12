@@ -30,7 +30,7 @@ NaowhForever_DamageMeter/
     Menus.lua                    a window's list, session and window menus (DM.Menus)
     Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     ImageHelp.lua                a dialog that says how to add a picture of your own (DM.ShowImageHelp)
-    SettingsPage.lua             its settings page: sixteen small cards
+    SettingsPage.lua             its settings page: seventeen small cards
   README.md                      this file
 ```
 
@@ -82,6 +82,12 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- When it shows: Where gains In a Raid, and Hide in Battlegrounds hides it in a `pvp` or `arena` instance
+  whatever Where says. Pet battles, cinematics and hiding the UI take the windows with `UIParent`, so
+  they need no rule. Data and Reset: entering a new instance (a different instance id, not a login or a
+  reload) clears the game's data or asks first, leaving a group clears it, and nothing is cleared in
+  combat. Show Overall Out of Combat sets each shown window's session setting to Overall when combat ends
+  and back to Current when it begins, so the menu and the settings page say what is shown.
 - Fading is the window's alpha, stepped toward its target from a small `OnUpdate` (every tenth of a
   second, and only while a fade is set or still moving): full in combat, while the mouse is over the
   window (`IsMouseOver`, since a row on top of the window would take an `OnEnter` of the frame itself),

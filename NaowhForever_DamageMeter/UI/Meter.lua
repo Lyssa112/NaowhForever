@@ -31,6 +31,7 @@ local FADE_EVERY, FADE_STEP, FADE_SNAP = 0.1, 0.35, 0.02
 local TEXT_OFF = "Enable the Damage Meter first."
 local TEXT_IN_COMBAT = "Preview is available outside combat."
 local TEXT_RESET_DONE = "Damage meter data reset."
+local TEXT_RESET_INSTANCE_ASK = "You entered a new instance. Reset the damage meter data?"
 local TEXT_FIGHT = "Fight"
 local TEXT_SESSION_TIP = "The current fight, everything since the last reset, or a past fight."
 local TEXT_MORE_TIP = "The list and the session, report, reset, add or close a window, and settings."
@@ -38,6 +39,7 @@ local TEXT_MORE_TIP = "The list and the session, report, reset, add or close a w
 local windows = {}
 local pendingUpdate, unlocked, hovered, tipRow
 local lastCombatEnd, override
+local lastInstance, wasGrouped
 local preview = false
 local updateGeneration, previewGeneration = 0, 0
 local events = CreateFrame("Frame")
@@ -405,8 +407,13 @@ end
 -- Whether the visibility setting wants the windows up: a key press can override it until combat starts.
 local function ShownNow()
     if override ~= nil then return override end
+    if S.Get("hideInPvP") then
+        local inside, kind = IsInInstance()
+        if inside and (kind == "pvp" or kind == "arena") then return false end
+    end
     local where = S.Get("visibility")
     if where == "group" then return IsInGroup() end
+    if where == "raid" then return IsInRaid() end
     if where == "instance" then return (IsInInstance()) end
     if where == "combat" then
         if InCombatLockdown() then return true end
@@ -547,6 +554,54 @@ end
 
 DM.Refresh = RequestUpdate
 
+local function ResetNow()
+    if InCombatLockdown() then return end
+    DM.Reset()
+    ns.Print(TEXT_RESET_DONE)
+end
+
+-- The id of the instance you are in, or nil outside one.
+local function InstanceID()
+    if not IsInInstance() then return nil end
+    return select(8, GetInstanceInfo())
+end
+
+-- Entering a new instance (not a login or a reload) resets the data, or asks to, as the setting says.
+local function OnEnterWorld(isLogin, isReload)
+    local now = InstanceID()
+    local entered = now ~= nil and now ~= lastInstance
+    lastInstance = now
+    if isLogin or isReload or not entered or InCombatLockdown() then return end
+    local mode = S.Get("resetOn")
+    if mode == "instance" then
+        ResetNow()
+    elseif mode == "ask" then
+        ns.Confirm(TEXT_RESET_INSTANCE_ASK, ResetNow)
+    end
+end
+
+-- Leaving a group resets the data when the setting says so.
+local function OnGroupChanged()
+    local grouped = IsInGroup()
+    local left = wasGrouped == true and not grouped
+    wasGrouped = grouped
+    if left and S.Get("resetOnLeave") then ResetNow() end
+end
+
+-- Every window shows the whole of the data out of combat and the current fight in it.
+local function ShowOverall(on)
+    for index = 1, DM.MAX_WINDOWS do
+        if DM.WindowOn(index) then
+            local key, want = Key("session", index), on and "overall" or "current"
+            if S.Get(key) ~= want then
+                S.Set(key, want)
+                local w = windows[index]
+                if w then w.fight, w.offset = nil, 0 end
+            end
+        end
+    end
+end
+
 local function ForgetFights()
     for _, w in pairs(windows) do w.fight, w.detail, w.offset, w.offset2 = nil, nil, 0, 0 end
 end
@@ -555,10 +610,12 @@ local function OnEvent(_, event, ...)
     if event == "PLAYER_REGEN_DISABLED" or event:find("^DAMAGE_METER") then DM.ClearTargets() end
     if event == "PLAYER_REGEN_DISABLED" then
         preview, override = false, nil
+        if S.Get("overallOutOfCombat") then ShowOverall(false) end
         DM.History.OnCombatStart()
     elseif event == "ENCOUNTER_END" then
         DM.History.OnEncounterEnd((select(2, ...)))
     elseif event == "PLAYER_REGEN_ENABLED" then
+        if S.Get("overallOutOfCombat") then ShowOverall(true) end
         DM.History.Arm()
         GameMeter(DM.On() and S.Get("hideGameMeter"))
         DM.ScanRoster()
@@ -568,8 +625,12 @@ local function OnEvent(_, event, ...)
         end
     elseif event == "DAMAGE_METER_RESET" then
         ForgetFights()
-    elseif event == "PLAYER_ENTERING_WORLD" or event == "GROUP_ROSTER_UPDATE" then
+    elseif event == "PLAYER_ENTERING_WORLD" then
         DM.ScanRoster()
+        OnEnterWorld(...)
+    elseif event == "GROUP_ROSTER_UPDATE" then
+        DM.ScanRoster()
+        OnGroupChanged()
     end
     RequestUpdate()
 end
@@ -630,6 +691,7 @@ end
 
 local function OnSet(key)
     if key:find("^meterPos") then return end
+    if key == "overallOutOfCombat" and S.Get("overallOutOfCombat") then ShowOverall(not InCombatLockdown()) end
     if key == "enabled" or key == "hideGameMeter" or key:find("^window%d$") then
         previewGeneration = previewGeneration + 1
         preview = false
