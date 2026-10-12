@@ -45,6 +45,16 @@ function DM.Format(n)
     return AbbreviateNumbers(n, formatOptions)
 end
 
+-- A share as the settings write it: 25.0%.
+function DM.PercentText(percent)
+    return ("%." .. S.Get("percentDecimals") .. "f%%"):format(percent)
+end
+
+-- What follows a per-second figure: "/s" when the settings say so.
+function DM.RateSuffix()
+    return S.Get("rateSuffix") == true and "/s" or ""
+end
+
 -- m:ss, or h:mm:ss from an hour.
 function DM.Clock(seconds)
     seconds = math.floor(seconds)

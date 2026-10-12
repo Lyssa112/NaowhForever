@@ -2147,6 +2147,111 @@ do
         == "40% out of combat, mouse passes through")
 end
 
+-- class colored names and figures, sizes of their own, and how names and numbers are written
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.ownName = "Lyssa"
+    s.session.totalAmount = 400
+    s.session.combatSources[1].totalAmount = 100
+    s.Login()
+    local w = s.Window()
+    local function Is(c, t) return c and c.r == t.r and c.g == t.g and c.b == t.b end
+    check("names and figures in the theme's colors by default", Is(w.rows[1].name.textColor, THEME.fg)
+        and Is(w.rows[1].colA.textColor, THEME.fg))
+    s.store.Set("nameClassColor", true); s.Flush()
+    check("Class Colored Names: each in its class's color", Is(w.rows[1].name.textColor, CLASS.MAGE)
+        and Is(w.rows[2].name.textColor, CLASS.ROGUE) and Is(w.rows[1].colA.textColor, THEME.fg))
+    s.store.Set("valueClassColor", true); s.Flush()
+    check("and the figures, share too", Is(w.rows[1].colA.textColor, CLASS.MAGE) and Is(w.rows[1].colB.textColor, CLASS.MAGE)
+        and Is(w.rows[2].colB.textColor, CLASS.ROGUE))
+    s.store.Set("showPercent", true); s.Flush()
+    check("with the share", Is(w.rows[1].colP.textColor, CLASS.MAGE))
+    s.store.Set("showPercent", false)
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("a spell is not in the class's color, nor is a heading", Is(w.rows[1].name.textColor, THEME.fg)
+        and Is(w.rows[1].colA.textColor, THEME.fg))
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    s.store.Set("nameClassColor", false); s.store.Set("valueClassColor", false); s.Flush()
+    check("off: the theme's again", Is(w.rows[1].name.textColor, THEME.fg) and Is(w.rows[1].colA.textColor, THEME.fg))
+
+    -- your name, cut names
+    check("your name as it is", w.rows[2].name.text == "Lyssa")
+    s.store.Set("youLabel", true); s.Flush()
+    check("Call Me You: yours says You, the others as they are", w.rows[2].name.text == "You"
+        and w.rows[1].name.text == "Aldrin")
+    s.store.Set("youLabel", false)
+    s.store.Set("nameMaxLetters", 3); s.Flush()
+    check("Name Length: cut, with dots", w.rows[1].name.text == "Ald..." and w.rows[2].name.text == "Lys...")
+    s.store.Set("nameMaxLetters", 6); s.Flush()
+    check("a name that fits is left", w.rows[1].name.text == "Aldrin")
+    s.session.combatSources[1].name = "\195\137mile"
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    s.store.Set("nameMaxLetters", 2); s.Flush()
+    check("counted in letters, not bytes", w.rows[1].name.text == "\195\137m...")
+    s.session.combatSources[1].name = SECRET_TEXT
+    s.session.combatSources[1].classFilename = "MAGE"
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a name the game keeps back goes as it is", w.rows[1].name.text == SECRET_TEXT)
+    s.store.Set("nameMaxLetters", 0)
+    s.session.combatSources[1].name = "Aldrin"
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+
+    -- sizes
+    check("by default: ranks 10, figures as the names", w.rows[1].rank.fontSize == 10 and w.rows[1].colA.fontSize == 11
+        and w.rows[1].name.fontSize == 11 and w.rows[1].colA.w == 47)
+    s.store.Set("valueFontSize", 14); s.Flush()
+    check("Figures Size: the amounts only, and their columns with it", w.rows[1].colA.fontSize == 14
+        and w.rows[1].colB.fontSize == 14 and w.rows[1].name.fontSize == 11 and w.rows[1].colA.w == math.floor(7 * 0.62 * 14))
+    s.store.Set("valueFontSize", 0); s.Flush()
+    s.store.Set("rankSize", 15); s.Flush()
+    check("Rank Size: the rank's text, and room for it", w.rows[1].rank.fontSize == 15 and w.rows[1].rank.w == 27
+        and w.rows[1].icon.points[1][2] == 6 + 27)
+    s.store.Set("rankSize", 10)
+
+    -- numbers
+    s.store.Set("showPercent", true); s.Flush()
+    check("a share with a decimal", w.rows[1].colP.text == "25.0%")
+    s.store.Set("percentDecimals", 0); s.Flush()
+    check("Percent Decimals zero: whole", w.rows[1].colP.text == "25%")
+    s.store.Set("percentDecimals", 2); s.Flush()
+    check("two", w.rows[1].colP.text == "25.00%")
+    s.store.Set("percentDecimals", 1); s.store.Set("showPercent", false)
+    s.store.Set("rateSuffix", true); s.Flush()
+    check("Per-Second Suffix: /s after the per-second figure only", w.rows[1].colB.text == "<a>/s"
+        and w.rows[1].colA.text == "<100>")
+    s.store.Set("showDivider", true); s.Flush()
+    check("in one text too", w.rows[1].colB.text == "<100> | <a>/s")
+    s.store.Set("mode", "dps"); s.Flush()
+    check("and where it leads", w.rows[1].colB.text == "<a>/s | <100>")
+    s.store.Set("mode", "damage"); s.store.Set("showDivider", false); s.Flush()
+    s.Hover(w, 2)
+    local panel = s.Panel()
+    check("the spell panel writes it too, and the share with the decimals", panel.rows[1].value.text
+        == "<600>  <4.8>/s  60.0%")
+    s.store.Set("percentDecimals", 0)
+    s.Hover(w, 2)
+    check("as the settings say", panel.rows[1].value.text == "<600>  <4.8>/s  60%")
+    s.store.Set("percentDecimals", 1)
+    w.rows[2].scripts.OnLeave(w.rows[2])
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("in a breakdown the figures too", w.rows[1].colB.text == "<4.8>/s")
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+
+    local names = {}
+    for _, key in ipairs({ "nameClassColor", "valueClassColor", "valueFontSize", "rankSize", "youLabel",
+        "nameMaxLetters", "percentDecimals", "rateSuffix" }) do
+        names[key] = RowOf(s.page, key) ~= nil
+    end
+    local all = true
+    for _, v in pairs(names) do all = all and v end
+    check("each has a row on the page", all)
+    local _, textCard = RowOf(s.page, "valueFontSize")
+    local _, numbers = RowOf(s.page, "rateSuffix")
+    local _, colors = RowOf(s.page, "nameClassColor")
+    check("in Text and Bars, Numbers and Names and Text Colors", textCard.id == "text" and numbers.id == "numbers"
+        and colors.id == "textColors")
+end
+
 -- Always Show My Row: yours is the last row when it is not among the rows shown
 do
     local s = Boot({ settings = { enabled = true, height = 100 } })

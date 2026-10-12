@@ -39,7 +39,7 @@ ns.DamageMeter.C = {
     TEXT_RESET_ASK = "Reset the damage meter data?",
     ENEMY_COLOR = { r = 0.78, g = 0.2, b = 0.2 },
     COLUMN_HEAD = 16, COL_GAP = 6, SUMMARY_H = 16, LOWER_STRIP = 20, LOWER_GAP = 4,
-    MIN_TITLE = 8, MAX_TITLE = 20,
+    MIN_TITLE = 8, MAX_TITLE = 20, MAX_NAME_LETTERS = 24, MAX_PERCENT_DECIMALS = 2,
     NUMBER_UNITS = { game = "Game Default", latin = "K, M, B", asian = "Ten-thousands", full = "Full Numbers" },
     NUMBER_UNITS_ORDER = { "game", "latin", "asian", "full" },
     NUMBER_DECIMALS_MAX = 2, MAX_HIDE_DELAY = 60, MIN_KEEP = 5, MAX_KEEP = 100, MIN_TILE = 16, MAX_TILE = 512,

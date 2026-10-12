@@ -26,7 +26,7 @@ local TITLE_SIZE, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 11, 10, 3, 
 local TEXT_EMPTY = "No data yet"
 local TEXT_UNAVAILABLE = "The damage meter is not available"
 local TEXT_NAME_HEAD, TEXT_TOTAL, TEXT_RATE, TEXT_PERCENT_HEAD = "Name", "Total", "Per Sec", "%"
-local PERCENT_TEXT, DIVIDED_TEXT = "%.1f%%", "%s | %s"
+local DIVIDED_TEXT, TEXT_YOU = "%s | %s", "You"
 local SUMMARY_GAP, TEXT_RAID, TEXT_RANK = "   ", "Raid %s", "Rank %d/%d"
 local RANK_TEXT = "%d"
 
@@ -223,13 +223,13 @@ local function LayRow(row, pane, i, g)
     row:SetReverseFill(g.reverseFill)
     row:SetStatusBarTexture(UI.TexturePath(g.texture, GRADIENT_TEX))
     local left = TEXT_PAD
-    row.rank:ClearAllPoints(); row.rank:SetPoint("LEFT", left, 0); row.rank:SetWidth(RANK_W)
+    row.rank:ClearAllPoints(); row.rank:SetPoint("LEFT", left, 0); row.rank:SetWidth(g.rankWidth)
     row.rank:SetShown(g.showRanks)
     row.rank:SetTextColor(f.rankColor.r, f.rankColor.g, f.rankColor.b)
     row.name:SetTextColor(f.nameColor.r, f.nameColor.g, f.nameColor.b)
     row.colA:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
     row.colB:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
-    if g.showRanks then left = left + RANK_W end
+    if g.showRanks then left = left + g.rankWidth end
     local iconSize = math.min(ICON_MAX, g.bh - ICON_PAD)
     row.icon:ClearAllPoints(); row.icon:SetPoint("LEFT", left, 0); row.icon:SetSize(iconSize, iconSize)
     row.icon:SetShown(g.showIcons)
@@ -249,10 +249,11 @@ local function LayRow(row, pane, i, g)
     row.colA:SetShown(pane.columns == 2)
     row.name:ClearAllPoints(); row.name:SetPoint("LEFT", left, 0)
     row.name:SetPoint("RIGHT", -TEXT_PAD - pane.valueWidth - NAME_GAP, 0)
+    Parts.HudFont(row.rank, g.font, g.rankSize, g.outline)
     Parts.HudFont(row.name, g.font, g.fontSize, g.outline)
-    Parts.HudFont(row.colA, g.font, g.fontSize, g.outline)
-    Parts.HudFont(row.colB, g.font, g.fontSize, g.outline)
-    Parts.HudFont(row.colP, g.font, g.fontSize, g.outline)
+    Parts.HudFont(row.colA, g.font, g.valueSize, g.outline)
+    Parts.HudFont(row.colB, g.font, g.valueSize, g.outline)
+    Parts.HudFont(row.colP, g.font, g.valueSize, g.outline)
 end
 
 -- The column titles above a pane's rows at y: Name, and a title over each value column.
@@ -276,7 +277,7 @@ local function LayHeads(pane, g, y)
     pane.headA:ClearAllPoints(); pane.headA:SetPoint("TOPRIGHT", pane.headB, "TOPLEFT", -COL_GAP, 0)
     pane.headA:SetWidth(g.colWidth)
     pane.headName:ClearAllPoints()
-    pane.headName:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + TEXT_PAD + (g.showRanks and RANK_W or 0), y)
+    pane.headName:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + TEXT_PAD + (g.showRanks and g.rankWidth or 0), y)
     for _, fs in ipairs({ pane.headName, pane.headA, pane.headB, pane.headP }) do
         Parts.HudFont(fs, g.font, HEAD_SIZE, g.outline)
         fs:SetTextColor(f.columnColor.r, f.columnColor.g, f.columnColor.b)
@@ -420,9 +421,13 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     f.geo = g
     g.w, g.bh, g.gap, g.headTop, g.fontSize = w, bh, gap, headTop, fontSize
     g.showRanks, g.showIcons, g.showHead = S.Get("showRanks") and not f.detail, S.Get("showIcons"), showHead
-    g.colWidth = math.floor(chars * CHAR_W * fontSize)
-    g.pctWidth = math.floor(PERCENT_CHARS * CHAR_W * fontSize)
-    g.mergedWidth = 2 * g.colWidth + math.floor(DIVIDER_CHARS * CHAR_W * fontSize)
+    local valueSize = S.Get("valueFontSize")
+    g.valueSize = valueSize > 0 and valueSize or fontSize
+    g.rankSize = S.Get("rankSize")
+    g.rankWidth = math.ceil(RANK_W * g.rankSize / RANK_SIZE)
+    g.colWidth = math.floor(chars * CHAR_W * g.valueSize)
+    g.pctWidth = math.floor(PERCENT_CHARS * CHAR_W * g.valueSize)
+    g.mergedWidth = 2 * g.colWidth + math.floor(DIVIDER_CHARS * CHAR_W * g.valueSize)
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
     g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
     g.titleX, g.titleY = S.Get("titleX"), S.Get("titleY")
@@ -432,7 +437,7 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
+        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), g.valueSize, g.rankSize, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
         name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
     g.key = key
     if f.laidKey ~= key then LayFrame(f, g) end
@@ -472,26 +477,38 @@ local function ValueOf(source, kind)
 end
 
 -- A figure in its column, or nothing when there is none: a spell's per-second figure is not known in combat.
-local function PaintValue(fs, value)
-    if value == nil then fs:SetText("") else fs:SetText(Format(value)) end
+-- suffix follows it ("/s" for a per-second figure, when the settings say so); the figure may be secret, so
+-- the text is made by the client.
+local function PaintValue(fs, value, suffix)
+    if value == nil then
+        fs:SetText("")
+    elseif suffix ~= "" then
+        fs:SetFormattedText("%s" .. suffix, Format(value))
+    else
+        fs:SetText(Format(value))
+    end
 end
 
 -- The values of a row: the two figures, and its share of the list's total once both are plain numbers.
 local function PaintValues(row, source, cols, session)
+    local rate = DM.RateSuffix()
+    local suffixA, suffixB = cols.a == "rate" and rate or "", cols.b == "rate" and rate or ""
     if cols.merged then
         local first, second = ValueOf(source, cols.a), ValueOf(source, cols.b)
         if first ~= nil and second ~= nil then
-            row.colB:SetFormattedText(DIVIDED_TEXT, Format(first), Format(second))
+            row.colB:SetFormattedText("%s" .. suffixA .. " | %s" .. suffixB, Format(first), Format(second))
+        elseif first ~= nil then
+            PaintValue(row.colB, first, suffixA)
         else
-            PaintValue(row.colB, first == nil and second or first)
+            PaintValue(row.colB, second, suffixB)
         end
     else
-        if cols.a then PaintValue(row.colA, ValueOf(source, cols.a)) end
-        if cols.b then PaintValue(row.colB, ValueOf(source, cols.b)) end
+        if cols.a then PaintValue(row.colA, ValueOf(source, cols.a), suffixA) end
+        if cols.b then PaintValue(row.colB, ValueOf(source, cols.b), suffixB) end
     end
     if cols.p then
         local percent = source.noPercent ~= true and DM.Percent(source.totalAmount, session.totalAmount)
-        row.colP:SetText(percent and PERCENT_TEXT:format(percent) or "")
+        row.colP:SetText(percent and DM.PercentText(percent) or "")
     end
 end
 
@@ -525,8 +542,30 @@ local function PaintHeading(row, source, f)
     row.colA:SetText(""); row.colB:SetText(""); row.colP:SetText("")
 end
 
+-- A cut of text to letters characters, with ... after it.
+local function Truncate(text, letters)
+    local count, position = 0, 1
+    for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+        count = count + 1
+        if count > letters then return text:sub(1, position - 1) .. "..." end
+        position = position + #char
+    end
+    return text
+end
+
+-- What a row calls its source: You for your own when the settings say so, the name as written, cut to the
+-- letters allowed when it is a plain text (a name the game keeps back goes as it is).
+local function NameOf(source, you, letters)
+    if you and source.isLocalPlayer == true then return TEXT_YOU end
+    local name = DM.DisplayName(source)
+    if letters > 0 and DM.Plain(name, "string") then name = Truncate(name, letters) end
+    return name
+end
+
 local function PaintPane(pane, session, first, shown, mode, available)
     local sources = session.combatSources
+    local you, letters = S.Get("youLabel") == true, S.Get("nameMaxLetters")
+    local classNames, classValues = S.Get("nameClassColor") == true, S.Get("valueClassColor") == true
     local alpha = S.Get("barAlpha")
     local own = S.Get("highlightPlayer")
     local classOnly = S.Get("iconStyle") == "class"
@@ -557,8 +596,15 @@ local function PaintPane(pane, session, first, shown, mode, available)
             row.rank:SetFormattedText(RANK_TEXT, session.rank or index)
             row.icon:SetTexture(IconOf(source, classOnly))
             row.icon:SetShown(showIcons and source.noIcon ~= true)
-            row.name:SetText(source.label or DM.DisplayName(source))
-            row.name:SetTextColor(f.nameColor.r, f.nameColor.g, f.nameColor.b)
+            row.name:SetText(source.label or NameOf(source, you, letters))
+            local tint = f.nameColor
+            if classNames and not source.label then tint = ClassColor(source.classFilename) end
+            row.name:SetTextColor(tint.r, tint.g, tint.b)
+            tint = f.valueColor
+            if classValues and not source.label then tint = ClassColor(source.classFilename) end
+            row.colA:SetTextColor(tint.r, tint.g, tint.b)
+            row.colB:SetTextColor(tint.r, tint.g, tint.b)
+            row.colP:SetTextColor(tint.r, tint.g, tint.b)
             PaintValues(row, source, pane.cols, session)
         end
     end

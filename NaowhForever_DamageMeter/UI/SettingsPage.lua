@@ -38,6 +38,8 @@ local TITLE_RANGE = { C.MIN_TITLE, C.MAX_TITLE, 1 }
 local OFFSET_X_RANGE, OFFSET_Y_RANGE = { -C.MAX_OFFSET_X, C.MAX_OFFSET_X, 1 }, { -C.MAX_OFFSET_Y, C.MAX_OFFSET_Y, 1 }
 local KEEP_RANGE = { C.MIN_KEEP, C.MAX_KEEP, 1 }
 local TILE_RANGE = { C.MIN_TILE, C.MAX_TILE, 8 }
+local VALUE_SIZE_RANGE, RANK_SIZE_RANGE = { 0, C.MAX_FONT, 1 }, { C.MIN_FONT, C.MAX_FONT, 1 }
+local LETTERS_RANGE, PERCENT_DECIMALS_RANGE = { 0, C.MAX_NAME_LETTERS, 1 }, { 0, C.MAX_PERCENT_DECIMALS, 1 }
 
 local MODE = { C.MODE_LABELS, C.MODE_ORDER }
 local SESSION = { C.SESSION_LABELS, C.SESSION_ORDER }
@@ -427,9 +429,18 @@ page:Card({
           help = "How big numbers are written. Ten-thousands groups by ten-thousands and hundred-millions." },
         { key = "numberDecimals", label = "Decimals", slider = DECIMALS_RANGE, needs = Abbreviating,
           why = OFF_ABBREVIATING },
+        { key = "percentDecimals", label = "Percent Decimals", slider = PERCENT_DECIMALS_RANGE, needs = Enabled,
+          why = OFF },
+        { key = "rateSuffix", label = "Per-Second Suffix", toggle = true, needs = Enabled, why = OFF,
+          help = "Writes the per-second figure with /s after it." },
+        Group("Names"),
         { key = "nameFormat", label = "Name Format", choice = NAME_FORMAT, needs = Enabled, why = OFF,
           help = "How a player's name is written. In combat the game hides other players' names, so those "
               .. "are found by class and left whole when two players share one." },
+        { key = "youLabel", label = "Call Me You", toggle = true, needs = Enabled, why = OFF,
+          help = "Your own row says You in place of your name." },
+        { key = "nameMaxLetters", label = "Name Length", slider = LETTERS_RANGE, needs = Enabled, why = OFF,
+          help = "Cuts a name to this many letters, with ... after it. Zero leaves names whole." },
     },
 })
 
@@ -487,13 +498,22 @@ page:Card({
     },
 })
 
+-- The font, its outline and size, and the bars' texture, then the sizes of the figures and the ranks.
+local function TextRows()
+    local rows = Settings.Look("", { text = true, size = TEXT_RANGE, bar = "Naowh Gradient", needs = Enabled,
+        why = OFF })
+    rows[#rows + 1] = Group("Sizes")
+    rows[#rows + 1] = { key = "valueFontSize", label = "Figures Size", slider = VALUE_SIZE_RANGE, needs = Enabled,
+        why = OFF, help = "The size of the amounts. Zero is the same as the names." }
+    rows[#rows + 1] = { key = "rankSize", label = "Rank Size", slider = RANK_SIZE_RANGE, needs = Enabled, why = OFF }
+    return rows
+end
+
 page:Card({
     id = "text", name = "Text and Bars", order = 60,
     help = "The font, its outline and the texture of the bars.",
     summary = TextSummary,
-    rows = {
-        Settings.Look("", { text = true, size = TEXT_RANGE, bar = "Naowh Gradient", needs = Enabled, why = OFF }),
-    },
+    rows = TextRows(),
 })
 
 page:Card({
@@ -563,11 +583,23 @@ page:Card({
     },
 })
 
+-- The colors of the texts, after two switches that give names and figures their class's color.
+local function TextColorRows()
+    local rows = {
+        { key = "nameClassColor", label = "Class Colored Names", toggle = true, needs = Enabled, why = OFF,
+          help = "Each name in its class's color, in place of the Names color." },
+        { key = "valueClassColor", label = "Class Colored Figures", toggle = true, needs = Enabled, why = OFF,
+          help = "Each amount in its class's color, in place of the Amounts color." },
+    }
+    for _, row in ipairs(ColorRows("Text")) do rows[#rows + 1] = row end
+    return rows
+end
+
 page:Card({
     id = "textColors", name = "Text Colors", order = 100,
     help = "A color for each text. Until you pick one, it follows your theme.",
     summary = PickedSummary("Text"),
-    rows = ColorRows("Text"),
+    rows = TextColorRows(),
 })
 
 page:Card({

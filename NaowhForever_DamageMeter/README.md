@@ -82,6 +82,14 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- Class Colored Names and Figures use the row's `classFilename` (never secret) through the same
+  `ClassColor` the bars use, so a class picked for its bar is the class's text color too; spell and enemy
+  rows (they have a `label`) keep the theme's. Call Me You and Name Length are done in the view, not in
+  `DM.DisplayName`, so reports keep real names; a name is cut by letters (UTF-8 aware) and only when it
+  is a plain text. Figures Size is the amounts' font size (zero follows the names') and sizes their
+  columns, Rank Size the rank's and its room. A share is written by `DM.PercentText` (decimals from the
+  settings) and a per-second figure takes `DM.RateSuffix()`, through `SetFormattedText` so a secret
+  amount still goes in as it is.
 - Always Show My Row: when your row (found by `isLocalPlayer`, never secret) is outside the rows shown
   (above them after scrolling, or below), the last row shown is yours, with your rank, so the list
   still scrolls through the others. It is the same source table, so hovering and clicking it work.
