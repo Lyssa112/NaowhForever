@@ -91,14 +91,17 @@ NaowhForever_DamageMeter/
   Fights and Data, Looks, and a Second and a Third Window. A card shows what is used most, in two columns,
   and keeps the rest behind the cog of the row it belongs to (`cog` on the row, `under = <its label>` on the
   rows behind it, which the framework leaves off the page, searches and resets with the card): the icon's
-  style, size, side and crop behind Icons; a text's size, font, outline and color behind the row of its
+  style, side, crop and gap behind Icons; a text's size switch, font, outline and color behind the row of its
   color or its switch (Name Color, Figure Color, Rank Numbers, Title Color, Show Fight Time, Column Titles,
   Summary Line); the picture's path and tiling behind Image; the classes' colors behind Bar Color; the spell
   panel behind Spell Breakdown; a window's own look and columns behind Own Look and Column Order. A row that
   means something for one choice only (`hidden` as a function) is left off while another is picked: Hide
   After, Custom Bar Color, Track Color and Decimals. A row's label is the only one of its name on its card,
-  because a cog is found by the label of the row that owns it. The window's own font and outline are on the
-  Window card; Clean Look is on the Looks card.
+  because a cog is found by the label of the row that owns it. A text's size is on the card, beside the row
+  of its text (`SizeRow`): it shows the size the text has, and setting it sets the size and turns the text's
+  Own Size switch on, which the cog turns off again. A card folded with its cog open takes the cog's panel
+  with it (`Draw:Card` in the shared page). The window's own font and outline are on the Window card; Clean
+  Look is on the Looks card.
 - Reset All Settings (Fights and Data card, asks first) clears every key of the module's settings but
   `enabled` and the windows' places (`meterPos*`), so each setting reads its default again. The looks kept
   by name and the fights kept are on the account, not in the settings, and stay.
@@ -140,8 +143,8 @@ NaowhForever_DamageMeter/
   than it), side, crop and gap, the padding at the ends, the gap between columns and the edge's width.
   An icon on the right takes room from the figures (`rightInset`, which the titles over them follow),
   and the name's right end is the figures' left less that. An icon before the bar (`iconSide = "before"`)
-  stands outside it, at the bar's height: the row starts after it and its gap (`g.iconOutside`), and the
-  icon is anchored to the row's left end. Bar Track is a texture under the status bar,
+  stands outside it, at the bar's height and touching it, whatever Icon Gap says: the row starts after it
+  (`g.iconOutside`), and the icon is anchored to the row's left end. Bar Track is a texture under the status bar,
   in the Bar Track color at a fixed opacity.
 - Class Colored Names and Figures use the row's `classFilename` (never secret) through the same
   `ClassColor` the bars use, so a class picked for its bar is the class's text color too; spell and enemy

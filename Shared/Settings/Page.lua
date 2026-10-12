@@ -222,6 +222,8 @@ function Draw:Card(card, found)
     local top = self.cursor
     local frame = OpenCardFrame(self)
     local isOpen = (found ~= nil or Settings.IsOpen(card)) and Settings.Openable(card)
+    -- A card folded with its cog open takes the cog's panel with it.
+    if not isOpen and cog and cog:IsShown() and cog.card == card then cog:Hide() end
     self:Add("cardHead", card, isOpen, found ~= nil)
     if isOpen then self:CardBody(card, found) end
     frame:SetHeight(self.cursor - top)
