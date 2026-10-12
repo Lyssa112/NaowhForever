@@ -75,6 +75,16 @@ function DM.CopyLook(index)
     for _, key in ipairs(DM.C.OWN_LOOK_ORDER) do S.Set(key .. index, S.Get(key)) end
 end
 
+-- Every setting back to its default, but whether the module is on and where the windows stand. The looks
+-- kept by name and the fights kept are not settings.
+function DM.ResetSettings()
+    local keys = {}
+    for key in pairs(S.DB()) do
+        if key ~= "enabled" and not key:find("^meterPos") then keys[#keys + 1] = key end
+    end
+    for _, key in ipairs(keys) do S.Set(key, nil) end
+end
+
 function DM.Setting(index, key)
     return S.Get(DM.LookKey(index, key))
 end

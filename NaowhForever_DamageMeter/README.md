@@ -93,6 +93,9 @@ NaowhForever_DamageMeter/
   summary line each have a card with their own size, font and outline behind a switch each, and their color;
   Font and Outline holds the window's. Clean Look is on the Looks card, with the other ways to set the look
   at once.
+- Reset All Settings (Data and Reset card, asks first) clears every key of the module's settings but
+  `enabled` and the windows' places (`meterPos*`), so each setting reads its default again. The looks kept
+  by name and the fights kept are on the account, not in the settings, and stay.
 - The spell panel's pool is as many rows as the settings can ask for (`BREAKDOWN_MAX`, `TARGET_MAX`) and
   it shows as many as Spells Shown and Enemies Shown say, at Panel Width, Scale and Opacity, on the side
   Panel Side says or else the one the window leaves room on. Enemies Shown also sets how many enemies a

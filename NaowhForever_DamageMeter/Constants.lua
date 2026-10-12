@@ -41,6 +41,7 @@ ns.DamageMeter.C = {
     PANEL_SIDES_ORDER = { "auto", "left", "right" },
     TEXT_SPELLS_COMBAT = "Spells show after combat.", TEXT_SPELLS_NONE = "No spell data.",
     TEXT_RESET_ASK = "Reset the damage meter data?",
+    TEXT_RESET_SETTINGS_ASK = "Put every Damage Meter setting back to its default?",
     ENEMY_COLOR = { r = 0.78, g = 0.2, b = 0.2 },
     COLUMN_HEAD = 16, SUMMARY_H = 16, LOWER_STRIP = 20, LOWER_GAP = 4,
     MIN_TITLE = 8, MAX_TITLE = 20, MAX_NAME_LETTERS = 24, MAX_PERCENT_DECIMALS = 2, MAX_ICON = 40, MAX_PAD = 20,

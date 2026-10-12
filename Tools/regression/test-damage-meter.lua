@@ -2606,6 +2606,35 @@ do
         and scale.choice[1].top == "Top Player" and scale.choice[1].total == "List Total")
 end
 
+-- Reset All Settings: every setting back to its default, but the switch and where the windows are
+do
+    local place = { point = "TOPLEFT", relPoint = "TOPLEFT", x = 5, y = -5 }
+    local s = Boot({ settings = { enabled = true, window2 = true, barHeight = 30, fontSize = 14, showRanks = false,
+        ownLook2 = true, barHeight2 = 40, nameOwnFont = true, nameFont = "Fonts\\x.ttf", meterPos = place,
+        meterPos2 = place, classColors = { MAGE = { r = 1, g = 0, b = 0 } } } })
+    s.account.damageMeterLooks = { { name = "Kept" } }
+    s.Login()
+    local w = s.Window()
+    check("set: tall bars", w.rows[1].h == 30 and s.store.Get("window2") == true)
+    local reset
+    for _, row in ipairs(CardOf(s.page, "data").rows) do
+        if row.label == "Reset All Settings" then reset = row end
+    end
+    check("a button on the Data and Reset card, there when the module is off too", reset and reset.buttonText == "Reset"
+        and reset.needs == nil)
+    reset.button()
+    check("it asks first, and changes nothing yet", #s.confirms == 1 and s.store.Get("barHeight") == 30)
+    local before = s.refreshed or 0
+    s.confirms[1].yes(); s.Flush()
+    check("then every setting is its default", s.store.Get("barHeight") == 20 and s.store.Get("fontSize") == 11
+        and s.store.Get("showRanks") == true and s.store.Get("window2") == false and s.store.Get("ownLook2") == false
+        and s.settings.barHeight2 == nil and s.settings.nameFont == nil and s.settings.classColors == nil)
+    check("the module stays on and the windows where they were", s.store.Get("enabled") == true
+        and s.settings.meterPos == place and s.settings.meterPos2 == place)
+    check("the looks kept stay", s.account.damageMeterLooks[1].name == "Kept")
+    check("the window shows it, and the page is drawn again", w.rows[1].h == 20 and (s.refreshed or 0) > before)
+end
+
 -- a name is always shown: there is no setting to take it out of a row
 do
     local s = Boot({ settings = { enabled = true, showName = false, showName2 = false } })

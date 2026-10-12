@@ -772,6 +772,15 @@ page:Card({
         { label = "Reset Data Now", buttonText = "Reset", needs = Enabled, why = OFF,
           button = function() ns.Confirm(C.TEXT_RESET_ASK, DM.Reset) end,
           help = "Clears the game's damage meter data, as Reset Data in the window's menu does." },
+        { label = "Reset All Settings", buttonText = "Reset",
+          button = function()
+              ns.Confirm(C.TEXT_RESET_SETTINGS_ASK, function()
+                  DM.ResetSettings()
+                  if ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
+              end)
+          end,
+          help = "Puts every setting back to its default. Where the windows are, the looks you kept and the "
+              .. "fights kept stay." },
     },
 })
 
