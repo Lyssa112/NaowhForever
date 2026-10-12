@@ -9,7 +9,7 @@ local TITLE, MAX_WINDOWS = "Damage Meter", 3
 local S = ns.UI.ModuleSettings("damageMeter", {
     enabled = F.enabled,
     visibility = "always", locked = false,
-    barHeight = 20, barSpacing = 2,
+    barHeight = 20, barSpacing = 2, growUp = false, reverseFill = false, barScale = "top",
     showTotal = true, showRate = true, showPercent = false, showDivider = false, showIcons = true, showRanks = true, highlightPlayer = true,
     barColor = "class", barAlpha = 0.85, backgroundAlpha = 0.9,
     fontSize = 11, font = "", outline = "OUTLINE", texture = "",

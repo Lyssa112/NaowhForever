@@ -50,6 +50,8 @@ ns.DamageMeter.C = {
         ["Blizzard Low Health"] = true, ["None"] = true },
     BAR_COLORS = { class = "Class Colors", accent = "Theme Accent", custom = "Custom Color" },
     BAR_COLORS_ORDER = { "class", "accent", "custom" },
+    BAR_SCALES = { top = "Top Player", total = "List Total" },
+    BAR_SCALES_ORDER = { "top", "total" },
     OWN_BAR_STYLES = { bar = "Same as Bar Color", class = "Class Color", custom = "Custom Color" },
     OWN_BAR_STYLES_ORDER = { "bar", "class", "custom" },
     EDGE_STYLES = { accent = "Theme Accent", class = "Class Color", custom = "Custom Color" },

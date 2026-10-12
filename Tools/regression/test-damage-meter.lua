@@ -37,6 +37,7 @@ local function Region(kind, parent)
     function r:GetStringHeight() return 14 end
     function r:SetFrameStrata(v) self.strata = v end
     function r:SetScale(v) self.scale = v end
+    function r:SetReverseFill(v) self.reverse = v end
     function r:GetScale() return self.scale or 1 end
     function r:EnableMouse(v) self.mouse = v end
     function r:SetToplevel(v) self.toplevel = v end
@@ -2040,6 +2041,39 @@ do
         and s.Window(3).shown == true and s.Window().shown == true)
     w.more.onClick()
     check("and it can be added again", s.menu:Find("Add Window") ~= nil)
+end
+
+-- bars: grown upward, filled from the right, and compared to the list's total
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    check("by default the first row on top, filling from the left, against the top player",
+        w.rows[1].points[1][5] == -(42 + 6) and w.rows[2].points[1][5] == -(42 + 6 + 22)
+        and w.rows[1].reverse == false and w.rows[1].barMax == s.session.maxAmount)
+    s.store.Set("growUp", true); s.Flush()
+    check("Grow Upward: the first row at the bottom of the room, the rest above it",
+        w.rows[1].points[1][5] == -(42 + 6 + 6 * 22) and w.rows[2].points[1][5] == -(42 + 6 + 5 * 22))
+    s.store.Set("height", 150); s.Flush()
+    check("in a window with other room: from the bottom of that", w.rows[1].points[1][5] == -(42 + 6 + 3 * 22)
+        and w.rows[2].points[1][5] == -(42 + 6 + 2 * 22))
+    s.store.Set("lower", "healing"); s.Flush()
+    local first = w.panes[1].capacity
+    check("with a second list each from the bottom of its own room", w.rows[1].points[1][5]
+        == -(42 + 6 + (first - 1) * 22) and w.rows2[1].points[1][5] == -(w.panes[2].top + 6 + (w.panes[2].capacity - 1) * 22))
+    s.store.Set("lower", ""); s.store.Set("height", 206); s.store.Set("growUp", false); s.Flush()
+    check("off: back at the top", w.rows[1].points[1][5] == -(42 + 6))
+    s.store.Set("reverseFill", true); s.Flush()
+    check("Fill From the Right: the bars fill that way", w.rows[1].reverse == true and w.rows[2].reverse == true)
+    s.store.Set("reverseFill", false); s.Flush()
+    check("and not", w.rows[1].reverse == false)
+    s.store.Set("barScale", "total"); s.Flush()
+    check("Bars Compare To the list total: the whole is full", w.rows[1].barMax == s.session.totalAmount)
+    s.store.Set("barScale", "top"); s.Flush()
+    check("and the top player again", w.rows[1].barMax == s.session.maxAmount)
+    local grow, fill, scale = RowOf(s.page, "growUp"), RowOf(s.page, "reverseFill"), RowOf(s.page, "barScale")
+    check("the three are on the Rows card", grow and fill and scale and grow.toggle and fill.toggle
+        and scale.choice[1].top == "Top Player" and scale.choice[1].total == "List Total")
 end
 
 -- each window has its own scale, and a change keeps its corner where it was

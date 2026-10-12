@@ -216,8 +216,11 @@ end
 local function LayRow(row, pane, i, g)
     local f = pane.f
     row:ClearAllPoints()
-    row:SetPoint("TOPLEFT", f, "TOPLEFT", INSET, -pane.top - INSET - (i - 1) * (g.bh + g.gap))
+    local slot = i - 1
+    if g.growUp then slot = pane.capacity - i end
+    row:SetPoint("TOPLEFT", f, "TOPLEFT", INSET, -pane.top - INSET - slot * (g.bh + g.gap))
     row:SetSize(g.w - 2 * INSET, g.bh)
+    row:SetReverseFill(g.reverseFill)
     row:SetStatusBarTexture(UI.TexturePath(g.texture, GRADIENT_TEX))
     local left = TEXT_PAD
     row.rank:ClearAllPoints(); row.rank:SetPoint("LEFT", left, 0); row.rank:SetWidth(RANK_W)
@@ -344,6 +347,7 @@ end
 -- Lays out one pane's columns, titles and the rows that fit; returns how many rows are shown.
 local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     local a, b = Columns(pane, mode)
+    pane.capacity = capacity
     pane.merged = pane.cols.merged == true
     pane.columns = pane.merged and 1 or (a and 1 or 0) + (b and 1 or 0)
     pane.percent = pane.cols.p == true
@@ -358,7 +362,7 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     first = math.max(0, math.min(first, total - capacity))
     local shown = math.min(total - first, capacity)
     local paneKey = key .. "|" .. pane.columns .. "|" .. tostring(pane.percent) .. "|" .. tostring(pane.merged)
-        .. "|" .. pane.top
+        .. "|" .. capacity .. "|" .. pane.top
     local fresh = pane.laidKey ~= paneKey
     if fresh then
         LayHeads(pane, g, headY)
@@ -422,12 +426,13 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
     g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
     g.titleX, g.titleY = S.Get("titleX"), S.Get("titleY")
+    g.growUp, g.reverseFill = S.Get("growUp") == true, S.Get("reverseFill") == true
     g.image, g.path, g.tile = S.Get("backgroundImage"), S.Get("backgroundPath"), S.Get("imageTile") == true
     g.tileSize = math.max(C.MIN_TILE, S.Get("imageTileSize"))
     g.n1, g.n2 = n1, n2
     g.lowerTop = top + INSET + (n1 * bh + (n1 - 1) * gap) + LOWER_GAP
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
+        headTop, g.titleSize, g.timeSize, tostring(S.Get("timeBrackets")), g.titleX, g.titleY, tostring(g.growUp), tostring(g.reverseFill), g.colWidth, g.texture, g.font, g.outline, name.r, name.g,
         name.b, value.r, value.g, value.b, rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
     g.key = key
     if f.laidKey ~= key then LayFrame(f, g) end
@@ -525,6 +530,7 @@ local function PaintPane(pane, session, first, shown, mode, available)
     local alpha = S.Get("barAlpha")
     local own = S.Get("highlightPlayer")
     local classOnly = S.Get("iconStyle") == "class"
+    local byTotal = S.Get("barScale") == "total"
     local f, showIcons = pane.f, pane.f.geo.showIcons
     pane.empty:SetText(session.emptyText or (available and TEXT_EMPTY or TEXT_UNAVAILABLE))
     pane.empty:SetShown(shown == 0)
@@ -536,7 +542,7 @@ local function PaintPane(pane, session, first, shown, mode, available)
         else
             local c = Look.BarColor(source)
             row:SetStatusBarColor(c.r, c.g, c.b, alpha)
-            row:SetMinMaxValues(0, source.maxAmount or session.maxAmount)
+            row:SetMinMaxValues(0, source.maxAmount or (byTotal and session.totalAmount or session.maxAmount))
             row:SetValue(source.totalAmount)
             local e = own and source.isLocalPlayer == true and Look.EdgeColor(source) or c
             row.edge:SetColorTexture(e.r, e.g, e.b, 1)

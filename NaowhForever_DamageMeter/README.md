@@ -82,6 +82,10 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- Grow Upward puts row i in the slot `capacity - i` of its pane's room (the first row at the bottom of
+  it), so each pane of a window with a second list fills from its own bottom. Fill From the Right is the
+  status bar's `SetReverseFill`. Bars Compare To is the second argument of `SetMinMaxValues`: the list's
+  biggest amount (the game's `maxAmount`) or its total, either of which may be secret.
 - A window has a scale of its own (`scale`, `scale2`, `scale3`), the frame's `SetScale`. Its saved place is
   in its own units, which are the screen's divided by the scale, so a change converts the saved place and
   puts the window back with its corner where it was, and a drag saves the place the same way. The size

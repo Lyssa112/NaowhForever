@@ -54,6 +54,7 @@ local EDGE = { C.EDGE_STYLES, C.EDGE_STYLES_ORDER }
 local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "class" } }
 local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
+local BAR_SCALE = { C.BAR_SCALES, C.BAR_SCALES_ORDER }
 local TITLE_TEXT = { C.TITLE_TEXTS, C.TITLE_TEXTS_ORDER }
 
 local function Enabled() return DM.On() and true or false end
@@ -355,6 +356,12 @@ page:Card({
         { key = "barSpacing", label = "Row Spacing", slider = SPACING_RANGE, needs = Enabled, why = OFF },
         { key = "barAlpha", label = "Bar Opacity", slider = BAR_ALPHA_RANGE, unit = "%", scale = TO_FRACTION,
           needs = Enabled, why = OFF },
+        { key = "growUp", label = "Grow Upward", toggle = true, needs = Enabled, why = OFF,
+          help = "The first row at the bottom and the rest stacked above it, as some meters do." },
+        { key = "reverseFill", label = "Fill From the Right", toggle = true, needs = Enabled, why = OFF,
+          help = "Each bar grows from its right end toward the left." },
+        { key = "barScale", label = "Bars Compare To", choice = BAR_SCALE, needs = Enabled, why = OFF,
+          help = "Top Player: the biggest bar is full. List Total: each bar is its share of the whole list." },
         Group("Row"),
         { key = "showIcons", label = "Icons", toggle = true, needs = Enabled, why = OFF },
         { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
