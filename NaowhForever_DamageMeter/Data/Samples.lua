@@ -2,6 +2,7 @@
 local ns = _G.NaowhForever
 
 ns.DamageMeter.SAMPLE = {
+    durationSeconds = 205,
     maxAmount = 100,
     totalAmount = 660,
     combatSources = {

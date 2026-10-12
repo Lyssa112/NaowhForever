@@ -92,6 +92,29 @@ function DM.SessionName(sessionKey, fightID)
     return "Fight " .. fightID
 end
 
+-- Seconds the shown session has run, as a plain number, or nil when the game keeps it back.
+function DM.Duration(sessionKey, fightID)
+    if not DM.Available() then return nil end
+    if fightID ~= nil then
+        for _, fight in ipairs(DM.Fights()) do
+            if fight.id == fightID then return fight.seconds end
+        end
+        return nil
+    end
+    local ok, seconds = pcall(C_DamageMeter.GetSessionDurationSeconds, SessionType(sessionKey))
+    if ok and Plain(seconds, "number") then return seconds end
+    return nil
+end
+
+-- m:ss, or h:mm:ss from an hour.
+function DM.Clock(seconds)
+    seconds = math.floor(seconds)
+    if seconds >= 3600 then
+        return ("%d:%02d:%02d"):format(math.floor(seconds / 3600), math.floor(seconds % 3600 / 60), seconds % 60)
+    end
+    return ("%d:%02d"):format(math.floor(seconds / 60), seconds % 60)
+end
+
 -- The spells behind one row, as the game's { combatSpells, maxAmount, totalAmount }, or nil. In combat the
 -- game takes a plain guid only: your own row's, or a row whose guid is readable.
 function DM.SourceSpells(modeKey, sessionKey, fightID, source)

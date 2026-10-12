@@ -18,7 +18,7 @@ local TEXT_PAD, NAME_GAP, EDGE_W = 6, 6, 2
 local RANK_W, RANK_SIZE = 18, 10
 local VALUE_CHARS_BOTH, VALUE_CHARS_ONE, CHAR_W = 14, 7, 0.62
 local EMPTY_SIZE, EMPTY_Y = 12, -10
-local TITLE_SIZE, TITLE_X = 12, 8
+local TITLE_SIZE, TITLE_X, TIME_SIZE = 12, 8, 11
 
 local TEXT_EMPTY = "No data yet"
 local TEXT_UNAVAILABLE = "The damage meter is not available"
@@ -60,6 +60,8 @@ function Look.New(frame, index)
     frame.empty:SetPoint("CENTER", 0, EMPTY_Y)
     frame.title = ns.Font(frame.header, TITLE_SIZE, "OUTLINE", T.fg)
     frame.title:SetPoint("LEFT", TITLE_X, 0); frame.title:SetJustifyH("LEFT"); frame.title:SetWordWrap(false)
+    frame.time = ns.Font(frame.header, TIME_SIZE, "OUTLINE", T.muted)
+    frame.time:SetWidth(C.TIME_WIDTH); frame.time:SetJustifyH("RIGHT")
 end
 
 function Look.Row(f, i)

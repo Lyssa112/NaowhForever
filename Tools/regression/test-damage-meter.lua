@@ -95,6 +95,7 @@ end
 local function Boot(opts)
     opts = opts or {}
     local s = { settings = opts.settings or {}, calls = {}, idCalls = {}, spellCalls = {}, spellIdCalls = {},
+        durationCalls = {}, duration = 125,
         cvars = { damageMeterEnabled = opts.gameMeter or "1" }, timers = {}, printed = {}, frames = {}, buttons = {},
         confirms = {}, hooks = {}, account = {}, sent = {}, movers = {}, names = { [101] = "Fireball", [102] = "Pyroblast" } }
     local defaults
@@ -165,8 +166,9 @@ local function Boot(opts)
             return (type(v) == "table" and v.secret == true) or v == SECRET_NUMBER or v == SECRET_TEXT
         end,
         AbbreviateLargeNumbers = function(n) return "<" .. tostring(n) .. ">" end,
-        Enum = { DamageMeterType = { DamageDone = 0, HealingDone = 2, DamageTaken = 7, Absorbs = 4, Interrupts = 5,
-                Dispels = 6, Deaths = 9 }, DamageMeterSessionType = { Overall = 0, Current = 1 } },
+        Enum = { DamageMeterType = { DamageDone = 0, HealingDone = 2, DamageTaken = 7, AvoidableDamageTaken = 8,
+                Absorbs = 4, Interrupts = 5, Dispels = 6, Deaths = 9 },
+            DamageMeterSessionType = { Overall = 0, Current = 1 } },
         C_DamageMeter = {
             GetCombatSessionFromType = function(kind, type)
                 s.calls[#s.calls + 1] = { kind, type }
@@ -177,6 +179,11 @@ local function Boot(opts)
                 s.idCalls[#s.idCalls + 1] = { id, type }
                 if s.apiError then error("secret") end
                 return s.idResult == nil and session or s.idResult
+            end,
+            GetSessionDurationSeconds = function(kind)
+                s.durationCalls[#s.durationCalls + 1] = kind
+                if s.durationError then error("secret") end
+                return s.duration
             end,
             GetAvailableCombatSessions = function()
                 if s.fightsError then error("secret") end
@@ -277,9 +284,11 @@ do
     check("class colors by default", s.store.Get("barColor") == "class")
     local DM = s.DM
     local C = DM.C
-    check("seven lists, in order", #C.MODES == 7 and C.MODE_ORDER[1] == "damage" and C.MODE_ORDER[7] == "deaths")
+    check("eight lists, in order", #C.MODES == 8 and C.MODE_ORDER[1] == "damage" and C.MODE_ORDER[4] == "avoidable"
+        and C.MODE_ORDER[8] == "deaths")
     check("each has its game type", DM.Mode("healing").type == "HealingDone" and DM.Mode("deaths").type == "Deaths"
-        and DM.Mode("interrupts").rate == false and DM.Mode("damage").rate == true)
+        and DM.Mode("avoidable").type == "AvoidableDamageTaken" and DM.Mode("interrupts").rate == false
+        and DM.Mode("damage").rate == true)
     check("an unknown list reads as Damage Done", DM.Mode("bogus").key == "damage" and DM.Mode(nil).key == "damage")
     check("the API is there", DM.Available() == true)
     local got = DM.Session("taken", "overall")
@@ -331,6 +340,32 @@ do
         and plain[1].name == nil and plain[1].seconds == nil)
     s.fightsError = true
     check("an error from the API: no fights", #DM.Fights() == 0)
+end
+
+-- how long the shown session has run
+do
+    local s = Boot()
+    local DM = s.DM
+    check("the current session's length, from the game", DM.Duration("current") == 125 and s.durationCalls[1] == 1)
+    check("and the overall one's", DM.Duration("overall") == 125 and s.durationCalls[2] == 0)
+    s.duration = SECRET_NUMBER
+    check("a secret length reads as nothing", DM.Duration("current") == nil)
+    s.duration = "soon"
+    check("so does one that is no number", DM.Duration("current") == nil)
+    s.duration = 125
+    s.durationError = true
+    check("and an error from the API", DM.Duration("current") == nil)
+    s.durationError = nil
+    s.fights = { { sessionID = 3, durationSeconds = 61 }, { sessionID = 4 } }
+    check("a past fight's length is the game's list's", DM.Duration("current", 3) == 61 and DM.Duration("current", 4) == nil
+        and DM.Duration("current", 9) == nil)
+    check("a clock reads m:ss, and h:mm:ss from an hour", DM.Clock(0) == "0:00" and DM.Clock(65) == "1:05"
+        and DM.Clock(59.9) == "0:59" and DM.Clock(600) == "10:00" and DM.Clock(3599) == "59:59"
+        and DM.Clock(3600) == "1:00:00" and DM.Clock(3725) == "1:02:05")
+    s.env.C_DamageMeter.GetSessionDurationSeconds = nil
+    check("an API without it reads as nothing", DM.Duration("current") == nil)
+    s.env.C_DamageMeter = nil
+    check("and no API", DM.Duration("current") == nil)
 end
 
 -- the spells behind a row
@@ -422,6 +457,33 @@ do
     check("and the API was asked for it", s.calls[#s.calls][2] == 5)
 end
 
+-- the fight time in the title bar
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.fights = { { sessionID = 3, durationSeconds = 61 } }
+    s.Login()
+    local w = s.Window()
+    check("the title bar shows how long the session ran", w.time.text == "2:05" and w.time.shown == true)
+    s.duration = 3725
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("and follows it", w.time.text == "1:02:05")
+    s.store.Set("showTime", false); s.Flush()
+    check("Show Fight Time off: nothing", w.time.shown == false and w.time.text == "")
+    s.store.Set("showTime", true)
+    s.store.Set("width", 170); s.Flush()
+    check("no room beside the title: hidden", w.time.shown == false)
+    s.store.Set("width", 300)
+    s.duration = SECRET_NUMBER; s.Flush()
+    check("a length the game keeps back: hidden", w.time.shown == false)
+    s.duration = 125
+    w.session.onClick()
+    s.menu:Find("Fight 3 (1:01)").set()
+    s.Flush()
+    check("a past fight: its own length", w.time.text == "1:01" and w.time.shown == true)
+    s.ns.PreviewDamageMeter()
+    check("the sample has a length too", w.time.text == "3:25")
+end
+
 -- the menus: the list, the session, and the rest
 do
     local s = Boot({ settings = { enabled = true } })
@@ -431,7 +493,7 @@ do
     w.modeButton.scripts.OnClick(w.modeButton)
     local list = s.menu
     check("the title opens the list menu on itself", list.owner == w.modeButton and list.items[1].text == "List")
-    check("with the seven lists, the current one chosen", #list.items == 8 and list:Find("Damage Done").selected() == true
+    check("with the eight lists, the current one chosen", #list.items == 9 and list:Find("Damage Done").selected() == true
         and list:Find("Healing Done").selected() == false)
     list:Find("Healing Done").set()
     check("choosing one sets it", s.store.Get("mode") == "healing")

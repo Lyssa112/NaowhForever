@@ -99,6 +99,8 @@ page:Card({
         { key = "height", label = "Window Height", slider = HEIGHT_RANGE, needs = Enabled, why = OFF },
         { key = "locked", label = "Lock Window", toggle = true, needs = Enabled, why = OFF,
           help = "Off: drag the title bar or resize with the corner, outside combat." },
+        { key = "showTime", label = "Show Fight Time", toggle = true, needs = Enabled, why = OFF,
+          help = "How long the shown session has run, in the title bar when there is room." },
         { key = "backgroundAlpha", label = "Background Opacity", slider = BACKGROUND_RANGE, unit = "%",
           scale = TO_FRACTION, needs = Enabled, why = OFF },
         { key = "hideGameMeter", label = "Replace the Game's Meter", toggle = true, needs = Enabled, why = OFF,

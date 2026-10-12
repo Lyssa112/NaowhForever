@@ -57,6 +57,12 @@ NaowhForever_DamageMeter/
 - A report is made of plain numbers, so it is sent outside combat only, and a source whose name or
   amount is still secret is left out. It goes to chat with `SendChatMessage` from a menu click, which
   is a hardware event, so Say works too.
+- The fight time in the title bar is the shown session's own length from the game
+  (`GetSessionDurationSeconds`, or a past fight's from `GetAvailableCombatSessions`), read through
+  `DM.Duration` and shown only as a plain number and only when the bar has room beside the title.
+- Avoidable Damage is the game's own list of damage taken from avoidable abilities.
+- There is no combat timer or cast history here: the QoL module already has a Combat Timer and a GCD
+  Tracker.
 - The reset key is `NaowhForever_ResetDamageMeter`, declared in `Bindings.xml`. Core defines a stub
   that says the module is off; this module replaces it.
 
