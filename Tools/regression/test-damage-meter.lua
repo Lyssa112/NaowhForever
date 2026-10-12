@@ -650,6 +650,66 @@ do
     check("and a report", s.printed[2] == "1. Aldrin  <100> (<10>)")
 end
 
+-- the summary line, the title and time sizes
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    check("the summary line is off by default", w.summary.shown == false)
+    s.store.Set("showSummary", true); s.Flush()
+    check("on: the session, its total and your rank, the total as the game's secret", w.summary.shown == true
+        and w.summary.text == "Current   Damage <total>   Rank 2/3")
+    check("the rows move down for it, and the column titles", w.rows[1].points[1][5] == -(26 + 16 + 16) - 6
+        and w.headB.points[1][5] == -(26 + 16) - 3)
+    s.apiResult = { combatSources = { { name = "You", classFilename = "ROGUE", isLocalPlayer = true,
+        totalAmount = 5000, amountPerSecond = 40 } }, maxAmount = 5000, totalAmount = 5000 }
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("with plain numbers: the raid's per-second figure too", w.summary.text
+        == "Current   Damage <5000>   Raid DPS <40>   Rank 1/1")
+    s.apiResult.totalAmount = SECRET_NUMBER
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("a total the game keeps back has none", w.summary.text == "Current   Damage <424242>   Rank 1/1")
+    s.apiResult.totalAmount = 5000
+    s.duration = SECRET_NUMBER
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("nor a length it keeps back", w.summary.text == "Current   Damage <5000>   Rank 1/1")
+    s.duration = 0
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("nor no time at all", w.summary.text == "Current   Damage <5000>   Rank 1/1")
+    s.duration = 125
+    s.apiResult.combatSources[1].isLocalPlayer = false
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("without you in it, no rank", w.summary.text == "Current   Damage <5000>   Raid DPS <40>")
+    s.apiResult.combatSources[1].isLocalPlayer = true
+    s.store.Set("mode", "interrupts"); s.Flush()
+    check("a list without a rate has no raid figure, and names its own total", w.summary.text
+        == "Current   Interrupts <5000>   Rank 1/1")
+    s.store.Set("mode", "damage")
+    s.store.Set("session", "overall"); s.Flush()
+    check("it names the session", w.summary.text:find("^Overall   ") ~= nil)
+    s.store.Set("session", "current")
+    w.summary.text = "untouched"
+    s.store.Set("showSummary", false); s.Flush()
+    check("off again: gone, not painted, and the rows back", w.summary.shown == false and w.summary.text == "untouched"
+        and w.rows[1].points[1][5] == -(26 + 16) - 6)
+    s.apiResult = nil
+
+    check("the title and the time have their own sizes", w.title.fontSize == 12 and w.time.fontSize == 11
+        and w.time.w == 48)
+    s.store.Set("titleSize", 16); s.store.Set("timeSize", 14); s.Flush()
+    check("which follow the settings, the time's room with it", w.title.fontSize == 16 and w.time.fontSize == 14
+        and w.time.w == math.ceil(7 * 0.62 * 14))
+    check("the time still shows", w.time.shown == true and w.time.text == "2:05")
+    s.store.Set("width", 205); s.Flush()
+    check("a bigger time needs more room: it fits at 11 and not at 14", w.time.shown == false)
+    s.store.Set("width", 300); s.Flush()
+    check("and the time is back with it", w.time.shown == true)
+    check("they are drawn in the window's font", w.title.font == "" and w.summary.font == "")
+    s.store.Set("font", "Fonts\\x.ttf"); s.Flush()
+    check("and a font picked reaches them", w.title.font == "Fonts\\x.ttf" and w.time.font == "Fonts\\x.ttf"
+        and w.summary.font == "Fonts\\x.ttf")
+end
+
 -- the columns and their titles
 do
     local s = Boot({ settings = { enabled = true } })
@@ -765,6 +825,7 @@ do
         rankColor = function() return row.rank.textColor end,
         titleColor = function() return w.title.textColor end,
         timeColor = function() return w.time.textColor end,
+        summaryColor = function() return w.summary.textColor end,
         trackColor = function() return Solid(row.bg) end,
         edgeColor = function() return Solid(own.edge) end,
         windowColor = function() return Solid(w.background) end,
@@ -782,7 +843,7 @@ do
         Unpick(key)
         check(key .. ": back to the theme", not Is(read(), PICK))
     end
-    check("every color of the window is covered", count == 11)
+    check("every color of the window is covered", count == 12)
     Pick("valueColor")
     check("a picked amount color reaches both columns", Is(row.colA.textColor, PICK) and Is(row.colB.textColor, PICK))
     Unpick("valueColor")
@@ -1348,7 +1409,7 @@ do
             end
         end
     end
-    check("the rows cover the windows, the rows, the hover and the colors", #keys >= 47)
+    check("the rows cover the windows, the rows, the hover and the colors", #keys >= 50)
     check("one short help sentence on each card", #page.cards[1].help < 120 and #page.cards[2].help < 120
         and #page.cards[3].help < 120)
     check("the first card's summary reads window one", page.cards[1].summary(s.store) == "Damage Done, 300 by 206")

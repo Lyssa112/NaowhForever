@@ -169,6 +169,21 @@ function DM.SourceSpells(modeKey, sessionKey, fightID, source)
     return nil
 end
 
+-- A total over a length of time, or nil when either is secret or there is no time.
+function DM.PerSecond(total, seconds)
+    if not (Plain(total, "number") and Plain(seconds, "number")) or seconds <= 0 then return nil end
+    return total / seconds
+end
+
+-- Where the local player stands in a session's sources, and how many there are: the game sorts them.
+function DM.Rank(session)
+    local sources = session.combatSources
+    for i = 1, #sources do
+        if sources[i].isLocalPlayer == true then return i, #sources end
+    end
+    return nil, #sources
+end
+
 -- A share of a total, as a percentage, or nil when either is secret or there is no total.
 function DM.Percent(amount, total)
     if not (Plain(amount, "number") and Plain(total, "number")) or total <= 0 then return nil end

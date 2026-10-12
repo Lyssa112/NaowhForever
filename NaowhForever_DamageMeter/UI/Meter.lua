@@ -12,7 +12,7 @@ local INSET, HEADER, ROUND = C.INSET, C.HEADER, C.ROUND
 local MIN_WIDTH, MAX_WIDTH, MAX_HEIGHT = C.MIN_WIDTH, C.MAX_WIDTH, C.MAX_HEIGHT
 local BUTTON_H, MORE_W, SESSION_W, BUTTON_GAP, BUTTON_RIGHT = 18, 22, 62, 4, -6
 local TITLE_PAD = 8
-local TIME_NEED = 2 * TITLE_PAD + C.TIME_WIDTH + SESSION_W + MORE_W + BUTTON_GAP - BUTTON_RIGHT
+local TIME_ROOM = 2 * TITLE_PAD + SESSION_W + MORE_W + BUTTON_GAP - BUTTON_RIGHT
 local GRIP_SIZE, GRIP_INSET, GRIP_LEVEL, GRIP_LOCKED_ALPHA = 20, 2, 20, 0.4
 local HOME_X, HOME_Y = -24, 210
 local FRAME_NAME = "NaowhForeverDamageMeter"
@@ -68,10 +68,16 @@ local function Render(w, session, available, seconds)
     local frame = w.frame
     local shown, mode = Layout(w, session)
     Look.Paint(frame, session, w.offset, shown, mode, available)
+    local summary = S.Get("showSummary") == true
+    frame.summary:SetShown(summary)
+    if summary then
+        Look.PaintSummary(frame, session, mode, DM.SessionName(Get(w, "session"), w.fight), seconds)
+    end
     frame.title:SetText(mode.label)
     local titleWidth = frame.title:GetStringWidth()
     frame.modeButton:SetWidth(titleWidth + 2 * TITLE_PAD)
-    local fits = seconds ~= nil and S.Get("showTime") and frame:GetWidth() >= titleWidth + TIME_NEED
+    local fits = seconds ~= nil and S.Get("showTime")
+        and frame:GetWidth() >= titleWidth + TIME_ROOM + Look.TimeWidth()
     frame.time:SetText(fits and DM.Clock(seconds) or "")
     frame.time:SetShown(fits == true)
     ns.SetButtonText(frame.session, w.fight and TEXT_FIGHT or C.SESSION_LABELS[Get(w, "session")]

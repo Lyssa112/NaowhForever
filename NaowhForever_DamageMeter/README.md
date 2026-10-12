@@ -78,6 +78,10 @@ NaowhForever_DamageMeter/
 - A report is made of plain numbers, so it is sent outside combat only, and a source whose name or
   amount is still secret is left out. It goes to chat with `SendChatMessage` from a menu click, which
   is a hardware event, so Say works too.
+- The summary line under the title bar is made with one `SetFormattedText`: the session's name, its
+  total (a secret string in combat), the raid's per-second figure and your rank. The raid figure is
+  the total over the session's length, so it only appears once both are plain numbers, after the
+  fight; your rank is your row's position in the game's order, which is never secret.
 - The fight time in the title bar is the shown session's own length from the game
   (`GetSessionDurationSeconds`, or a past fight's from `GetAvailableCombatSessions`), read through
   `DM.Duration` and shown only as a plain number and only when the bar has room beside the title.

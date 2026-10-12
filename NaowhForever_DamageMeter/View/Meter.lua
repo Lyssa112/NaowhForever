@@ -14,15 +14,17 @@ local CLASS_ICON = "Interface\\Icons\\ClassIcon_"
 local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local ICON_CROP, ICON_MAX, ICON_PAD, ICON_GAP = ns.Shared.Style.ICON_CROP, 28, 4, 5
 local INSET, HEADER, COLUMN_HEAD, COL_GAP = C.INSET, C.HEADER, C.COLUMN_HEAD, C.COL_GAP
+local SUMMARY_H, TIME_CHARS = C.SUMMARY_H, 7
 local TEXT_PAD, NAME_GAP, EDGE_W = 6, 6, 2
 local RANK_W, RANK_SIZE = 18, 10
 local COL_CHARS, COL_CHARS_FULL, CHAR_W = 7, 10, 0.62
 local EMPTY_SIZE, EMPTY_Y = 12, -10
-local TITLE_SIZE, TITLE_X, TIME_SIZE, HEAD_SIZE, HEAD_PAD = 12, 8, 11, 10, 3
+local TITLE_SIZE, TITLE_X, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 8, 11, 10, 3, 11
 
 local TEXT_EMPTY = "No data yet"
 local TEXT_UNAVAILABLE = "The damage meter is not available"
 local TEXT_NAME_HEAD, TEXT_TOTAL, TEXT_RATE = "Name", "Total", "Per Sec"
+local SUMMARY_GAP, TEXT_RAID, TEXT_RANK = "   ", "Raid %s", "Rank %d/%d"
 local RANK_TEXT = "%d"
 
 local Look = {}
@@ -65,6 +67,11 @@ function Look.BarColor(source)
     return ClassColor(source.classFilename)
 end
 
+-- How wide the fight time is at the size the settings give it.
+function Look.TimeWidth()
+    return math.ceil(TIME_CHARS * CHAR_W * S.Get("timeSize"))
+end
+
 function Look.New(frame, index)
     frame.rows = {}
     frame.cols = {}
@@ -83,7 +90,9 @@ function Look.New(frame, index)
     frame.title = ns.Font(frame.header, TITLE_SIZE, "OUTLINE", T.fg)
     frame.title:SetPoint("LEFT", TITLE_X, 0); frame.title:SetJustifyH("LEFT"); frame.title:SetWordWrap(false)
     frame.time = ns.Font(frame.header, TIME_SIZE, "OUTLINE", T.muted)
-    frame.time:SetWidth(C.TIME_WIDTH); frame.time:SetJustifyH("RIGHT")
+    frame.time:SetJustifyH("RIGHT")
+    frame.summary = ns.Font(frame, SUMMARY_SIZE, "OUTLINE", T.muted)
+    frame.summary:SetJustifyH("LEFT"); frame.summary:SetWordWrap(false)
     frame.headName = ns.Font(frame, HEAD_SIZE, "OUTLINE", T.muted)
     frame.headName:SetJustifyH("LEFT"); frame.headName:SetText(TEXT_NAME_HEAD)
     frame.headA = ns.Font(frame, HEAD_SIZE, "OUTLINE", T.muted)
@@ -171,11 +180,18 @@ end
 -- The column titles above the rows: Name, and a title over each value column.
 local function LayHeads(f, g)
     local show = g.showHead
+    f.summary:ClearAllPoints()
+    f.summary:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + TEXT_PAD, -HEADER - HEAD_PAD)
+    f.summary:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + TEXT_PAD), -HEADER - HEAD_PAD)
+    Parts.HudFont(f.summary, g.font, SUMMARY_SIZE, g.outline)
+    Parts.HudFont(f.title, g.font, g.titleSize, g.outline)
+    Parts.HudFont(f.time, g.font, g.timeSize, g.outline)
+    f.time:SetWidth(Look.TimeWidth())
     f.headName:SetShown(show)
     f.headA:SetShown(show and g.columns == 2)
     f.headB:SetShown(show and g.columns >= 1)
     if not show then return end
-    local y = -HEADER - HEAD_PAD
+    local y = -g.headTop - HEAD_PAD
     f.headB:ClearAllPoints(); f.headB:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(INSET + TEXT_PAD), y)
     f.headB:SetWidth(g.colWidth)
     f.headA:ClearAllPoints(); f.headA:SetPoint("TOPRIGHT", f.headB, "TOPLEFT", -COL_GAP, 0)
@@ -192,7 +208,9 @@ end
 local function PaintFrame(f)
     local window, header, border = Look.Color("windowColor"), Look.Color("headerColor"), Look.Color("borderColor")
     local title, time, rank = Look.Color("titleColor"), Look.Color("timeColor"), Look.Color("rankColor")
+    local summary = Look.Color("summaryColor")
     local alpha = S.Get("backgroundAlpha")
+    f.summary:SetTextColor(summary.r, summary.g, summary.b)
     f.background:SetColorTexture(window.r, window.g, window.b, 1)
     f.background:SetAlpha(alpha)
     f.headerBackground:SetColorTexture(header.r, header.g, header.b, 1)
@@ -210,8 +228,9 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     local minHeight = math.max(C.MIN_HEIGHT, HEADER + 2 * INSET + bh)
     local h = math.max(minHeight, S.Get(Key("height", f.index)))
     if not f.sizing then f:SetSize(w, h) else w, h = f:GetWidth(), f:GetHeight() end
-    local showHead = S.Get("showColumnHeaders") == true
-    local top = HEADER + (showHead and COLUMN_HEAD or 0)
+    local showHead, showSummary = S.Get("showColumnHeaders") == true, S.Get("showSummary") == true
+    local headTop = HEADER + (showSummary and SUMMARY_H or 0)
+    local top = headTop + (showHead and COLUMN_HEAD or 0)
     local capacity = Look.Capacity(h, bh, gap, top)
     first = math.max(0, math.min(first, total - capacity))
     local shown = math.min(total - first, capacity)
@@ -226,12 +245,13 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     f.nameColor, f.valueColor, f.rankColor, f.columnColor = name, value, rank, column
     local g = f.geo or {}
     f.geo = g
-    g.w, g.bh, g.gap, g.top, g.fontSize = w, bh, gap, top, fontSize
+    g.w, g.bh, g.gap, g.top, g.headTop, g.fontSize = w, bh, gap, top, headTop, fontSize
     g.showRanks, g.showIcons, g.showHead = S.Get("showRanks"), S.Get("showIcons"), showHead
     g.columns, g.colWidth, g.valueWidth = columns, colWidth, valueWidth
     g.texture, g.font, g.outline = S.Get("texture"), S.Get("font"), S.Get("outline")
+    g.titleSize, g.timeSize = S.Get("titleSize"), S.Get("timeSize")
     local key = table.concat({ w, h, bh, gap, fontSize, tostring(g.showRanks), tostring(g.showIcons), tostring(showHead),
-        columns, colWidth, g.texture, g.font, g.outline, name.r, name.g, name.b, value.r, value.g, value.b,
+        headTop, g.titleSize, g.timeSize, columns, colWidth, g.texture, g.font, g.outline, name.r, name.g, name.b, value.r, value.g, value.b,
         rank.r, rank.g, rank.b, column.r, column.g, column.b }, "|")
     if f.laidKey ~= key then LayHeads(f, g) end
     f.headName:SetText(TEXT_NAME_HEAD)
@@ -259,6 +279,24 @@ end
 local function PaintValues(row, source, cols)
     if cols.a then row.colA:SetText(Format(ValueOf(source, cols.a))) end
     if cols.b then row.colB:SetText(Format(ValueOf(source, cols.b))) end
+end
+
+-- The line under the title bar: the session's name, its total, the raid's per-second figure once both
+-- are plain numbers, and where you stand. The total is secret in combat and goes in as a string.
+function Look.PaintSummary(f, session, mode, name, seconds)
+    local format, args = "%s", { name }
+    format = format .. SUMMARY_GAP .. (mode.total or TEXT_TOTAL) .. " %s"
+    args[#args + 1] = Format(session.totalAmount)
+    local rate = mode.rate and DM.PerSecond(session.totalAmount, seconds)
+    if rate then
+        format = format .. SUMMARY_GAP .. TEXT_RAID:format(mode.perSecond or TEXT_RATE) .. " %s"
+        args[#args + 1] = Format(rate)
+    end
+    local rank, count = DM.Rank(session)
+    if rank then
+        format = format .. SUMMARY_GAP .. TEXT_RANK:format(rank, count)
+    end
+    f.summary:SetFormattedText(format, unpack(args))
 end
 
 function Look.Paint(f, session, first, shown, _, available)

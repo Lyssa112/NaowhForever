@@ -33,6 +33,7 @@ local ICON_STYLE = { { spec = "Spec Icon", class = "Class Icon" }, { "spec", "cl
 local NUMBER_UNITS = { C.NUMBER_UNITS, C.NUMBER_UNITS_ORDER }
 local NAME_FORMAT = { C.NAME_FORMATS, C.NAME_FORMATS_ORDER }
 local DECIMALS_RANGE = { 0, C.NUMBER_DECIMALS_MAX, 1 }
+local TITLE_RANGE = { C.MIN_TITLE, C.MAX_TITLE, 1 }
 
 local function Enabled() return DM.On() and true or false end
 local function CustomBars() return DM.On() and S.Get("barColor") == "custom" end
@@ -163,6 +164,11 @@ page:Card({
           help = "Off: drag the title bar to move it and the corner to resize it, in combat too." },
         { key = "showTime", label = "Show Fight Time", toggle = true, needs = Enabled, why = OFF,
           help = "How long the shown session has run, in the title bar when there is room." },
+        { key = "showSummary", label = "Summary Line", toggle = true, needs = Enabled, why = OFF,
+          help = "Under the title bar: the session, its total, the raid's per-second figure once the fight "
+              .. "is over, and your rank." },
+        { key = "titleSize", label = "Title Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
+        { key = "timeSize", label = "Fight Time Size", slider = TITLE_RANGE, needs = Enabled, why = OFF },
         { key = "showBorder", label = "Border", toggle = true, needs = Enabled, why = OFF },
         { key = "backgroundAlpha", label = "Background Opacity", slider = BACKGROUND_RANGE, unit = "%",
           scale = TO_FRACTION, needs = Enabled, why = OFF },
