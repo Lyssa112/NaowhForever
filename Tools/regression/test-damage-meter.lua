@@ -9,7 +9,7 @@ local METHODS = { __index = function(_, k) if type(k) == "string" and k:find("^[
 
 local function Region(kind, parent)
     local r = setmetatable({ kind = kind, parent = parent, shown = true, scripts = {}, events = {}, children = {},
-        w = 0, h = 0, alpha = 1, level = 1, text = "" }, METHODS)
+        w = 0, h = 0, alpha = 1, level = 1, text = "", points = {} }, METHODS)
     function r:SetScript(k, fn) self.scripts[k] = fn end
     function r:HookScript(k, fn) self.scripts[k] = fn end
     function r:RegisterEvent(e) self.events[e] = true end
@@ -25,6 +25,9 @@ local function Region(kind, parent)
     function r:SetHeight(h) self.h = h end
     function r:GetWidth() return self.w end
     function r:GetHeight() return self.h end
+    function r:SetPoint(...) self.points[#self.points + 1] = { ... } end
+    function r:ClearAllPoints() self.points = {} end
+    function r:GetCenter() return self.centerX end
     function r:SetAlpha(a) self.alpha = a end
     function r:SetText(t) self.text = t end
     function r:GetText() return self.text end
@@ -53,18 +56,47 @@ local THEME = {
     fg = { r = 0.9, g = 0.9, b = 0.9 }, muted = { r = 0.6, g = 0.6, b = 0.6 }, accent = { r = 0, g = 0.5, b = 1 },
 }
 local CLASS = { MAGE = { r = 0.25, g = 0.78, b = 0.92 }, ROGUE = { r = 1, g = 0.96, b = 0.41 } }
+-- what the stub client calls secret: a flagged table, this number and this string
+local SECRET_NUMBER, SECRET_TEXT = 424242, "secret-name"
 
 local function Amount(name) return setmetatable({ name = name }, { __tostring = function() return name end }) end
 
-local function Source(name, class, total, rate, own)
+local function Source(name, class, total, rate, own, guid)
     return { name = name, classFilename = class, specIconID = 0, totalAmount = Amount(total), amountPerSecond = Amount(rate),
-        isLocalPlayer = own == true }
+        isLocalPlayer = own == true, sourceGUID = guid }
+end
+
+local function Spell(id, total) return { spellID = id, totalAmount = total, amountPerSecond = total / 10 } end
+
+-- a menu, as the game's builder hands it to the generator
+local function Menu()
+    local m = { items = {} }
+    local function add(self, item) self.items[#self.items + 1] = item; return item end
+    function m:CreateTitle(text) return add(self, { kind = "title", text = text }) end
+    function m:CreateDivider() return add(self, { kind = "divider" }) end
+    function m:CreateButton(text, onClick)
+        local item = Menu(); item.kind, item.text, item.onClick = "button", text, onClick
+        return add(self, item)
+    end
+    function m:CreateRadio(text, isSelected, set)
+        return add(self, { kind = "radio", text = text, selected = isSelected, set = set })
+    end
+    function m:CreateCheckbox(text, isSelected, set)
+        return add(self, { kind = "check", text = text, selected = isSelected, set = set })
+    end
+    function m:Find(text)
+        for _, item in ipairs(self.items) do
+            if item.text == text then return item end
+        end
+    end
+    return m
 end
 
 local function Boot(opts)
     opts = opts or {}
-    local s = { settings = opts.settings or {}, calls = {}, cvars = { damageMeterEnabled = opts.gameMeter or "1" },
-        timers = {}, printed = {}, frames = {}, buttons = {}, confirms = {}, hooks = {}, account = {} }
+    local s = { settings = opts.settings or {}, calls = {}, idCalls = {}, spellCalls = {}, spellIdCalls = {},
+        cvars = { damageMeterEnabled = opts.gameMeter or "1" }, timers = {}, printed = {}, frames = {}, buttons = {},
+        confirms = {}, hooks = {}, account = {}, sent = {}, movers = {}, names = { [101] = "Fireball", [102] = "Pyroblast" } }
     local defaults
     local store = {}
     function store.Get(k)
@@ -74,15 +106,22 @@ local function Boot(opts)
     end
     function store.Set(k, v) s.settings[k] = v end
     function store.DB() return s.settings end
-    local session = { combatSources = { Source("Aldrin", "MAGE", "A", "a"), Source("You", "ROGUE", "B", "b", true),
-        Source("Cara", "MAGE", "C", "c") }, maxAmount = Amount("max"), totalAmount = Amount("total") }
+    local session = { combatSources = { Source("Aldrin", "MAGE", "A", "a", false, "Player-2"),
+        Source("You", "ROGUE", "B", "b", true, "Player-1"), Source("Cara", "MAGE", "C", "c", false, "Player-3") },
+        maxAmount = Amount("max"), totalAmount = Amount("total") }
     s.session = session
+    s.spells = { combatSpells = { Spell(101, 600), Spell(102, 300), Spell(103, 100) }, maxAmount = 600, totalAmount = 1000 }
     local ns = { THEME = THEME, MEDIA = "Media\\",
         FEATURES = { damageMeter = { enabled = false } },
         UI = {
             ModuleSettings = function(_, d) defaults = d; return store end,
             TexturePath = function(name, fallback) return name ~= "" and name or fallback end,
-            AttachMover = function(frame) local m = Region("Mover", frame); s.mover = m; return m end,
+            AttachMover = function(frame, label, onSave, page, card)
+                local m = Region("Mover", frame)
+                s.mover = m
+                s.movers[label] = { mover = m, save = onSave, page = page, card = card }
+                return m
+            end,
         },
         Shared = {
             Style = { ICON_CROP = 0.08, ALPHA_RANGE = { 0, 100, 5 }, OPACITY_STEP = 5, PERCENT_SCALE = 0.01 },
@@ -115,8 +154,16 @@ local function Boot(opts)
         math = math, table = table, string = string, setmetatable = setmetatable, pcall = pcall, unpack = unpack,
         UIParent = Region("Frame"), NaowhForever = ns, RAID_CLASS_COLORS = CLASS,
         InCombatLockdown = function() return s.combat == true end,
-        IsInGroup = function() return s.group == true end,
+        IsInGroup = function(category) if category == 2 then return s.instanceGroup == true end return s.group == true end,
+        IsInRaid = function() return s.raid == true end,
+        IsInGuild = function() return s.guild == true end,
         IsInInstance = function() return s.instance == true end,
+        LE_PARTY_CATEGORY_INSTANCE = 2,
+        UnitGUID = function(unit) if unit == "player" then return "Player-1" end end,
+        SendChatMessage = function(text, channel) s.sent[#s.sent + 1] = { text = text, channel = channel } end,
+        issecretvalue = function(v)
+            return (type(v) == "table" and v.secret == true) or v == SECRET_NUMBER or v == SECRET_TEXT
+        end,
         AbbreviateLargeNumbers = function(n) return "<" .. tostring(n) .. ">" end,
         Enum = { DamageMeterType = { DamageDone = 0, HealingDone = 2, DamageTaken = 7, Absorbs = 4, Interrupts = 5,
                 Dispels = 6, Deaths = 9 }, DamageMeterSessionType = { Overall = 0, Current = 1 } },
@@ -126,7 +173,41 @@ local function Boot(opts)
                 if s.apiError then error("secret") end
                 return s.apiResult == nil and session or s.apiResult
             end,
+            GetCombatSessionFromID = function(id, type)
+                s.idCalls[#s.idCalls + 1] = { id, type }
+                if s.apiError then error("secret") end
+                return s.idResult == nil and session or s.idResult
+            end,
+            GetAvailableCombatSessions = function()
+                if s.fightsError then error("secret") end
+                return s.fights or {}
+            end,
+            GetCombatSessionSourceFromType = function(kind, type, guid, creature)
+                s.spellCalls[#s.spellCalls + 1] = { kind = kind, type = type, guid = guid, creature = creature }
+                if s.spellError then error("secret") end
+                if s.spellsResult ~= nil then return s.spellsResult end
+                return s.spells
+            end,
+            GetCombatSessionSourceFromID = function(id, type, guid, creature)
+                s.spellIdCalls[#s.spellIdCalls + 1] = { id = id, type = type, guid = guid, creature = creature }
+                return s.spells
+            end,
             ResetAllCombatSessions = function() s.resets = (s.resets or 0) + 1 end,
+        },
+        C_Spell = {
+            GetSpellName = function(id) return s.names[id] end,
+            GetSpellTexture = function(id)
+                if s.noTexture then error("bad argument") end
+                return 1000 + id
+            end,
+        },
+        MenuUtil = {
+            CreateContextMenu = function(owner, generator)
+                local root = Menu()
+                root.owner = owner
+                generator(owner, root)
+                s.menu = root
+            end,
         },
         C_CVar = { GetCVar = function(k) return s.cvars[k] end, SetCVar = function(k, v) s.cvars[k] = v end },
         C_Timer = { After = function(sec, fn) s.timers[#s.timers + 1] = { sec = sec, fn = fn } end },
@@ -142,8 +223,9 @@ local function Boot(opts)
         end,
     }
     env._G = env
-    local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "View/Meter.lua", "UI/Meter.lua",
-        "UI/SettingsPage.lua" }
+    env.UIParent.w = 1000
+    local files = { "DamageMeter.lua", "Constants.lua", "Data/Samples.lua", "Source.lua", "Report.lua", "View/Meter.lua",
+        "View/Breakdown.lua", "UI/Menus.lua", "UI/Meter.lua", "UI/SettingsPage.lua" }
     for _, file in ipairs(files) do
         local chunk = assert(loadfile("NaowhForever_DamageMeter/" .. file))
         setfenv(chunk, env)
@@ -151,17 +233,17 @@ local function Boot(opts)
     end
     s.ns, s.store, s.env = ns, store, env
     s.DM = ns.DamageMeter
-    -- the frame of the window, and the boot frame that logs in
     for _, f in ipairs(s.frames) do
-        if f.name == "NaowhForeverDamageMeter" then s.window = f end
         if f.events and f.events.PLAYER_LOGIN then s.boot = f end
     end
     function s.Login() s.boot.scripts.OnEvent(s.boot, "PLAYER_LOGIN") end
-    function s.Window()
+    local function Named(name)
         for _, f in ipairs(s.frames) do
-            if f.name == "NaowhForeverDamageMeter" then return f end
+            if f.name == name then return f end
         end
     end
+    function s.Window(i) return Named(i and i > 1 and "NaowhForeverDamageMeter" .. i or "NaowhForeverDamageMeter") end
+    function s.Panel() return Named("NaowhForeverDamageMeterBreakdown") end
     function s.Fire(event)
         for _, f in ipairs(s.frames) do
             if f.events[event] and f.scripts.OnEvent then f.scripts.OnEvent(f, event) end
@@ -171,6 +253,19 @@ local function Boot(opts)
         local due = s.timers
         s.timers = {}
         for _, t in ipairs(due) do t.fn() end
+    end
+    function s.Listening()
+        for _, f in ipairs(s.frames) do
+            for e in pairs(f.events) do
+                if e:find("^DAMAGE_METER") then return true end
+            end
+        end
+        return false
+    end
+    function s.Hover(w, i)
+        local row = w.rows[i]
+        row.scripts.OnEnter(row)
+        return row
     end
     return s
 end
@@ -203,21 +298,87 @@ do
     check("no API: not available, and nothing", DM.Available() == false and #DM.Session("damage", "current").combatSources == 0)
     DM.Reset()
     check("and a reset does nothing", s.resets == nil)
+    check("and there are no fights", #DM.Fights() == 0)
+end
+
+-- past fights: the list, their labels and reading one by its id
+do
+    local s = Boot()
+    local DM = s.DM
+    local got = DM.Session("healing", "overall", 7)
+    check("a fight is read by its id and the list's type", got == s.session and s.idCalls[1][1] == 7
+        and s.idCalls[1][2] == 2 and #s.calls == 0)
+    s.apiError = true
+    check("a fight the game errors on reads as nothing", #DM.Session("damage", "current", 7).combatSources == 0)
+    s.apiError = nil
+    s.fights = { { sessionID = 3, name = "Boss", durationSeconds = 125 }, { sessionID = 5, name = "", durationSeconds = 61 },
+        { sessionID = 4 } }
+    local fights = DM.Fights()
+    check("past fights, newest first", #fights == 3 and fights[1].id == 5 and fights[2].id == 4 and fights[3].id == 3)
+    check("with the name the game gives", fights[3].name == "Boss" and fights[1].name == nil)
+    check("labeled by name and length", DM.FightLabel(fights[3]) == "Boss (2:05)" and DM.FightLabel(fights[1]) == "Fight 5 (1:01)"
+        and DM.FightLabel(fights[2]) == "Fight 4")
+    check("a session's name", DM.SessionName("overall") == "Overall" and DM.SessionName("bogus") == "Current"
+        and DM.SessionName("current", 3) == "Boss (2:05)" and DM.SessionName("current", 99) == "Fight 99")
+    s.fights = {}
+    for i = 1, 15 do s.fights[i] = { sessionID = i } end
+    local many = DM.Fights()
+    check("at most ten, the newest", #many == 10 and many[1].id == 15 and many[10].id == 6)
+    s.fights = { { sessionID = SECRET_NUMBER }, { sessionID = 2, name = SECRET_TEXT, durationSeconds = SECRET_NUMBER },
+        "junk" }
+    local plain = DM.Fights()
+    check("a secret id is skipped, a secret name or length left off", #plain == 1 and plain[1].id == 2
+        and plain[1].name == nil and plain[1].seconds == nil)
+    s.fightsError = true
+    check("an error from the API: no fights", #DM.Fights() == 0)
+end
+
+-- the spells behind a row
+do
+    local s = Boot()
+    local DM = s.DM
+    local you = Source("You", "ROGUE", 5, 1, true, "Player-9")
+    local other = Source("Aldrin", "MAGE", 5, 1, false, "Player-2")
+    local data = DM.SourceSpells("damage", "current", nil, you)
+    local call = s.spellCalls[1]
+    check("your row asks with your own guid, the list's type and no creature", data == s.spells and call.guid == "Player-1"
+        and call.type == 0 and call.kind == 1 and call.creature == nil)
+    DM.SourceSpells("damage", "overall", nil, other)
+    check("another row asks with its guid, for the overall session", s.spellCalls[2].guid == "Player-2" and s.spellCalls[2].kind == 0)
+    DM.SourceSpells("healing", "current", 9, other)
+    check("a past fight by its id", s.spellIdCalls[1].id == 9 and s.spellIdCalls[1].type == 2
+        and s.spellIdCalls[1].guid == "Player-2" and s.spellIdCalls[1].creature == nil)
+    local before = #s.spellCalls
+    check("a secret guid: nothing, and the game is not asked",
+        DM.SourceSpells("damage", "current", nil, Source("X", "MAGE", 5, 1, false, SECRET_TEXT)) == nil
+        and DM.SourceSpells("damage", "current", nil, Source("Y", "MAGE", 5, 1, false, nil)) == nil
+        and #s.spellCalls == before)
+    check("deaths have no spells", DM.SourceSpells("deaths", "current", nil, you) == nil and #s.spellCalls == before)
+    s.spellsResult = { combatSpells = {} }
+    check("a source without spells reads as nothing", DM.SourceSpells("damage", "current", nil, you) == nil)
+    s.spellsResult = "no"
+    check("an answer that is no table too", DM.SourceSpells("damage", "current", nil, you) == nil)
+    s.spellsResult = nil
+    s.spellError = true
+    check("an error from the API reads as nothing", DM.SourceSpells("damage", "current", nil, you) == nil)
+    s.env.C_DamageMeter = nil
+    check("no API: nothing", DM.SourceSpells("damage", "current", nil, you) == nil)
+
+    check("a share of a total", DM.Percent(250, 1000) == 25)
+    check("none when either is secret, missing or zero", DM.Percent(SECRET_NUMBER, 1000) == nil
+        and DM.Percent(5, SECRET_NUMBER) == nil and DM.Percent(5, 0) == nil and DM.Percent(Amount("x"), 10) == nil
+        and DM.Percent(5, nil) == nil)
 end
 
 -- off: nothing is built, listened to or changed
 do
     local s = Boot()
     s.Login()
-    check("off: no window", s.Window() == nil)
-    local listening = false
-    for _, f in ipairs(s.frames) do
-        for e in pairs(f.events) do
-            if e:find("^DAMAGE_METER") then listening = true end
-        end
-    end
-    check("off: no damage meter events", not listening)
+    check("off: no window", s.Window() == nil and s.Window(2) == nil)
+    check("off: no damage meter events", not s.Listening())
     check("off: the game's meter is untouched", s.cvars.damageMeterEnabled == "1" and s.account.damageMeterGameWas == nil)
+    s.env.NaowhForever_ResetDamageMeter()
+    check("off: the reset key says so and resets nothing", s.resets == nil and #s.printed == 1)
 end
 
 -- on: the window, its rows and its texts
@@ -239,6 +400,7 @@ do
     check("the title is the list", w.title.text == "Damage Done")
     check("the session button names the session", w.session.label == "Current")
     check("the preview text is hidden with rows shown", w.empty.shown == false)
+    check("only the first window", s.Window(2) == nil and s.Window(3) == nil)
 
     s.store.Set("barColor", "accent")
     s.Flush()
@@ -260,41 +422,189 @@ do
     check("and the API was asked for it", s.calls[#s.calls][2] == 5)
 end
 
--- the pickers, reset and settings
+-- the menus: the list, the session, and the rest
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.fights = { { sessionID = 3, name = "Boss", durationSeconds = 125 }, { sessionID = 4 } }
+    s.Login()
+    local w = s.Window()
+    w.modeButton.scripts.OnClick(w.modeButton)
+    local list = s.menu
+    check("the title opens the list menu on itself", list.owner == w.modeButton and list.items[1].text == "List")
+    check("with the seven lists, the current one chosen", #list.items == 8 and list:Find("Damage Done").selected() == true
+        and list:Find("Healing Done").selected() == false)
+    list:Find("Healing Done").set()
+    check("choosing one sets it", s.store.Get("mode") == "healing")
+    s.Flush()
+    check("and the window follows", w.title.text == "Healing Done" and s.calls[#s.calls][2] == 2)
+    list:Find("Deaths").set()
+    check("the last one too", s.store.Get("mode") == "deaths" and list:Find("Deaths").selected() == true)
+    s.store.Set("mode", "damage")
+
+    w.session.onClick()
+    local menu = s.menu
+    check("the session button opens the session menu", menu.owner == w.session and menu:Find("Current").selected() == true
+        and menu:Find("Overall").selected() == false)
+    check("past fights, newest first, each by its label", menu:Find("Past Fights") ~= nil and menu.items[6].text == "Fight 4"
+        and menu.items[7].text == "Boss (2:05)")
+    menu:Find("Overall").set()
+    check("Overall is a setting", s.store.Get("session") == "overall")
+    s.Flush()
+    check("and the button says so", w.session.label == "Overall")
+    menu:Find("Boss (2:05)").set()
+    s.Flush()
+    check("a past fight is read by its id", s.idCalls[#s.idCalls][1] == 3 and w.session.label == "Fight")
+    s.Hover(w, 2)
+    check("its spells are asked for by the fight's id", s.spellIdCalls[#s.spellIdCalls].id == 3)
+    w.rows[2].scripts.OnLeave(w.rows[2])
+    local asked = #s.idCalls
+    w.more.onClick()
+    s.menu:Find("Report To"):Find("Yourself").onClick()
+    check("and so is its report", #s.idCalls == asked + 1 and s.idCalls[#s.idCalls][1] == 3)
+    w.session.onClick()
+    menu = s.menu
+    check("and chosen in the menu, the sessions not", menu:Find("Boss (2:05)").selected() == true
+        and menu:Find("Overall").selected() == false and s.store.Get("session") == "overall")
+    menu:Find("Current").set()
+    s.Flush()
+    check("Current goes back to the live session", s.store.Get("session") == "current" and w.session.label == "Current"
+        and menu:Find("Boss (2:05)").selected() == false)
+
+    s.fights = {}
+    w.session.onClick()
+    check("no past fights: it says so", s.menu:Find("No Past Fights Yet") ~= nil)
+
+    s.fights = { { sessionID = 3 } }
+    s.store.Set("session", "current")
+    w.session.onClick()
+    s.menu:Find("Fight 3").set()
+    s.Flush()
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("a reset forgets the past fight", w.session.label == "Current")
+end
+
+-- the window menu
 do
     local s = Boot({ settings = { enabled = true } })
     s.Login()
     local w = s.Window()
-    local click = w.modeButton.scripts.OnClick
-    click(w.modeButton, "LeftButton")
-    check("a click: the next list", s.store.Get("mode") == "healing")
-    click(w.modeButton, "RightButton")
-    click(w.modeButton, "RightButton")
-    check("right clicks go back, round the end", s.store.Get("mode") == "deaths")
-    click(w.modeButton, "LeftButton")
-    check("and forward round the end", s.store.Get("mode") == "damage")
-    w.session.onClick()
-    check("the session button switches to Overall", s.store.Get("session") == "overall")
-    s.Flush()
-    check("and says so", w.session.label == "Overall")
-    w.session.onClick()
-    check("and back", s.store.Get("session") == "current")
-    w.reset.onClick()
+    w.more.onClick()
+    local menu = s.menu
+    check("the ... button opens the window menu", menu.owner == w.more and menu.items[1].text == "Damage Meter")
+    check("with a report, a reset, add, lock and settings", menu:Find("Report To") ~= nil and menu:Find("Reset Data") ~= nil
+        and menu:Find("Add Window") ~= nil and menu:Find("Lock Window").kind == "check" and menu:Find("Settings") ~= nil)
+    check("no Close Window on the first window", menu:Find("Close Window") == nil)
+    menu:Find("Reset Data").onClick()
     check("reset asks first", #s.confirms == 1 and s.resets == nil)
     s.confirms[1].yes()
     check("then clears the game's data", s.resets == 1)
-    w.settings.onClick()
-    check("the settings button opens the page", s.opened == "Damage Meter")
+    menu:Find("Lock Window").set()
+    check("Lock Window is the setting", s.store.Get("locked") == true and menu:Find("Lock Window").selected() == true)
+    menu:Find("Settings").onClick()
+    check("Settings opens the page", s.opened == "Damage Meter")
+    local channels = menu:Find("Report To").items
+    check("reports go to yourself and Say alone, alone", #channels == 2 and channels[1].text == "Yourself" and channels[2].text == "Say")
+    s.group, s.raid, s.guild, s.instanceGroup = true, true, true, true
+    w.more.onClick()
+    local all = s.menu:Find("Report To").items
+    check("and to the party, raid, instance and guild when there", #all == 6 and all[3].text == "Party" and all[4].text == "Raid"
+        and all[5].text == "Instance" and all[6].text == "Guild")
+    s.menu:Find("Add Window").onClick()
+    check("Add Window opens the next one", s.store.Get("window2") == true and s.Window(2) ~= nil and s.Window(2).shown == true)
+    w.more.onClick()
+    s.menu:Find("Add Window").onClick()
+    check("and the one after", s.store.Get("window3") == true and s.Window(3).shown == true)
+    w.more.onClick()
+    check("with all three open there is nothing to add", s.menu:Find("Add Window") == nil)
+    local second = s.Window(2)
+    second.more.onClick()
+    check("the other windows can close", s.menu.items[1].text == "Damage Meter 2" and s.menu:Find("Close Window") ~= nil)
+    s.menu:Find("Close Window").onClick()
+    check("closing hides it and keeps the rest", s.store.Get("window2") == false and second.shown == false
+        and s.Window(3).shown == true and s.Window().shown == true)
+    w.more.onClick()
+    check("and it can be added again", s.menu:Find("Add Window") ~= nil)
+end
+
+-- more windows: each with its own list, session, size and place
+do
+    local s = Boot({ settings = { enabled = true, window2 = true, mode2 = "taken", session2 = "overall", width2 = 240,
+        height2 = 120 } })
+    s.Login()
+    local one, two = s.Window(), s.Window(2)
+    check("a second window, shown", two and two.shown and s.Window(3) == nil)
+    check("its own list and session", two.title.text == "Damage Taken" and two.session.label == "Overall"
+        and one.title.text == "Damage Done" and one.session.label == "Current")
+    check("each asked the game for its own", s.calls[#s.calls][2] == 7 and s.calls[#s.calls][1] == 0)
+    check("its own size", two.w == 240 and two.h == 120 and one.w == 300 and one.h == 190)
+    s.store.Set("mode2", "healing")
+    s.Flush()
+    check("a change to one leaves the other", two.title.text == "Healing Done" and one.title.text == "Damage Done")
+    two.modeButton.scripts.OnClick(two.modeButton)
+    s.menu:Find("Absorbs").set()
+    check("a window's list menu sets its own list", s.store.Get("mode2") == "absorbs" and s.settings.mode == nil)
+    two.header.scripts.OnDragStart(two.header)
+    two.header.scripts.OnDragStop(two.header)
+    check("dragging a window saves its own place", s.store.Get("meterPos2").point == "TOPLEFT"
+        and s.settings.meterPos == nil)
+    check("their own name, page and card for Unlock Mode", s.movers["Damage Meter"].card == "Damage Meter/Settings:meter"
+        and s.movers["Damage Meter 2"].card == "Damage Meter/Settings:windows"
+        and s.movers["Damage Meter 2"].page == "Damage Meter/Settings")
+    s.movers["Damage Meter 2"].save({ point = "CENTER", relPoint = "CENTER", x = 5, y = 6 })
+    check("a moved window saves its own place", s.store.Get("meterPos2").x == 5 and s.store.Get("meterPos").x == -24)
+    check("the others start stacked above the first", s.settings.meterPos == nil and s.store.Get("meterPos").y == 210
+        and s.store.Get("meterPos3").y == 630)
+    check("keys carry the window's number", s.DM.Key("mode", 1) == "mode" and s.DM.Key("mode", 2) == "mode2"
+        and s.DM.Key("width", 3) == "width3")
+    s.store.Set("window2", false)
+    check("switching one off hides just it", two.shown == false and one.shown == true)
+    s.store.Set("enabled", false)
+    check("the module off hides all", one.shown == false and not s.Listening())
+end
+
+-- the wheel scrolls the window under it, from its rows or from its frame
+do
+    local s = Boot({ settings = { enabled = true, window2 = true, height2 = 70 } })
+    s.Login()
+    local one, two = s.Window(), s.Window(2)
+    check("a short window shows one row", two.rows[1].shown == true and two.rows[2] == nil
+        and two.rows[1].name.text == "Aldrin")
+    two.rows[1].scripts.OnMouseWheel(two.rows[1], -1)
+    check("a row passes the wheel to its window: one row down", two.rows[1].name.text == "You"
+        and two.rows[1].rank.text == "2" and one.rows[1].name.text == "Aldrin")
+    two.scripts.OnMouseWheel(two, -1)
+    check("and the frame scrolls it too", two.rows[1].name.text == "Cara")
+    two.scripts.OnMouseWheel(two, -1)
+    check("not past the last row", two.rows[1].name.text == "Cara")
+    two.scripts.OnMouseWheel(two, 2)
+    check("and back to the top", two.rows[1].name.text == "Aldrin")
+end
+
+-- the second window's grip saves its own size
+do
+    local s = Boot({ settings = { enabled = true, window2 = true } })
+    s.Login()
+    local two = s.Window(2)
+    local grip
+    for _, f in ipairs(s.frames) do
+        if f.parent == two and f.kind == "Button" and f.scripts.OnMouseDown then grip = f end
+    end
+    grip.scripts.OnMouseDown(grip, "LeftButton")
+    check("the grip sizes the window", two.sizing == true)
+    two.w, two.h = 260.4, 150.6
+    grip.scripts.OnMouseUp(grip)
+    check("and saves its size under its number", s.store.Get("width2") == 260 and s.store.Get("height2") == 151
+        and s.settings.width == nil)
 end
 
 -- where it shows
 do
-    local s = Boot({ settings = { enabled = true, visibility = "group" } })
+    local s = Boot({ settings = { enabled = true, visibility = "group", window2 = true } })
     s.Login()
-    check("In a Group: hidden alone", s.Window().shown == false)
+    check("In a Group: hidden alone", s.Window().shown == false and s.Window(2).shown == false)
     s.group = true
     s.Fire("GROUP_ROSTER_UPDATE"); s.Flush()
-    check("and shown in a group", s.Window().shown == true)
+    check("and shown in a group", s.Window().shown == true and s.Window(2).shown == true)
     s.store.Set("visibility", "instance"); s.Flush()
     check("In Instances: hidden outside one", s.Window().shown == false)
     s.instance = true
@@ -330,21 +640,16 @@ end
 
 -- Unlock Mode shows the sample, and switching the meter off while it is unlocked stops the listening
 do
-    local s = Boot({ settings = { enabled = true } })
+    local s = Boot({ settings = { enabled = true, window2 = true } })
     s.Login()
     s.ns.ShowUnlockMode()
     local w = s.Window()
-    check("Unlock Mode: the sample and the mover", #w.rows == 7 and s.mover.shown == true)
+    check("Unlock Mode: the sample and the mover, on every open window", #w.rows == 7 and s.Window(2).rows[7] ~= nil
+        and s.movers["Damage Meter 2"].mover.shown == true and s.movers["Damage Meter"].mover.shown == true)
     s.store.Set("enabled", false)
-    local listening = false
-    for _, f in ipairs(s.frames) do
-        for e in pairs(f.events) do
-            if e:find("^DAMAGE_METER") then listening = true end
-        end
-    end
-    check("switched off while unlocked: no damage meter events", not listening)
+    check("switched off while unlocked: no damage meter events", not s.Listening())
     s.ns.HideUnlockMode()
-    check("locked again: the window goes", w.shown == false)
+    check("locked again: the windows go", w.shown == false and s.Window(2).shown == false)
 end
 
 -- updates are coalesced, and the sample shows without data
@@ -388,28 +693,210 @@ do
     check("no API: the window says so", w.empty.text == "The damage meter is not available" and w.empty.shown == true)
 end
 
+-- the reset key
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    s.env.NaowhForever_ResetDamageMeter()
+    check("the reset key clears the data and says so", s.resets == 1 and #s.printed == 1 and #s.confirms == 0)
+end
+
+-- the report
+do
+    local s = Boot({ settings = { enabled = true, reportLines = 2 } })
+    s.Login()
+    local DM = s.DM
+    local plain = { combatSources = {
+        { name = "Aldrin", totalAmount = 1500, amountPerSecond = 150 }, { name = SECRET_TEXT, totalAmount = 1200, amountPerSecond = 120 },
+        { name = "You", totalAmount = 900, amountPerSecond = 90 }, { name = "Cara", totalAmount = SECRET_NUMBER, amountPerSecond = 30 },
+        { name = Amount("table"), totalAmount = 200, amountPerSecond = 20 }, { name = "Dan", totalAmount = 100, amountPerSecond = 10 },
+    }, maxAmount = 1500, totalAmount = 4000 }
+    local lines = DM.ReportLines(plain, DM.Mode("damage"), "Current", 2, true)
+    check("a header, then the top rows with total and rate", #lines == 3 and lines[1] == "Damage Done, Current"
+        and lines[2] == "1. Aldrin  <1500> (<150>)")
+    check("a secret name is left out and the ranks go on", lines[3] == "2. You  <900> (<90>)")
+    lines = DM.ReportLines(plain, DM.Mode("damage"), "Current", 10, false)
+    check("without the rate, the total alone; secret names and amounts left out",
+        #lines == 4 and lines[2] == "1. Aldrin  <1500>" and lines[4] == "3. Dan  <100>")
+    lines = DM.ReportLines(plain, DM.Mode("interrupts"), "Overall", 1, true)
+    check("a list without a rate has none", lines[1] == "Interrupts, Overall" and lines[2] == "1. Aldrin  <1500>")
+    check("a secret rate is left off the line", DM.ReportLines({ combatSources = { { name = "A", totalAmount = 5,
+        amountPerSecond = SECRET_NUMBER } } }, DM.Mode("damage"), "x", 5, true)[2] == "1. A  <5>")
+
+    s.apiResult = plain
+    DM.Report("PARTY", "damage", "current", nil)
+    check("sent to the channel, header first, as many as Report Lines says", #s.sent == 3 and s.sent[1].channel == "PARTY"
+        and s.sent[1].text == "Damage Done, Current" and s.sent[3].text == "2. You  <900> (<90>)")
+    s.sent = {}
+    s.store.Set("showRate", false)
+    DM.Report("RAID", "damage", "overall", nil)
+    check("Show Per Second off: totals only", s.sent[2].text == "1. Aldrin  <1500>" and s.sent[1].text == "Damage Done, Overall")
+    s.sent = {}
+    s.printed = {}
+    DM.Report("SELF", "damage", "current", nil)
+    check("Yourself: printed, not sent", #s.sent == 0 and #s.printed == 3)
+    s.printed = {}
+    s.combat = true
+    DM.Report("SAY", "damage", "current", nil)
+    check("in combat: nothing is sent, and it says why", #s.sent == 0 and #s.printed == 1)
+    s.combat = false
+    s.printed = {}
+    s.apiResult = { combatSources = {}, maxAmount = 0, totalAmount = 0 }
+    DM.Report("SAY", "damage", "current", nil)
+    check("nothing to report: it says so", #s.sent == 0 and #s.printed == 1)
+    s.apiResult = nil
+    s.sent = {}
+    s.fights = { { sessionID = 3, name = "Boss", durationSeconds = 60 } }
+    s.idResult = plain
+    DM.Report("GUILD", "damage", "current", 3)
+    check("a past fight is reported by its name", s.sent[1].text == "Damage Done, Boss (1:00)" and s.idCalls[#s.idCalls][1] == 3)
+
+    s.apiResult = plain
+    s.sent = {}
+    s.Window().more.onClick()
+    s.menu:Find("Report To"):Find("Say").onClick()
+    check("the menu's channel sends what its window shows", #s.sent == 3 and s.sent[1].channel == "SAY"
+        and s.sent[1].text == "Damage Done, Current")
+end
+
+-- the spell breakdown on hover
+do
+    local s = Boot({ settings = { enabled = true } })
+    s.Login()
+    local w = s.Window()
+    local row = s.Hover(w, 2)
+    local panel = s.Panel()
+    check("hover: the panel shows, titled by the row", panel and panel.shown and panel.title.text == "You")
+    check("with the spells of your row, by your own guid", s.spellCalls[#s.spellCalls].guid == "Player-1")
+    check("the spells, in the game's order, with their names", panel.rows[1].name.text == "Fireball"
+        and panel.rows[2].name.text == "Pyroblast" and panel.rows[3].name.text == "Unknown")
+    check("each a bar out of the largest", panel.rows[2].barMax == 600 and panel.rows[2].barValue == 300)
+    check("amount and share when both are plain", panel.rows[1].value.text == "<600>  60.0%"
+        and panel.rows[3].value.text == "<100>  10.0%")
+    check("and the spell's icon", panel.rows[1].icon.texture == 1101 and panel.rows[1].icon.shown == true)
+    check("only as many rows as spells, and no note", panel.rows[4].shown == false and panel.note.shown == false
+        and panel.h == 24 + 3 * 20 - 2 + 6)
+    check("the bars in the row's class color", panel.rows[1].color[1] == CLASS.ROGUE.r)
+    local spells = s.spells
+    local many = {}
+    for i = 1, 12 do many[i] = Spell(200 + i, 100 - i) end
+    s.spells = { combatSpells = many, maxAmount = 100, totalAmount = 1000 }
+    s.Hover(w, 2)
+    check("at most eight spells", panel.rows[8].shown == true and panel.h == 24 + 8 * 20 - 2 + 6)
+    s.spells = spells
+    s.Hover(w, 2)
+    check("on the left of a window on the right half, the right of one on the left",
+        panel.points[1][1] == "TOPRIGHT" and panel.points[1][2] == row)
+    w.centerX = 100
+    s.Hover(w, 2)
+    check("a window on the left half: beside its right edge", s.Panel().points[1][1] == "TOPLEFT")
+    w.rows[2].scripts.OnLeave(w.rows[2])
+    check("leaving hides it", panel.shown == false)
+
+    s.spells.totalAmount = SECRET_NUMBER
+    s.Hover(w, 2)
+    check("a secret total: amounts, no share", panel.rows[1].value.text == "<600>")
+    s.spells.totalAmount = 1000
+    s.noTexture = true
+    s.Hover(w, 2)
+    check("an icon the game refuses: no icon, no error", panel.rows[1].icon.shown == false)
+    s.noTexture = nil
+    s.names = { [101] = SECRET_TEXT }
+    s.Hover(w, 2)
+    check("a secret name goes to the text as it is", panel.rows[1].name.text == SECRET_TEXT)
+    s.names = { [101] = "Fireball", [102] = "Pyroblast" }
+
+    s.combat = true
+    s.Hover(w, 1)
+    check("in combat, a row with a readable guid still shows", panel.rows[1].shown == true)
+    s.session.combatSources[1].sourceGUID = SECRET_TEXT
+    s.spellCalls = {}
+    s.Hover(w, 1)
+    check("in combat, a row with a secret guid says spells show after combat", #s.spellCalls == 0 and panel.rows[1].shown == false
+        and panel.note.text == "Spells show after combat." and panel.note.shown == true)
+    s.combat = false
+    s.Hover(w, 1)
+    check("out of combat with no data: a plain note", panel.note.text == "No spell data.")
+    s.session.combatSources[1].sourceGUID = "Player-2"
+    s.spellsResult = { combatSpells = {} }
+    s.Hover(w, 1)
+    check("a source with no spells says so", panel.note.text == "No spell data." and panel.note.shown == true)
+    s.spellsResult = nil
+
+    s.store.Set("mode", "deaths"); s.Flush()
+    s.spellCalls = {}
+    w.rows[1].scripts.OnLeave(w.rows[1])
+    s.Hover(w, 1)
+    check("Deaths: no panel, no question", panel.shown == false and #s.spellCalls == 0)
+    s.store.Set("mode", "damage"); s.Flush()
+
+    s.store.Set("breakdown", false)
+    s.spellCalls = {}
+    s.Hover(w, 2)
+    check("Spell Breakdown off: nothing", panel.shown == false and #s.spellCalls == 0)
+    s.store.Set("breakdown", true)
+end
+
+-- the panel follows updates, and goes with its window
+do
+    local s = Boot({ settings = { enabled = true, visibility = "group" } })
+    s.group = true
+    s.Login()
+    local w = s.Window()
+    s.Hover(w, 2)
+    local panel = s.Panel()
+    s.spells.combatSpells = { Spell(101, 50) }
+    s.spells.maxAmount, s.spells.totalAmount = 50, 100
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("an update redraws the hovered row's spells", panel.rows[1].value.text == "<50>  50.0%" and panel.rows[2].shown == false)
+    s.group = false
+    s.Fire("GROUP_ROSTER_UPDATE"); s.Flush()
+    check("the window hiding takes the panel with it", w.shown == false and panel.shown == false)
+
+    local sample = Boot({ settings = { enabled = true } })
+    sample.Login()
+    sample.ns.ShowUnlockMode()
+    sample.Hover(sample.Window(), 1)
+    check("the sample has no spells to show", sample.Panel() == nil or sample.Panel().shown == false)
+end
+
 -- the page
 do
     local s = Boot()
     local page = s.page
-    check("one page, one card, with its heading", page and #page.cards == 1 and page.cards[1].id == "meter" and page.window ~= nil)
+    check("one page, two cards: the meter and its more windows", page and #page.cards == 2
+        and page.cards[1].id == "meter" and page.cards[2].id == "windows" and page.window ~= nil)
     check("the heading reads the state", page.window.headline() == "Damage Meter is off")
     s.store.Set("enabled", true)
     check("on: it names the list", page.window.headline() == "Damage Done")
-    local keys = 0
-    for _, row in ipairs(page.cards[1].rows) do
-        if row.key then
-            keys = keys + 1
-            check("the setting " .. row.key .. " has a default", s.store.Get(row.key) ~= nil or row.key == "backgroundColor")
-            if row.choice then
-                for _, value in ipairs(row.choice[2]) do
-                    check(row.key .. " choice " .. value .. " has a label", row.choice[1][value] ~= nil)
+    local keys = {}
+    for _, card in ipairs(page.cards) do
+        for _, row in ipairs(card.rows) do
+            if row.key then
+                keys[#keys + 1] = row.key
+                check("the setting " .. row.key .. " has a default", s.store.Get(row.key) ~= nil or row.key == "backgroundColor")
+                if row.choice then
+                    for _, value in ipairs(row.choice[2]) do
+                        check(row.key .. " choice " .. value .. " has a label", row.choice[1][value] ~= nil)
+                    end
                 end
             end
         end
     end
-    check("the rows cover the window, the rows and the colors", keys >= 14)
-    check("one short help sentence on the card", #page.cards[1].help < 120)
+    check("the rows cover the windows, the rows, the hover and the colors", #keys >= 28)
+    check("one short help sentence on each card", #page.cards[1].help < 120 and #page.cards[2].help < 120)
+    check("the first card's summary reads window one", page.cards[1].summary(s.store) == "Damage Done, 300 by 190")
+    check("the closed windows say off", page.cards[2].summary(s.store) == "Second: Off, Third: Off")
+    s.store.Set("window2", true)
+    s.store.Set("mode2", "healing")
+    check("an open one reads its own list", page.cards[2].summary(s.store) == "Second: Healing Done, Third: Off")
+    local more = page.cards[2].rows
+    check("each window has a group and five rows, with its own keys", #more == 12 and more[2].key == "window2"
+        and more[3].key == "mode2" and more[6].key == "height2" and more[8].key == "window3" and more[12].key == "height3")
+    check("the labels differ across the card", more[3].label ~= more[9].label and more[2].label ~= more[8].label)
+    check("an open window's rows are enabled", more[2].needs() == true and more[3].needs() == true)
+    s.store.Set("window2", false)
+    check("closed: its own rows are disabled, its toggle is not", more[3].needs() == false and more[2].needs() == true)
 end
 
 print("PASS damage meter: " .. checks .. " checks")

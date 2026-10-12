@@ -1,9 +1,10 @@
 # Damage Meter
 
 Damage, healing and more for your group, one bar each, in your theme. It reads the game's own
-`C_DamageMeter` data and draws its own window, and turns the game's meter off while it is on. Its
-settings page is Damage Meter/Settings. Its on/off switch and default come from
-`ns.FEATURES.damageMeter`.
+`C_DamageMeter` data and draws its own windows, and turns the game's meter off while it is on. Up to
+three windows, each with its own list, session and size. Hover a row for its spells, report to chat
+from the window's menu, and reset from the menu or a key binding. Its settings page is Damage
+Meter/Settings. Its on/off switch and default come from `ns.FEATURES.damageMeter`.
 
 ## Layout
 
@@ -15,31 +16,53 @@ NaowhForever_DamageMeter/
   Constants.lua                  the sizes, the lists and the sessions (DM.C)
   Data/
     Samples.lua                  the sample group the preview and Unlock Mode show (DM.SAMPLE)
-  Source.lua                     reading the game's session (DM.Session), nothing drawn
+  Source.lua                     reading the game's sessions, fights and spells (DM.Session, DM.Fights, DM.SourceSpells)
+  Report.lua                     the lines a report sends, and where it can go (DM.Report, DM.Channels)
   View/
-    Meter.lua                    the window's look and layout (DM.Look)
+    Meter.lua                    a window's look and layout (DM.Look)
+    Breakdown.lua                the spells panel beside a hovered row (DM.Breakdown)
   UI/
-    Meter.lua                    the window: drag, resize, scroll, pickers, updates (ns.PreviewDamageMeter)
+    Menus.lua                    a window's list, session and window menus (DM.Menus)
+    Meter.lua                    the windows: drag, resize, scroll, hover, updates (ns.PreviewDamageMeter)
     SettingsPage.lua             its settings page, declared as cards
   README.md                      this file
 ```
 
 ## Why
 
-- Amounts and names are secret in combat. Nothing in `Source.lua` or `View/Meter.lua` compares or
-  adds them: they go straight to `StatusBar:SetValue`, `SetMinMaxValues` and `SetText`, through the
-  client's own `AbbreviateLargeNumbers`, which takes a secret. That is also why there is no percent
-  column. The class, the spec icon and `isLocalPlayer` are never secret, so those are read.
-- The game returns its sources already sorted, so the window draws them in order and ranks by position.
-- The API call goes through `pcall`: an error reads as no data and the window says so, not a Lua error.
+- Amounts and names are secret in combat. Nothing in `Source.lua` or `View/` compares or adds them
+  without asking `DM.IsSecret`: they go straight to `StatusBar:SetValue`, `SetMinMaxValues` and
+  `SetText`, through the client's own `AbbreviateLargeNumbers`, which takes a secret. The class, the
+  spec icon and `isLocalPlayer` are never secret, so those are read.
+- The game returns its sources and spells already sorted, so the window draws them in order and ranks
+  by position.
+- The API calls go through `pcall`: an error reads as no data and the window says so, not a Lua error.
 - Updates are coalesced, 0.25 seconds after the first event of a burst, since the game fires one per
-  source per update.
+  source per update. All open windows redraw together.
 - The game's meter is the `damageMeterEnabled` setting. It is turned off while this one is on and put
   back as it was after, kept on the account so it survives a reload. It is left alone in combat and
   done again when combat ends.
-- Interrupts, Dispels and Deaths have no per-second figure, so Show Per Second skips them.
+- Interrupts, Dispels and Deaths have no per-second figure, so Show Per Second skips them. Deaths has
+  no spells either.
+- Windows 2 and 3 use the first window's keys with their number added (`mode2`, `width3`,
+  `meterPos2`), so the window code takes an index and reads `DM.Key(base, index)`.
+- A past fight is a field of the window (`fight`), not a setting: the game's fight ids do not outlive
+  a reset or a reload, so the saved session stays Current or Overall and a reset puts every window
+  back on it.
+- A spell panel asks the game for a source by guid, and in combat the game takes a plain guid only:
+  your own row's (`UnitGUID("player")`) or one whose guid is not secret. Any other row says its spells
+  show after combat. The share is shown only when the amount and the total are plain numbers.
+- A spell's icon and name come from `C_Spell` through `pcall` and are tested with `type()`, never by
+  truthiness, since a secret id gives a secret answer. They go to the texture and the text as they are.
+- A report is made of plain numbers, so it is sent outside combat only, and a source whose name or
+  amount is still secret is left out. It goes to chat with `SendChatMessage` from a menu click, which
+  is a hardware event, so Say works too.
+- The reset key is `NaowhForever_ResetDamageMeter`, declared in `Bindings.xml`. Core defines a stub
+  that says the module is off; this module replaces it.
 
 ## Checking
 
-- `lua Tools/regression/test-damage-meter.lua`: the API read, the rows, the pickers, where it shows,
-  the game's meter, updates and the settings page, with amounts that fail on any arithmetic.
+- `lua Tools/regression/test-damage-meter.lua`: the API reads, the windows, the menus, the report,
+  the spell panel, where it shows, the game's meter, updates and the settings page, with amounts that
+  fail on any arithmetic.
+- `lua Tools/regression/test-nf-commands.lua`: the reset binding and its stub.

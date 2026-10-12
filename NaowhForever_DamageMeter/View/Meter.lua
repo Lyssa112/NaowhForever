@@ -6,7 +6,7 @@ local T = ns.THEME
 local Parts = ns.Shared.Parts
 local DM = ns.DamageMeter
 local S = DM.Settings
-local C = DM.C
+local C, Key, Short = DM.C, DM.Key, DM.Short
 
 local FALLBACK = { r = 0.6, g = 0.6, b = 0.6 }
 local GRADIENT_TEX = ns.MEDIA .. "NaowhGradient.tga"
@@ -29,11 +29,6 @@ DM.Look = Look
 
 local classIcons = {}
 
-local function Short(n)
-    if AbbreviateLargeNumbers then return AbbreviateLargeNumbers(n) end
-    return tostring(n)
-end
-
 local function ClassColor(class)
     return class and RAID_CLASS_COLORS[class] or FALLBACK
 end
@@ -50,8 +45,9 @@ local function IconOf(source)
     return UNKNOWN_ICON
 end
 
-function Look.New(frame)
+function Look.New(frame, index)
     frame.rows = {}
+    frame.index = index
     frame.background = ns.Solid(frame, "BACKGROUND", T.bg, 1)
     frame.background:SetAllPoints()
     frame.border = ns.Border(frame)
@@ -69,6 +65,10 @@ end
 function Look.Row(f, i)
     local row = CreateFrame("StatusBar", nil, f)
     row:SetMinMaxValues(0, 1)
+    row:EnableMouse(true); row:EnableMouseWheel(true)
+    row:SetScript("OnEnter", function(self) if f.onRowEnter then f.onRowEnter(self) end end)
+    row:SetScript("OnLeave", function() if f.onRowLeave then f.onRowLeave() end end)
+    row:SetScript("OnMouseWheel", function(_, delta) if f.onWheel then f.onWheel(delta) end end)
     row.bg = row:CreateTexture(nil, "BACKGROUND")
     row.bg:SetAllPoints()
     row.edge = row:CreateTexture(nil, "OVERLAY")
@@ -110,9 +110,9 @@ end
 
 -- Sizes the window and lays the rows that fit; returns how many are shown and the first one's index.
 function Look.Layout(f, total, first, bh, gap, fontSize, mode)
-    local w = math.max(C.MIN_WIDTH, S.Get("width"))
+    local w = math.max(C.MIN_WIDTH, S.Get(Key("width", f.index)))
     local minHeight = math.max(C.MIN_HEIGHT, HEADER + 2 * INSET + bh)
-    local h = math.max(minHeight, S.Get("height"))
+    local h = math.max(minHeight, S.Get(Key("height", f.index)))
     if not f.sizing then f:SetSize(w, h) else w, h = f:GetWidth(), f:GetHeight() end
     local capacity = Look.Capacity(h, bh, gap)
     first = math.max(0, math.min(first, total - capacity))
@@ -153,9 +153,14 @@ local function PaintValue(row, source, mode, showTotal, showRate)
     end
 end
 
+-- A source's bar color: its class, or the theme's Accent for everyone.
+function Look.Color(source)
+    if S.Get("barColor") == "accent" then return T.accent end
+    return ClassColor(source.classFilename)
+end
+
 function Look.Paint(f, session, first, shown, mode, available)
     local sources = session.combatSources
-    local accent = S.Get("barColor") == "accent"
     local alpha = S.Get("barAlpha")
     local showTotal, showRate = S.Get("showTotal"), S.Get("showRate")
     local own = S.Get("highlightPlayer")
@@ -163,7 +168,8 @@ function Look.Paint(f, session, first, shown, mode, available)
     f.empty:SetShown(shown == 0)
     for i = 1, shown do
         local source, row = sources[first + i], f.rows[i]
-        local c = accent and T.accent or ClassColor(source.classFilename)
+        local c = Look.Color(source)
+        row.source = source
         row:SetStatusBarColor(c.r, c.g, c.b, alpha)
         row:SetMinMaxValues(0, session.maxAmount)
         row:SetValue(source.totalAmount)

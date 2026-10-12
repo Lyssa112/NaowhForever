@@ -8,7 +8,7 @@ local MODES = {
     { key = "absorbs", label = "Absorbs", type = "Absorbs", rate = true },
     { key = "interrupts", label = "Interrupts", type = "Interrupts", rate = false },
     { key = "dispels", label = "Dispels", type = "Dispels", rate = false },
-    { key = "deaths", label = "Deaths", type = "Deaths", rate = false },
+    { key = "deaths", label = "Deaths", type = "Deaths", rate = false, spells = false },
 }
 
 local byKey, labels, order = {}, {}, {}
@@ -25,6 +25,7 @@ ns.DamageMeter.C = {
     INSET = 6, HEADER = 26,
     ROUND = 0.5,
     DEFAULT_MODE = "damage",
+    BREAKDOWN_LINES = 8, REPORT_MAX = 10, FIGHTS_MAX = 10,
     MODES = MODES, MODE_BY_KEY = byKey, MODE_LABELS = labels, MODE_ORDER = order,
     SESSION_LABELS = { current = "Current", overall = "Overall" },
     SESSION_ORDER = { "current", "overall" },
