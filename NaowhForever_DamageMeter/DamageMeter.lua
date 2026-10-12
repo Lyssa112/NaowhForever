@@ -4,6 +4,7 @@ local ns = _G.NaowhForever
 local F = ns.FEATURES.damageMeter
 
 local TITLE, MAX_WINDOWS = "Damage Meter", 3
+local SLOTS_KEPT = 64
 
 local S = ns.UI.ModuleSettings("damageMeter", {
     enabled = F.enabled,
@@ -82,12 +83,14 @@ function DM.Setting(index, key)
     return S.Get(DM.LookKey(index, key))
 end
 
-function DM.ColumnSlots(value, mode)
+local slotsOf, slotsKept = {}, 0
+
+local function ParseColumns(value, rateFirst)
     local C = DM.C
     local slots, seen = {}, {}
     if type(value) ~= "string" or value == "auto" then
         slots = { "name", "total", "rate" }
-        if mode and mode.rateFirst then slots[2], slots[3] = "rate", "total" end
+        if rateFirst then slots[2], slots[3] = "rate", "total" end
     else
         for kind in value:gmatch("[^,]+") do
             if C.COLUMN_KINDS[kind] and #slots < C.COLUMN_SLOTS and (kind == "none" or not seen[kind]) then
@@ -108,9 +111,23 @@ function DM.ColumnSlots(value, mode)
     return slots
 end
 
+function DM.ColumnSlots(value, mode)
+    local rateFirst = mode ~= nil and mode.rateFirst == true
+    local key = (rateFirst and "r" or "n") .. tostring(value)
+    local slots = slotsOf[key]
+    if not slots then
+        if slotsKept >= SLOTS_KEPT then slotsOf, slotsKept = {}, 0 end
+        slots = ParseColumns(value, rateFirst)
+        slotsOf[key] = slots
+        slotsKept = slotsKept + 1
+    end
+    return slots
+end
+
 function DM.SetColumnSlot(index, slot, kind, mode)
     local key = DM.LookKey(index, "columns")
-    local slots = DM.ColumnSlots(S.Get(key), mode)
+    local slots = {}
+    for i, kept in ipairs(DM.ColumnSlots(S.Get(key), mode)) do slots[i] = kept end
     local old = slots[slot]
     if old == nil or old == kind or not DM.C.COLUMN_KINDS[kind] then return end
     local holder

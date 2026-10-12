@@ -4265,7 +4265,17 @@ do
     s.byType[5].combatSources[2].sourceGUID = SECRET_TEXT
     s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
     check("yours is found as yours, whatever its guid says", you.colX1.text == "<3>")
+    s.byType[5].combatSources = { s.byType[5].combatSources[1] }
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    check("a list that no longer has you leaves your cell empty", you.colX1.text == "")
     s.store.Set("columns", "auto"); s.byType = nil
+    local asked = #s.calls
+    s.Fire("DAMAGE_METER_CURRENT_SESSION_UPDATED"); s.Flush()
+    local again = false
+    for i = asked + 1, #s.calls do
+        if s.calls[i][2] == 5 or s.calls[i][2] == 9 then again = true end
+    end
+    check("a list no column takes from is not asked for any more", not again)
     w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
     s.store.Set("columns", "name,total,rate,interrupts"); s.Flush()
     check("in a player's breakdown the other lists' columns are not drawn", w.rows[1].colX1.shown == false

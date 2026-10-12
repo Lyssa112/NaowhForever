@@ -37,6 +37,10 @@ DM.Look = Look
 
 local classIcons = {}
 local tokenOf = {}
+
+local function Clear(list)
+    for i = #list, 1, -1 do list[i] = nil end
+end
 for _, entry in ipairs(C.COLORS) do tokenOf[entry.key] = entry.token end
 
 local function ClassColor(class)
@@ -139,7 +143,7 @@ end
 
 local function NewPane(f, n)
     local pane = { f = f, n = n, rows = {}, cols = { x = {} }, order = {}, cells = {}, before = {}, after = {},
-        titleWidths = {}, beforeWidth = 0, afterWidth = 0, top = 0 }
+        figures = {}, extras = {}, listing = {}, titleWidths = {}, beforeWidth = 0, afterWidth = 0, top = 0 }
     pane.headName = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
     pane.headName:SetJustifyH("LEFT"); pane.headName:SetWordWrap(false); pane.headName:SetText(TEXT_NAME_HEAD)
     for _, id in ipairs(CELLS) do
@@ -221,7 +225,8 @@ end
 local function Columns(pane, mode)
     local f = pane.f
     local slots = DM.ColumnSlots(DM.Setting(f.index, "columns"), mode)
-    local figures, extras, order = {}, {}, {}
+    local figures, extras, order = pane.figures, pane.extras, pane.listing
+    Clear(figures); Clear(extras); Clear(order)
     for _, kind in ipairs(slots) do
         if kind == "name" then
             order[#order + 1] = "N"
@@ -239,8 +244,9 @@ local function Columns(pane, mode)
     local two = #figures == 2
     cols.a, cols.b = two and figures[1] or nil, figures[two and 2 or 1]
     cols.merged = two and DM.Setting(f.index, "showDivider") == true
-    cols.p, cols.x = false, {}
-    pane.order, pane.cells, pane.before, pane.after = {}, {}, {}, {}
+    cols.p = false
+    for id in pairs(cols.x) do cols.x[id] = nil end
+    Clear(pane.order); Clear(pane.cells); Clear(pane.before); Clear(pane.after)
     local side = pane.before
     for _, id in ipairs(order) do
         if id == "F1" then
@@ -672,17 +678,30 @@ local function PaintValues(row, source, cols, session, extras)
     end
 end
 
+local extras, extraPool = {}, {}
+local extrasSession, extrasFight
+
+setmetatable(extras, { __index = function(lookups, kind)
+    local lookup = extraPool[kind]
+    if not lookup then
+        lookup = { byGuid = {} }
+        extraPool[kind] = lookup
+    end
+    lookup.own = nil
+    for guid in pairs(lookup.byGuid) do lookup.byGuid[guid] = nil end
+    for _, source in ipairs(DM.Session(kind, extrasSession, extrasFight).combatSources) do
+        if source.isLocalPlayer == true then lookup.own = source end
+        local guid = source.sourceGUID
+        if DM.Plain(guid, "string") then lookup.byGuid[guid] = source end
+    end
+    lookups[kind] = lookup
+    return lookup
+end })
+
 function Look.Extras(sessionKey, fightID)
-    return setmetatable({}, { __index = function(lookups, kind)
-        local lookup = { byGuid = {} }
-        for _, source in ipairs(DM.Session(kind, sessionKey, fightID).combatSources) do
-            if source.isLocalPlayer == true then lookup.own = source end
-            local guid = source.sourceGUID
-            if DM.Plain(guid, "string") then lookup.byGuid[guid] = source end
-        end
-        lookups[kind] = lookup
-        return lookup
-    end })
+    for kind in pairs(extras) do extras[kind] = nil end
+    extrasSession, extrasFight = sessionKey, fightID
+    return extras
 end
 
 function Look.PaintSummary(f, session, mode, name, seconds)
