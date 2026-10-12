@@ -82,6 +82,9 @@ NaowhForever_DamageMeter/
 - The Fight History window sits in the FULLSCREEN strata, over the settings window (DIALOG), and opens
   beside it when there is room, so the two do not cover each other. A window the player has moved stays
   where it was put.
+- Always Show My Row: when your row (found by `isLocalPlayer`, never secret) is outside the rows shown
+  (above them after scrolling, or below), the last row shown is yours, with your rank, so the list
+  still scrolls through the others. It is the same source table, so hovering and clicking it work.
 - When it shows: Where gains In a Raid, and Hide in Battlegrounds hides it in a `pvp` or `arena` instance
   whatever Where says. Pet battles, cinematics and hiding the UI take the windows with `UIParent`, so
   they need no rule. Data and Reset: entering a new instance (a different instance id, not a login or a

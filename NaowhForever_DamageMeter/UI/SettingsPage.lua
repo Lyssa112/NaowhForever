@@ -403,6 +403,8 @@ page:Card({
         { key = "iconStyle", label = "Icon Style", choice = ICON_STYLE, needs = Enabled, why = OFF },
         { key = "showRanks", label = "Rank Numbers", toggle = true, needs = Enabled, why = OFF },
         { key = "highlightPlayer", label = "Highlight Your Row", toggle = true, needs = Enabled, why = OFF },
+        { key = "pinSelf", label = "Always Show My Row", toggle = true, needs = Enabled, why = OFF,
+          help = "When you are not among the rows shown, the last row is yours, with your rank." },
     },
 })
 

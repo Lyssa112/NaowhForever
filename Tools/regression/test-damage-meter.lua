@@ -2147,6 +2147,70 @@ do
         == "40% out of combat, mouse passes through")
 end
 
+-- Always Show My Row: yours is the last row when it is not among the rows shown
+do
+    local s = Boot({ settings = { enabled = true, height = 100 } })
+    s.session.combatSources = {
+        Source("Ann", "MAGE", "a1", "r1", false, "P-1"), Source("Bob", "MAGE", "a2", "r2", false, "P-2"),
+        Source("Cy", "MAGE", "a3", "r3", false, "P-3"), Source("Di", "MAGE", "a4", "r4", false, "P-4"),
+        Source("You", "ROGUE", "a5", "r5", true, "Player-1"), Source("Fay", "MAGE", "a6", "r6", false, "P-6"),
+    }
+    s.Login()
+    local w = s.Window()
+    check("two rows fit", w.rows[2].shown == true and w.rows[3] == nil)
+    check("off: the first two", w.rows[1].name.text == "Ann" and w.rows[2].name.text == "Bob"
+        and w.rows[2].rank.text == "2")
+    s.store.Set("pinSelf", true); s.Flush()
+    check("on: the last row is yours, with your rank", w.rows[1].name.text == "Ann" and w.rows[1].rank.text == "1"
+        and w.rows[2].name.text == "You" and w.rows[2].rank.text == "5" and w.rows[2].source.isLocalPlayer == true)
+    s.Hover(w, 2)
+    check("and it is the real row: its spells are yours", s.spellCalls[#s.spellCalls].guid == "Player-1")
+    w.rows[2].scripts.OnLeave(w.rows[2])
+    w.rows[1].scripts.OnMouseWheel(w.rows[1], -1)
+    check("scrolled, still yours", w.rows[1].name.text == "Bob" and w.rows[2].name.text == "You")
+    w.rows[1].scripts.OnMouseWheel(w.rows[1], -2)
+    check("scrolled to it: it is in its own place, and not twice", w.rows[1].name.text == "Di"
+        and w.rows[2].name.text == "You" and w.rows[2].rank.text == "5")
+    w.rows[1].scripts.OnMouseWheel(w.rows[1], -3)
+    check("to the end: yours is the first of the last two, as it stands", w.rows[1].name.text == "You"
+        and w.rows[1].rank.text == "5" and w.rows[2].name.text == "Fay" and w.rows[2].rank.text == "6")
+
+    -- yours above the rows shown
+    s.session.combatSources = {
+        Source("You", "ROGUE", "a1", "r1", true, "Player-1"), Source("Bob", "MAGE", "a2", "r2", false, "P-2"),
+        Source("Cy", "MAGE", "a3", "r3", false, "P-3"), Source("Di", "MAGE", "a4", "r4", false, "P-4"),
+    }
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("on top: it is the first row", w.rows[1].name.text == "You" and w.rows[1].rank.text == "1")
+    w.rows[1].scripts.OnMouseWheel(w.rows[1], -2)
+    check("scrolled past it: the last row is yours, ranked first", w.rows[2].name.text == "You"
+        and w.rows[2].rank.text == "1" and w.rows[1].name.text == "Cy")
+
+    -- one row only
+    s.store.Set("height", 70); s.Flush()
+    check("a window with room for one row: that row is yours", w.rows[1].name.text == "You" and w.rows[2] ~= nil
+        and w.rows[2].shown == false)
+
+    -- not in Raid Mode, not in a breakdown
+    s.store.Set("height", 100); s.store.Set("raidMode", true); s.Flush()
+    check("Raid Mode: yours alone, ranked as it is", w.rows[1].name.text == "You" and w.rows[2].shown == false)
+    s.store.Set("raidMode", false); s.Flush()
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    check("a breakdown: its spells, none of yours twice", w.rows[1].name.text == "Fireball"
+        and w.rows[2].name.text == "Pyroblast")
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    local row = RowOf(s.page, "pinSelf")
+    check("a toggle on the Rows card", row and row.toggle == true and row.label == "Always Show My Row")
+
+    -- you are not in the list
+    s.session.combatSources = {
+        Source("Ann", "MAGE", "a1", "r1", false, "P-1"), Source("Bob", "MAGE", "a2", "r2", false, "P-2"),
+        Source("Cy", "MAGE", "a3", "r3", false, "P-3"),
+    }
+    s.Fire("DAMAGE_METER_RESET"); s.Flush()
+    check("not listed: the rows as they are", w.rows[1].name.text == "Ann" and w.rows[2].name.text == "Bob")
+end
+
 -- bars: grown upward, filled from the right, and compared to the list's total
 do
     local s = Boot({ settings = { enabled = true } })

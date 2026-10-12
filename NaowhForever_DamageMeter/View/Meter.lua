@@ -534,8 +534,16 @@ local function PaintPane(pane, session, first, shown, mode, available)
     local f, showIcons = pane.f, pane.f.geo.showIcons
     pane.empty:SetText(session.emptyText or (available and TEXT_EMPTY or TEXT_UNAVAILABLE))
     pane.empty:SetShown(shown == 0)
+    -- With Always Show My Row, the last row is yours when yours is not among the rows shown.
+    local pinned
+    if S.Get("pinSelf") == true and shown >= 1 then
+        local rank = DM.Rank(session)
+        if rank and (rank <= first or rank > first + shown) then pinned = rank end
+    end
     for i = 1, shown do
-        local source, row = sources[first + i], pane.rows[i]
+        local index = first + i
+        if pinned and i == shown then index = pinned end
+        local source, row = sources[index], pane.rows[i]
         row.source, row.modeKey = source, mode.key
         if source.isHeader then
             PaintHeading(row, source, f)
@@ -546,7 +554,7 @@ local function PaintPane(pane, session, first, shown, mode, available)
             row:SetValue(source.totalAmount)
             local e = own and source.isLocalPlayer == true and Look.EdgeColor(source) or c
             row.edge:SetColorTexture(e.r, e.g, e.b, 1)
-            row.rank:SetFormattedText(RANK_TEXT, session.rank or first + i)
+            row.rank:SetFormattedText(RANK_TEXT, session.rank or index)
             row.icon:SetTexture(IconOf(source, classOnly))
             row.icon:SetShown(showIcons and source.noIcon ~= true)
             row.name:SetText(source.label or DM.DisplayName(source))
