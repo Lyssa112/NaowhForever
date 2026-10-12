@@ -276,6 +276,14 @@ NaowhForever_DamageMeter/
 - The reset key is `NaowhForever_ResetDamageMeter`, declared in `Bindings.xml`. Core defines a stub
   that says the module is off; this module replaces it.
 
+- A fight is kept when combat ends (`History.Arm`), read again until its amounts are plain: they are secret
+  in combat and for a moment after it. Only plain numbers are kept, a fight too short to be worth keeping
+  is dropped, and the fights are on the account under the character.
+- Take Screenshot waits a moment (`SHOT_DELAY`) so that the menu that was clicked has closed and is not
+  in the picture.
+- A source's spells are asked for by its guid, which is secret in combat except your own: `UnitGUID("player")`
+  stands in for your row, and any other row says its spells show after combat.
+
 ## Checking
 
 - `lua Tools/regression/test-damage-meter.lua`: the API reads, the windows, the menus, the report,

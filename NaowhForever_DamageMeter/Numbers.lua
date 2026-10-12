@@ -1,5 +1,4 @@
--- Numbers.lua: how a number is written, and the sums over plain numbers. The client formats a secret
--- number for us (AbbreviateNumbers with a config of breakpoints), so a format works in combat too.
+-- Numbers.lua: how a number is written, and the sums over plain numbers.
 local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
@@ -32,7 +31,6 @@ end
 
 local formatKey, formatOptions
 
--- A number as the settings write it. n may be secret, and the answer is a string made from it.
 function DM.Format(n)
     local units = S.Get("numberUnits")
     if units == "game" or not (AbbreviateNumbers and CreateAbbreviateConfig) then return Game(n) end
@@ -45,17 +43,14 @@ function DM.Format(n)
     return AbbreviateNumbers(n, formatOptions)
 end
 
--- A share as the settings write it: 25.0%.
 function DM.PercentText(percent)
     return ("%." .. S.Get("percentDecimals") .. "f%%"):format(percent)
 end
 
--- What follows a per-second figure: "/s" when the settings say so.
 function DM.RateSuffix()
     return S.Get("rateSuffix") == true and "/s" or ""
 end
 
--- m:ss, or h:mm:ss from an hour.
 function DM.Clock(seconds)
     seconds = math.floor(seconds)
     if seconds >= 3600 then
@@ -64,13 +59,11 @@ function DM.Clock(seconds)
     return ("%d:%02d"):format(math.floor(seconds / 60), seconds % 60)
 end
 
--- A total over a length of time, or nil when either is secret or there is no time.
 function DM.PerSecond(total, seconds)
     if not (Plain(total, "number") and Plain(seconds, "number")) or seconds <= 0 then return nil end
     return total / seconds
 end
 
--- A share of a total, as a percentage, or nil when either is secret or there is no total.
 function DM.Percent(amount, total)
     if not (Plain(amount, "number") and Plain(total, "number")) or total <= 0 then return nil end
     return amount / total * 100

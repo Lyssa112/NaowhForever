@@ -1,5 +1,4 @@
--- History.lua: the fights kept, listed in a window of their own: when, which fight, how long, and the
--- per-second figures for you and for the raid.
+-- History.lua: the fights kept, listed in a window of their own.
 local ns = _G.NaowhForever
 
 local T = ns.THEME
@@ -19,7 +18,6 @@ local TEXT_TITLE, TEXT_CLEAR, TEXT_CLOSE = "Fight History", "Clear", "X"
 local TEXT_EMPTY = "No fights kept yet"
 local TEXT_ASK = "Clear the fight history?"
 
--- left: text starts at the left edge; the others are numbers, right-aligned.
 local COLUMNS = {
     { key = "when", title = "Time", width = 84, left = true },
     { key = "name", title = "Fight", width = 150, left = true },
@@ -110,8 +108,6 @@ local function Paint()
     end
 end
 
--- Beside the settings window when it is open and there is room, so the two do not cover each other, and
--- else in the middle of the screen. Where the player moved it to stays.
 local function PlaceWindow()
     if frame.moved then return end
     frame:ClearAllPoints()

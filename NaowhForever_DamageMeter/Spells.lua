@@ -1,6 +1,4 @@
 -- Spells.lua: a source's spells, and the enemies it hurt, as the rows a window draws in place of its list.
--- Amounts may be secret in combat: they go straight into the rows, and a figure made from them is made
--- only once they are plain.
 local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
@@ -8,7 +6,6 @@ local C = DM.C
 
 local TEXT_UNKNOWN, TEXT_TARGETS = "Unknown", "Targets"
 
--- A spell's name from the game, or its creature's for a pet or a summon.
 function DM.SpellName(spell)
     local getName = C_Spell and C_Spell.GetSpellName
     if getName then
@@ -19,7 +16,6 @@ function DM.SpellName(spell)
     return TEXT_UNKNOWN
 end
 
--- A spell's icon, or nil when the game has none or refuses the id.
 function DM.SpellIcon(spell)
     local getTexture = C_Spell and C_Spell.GetSpellTexture
     if not getTexture then return nil end
@@ -28,10 +24,6 @@ function DM.SpellIcon(spell)
     return nil
 end
 
--- The rows of a source's breakdown, shaped like a session so the window paints them as it does a list: its
--- spells, then the enemies it hurt under a Targets line. data is the game's answer for the source (or nil),
--- and view says seconds (the session's length), rate (the list has a per-second figure), targets and
--- inCombat. Each row says what it is: isSpell, isHeader or isTarget.
 function DM.SpellSession(data, source, view)
     local rows = {}
     local spells = data and data.combatSpells or {}

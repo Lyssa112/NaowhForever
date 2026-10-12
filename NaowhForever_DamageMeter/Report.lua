@@ -1,5 +1,4 @@
--- Report.lua: a report of the meter to chat. It is made of plain numbers, so it is sent outside combat only,
--- and anything still secret is left out.
+-- Report.lua: a report of the meter to chat.
 local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
@@ -17,7 +16,6 @@ local function InInstanceGroup() return LE_PARTY_CATEGORY_INSTANCE ~= nil and Is
 local function InGuild() return IsInGuild() end
 local function Always() return true end
 
--- Where a report can go, in menu order; a channel is offered while its can() holds.
 local CHANNELS = {
     { key = "SELF", label = "Yourself", can = Always },
     { key = "SAY", label = "Say", can = Always },
@@ -35,7 +33,6 @@ function DM.Channels()
     return list
 end
 
--- The header, then one line per source up to count; a source with a secret name or amount is left out.
 function DM.ReportLines(session, mode, sessionName, count, withRate)
     local lines = { HEADER:format(mode.label, sessionName) }
     local sources = session.combatSources

@@ -28,8 +28,6 @@ DM.Breakdown = Breakdown
 
 local panel
 
--- A row of the panel: a bar with a name and a value, and for a spell its icon. Rows are placed when the
--- panel is shown, since the sections stack.
 local function NewRow(pool, i, withIcon)
     local row = CreateFrame("StatusBar", nil, panel)
     row:SetMinMaxValues(0, 1)
@@ -84,8 +82,6 @@ local function PaintIcon(icon, spell)
     icon:SetShown(texture ~= nil)
 end
 
--- A spell: its bar against the largest, its name, and its amount with its per-second figure (when the
--- list has one) and its share of the total, each only once it is a plain number.
 local function PaintRow(row, spell, data, color, alpha, seconds)
     row:SetStatusBarTexture(UI.TexturePath(S.Get("texture"), GRADIENT_TEX))
     row:SetStatusBarColor(color.r, color.g, color.b, alpha)
@@ -108,7 +104,6 @@ local function PaintRow(row, spell, data, color, alpha, seconds)
     row:Show()
 end
 
--- The font, outline and colors the meter's settings ask for.
 local function Style()
     local font, outline = S.Get("font"), S.Get("outline")
     local name, value, rank = Look.Color("nameColor"), Look.Color("valueColor"), Look.Color("rankColor")
@@ -135,7 +130,6 @@ local function Style()
     end
 end
 
--- A target: its bar against the largest, its name, and the damage with its per-second figure.
 local function PaintTarget(row, target, largest, seconds, alpha)
     local c = C.ENEMY_COLOR
     row:SetStatusBarTexture(UI.TexturePath(S.Get("texture"), GRADIENT_TEX))
@@ -152,7 +146,6 @@ local function PaintTarget(row, target, largest, seconds, alpha)
     row:Show()
 end
 
--- Beside the window: on the side the settings say, or the one the screen has room on (toRight).
 local function Place(owner, toRight)
     local side = S.Get("panelSide")
     if side == "left" then toRight = false elseif side == "right" then toRight = true end
@@ -164,10 +157,6 @@ local function Place(owner, toRight)
     end
 end
 
--- Shows source's spells beside row. data is the game's answer for the source, or nil: then the panel says
--- why. view says how: toRight (the side of the window), inCombat, targets (the enemies it hurt, when
--- there are any), seconds (the session's length), rate (the list has a per-second figure), label (the
--- list's name).
 function Breakdown.Show(row, source, data, view)
     if not panel then Build() end
     Style()

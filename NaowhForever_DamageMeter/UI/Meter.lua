@@ -14,8 +14,6 @@ local BUTTON_H, MORE_W, SESSION_W, BUTTON_GAP, BUTTON_RIGHT = 18, 22, 62, 4, -6
 local TITLE_X = C.TITLE_X
 local TITLE_JOIN = " - "
 local TIME_BRACKETS = "(%s)"
--- What the buttons take of the title bar's right end, from the edge to the session button's left. The room
--- is kept when they are hidden, so that nothing moves.
 local BAR_BUTTONS = BUTTON_GAP + SESSION_W + BUTTON_GAP + MORE_W - BUTTON_RIGHT
 local GRIP_SIZE, GRIP_INSET, GRIP_LEVEL, GRIP_LOCKED_ALPHA = 20, 2, 20, 0.4
 local HOME_X, HOME_Y = -24, 210
@@ -73,7 +71,6 @@ local function Layout(w, session, modeKey)
     return shown, mode
 end
 
--- Raid Mode: the session as it would be with only you in it, still ranked as you are.
 local function OwnOnly(session)
     local rank = DM.Rank(session)
     local sources = {}
@@ -81,7 +78,6 @@ local function OwnOnly(session)
     return { combatSources = sources, maxAmount = session.maxAmount, totalAmount = session.totalAmount, rank = rank }
 end
 
--- The title's words: the list's name, the fight's, or both when there is a fight's name to give.
 local function TitleText(mode, fightName)
     local says = S.Get("titleText")
     local label = DM.ModeLabel(mode)
@@ -90,11 +86,6 @@ local function TitleText(mode, fightName)
     return label .. TITLE_JOIN .. fightName
 end
 
--- Puts the title and the fight time in the bar. The title starts at the left and the time sits by the
--- buttons, or right after the title, each moved by its own offsets, and the same whether the buttons are
--- shown or not. The time
--- goes when both do not fit side by side, and a long title is cut to the room there is. text is the
--- title's words when it is not the usual.
 local function PaintTitleBar(frame, mode, seconds, fightName, text)
     local title, header = frame.title, frame.header
     local clock = frame.time
@@ -105,9 +96,6 @@ local function PaintTitleBar(frame, mode, seconds, fightName, text)
     title:SetText(text or TitleText(mode, fightName))
     local textWidth, timeWidth = math.ceil(title:GetStringWidth()), Look.TimeWidth()
     local x = TITLE_X + S.Get("titleX")
-    -- The room from the title's start to the bar's end, less what stands at the end: the buttons, or only
-    -- the margin when they are not shown. The time by the buttons stays where they would be, so a title
-    -- that is to leave it room leaves it that of the buttons.
     local reach = frame:GetWidth() - x
     local room = reach - (buttons and BAR_BUTTONS or TITLE_X)
     local timeRoom = S.Get("timeByTitle") == true and room or reach - BAR_BUTTONS
@@ -130,12 +118,10 @@ local function PaintTitleBar(frame, mode, seconds, fightName, text)
     clock:SetShown(shown)
 end
 
--- Whether the mouse passes through the window: it is locked and the setting says so.
 local function PassesMouse()
     return S.Get("clickThrough") == true and S.Get("locked") == true and not unlocked
 end
 
--- Where the source of an open breakdown is in a list now: your own row, or the one with its guid.
 local function SourceNow(list, detail)
     for _, source in ipairs(list.combatSources) do
         if detail.me then
@@ -146,9 +132,6 @@ local function SourceNow(list, detail)
     end
 end
 
--- What an open breakdown draws in place of the list: the source's spells and the enemies it hurt, as a
--- session, the key of its list, the title (its name and the list's, when the name is plain) and the
--- session of the list it was opened from.
 local function DetailView(w, session, lowerSession, seconds)
     local detail = w.detail
     local list = detail.pane == 2 and lowerSession or session
@@ -168,7 +151,6 @@ local function DetailView(w, session, lowerSession, seconds)
     return view, mode.key, title, list or session
 end
 
--- seconds is how long the session has run, or nil; fightName is what the game calls the fight, or nil.
 local function Render(w, session, available, seconds, lowerSession, fightName)
     local frame = w.frame
     local raid = S.Get("raidMode")
@@ -212,7 +194,6 @@ local function Place(w)
     end
 end
 
--- Where the window stands is saved in its own units, which are the screen's divided by its scale.
 local function SavePosition(w)
     local frame = w.frame
     local ratio = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
@@ -253,7 +234,6 @@ local function OnHide(w)
     end
 end
 
--- The wheel scrolls the pane under it: the second list's rows, or the first's.
 local function OnWheel(w, delta, row)
     if row and row.pane == 2 then
         w.offset2 = math.max(0, w.offset2 - delta)
@@ -268,8 +248,6 @@ local function HideSpellTip()
     tipRow = nil
 end
 
--- The game's tooltip for a spell row of an open breakdown, at the side away from the window. A spell id
--- the game keeps back in combat is secret, and is not asked for.
 local function ShowSpellTip(w, row)
     local id = row.source.spellID
     if type(id) ~= "number" or DM.IsSecret(id) then return end
@@ -284,9 +262,6 @@ local function ShowSpellTip(w, row)
     tipRow, row.tipID = row, id
 end
 
--- The spells behind a hovered row; the panel says why when there are none. Out of combat it adds each
--- spell's per-second figure, and the enemies a player hurt. A row of an open breakdown is a spell, and
--- shows the game's tooltip for it instead.
 local function ShowBreakdown(w, row)
     local source = row.source
     if source ~= nil and (source.isSpell or source.isTarget or source.isHeader) then
@@ -324,7 +299,6 @@ local function OnRowLeave()
     HideSpellTip()
 end
 
--- Closes an open breakdown: the list is back.
 local function CloseDetail(w)
     if not w.detail then return end
     w.detail, w.offset = nil, 0
@@ -332,8 +306,6 @@ local function CloseDetail(w)
     Update()
 end
 
--- A click on a row opens its source's spells in the window, in place of the list; a click on the spells
--- closes them again.
 local function OnRowClick(w, row, button)
     if button ~= "LeftButton" then return end
     if w.detail then
@@ -375,7 +347,6 @@ local function NewGrip(w)
     frame.grip:SetScript("OnMouseUp", function() OnGripUp(w) end)
 end
 
--- A window's mover points at the card with its size: the Window card, or the card of the second or third.
 local function AttachMover(frame, index, onSave)
     local name = DM.WindowName(index)
     if index == 1 then return UI.AttachMover(frame, name, onSave, C.PAGE, CARD) end
@@ -413,7 +384,6 @@ local function Build(w)
     frame:Hide(); Place(w)
 end
 
--- Whether the visibility setting wants the windows up: a key press can override it until combat starts.
 local function ShownNow()
     if override ~= nil then return override end
     if S.Get("hideInPvP") then
@@ -431,7 +401,6 @@ local function ShownNow()
     return true
 end
 
--- The game's own meter is switched off while ours is up, and put back as it was after.
 local function GameMeter(takeOver)
     if not (C_CVar and C_CVar.GetCVar and C_CVar.SetCVar) then return end
     local account = ns.AccountSettings()
@@ -456,8 +425,6 @@ local function HideAll()
     OnRowLeave()
 end
 
--- How opaque a window should be now: full in combat, with the mouse over it (when set), and while it is
--- being placed or previewed; else the opacity set for out of combat.
 local function TargetAlpha(w)
     local idle = S.Get("idleAlpha")
     if idle >= 1 or unlocked or preview or InCombatLockdown() then return 1 end
@@ -465,7 +432,6 @@ local function TargetAlpha(w)
     return idle
 end
 
--- Moves every shown window a step toward its opacity; true while any is still on its way.
 local function StepFade()
     local moving = false
     for index = 1, DM.MAX_WINDOWS do
@@ -490,12 +456,10 @@ local function OnFadeTick(_, elapsed)
     if not StepFade() and S.Get("idleAlpha") >= 1 then fader:SetScript("OnUpdate", nil) end
 end
 
--- Watches the mouse and the combat while the windows may be faded.
 local function StartFade()
     fader:SetScript("OnUpdate", OnFadeTick)
 end
 
--- The window takes the mouse, or lets it through.
 local function ApplyMouse(w)
     local frame, through = w.frame, PassesMouse()
     frame.header:EnableMouse(not through)
@@ -506,8 +470,6 @@ local function ApplyMouse(w)
     frame.passes = through
 end
 
--- The window's own scale. A change keeps its corner where it is: the saved place is in the window's own
--- units, so it is converted to the new scale and put back.
 local function ApplyScale(w)
     local frame, scale = w.frame, Get(w, "scale")
     local old = frame:GetScale()
@@ -569,13 +531,11 @@ local function ResetNow()
     ns.Print(TEXT_RESET_DONE)
 end
 
--- The id of the instance you are in, or nil outside one.
 local function InstanceID()
     if not IsInInstance() then return nil end
     return select(8, GetInstanceInfo())
 end
 
--- Entering a new instance (not a login or a reload) resets the data, or asks to, as the setting says.
 local function OnEnterWorld(isLogin, isReload)
     local now = InstanceID()
     local entered = now ~= nil and now ~= lastInstance
@@ -589,7 +549,6 @@ local function OnEnterWorld(isLogin, isReload)
     end
 end
 
--- Leaving a group resets the data when the setting says so.
 local function OnGroupChanged()
     local grouped = IsInGroup()
     local left = wasGrouped == true and not grouped
@@ -597,7 +556,6 @@ local function OnGroupChanged()
     if left and S.Get("resetOnLeave") then ResetNow() end
 end
 
--- Every window shows the whole of the data out of combat and the current fight in it.
 local function ShowOverall(on)
     for index = 1, DM.MAX_WINDOWS do
         if DM.WindowOn(index) then

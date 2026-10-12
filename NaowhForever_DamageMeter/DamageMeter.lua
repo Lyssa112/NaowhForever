@@ -5,7 +5,6 @@ local F = ns.FEATURES.damageMeter
 
 local TITLE, MAX_WINDOWS = "Damage Meter", 3
 
--- The first window keeps the plain keys; the others add their number: mode2, session3, meterPos2.
 local S = ns.UI.ModuleSettings("damageMeter", {
     enabled = F.enabled,
     visibility = "always", locked = false, idleAlpha = 1, hoverFull = true, clickThrough = false,
@@ -60,8 +59,6 @@ ns.DamageMeterSettings = S
 local DM = { Settings = S, TITLE = TITLE, MAX_WINDOWS = MAX_WINDOWS }
 ns.DamageMeter = DM
 
--- The key a look setting of a window is read and written under: its own (barHeight2) when the window has
--- its own look, else the one every window shares.
 function DM.LookKey(index, key)
     if index and DM.C.OWN_LOOK[key] and S.Get("ownLook" .. index) == true then
         return key .. index
@@ -69,13 +66,10 @@ function DM.LookKey(index, key)
     return key
 end
 
--- A window takes the look every window shares as its own, to start from.
 function DM.CopyLook(index)
     for _, key in ipairs(DM.C.OWN_LOOK_ORDER) do S.Set(key .. index, S.Get(key)) end
 end
 
--- Every setting back to its default, but whether the module is on and where the windows stand. The looks
--- kept by name and the fights kept are not settings.
 function DM.ResetSettings()
     local keys = {}
     for key in pairs(S.DB()) do
@@ -88,11 +82,6 @@ function DM.Setting(index, key)
     return S.Get(DM.LookKey(index, key))
 end
 
--- ---- the columns of a row: where its name stands, and which figures and totals come with it
-
--- The slots of a columns setting, left to right: COLUMN_SLOTS kinds, "none" in a free one. "auto" is the name,
--- the total and the per-second figure, the per-second figure first in the lists that lead with it, as the
--- game's own meter does (mode is the list). The name is always there, and a kind only once.
 function DM.ColumnSlots(value, mode)
     local C = DM.C
     local slots, seen = {}, {}
@@ -119,9 +108,6 @@ function DM.ColumnSlots(value, mode)
     return slots
 end
 
--- Puts kind in a slot of a window's columns: a kind that is in another slot trades places with what the
--- slot had. The name cannot be taken out; it moves to a free slot when another kind takes its place. mode is
--- the list the window shows, for what "auto" is on it.
 function DM.SetColumnSlot(index, slot, kind, mode)
     local key = DM.LookKey(index, "columns")
     local slots = DM.ColumnSlots(S.Get(key), mode)
@@ -151,7 +137,6 @@ function DM.SetColumnSlot(index, slot, kind, mode)
     S.Set(key, table.concat(slots, ","))
 end
 
--- Whether a window's columns have a kind of column.
 function DM.HasColumn(index, kind)
     for _, other in ipairs(DM.ColumnSlots(DM.Setting(index, "columns"))) do
         if other == kind then return true end
@@ -171,7 +156,6 @@ function DM.WindowName(index)
     return index > 1 and TITLE .. " " .. index or TITLE
 end
 
--- Whether window index is open: the first always is, the others when their setting is on.
 function DM.WindowOn(index)
     return index == 1 or S.Get(DM.Key("window", index)) == true
 end

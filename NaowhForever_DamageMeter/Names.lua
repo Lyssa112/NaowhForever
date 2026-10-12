@@ -1,6 +1,4 @@
 -- Names.lua: how a player's name is written in the window: in full, first name, last name or initials.
--- In combat a source's name is secret and cannot be cut, so it is found by the player's class among
--- the group, which is read from unit tokens and stays plain; a class two members share is left whole.
 local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
@@ -18,7 +16,6 @@ local SEPARATOR_PATTERN = SEPARATOR ~= " " and SEPARATOR:gsub("%W", "%%%0") or n
 local roster = {}
 local cache, cacheCount = {}, {}
 
--- A character's name with its surname, where the client has surnames (the second return of UnitName).
 local function WithSurname(name, surname, own)
     if not FOREVER or type(name) ~= "string" or type(surname) ~= "string" then return name end
     if own and not C_PlayerInfo.ShouldDisplaySurname() then return name end
@@ -54,7 +51,6 @@ local WRITE = {
     end,
 }
 
--- A plain name written in a format; the realm is dropped. Words are cut at spaces and the surname separator.
 local function Write(name, format)
     local write = WRITE[format] or WRITE.full
     local byFormat = cache[format]
@@ -71,7 +67,6 @@ local function Write(name, format)
     return text
 end
 
--- Who is in the group, by class: the class's one member's name, or false when two share it.
 function DM.ScanRoster()
     for class in pairs(roster) do roster[class] = nil end
     local function Add(unit)
@@ -96,7 +91,6 @@ local function IsPlayer(source)
     return type(class) == "string" and class ~= ""
 end
 
--- The name to show for a meter row. A secret name that cannot be found is returned as it is, whole.
 function DM.DisplayName(source)
     local name = source.name
     if not IsPlayer(source) then return name end

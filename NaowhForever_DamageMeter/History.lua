@@ -1,6 +1,4 @@
--- History.lua: a summary of each fight, kept when it ends, so the numbers outlive the game's own sessions.
--- The game's amounts are secret in combat and for a moment after it, so a fight is read again until
--- they are plain, and only plain numbers are kept.
+-- History.lua: a summary of each fight, kept when it ends.
 local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
@@ -37,7 +35,6 @@ local function Place()
     return GetZoneText() or ""
 end
 
--- One list's figures for you and for the raid, or nil while any of them is still secret.
 local function Figures(list, seconds)
     local session = DM.Session(list, "current")
     if not Plain(session.totalAmount, "number") then return nil end
@@ -52,7 +49,6 @@ local function Figures(list, seconds)
         totalPerSecond = DM.PerSecond(session.totalAmount, seconds) or 0, rank = rank, count = count }
 end
 
--- The fight as it stands, or nil when it is not readable yet, or false when it is not worth keeping.
 local function Snapshot()
     local seconds = DM.Duration("current")
     if not Plain(seconds, "number") then return nil end
@@ -64,8 +60,6 @@ local function Snapshot()
     return { at = time(), place = Place(), boss = name, seconds = seconds, damage = damage, healing = healing }
 end
 
--- The fights are kept on the account under the character, not in the profile: a profile that is changed,
--- reset or imported does not take them, and they are not in the strings it is shared by.
 local function Kept()
     local account = ns.AccountSettings()
     local all = account[KEPT_KEY]
@@ -76,7 +70,6 @@ local function Kept()
     return all, UnitGUID("player") or UNKNOWN_WHO
 end
 
--- This character's fights, newest first.
 function History.List()
     local all, who = Kept()
     local list = all[who]
@@ -114,7 +107,6 @@ local function Try()
     end
 end
 
--- Called when combat ends: read the fight once its numbers are plain.
 function History.Arm()
     if not started then return end
     started = false

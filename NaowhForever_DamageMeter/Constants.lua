@@ -1,8 +1,6 @@
 -- Constants.lua: the sizes and names the Damage Meter's files share.
 local ns = _G.NaowhForever
 
--- Each list: its game type, whether it has a per-second figure, and the titles of its two columns. The
--- DPS and HPS lists are the game's own, sorted by the per-second figure, which then leads.
 local MODES = {
     { key = "damage", short = "Damage", label = "Damage Done", type = "DamageDone", rate = true, total = "Damage", perSecond = "DPS",
       targets = true },
@@ -48,10 +46,7 @@ ns.DamageMeter.C = {
     NUMBER_UNITS = { game = "Game Default", latin = "K, M, B", asian = "Ten-thousands", full = "Full Numbers" },
     NUMBER_UNITS_ORDER = { "game", "latin", "asian", "full" },
     NUMBER_DECIMALS_MAX = 2, MAX_HIDE_DELAY = 60, MIN_KEEP = 5, MAX_KEEP = 100, MIN_TILE = 16, MAX_TILE = 512,
-    -- The choice of Image that stands for the picture typed in Custom Image.
     OWN_PICTURE = "@own",
-    -- Pictures the shared media lists that are not backgrounds worth putting behind a meter, and its own
-    -- None, which the page already has.
     HIDDEN_BACKGROUNDS = { ["Solid"] = true, ["Blizzard Tooltip"] = true, ["Blizzard Out of Control"] = true,
         ["Blizzard Low Health"] = true, ["None"] = true },
     BAR_COLORS = { class = "Class Colors", accent = "Theme Accent", custom = "Custom Color" },
@@ -60,8 +55,6 @@ ns.DamageMeter.C = {
     RESET_ON_ORDER = { "never", "instance", "ask" },
     ICON_SIDES = { left = "Left", right = "Right", before = "Before the Bar" },
     ICON_SIDES_ORDER = { "left", "right", "before" },
-    -- The look settings a second or third window may have of its own (barHeight2, barHeight3, ...): first
-    -- the bars and the window, then the columns.
     OWN_LOOK_ORDER = { "barHeight", "barSpacing", "barAlpha", "growUp", "fontSize", "showIcons", "showRanks",
         "backgroundAlpha", "headerAlpha", "showBorder", "barColor", "columns", "showDivider",
         "showColumnHeaders" },
@@ -75,18 +68,14 @@ ns.DamageMeter.C = {
     NAME_FORMATS = { full = "Full Name", first = "First Name", last = "Last Name", initials = "Initials",
         firstInitial = "First Name and Initial" },
     NAME_FORMATS_ORDER = { "full", "first", "last", "initials", "firstInitial" },
-    -- What the title says, and how far the title and the fight time may be moved from where they sit.
     TITLE_TEXTS = { list = "List Name", fight = "Fight Name", both = "List and Fight" },
     TITLE_TEXTS_ORDER = { "list", "fight", "both" },
     MAX_OFFSET_X = 300, MAX_OFFSET_Y = 20,
-    -- Ten-thousand grouping: the glyphs of thousand, ten-thousand and hundred-million, by locale (UTF-8).
     ASIAN_GLYPHS = {
         zhCN = { "\229\141\131", "\228\184\135", "\228\186\191" },
         zhTW = { "\229\141\131", "\232\144\172", "\229\132\132" },
         koKR = { "\236\178\156", "\235\167\140", "\236\150\181" },
     },
-    -- The colors of a window, in the order the page shows them. Each is a setting that is false until a
-    -- color is picked, and then follows the theme's token.
     COLORS = {
         { key = "barCustomColor", label = "Custom Bar Color", group = "Bars", token = "accent" },
         { key = "ownBarColor", label = "Your Bar Color", group = "Bars", token = "accent" },
@@ -114,8 +103,6 @@ ns.DamageMeter.C = {
 
 for _, key in ipairs(ns.DamageMeter.C.OWN_LOOK_ORDER) do ns.DamageMeter.C.OWN_LOOK[key] = true end
 
--- The settings that are the look of the meter, in the order a look is written: not where it is, what it
--- lists, when it shows or how it behaves. The colors follow.
 do
     local C = ns.DamageMeter.C
     C.LOOK_KEYS = { "barHeight", "barSpacing", "growUp", "reverseFill", "barScale", "columns", "showDivider",
@@ -132,9 +119,6 @@ do
     for _, entry in ipairs(C.COLORS) do C.LOOK_KEYS[#C.LOOK_KEYS + 1] = entry.key end
     C.MAX_LOOKS, C.LOOK_NAME_MAX, C.LOOK_TEXT_MAX = 12, 24, 20000
 
-    -- The columns of a row, left to right, are a window's setting `columns`: "auto", or COLUMN_SLOTS kinds
-    -- joined by commas. A kind is the name, the list's total, its per-second figure, the share, or the total
-    -- of another list for the same player (its key), and "none" leaves a slot free.
     C.COLUMN_SLOTS = 6
     C.COLUMN_EXTRAS = {}
     C.COLUMN_KINDS = { name = "Name", total = "Total", rate = "Per Second", percent = "Share", none = "None" }

@@ -1,4 +1,4 @@
--- Samples.lua: the sample group the preview and Unlock Mode show (DM.SAMPLE), shaped like the game's session.
+-- Samples.lua: the sample group the preview and Unlock Mode show (DM.SAMPLE).
 local ns = _G.NaowhForever
 
 local OWN = 2
@@ -19,8 +19,6 @@ ns.DamageMeter.SAMPLE = {
     },
 }
 
--- The sample with you in it: the row that is you takes your class, so your bar and its edge show as they
--- will with the settings picked.
 function ns.DamageMeter.Sample()
     local _, class = UnitClass("player")
     if type(class) == "string" and class ~= "" then

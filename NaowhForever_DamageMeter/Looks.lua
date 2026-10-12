@@ -1,6 +1,4 @@
--- Looks.lua: a look is the visual settings of the meter (not where it is, what it lists, or when it shows).
--- Looks are kept by name on the account, applied to the settings, and written as one line of text to be
--- shared. A text from someone else is read key by key, and a key or value that does not fit is left out.
+-- Looks.lua: a look is the visual settings of the meter, kept by name and shared as text.
 local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
@@ -28,8 +26,6 @@ local function IsColor(value)
     return true
 end
 
--- Whether a value may be the value of a look key: of the kind its default is, a color or false for a color
--- key, and a table of colors by class for the class colors.
 local function Fits(key, value)
     if key == "classColors" then
         if type(value) ~= "table" then return false end
@@ -45,16 +41,12 @@ local function Fits(key, value)
     return true
 end
 
--- ---- what is kept
-
--- The look the settings are in now.
 function DM.CaptureLook()
     local look = {}
     for _, key in ipairs(C.LOOK_KEYS) do look[key] = Copy(S.Get(key)) end
     return look
 end
 
--- Sets what fits of a look into the settings; returns how many it set.
 function DM.ApplyLook(look)
     local count = 0
     for _, key in ipairs(C.LOOK_KEYS) do
@@ -77,7 +69,6 @@ local function Kept()
     return all
 end
 
--- A name as it is kept: trimmed, no control characters, at most NAME_MAX bytes. Nil when nothing is left.
 function DM.LookName(text)
     if type(text) ~= "string" then return nil end
     text = text:gsub("%c", ""):match("^%s*(.-)%s*$")
@@ -85,7 +76,6 @@ function DM.LookName(text)
     return text:sub(1, NAME_MAX)
 end
 
--- The names of the saved looks, in alphabetical order.
 function DM.LookNames()
     local names = {}
     for name in pairs(Kept()) do names[#names + 1] = name end
@@ -97,7 +87,6 @@ function DM.SavedLook(name)
     return Kept()[name]
 end
 
--- Keeps the settings' look under a name; false and the reason when it is not kept.
 function DM.SaveLook(text)
     local name = DM.LookName(text)
     if not name then return false, "name" end
@@ -111,14 +100,11 @@ function DM.DeleteLook(name)
     Kept()[name] = nil
 end
 
--- Gives every other window the look the first has, as its own.
 function DM.CopyLookToWindows()
     for index = 2, DM.MAX_WINDOWS do
         S.Set("ownLook" .. index, true)
     end
 end
-
--- ---- as text
 
 local function Escape(text)
     return (text:gsub("[%c|=;:,%%\128-\255]", function(c) return ("%%%02X"):format(c:byte()) end))
@@ -151,7 +137,6 @@ local function EncodeValue(key, value)
     return "c" .. ColorText(value)
 end
 
--- A look as one line: NFDM1|key=value|key=value, each value with its kind in front of it.
 function DM.EncodeLook(look)
     local parts = { HEADER }
     for _, key in ipairs(C.LOOK_KEYS) do
@@ -194,7 +179,6 @@ local function DecodeValue(body)
     return nil
 end
 
--- The look a text holds, or nil when it is not one or holds nothing that fits.
 function DM.DecodeLook(text)
     if type(text) ~= "string" then return nil end
     text = text:match("^%s*(.-)%s*$")

@@ -1,5 +1,4 @@
--- Menus.lua: a window's menus: its session and the rest. They keep no state of their own; w is the
--- window (index, offset, fight) and every choice goes to the settings or to the window's own fields.
+-- Menus.lua: a window's menus: its session and the rest.
 local ns = _G.NaowhForever
 
 local DM = ns.DamageMeter
@@ -22,7 +21,6 @@ local function Chosen(w, base, value)
     return function() return w.fight == nil and S.Get(Key(base, w.index)) == value end
 end
 
--- The lists as radios in menu: the first list's, or with lower the one under it, which can also be none.
 local function ListChoices(menu, w, lower)
     local setting = Key(lower and "lower" or "mode", w.index)
     local function Choose(key)
@@ -38,7 +36,6 @@ local function ListChoices(menu, w, lower)
     end
 end
 
--- The sessions and the past fights the game still holds, as radios in menu.
 local function SessionChoices(menu, w)
     for _, key in ipairs(C.SESSION_ORDER) do
         menu:CreateRadio(C.SESSION_LABELS[key], Chosen(w, "session", key),
@@ -60,7 +57,6 @@ function Menus.Session(w, owner)
     end)
 end
 
--- A little later, so the menu has closed and is not in the picture.
 local function TakeScreenshot()
     C_Timer.After(SHOT_DELAY, function()
         if Screenshot then pcall(Screenshot) end

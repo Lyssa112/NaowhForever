@@ -28,7 +28,6 @@ DM.IMAGE_HELP = {
         .. "SharedMedia pack, lists them under Image. The game's plain ones, Solid among them, are left out." },
 }
 
--- Opens the dialog: a heading, each part as a title over its text, and a button to close it.
 function DM.ShowImageHelp()
     local UI, T = ns.UI, ns.THEME
     local dimmer, panel = ns.MakeModal(WIDTH, BUTTON_H, DIALOG)

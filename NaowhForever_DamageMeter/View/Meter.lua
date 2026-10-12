@@ -18,9 +18,6 @@ local SUMMARY_H, TIME_CHARS, LOWER_STRIP, LOWER_GAP = C.SUMMARY_H, 7, C.LOWER_ST
 local NAME_GAP, TRACK_ALPHA = 6, 0.6
 local RANK_W, RANK_SIZE = 18, 10
 local COL_CHARS, COL_CHARS_FULL, CHAR_W = 7, 10, 0.62
--- Every cell a row can have beside its name: A the first figure, B the second (or the only one, or both with a
--- divider), P the share, and X1 to X5 the totals of other lists. A cell is the row's colA, colB, ... and its
--- title the pane's headA, headB, ...
 local CELLS = { "A", "B", "P", "X1", "X2", "X3", "X4", "X5" }
 local PERCENT_CHARS, DIVIDER_CHARS = 6, 3
 local FIT_PAD = 2
@@ -42,7 +39,6 @@ local classIcons = {}
 local tokenOf = {}
 for _, entry in ipairs(C.COLORS) do tokenOf[entry.key] = entry.token end
 
--- A class's bar color: the one picked for it in the settings, or the game's.
 local function ClassColor(class)
     local picked = S.Get("classColors")
     local c = type(picked) == "table" and class and picked[class]
@@ -53,8 +49,6 @@ local function SharedMedia()
     return LibStub and LibStub("LibSharedMedia-3.0", true)
 end
 
--- The path of the background in use: the path typed in the settings when Image is your own picture, or
--- else the one picked by name from the shared media. Nil for none.
 local function ImagePath(name, typed)
     if name == C.OWN_PICTURE then return typed ~= "" and typed or nil end
     if C.HIDDEN_BACKGROUNDS[name] then return nil end
@@ -79,15 +73,12 @@ local function IconOf(source, classOnly)
     return UNKNOWN_ICON
 end
 
--- A color of the window: the one picked in the settings, or the theme's token it stands in for.
 function Look.Color(key)
     local c = S.Get(key)
     if type(c) == "table" then return c end
     return T[tokenOf[key]]
 end
 
--- A source's bar color: your own as Your Bar says, else its class, the theme's Accent for everyone, or
--- the one picked for everyone.
 function Look.BarColor(source, index)
     if source.color then return source.color end
     if source.isLocalPlayer == true then
@@ -101,7 +92,6 @@ function Look.BarColor(source, index)
     return ClassColor(source.classFilename)
 end
 
--- The strip on the left of your row: the theme's Accent, your class's color, or the one picked.
 function Look.EdgeColor(source)
     local style = S.Get("edgeStyle")
     if style == "class" then return ClassColor(source.classFilename) end
@@ -109,14 +99,10 @@ function Look.EdgeColor(source)
     return T.accent
 end
 
--- The size a text has when it has none of its own (the names' and the figures' follow the window's), and
--- the key of the size it can have of its own.
 local DEFAULT_SIZES = { rank = 10, title = 12, time = 11, summary = 11, head = 10 }
 local OWN_SIZES = { value = "valueFontSize", rank = "rankSize", title = "titleSize", time = "timeSize",
     summary = "summarySize", head = "headSize" }
 
--- The font, outline and size of one of the texts (name, value, rank, title, time, summary, head): its
--- own when the settings give it its own, else the window's. nameSize is the names' size.
 function Look.TextStyle(element, nameSize)
     local font, outline = S.Get("font"), S.Get("outline")
     if S.Get(element .. "OwnFont") == true then font, outline = S.Get(element .. "Font"), S.Get(element .. "Outline") end
@@ -128,7 +114,6 @@ function Look.TextStyle(element, nameSize)
     return font, outline, size
 end
 
--- Throws away what the layout kept, so that the next paint does all of it again.
 function Look.Invalidate(f)
     f.laidKey = nil
     for _, pane in ipairs(f.panes) do
@@ -137,8 +122,6 @@ function Look.Invalidate(f)
     end
 end
 
--- How tall a window's bars are: the Row Height, and at least as tall as an icon of its own size, so that a
--- big icon is not taller than the bar it sits on.
 function Look.BarHeight(index)
     local height = DM.Setting(index, "barHeight")
     local icon = S.Get("iconSize")
@@ -148,14 +131,12 @@ function Look.BarHeight(index)
     return height
 end
 
--- How wide the fight time is at the size the settings give it.
 function Look.TimeWidth()
     local chars = TIME_CHARS + (S.Get("timeBrackets") == true and 2 or 0)
     local _, _, size = Look.TextStyle("time", S.Get("fontSize"))
     return math.ceil(chars * CHAR_W * size)
 end
 
--- A pane is a list of rows with its column titles. A window has one, and a second below it on request.
 local function NewPane(f, n)
     local pane = { f = f, n = n, rows = {}, cols = { x = {} }, order = {}, cells = {}, before = {}, after = {},
         titleWidths = {}, beforeWidth = 0, afterWidth = 0, top = 0 }
@@ -233,15 +214,10 @@ function Look.Row(pane, i)
     return row
 end
 
--- How many rows fit under a title bar and the column titles of height top.
 function Look.Capacity(h, bh, gap, top)
     return math.max(1, math.floor((h - (top or HEADER) - 2 * INSET + gap) / (bh + gap)))
 end
 
--- Which cell of a row takes which kind of column, from the window's `columns` setting. pane.order lists N,
--- the name, and the cells in the order they stand, left to right; pane.before and pane.after the cells on
--- each side of the name. pane.cols says what the cells show: a and b the kinds of the two figures (b alone
--- when there is one), merged when both are one text, p the share, x the list each X cell takes its total from.
 local function Columns(pane, mode)
     local f = pane.f
     local slots = DM.ColumnSlots(DM.Setting(f.index, "columns"), mode)
@@ -289,8 +265,6 @@ local function Columns(pane, mode)
     end
 end
 
--- The width of a column of figures: what its texts need once they are known (pane.fit), else what the
--- longest figure of the settings would need, and never less than its title needs.
 local function CellWidth(g, pane, cell)
     local width = pane.fit and pane.fit[cell]
     if not width then
@@ -306,7 +280,6 @@ local function CellWidth(g, pane, cell)
     return title and title > width and title or width
 end
 
--- How much room cells take: their widths, and the gaps between them.
 local function GroupWidth(cells, pane, g)
     local width = 0
     for k, cell in ipairs(cells) do
@@ -315,15 +288,11 @@ local function GroupWidth(cells, pane, g)
     return width
 end
 
--- The room the cells before the name take, with the gap that keeps the name from them, and the room the cells
--- after it take.
 local function Measure(pane, g)
     pane.beforeWidth = #pane.before > 0 and GroupWidth(pane.before, pane, g) + NAME_GAP or 0
     pane.afterWidth = GroupWidth(pane.after, pane, g)
 end
 
--- Puts a row's rank, icon and name in the room the cells leave: from after the cells before the name to before
--- the cells after it.
 local function PlaceName(row, pane, g)
     local left = g.textPad + pane.beforeWidth
     row.rank:ClearAllPoints(); row.rank:SetPoint("LEFT", left, 0); row.rank:SetWidth(g.rankWidth)
@@ -342,7 +311,6 @@ local function PlaceName(row, pane, g)
     row.name:SetPoint("RIGHT", -g.rightInset - pane.afterWidth - NAME_GAP, 0)
 end
 
--- Sets a row's cells to the widths of their columns, and its name to the room they leave.
 local function SizeCells(row, pane, g)
     for _, cell in ipairs(pane.cells) do
         row["col" .. cell]:SetWidth(CellWidth(g, pane, cell))
@@ -355,9 +323,6 @@ local function ColumnTitle(mode, kind)
     return mode.total or TEXT_TOTAL
 end
 
--- The room the titles over the cells take, as the settings write them: a column is never narrower than
--- its words, which a title put by its right end would otherwise carry out of the window. Returns the widths
--- as one text, for the layout's key.
 local function TitleWidths(pane, g)
     local widths = pane.titleWidths
     for id in pairs(widths) do widths[id] = nil end
@@ -380,7 +345,6 @@ local function TitleWidths(pane, g)
     return table.concat(key, ",")
 end
 
--- The words over a cell: the title of the figure it has, both with a divider, the share, or the other list.
 local function HeadText(pane, mode, id)
     local cols = pane.cols
     if id == "P" then return TEXT_PERCENT_HEAD end
@@ -414,8 +378,6 @@ local function LayRow(row, pane, i, g)
         cell:SetTextColor(f.valueColor.r, f.valueColor.g, f.valueColor.b)
         cell:SetShown(false)
     end
-    -- The cells before the name from the left end, each to the right of the one before; the cells after it
-    -- from the right end, each to the left of the one after.
     local before
     for _, id in ipairs(pane.before) do
         local cell = row["col" .. id]
@@ -448,9 +410,6 @@ local function LayRow(row, pane, i, g)
     end
 end
 
--- The column titles above a pane's rows at y: Name, and a title over each value column. A title is put
--- by its right end, at the right end of its column, and is as wide as its words, so that a long one is
--- not cut and sits on the line of the others.
 local function LayHeads(pane, g, y)
     local f = pane.f
     local show = g.showHead
@@ -487,7 +446,6 @@ local function LayHeads(pane, g, y)
     end
 end
 
--- The parts of the window outside the panes: the summary line, the title and the time, the image.
 local function LayFrame(f, g)
     f.summary:ClearAllPoints()
     f.summary:SetPoint("TOPLEFT", f, "TOPLEFT", INSET + g.textPad, -HEADER - HEAD_PAD)
@@ -502,8 +460,6 @@ local function LayFrame(f, g)
     f.lowerTitle:SetJustifyH("LEFT")
 end
 
--- The picture behind the rows: stretched over the window, or repeated with each repeat tileSize wide.
--- The repeat is worked out here from the window's size, since a picture's own size is not known.
 local function LayImage(f, g, w, h)
     local path = ImagePath(g.image, g.path)
     f.image:SetShown(path ~= nil)
@@ -523,7 +479,6 @@ local function LayImage(f, g, w, h)
     end
 end
 
--- The window's own colors: the frame, the title bar and its texts.
 local function PaintFrame(f)
     local window, header, border = Look.Color("windowColor"), Look.Color("headerColor"), Look.Color("borderColor")
     local title, time, rank = Look.Color("titleColor"), Look.Color("timeColor"), Look.Color("rankColor")
@@ -548,7 +503,6 @@ local function PaintFrame(f)
     for _, pane in ipairs(f.panes) do pane.empty:SetTextColor(rank.r, rank.g, rank.b) end
 end
 
--- Lays out one pane's columns, titles and the rows that fit; returns how many rows are shown.
 local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     Columns(pane, mode)
     pane.capacity = capacity
@@ -582,9 +536,6 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     return shown, first
 end
 
--- Sizes the window and lays the first pane's rows that fit; returns how many are shown and the first
--- one's index. With a second list (f.lowerOn) the rows are shared between the panes, the first taking the
--- larger half.
 function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     local w = math.max(C.MIN_WIDTH, S.Get(Key("width", f.index)))
     local minHeight = math.max(C.MIN_HEIGHT, HEADER + 2 * INSET + bh)
@@ -614,8 +565,6 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     g.showIcons, g.showHead = DM.Setting(f.index, "showIcons"), showHead
     g.textPad, g.iconGap, g.edgeWidth, g.colGap = S.Get("textPad"), S.Get("iconGap"), S.Get("edgeWidth"), S.Get("colGap")
     g.iconSide, g.iconCrop = S.Get("iconSide"), S.Get("iconZoom") / 100
-    -- A size of its own is used as it is, even taller than the row. Fitted, an icon before the bar is the
-    -- bar's height and touches it: the rows start after it.
     local iconSetting, before = S.Get("iconSize"), g.iconSide == "before"
     g.iconSize = iconSetting > 0 and math.min(iconSetting, C.MAX_ICON)
         or math.min(ICON_MAX, before and bh or bh - ICON_PAD)
@@ -653,8 +602,6 @@ function Look.Layout(f, total, first, bh, gap, fontSize, mode)
     return LayPane(pane, mode, total, first, n1, g, key, -headTop - HEAD_PAD)
 end
 
--- The second pane: the list under the first, with a title strip of its own. Returns how many rows are
--- shown and the first one's index.
 function Look.LayoutLower(f, total, first, mode)
     local g, pane = f.geo, f.panes[2]
     local strip = f.lowerBar
@@ -667,7 +614,6 @@ function Look.LayoutLower(f, total, first, mode)
     return LayPane(pane, mode, total, first, g.n2, g, g.key, -g.lowerTop - LOWER_STRIP - HEAD_PAD)
 end
 
--- The second pane is off: its strip, titles and rows go.
 function Look.HideLower(f)
     local pane = f.panes[2]
     f.lowerBar:Hide()
@@ -682,9 +628,6 @@ local function ValueOf(source, kind)
     return source.totalAmount
 end
 
--- A figure in its column, or nothing when there is none: a spell's per-second figure is not known in combat.
--- suffix follows it ("/s" for a per-second figure, when the settings say so); the figure may be secret, so
--- the text is made by the client.
 local function PaintValue(fs, value, suffix)
     if value == nil then
         fs:SetText("")
@@ -695,8 +638,6 @@ local function PaintValue(fs, value, suffix)
     end
 end
 
--- The total another list has for a source: yours, or the one with the same guid. A guid the game keeps back
--- (in combat) finds nothing, so the cell is empty until the fight is over.
 local function ExtraOf(lookup, source)
     if not lookup then return nil end
     local other = source.isLocalPlayer == true and lookup.own or nil
@@ -705,8 +646,6 @@ local function ExtraOf(lookup, source)
     return other and other.totalAmount
 end
 
--- The values of a row: the two figures, its share of the list's total once both are plain numbers, and the
--- totals of other lists.
 local function PaintValues(row, source, cols, session, extras)
     local rate = DM.RateSuffix()
     local suffixA, suffixB = cols.a == "rate" and rate or "", cols.b == "rate" and rate or ""
@@ -733,8 +672,6 @@ local function PaintValues(row, source, cols, session, extras)
     end
 end
 
--- The lists the columns of other lists take their totals from, read as they are asked for: { own, byGuid }
--- for each, which is a player's row in it, yours or by guid.
 function Look.Extras(sessionKey, fightID)
     return setmetatable({}, { __index = function(lookups, kind)
         local lookup = { byGuid = {} }
@@ -748,9 +685,6 @@ function Look.Extras(sessionKey, fightID)
     end })
 end
 
--- The line under the title bar, from the pieces the settings keep: the session's name, its total, the
--- raid's per-second figure once both are plain numbers, and where you stand. The total is secret in
--- combat and goes in as a string.
 function Look.PaintSummary(f, session, mode, name, seconds)
     local parts, args = {}, {}
     if S.Get("summaryName") ~= false then
@@ -773,7 +707,6 @@ function Look.PaintSummary(f, session, mode, name, seconds)
     f.summary:SetFormattedText(table.concat(parts, SUMMARY_GAP), unpack(args))
 end
 
--- A line that heads a section, such as Targets: its words, and no bar or figures.
 local function PaintHeading(row, source, f)
     row:SetMinMaxValues(0, 1)
     row:SetValue(0)
@@ -786,7 +719,6 @@ local function PaintHeading(row, source, f)
     for _, id in ipairs(CELLS) do row["col" .. id]:SetText("") end
 end
 
--- A cut of text to letters characters, with ... after it.
 local function Truncate(text, letters)
     local count, position = 0, 1
     for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
@@ -797,8 +729,6 @@ local function Truncate(text, letters)
     return text
 end
 
--- What a row calls its source: You for your own when the settings say so, the name as written, cut to the
--- letters allowed when it is a plain text (a name the game keeps back goes as it is).
 local function NameOf(source, you, letters)
     if you and source.isLocalPlayer == true then return TEXT_YOU end
     local name = DM.DisplayName(source)
@@ -806,15 +736,11 @@ local function NameOf(source, you, letters)
     return name
 end
 
--- Whether a source's figures are known to the addon, which is when they can be measured.
 local function Known(source)
     return DM.Plain(source.totalAmount, "number")
         and (source.amountPerSecond == nil or DM.Plain(source.amountPerSecond, "number"))
 end
 
--- Sizes the columns of figures to the widest text in each, so that the name has the room they leave. A
--- figure the game keeps back (in combat) cannot be measured, and its columns keep the width the settings'
--- longest figure needs; a share is always known. plain is whether every figure shown is known.
 local function FitColumns(pane, shown, plain)
     local g = pane.f.geo
     local ruler = pane.ruler
@@ -868,7 +794,6 @@ local function PaintPane(pane, session, first, shown, mode, available, extras)
     local plain = true
     pane.empty:SetText(session.emptyText or (available and TEXT_EMPTY or TEXT_UNAVAILABLE))
     pane.empty:SetShown(shown == 0)
-    -- With Always Show My Row, the last row is yours when yours is not among the rows shown.
     local pinned
     if S.Get("pinSelf") == true and shown >= 1 then
         local rank = DM.Rank(session)
