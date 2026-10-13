@@ -181,7 +181,9 @@ local function Boot(settings, loaded, windows)
         damageMeterBarBgAlpha = 100, damageMeterScrollBar = "game", damageMeterBorder = false,
         damageMeterBorderColor = false, damageMeterTitleFade = "always", damageMeterTitleFadeAlpha = 0,
         damageMeterNameSize = 0, damageMeterValueSize = 0, damageMeterTitleSize = 0, damageMeterButtons = "game",
-        damageMeterButtonColor = false, damageMeterPanelColor = false, damageMeterPanelAlpha = 70 }
+        damageMeterButtonColor = false, damageMeterPanelColor = false, damageMeterPanelAlpha = 70,
+        damageMeterTheme = "current", damageMeterGameBars = "class", damageMeterGameTexture = "",
+        damageMeterGameIconEdge = false }
     local store = {}
     function store.Get(k)
         local v = s.settings[k]
@@ -195,7 +197,16 @@ local function Boot(settings, loaded, windows)
         for _, w in ipairs(self.windows) do fn(w) end
     end
     function meter:SetupSessionWindow() end
+    s.palettes = {}
+    for name, v in pairs({ default = 0.05, midnight = 0.2, custom = 0.3, classic = 0.5 }) do
+        s.palettes[name] = { { r = v, g = 0, b = 0.9 }, { r = 0, g = v, b = 0.9 }, { r = 0, g = 0.9, b = v },
+            { r = v, g = v, b = 0.9 }, { r = v, g = 0.9, b = v }, { r = 0.9, g = v, b = v } }
+    end
     local ns = { QoLSettings = store, THEME = THEME, Apply = function() end,
+        THEME_EDITABLE = { "bg", "panel", "line", "fg", "muted", "accent" },
+        THEME_PRESET_ORDER = { "midnight", "classic" },
+        THEME_PRESETS = { midnight = { name = "Midnight" }, classic = { name = "Classic" } },
+        ThemePalette = function(key) return s.palettes[key] or s.palettes.default end,
         DamageMeterLayout = { rows = {}, byName = {
             FrameWidth = { label = "Window Width", slider = { 200, 600, 1 }, frame = true,
                 get = function() return 300 end, set = function() end },
@@ -1014,6 +1025,223 @@ do
     for key, row in pairs(rows) do
         check(key .. ": help is one short sentence", row.help == nil or #row.help < 100)
     end
+end
+
+-- Blizzard (Default): what is not picked stays the game's, and everything that is picked still applies
+do
+    local CLASS = { r = CLASS_RGB[1], g = CLASS_RGB[2], b = CLASS_RGB[3] }
+    local GREY, RED = { r = 0.4, g = 0.4, b = 0.4 }, { r = 0.9, g = 0.1, b = 0.1 }
+    local s, store, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterTheme = "game",
+        damageMeterBars = "accent", damageMeterTexture = "Other", damageMeterIconEdge = true,
+        damageMeterBarBgAlpha = 50 }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    local c = window.MinimizeContainer
+    local entry = c.ScrollBox.frames[1]
+    local headerArt, windowArt = window.Header.atlas, c.Background.atlas
+    check("the game's art is kept: title bar, window and spell panel", window.Header.atlas == "ui-damagemeters-header-bar"
+        and window.Header.solid == nil and c.Background.atlas == "damagemeters-background" and c.Background.solid == nil
+        and c.SourceWindow.Background.atlas == "common-dropdown-bg" and c.SourceWindow.Background.solid == nil)
+    check("its buttons, scroll bar and spell panel are as they were", window.MinimizeButton.glyph.desaturated ~= true
+        and c.ScrollBar.thumb.vertex == nil and c.SourceWindow.Background.alpha == 1)
+    check("no border: not the window's, not an icon's", #s.borders == 0)
+    for i, e in ipairs(Entries(window)) do
+        local bar = e.StatusBar
+        check("entry " .. i .. ": the shadow is the game's, as solid as it was told", bar.Background.atlas
+            == "ui-damagemeters-bar-shadowbg" and bar.Background.alpha == 0.5 and bar.BackgroundEdge.alpha == 1)
+        check("entry " .. i .. ": the font is the player's, the colors are the game's", bar.Name.path == FONT
+            and bar.Value.path == FONT and bar.Name.r == 1 and bar.Name.g == 0.82 and bar.Value.r == 1)
+        check("entry " .. i .. ": the bar keeps the game's art and the class color, whatever the theme look says",
+            e.StatusBar.file == nil and SameRgb(e.barTexture.vertex, CLASS))
+    end
+    check("the title text: the font, and the color it had", window.SessionTimer.path == FONT
+        and window.SessionTimer.r == 1 and window.SessionTimer.g == 0.82)
+
+    -- the look's own bar texture and bar color
+    store.Set("damageMeterGameTexture", "Flat")
+    check("a texture picked for this look is written, and the theme look's is not", entry.StatusBar.file == "Textures\\Flat")
+    store.Set("damageMeterGameBars", "accent")
+    check("a bar color picked for this look", SameRgb(entry.barTexture.vertex, THEME.accent))
+    entry:UpdateStatusBarColor()
+    check("and kept when the game sets its color", SameRgb(entry.barTexture.vertex, THEME.accent))
+    store.Set("damageMeterGameBars", "class")
+    store.Set("damageMeterGameTexture", "")
+    check("not picked: the game's own bar again, in the class color", entry.barTexture.atlas == "UI-HUD-CoolDownManager-Bar"
+        and SameRgb(entry.barTexture.vertex, CLASS))
+
+    -- a color that is picked applies, the rest stays the game's
+    store.Set("damageMeterWindowColor", GREY)
+    check("a Window Color: the window, and what follows it, are that color; the title bar is still the game's",
+        SameRgb(c.Background.solid, GREY) and SameRgb(c.SourceWindow.Background.solid, GREY)
+        and c.SourceWindow.Background.alpha == 0.7 and SameRgb(entry.StatusBar.Background.solid, GREY)
+        and entry.StatusBar.BackgroundEdge.alpha == 0 and window.Header.atlas == headerArt)
+    store.Set("damageMeterHeaderColor", RED)
+    store.Set("damageMeterNameColor", RED)
+    check("a Title Bar Color and a Name Color", SameRgb(window.Header.solid, RED) and entry.StatusBar.Name.r == RED.r
+        and entry.StatusBar.Name.g == RED.g and entry.StatusBar.Value.r == 1 and entry.StatusBar.Value.g == 0.82)
+    store.Set("damageMeterBarBgColor", RED)
+    store.Set("damageMeterPanelColor", RED)
+    check("a Bar Background Color and a Spell Panel Color of their own", SameRgb(entry.StatusBar.Background.solid, RED)
+        and SameRgb(c.SourceWindow.Background.solid, RED))
+    store.Set("damageMeterBorder", true)
+    check("a Window Border: the window's and the spell panel's", #s.borders == 2 and s.borders[1]._frame.shown == true)
+    store.Set("damageMeterGameIconEdge", true)
+    check("an Icon Border, in this look's own switch", #s.borders == 6)
+    store.Set("damageMeterButtons", "themed")
+    store.Set("damageMeterScrollBar", "accent")
+    check("Themed buttons and an Accent scroll bar", window.MinimizeButton.glyph.desaturated == true
+        and SameRgb(c.ScrollBar.thumb.vertex, THEME.accent))
+
+    -- the rows: every one waits only for the reskin, and the look's own switches are the ones they read
+    local rows = {}
+    for _, row in ipairs(s.cards[1].rows) do
+        if row.key then rows[row.key] = row end
+    end
+    local values, order = rows.damageMeterTheme.choice()
+    check("the Theme row is a choice, and waits for the reskin", rows.damageMeterTheme.needs == "damageMeterSkin"
+        and order[1] == "game" and values.game == "Blizzard (Default)" and order[2] == "current"
+        and values.current == "Current Theme" and order[3] == "default" and values.default == "Naowh (default)"
+        and order[4] == "midnight" and values.midnight == "Midnight" and order[5] == "classic"
+        and order[6] == "custom" and values.custom == "Custom" and #order == 6)
+    check("the color, border, button and scroll bar rows wait for the reskin only",
+        rows.damageMeterWindowColor.needs == "damageMeterSkin" and rows.damageMeterHeaderColor.needs == "damageMeterSkin"
+        and rows.damageMeterNameColor.needs == "damageMeterSkin" and rows.damageMeterBorder.needs == "damageMeterSkin"
+        and rows.damageMeterButtons.needs == "damageMeterSkin" and rows.damageMeterScrollBar.needs == "damageMeterSkin"
+        and rows.damageMeterPanelColor.needs == "damageMeterSkin")
+    check("Border Color has its rule of its own", rows.damageMeterBorderColor.needs() == true)
+    store.Set("damageMeterBorder", false)
+    check("and waits for the border", rows.damageMeterBorderColor.needs() == false)
+    store.Set("damageMeterBorder", true)
+    check("each look shows its own Bar Texture row, named as the game's own or the Naowh Gradient",
+        rows.damageMeterGameTexture.hidden() == false and rows.damageMeterTexture.hidden() == true
+        and rows.damageMeterGameTexture.texture == "Game Default" and rows.damageMeterTexture.texture == "Naowh Gradient")
+    check("Bar Color and Icon Border read and write the look's own setting", rows.damageMeterBars.get() == "class"
+        and rows.damageMeterIconEdge.get() == true)
+    rows.damageMeterBars.set("custom")
+    rows.damageMeterIconEdge.set(false)
+    check("so the other look's are untouched", store.Get("damageMeterGameBars") == "custom"
+        and store.Get("damageMeterBars") == "accent" and store.Get("damageMeterIconEdge") == true
+        and store.Get("damageMeterGameIconEdge") == false)
+    store.Set("damageMeterGameBars", "class")
+    store.Set("damageMeterGameIconEdge", true)
+
+    -- Theme Colors on: what is not picked is the theme's, what is picked stays
+    store.Set("damageMeterWindowColor", false)
+    store.Set("damageMeterNameColor", false)
+    store.Set("damageMeterTheme", "current")
+    check("on: the window is the theme's; the title bar, the spell panel and the bar shadow are still the picks",
+        SameRgb(c.Background.solid, THEME.bg) and SameRgb(window.Header.solid, RED)
+        and SameRgb(c.SourceWindow.Background.solid, RED) and SameRgb(entry.StatusBar.Background.solid, RED))
+    check("on: the names are the theme's, the amounts too", entry.StatusBar.Name.r == THEME.fg.r
+        and entry.StatusBar.Value.r == THEME.muted.r)
+    check("on: the theme look's own texture, bar color and icon border", entry.StatusBar.file == "Textures\\Other"
+        and SameRgb(entry.barTexture.vertex, THEME.accent) and #s.borders == 6)
+    check("on: the other Bar Texture row is the one shown", rows.damageMeterTexture.hidden() == false
+        and rows.damageMeterGameTexture.hidden() == true)
+
+    -- off again: what is not picked is given back, with the font still the player's
+    store.Set("damageMeterTheme", "game")
+    check("off again: the window art is back, the picks stay", c.Background.atlas == windowArt
+        and SameRgb(window.Header.solid, RED) and SameRgb(c.SourceWindow.Background.solid, RED))
+    check("off again: the names are the game's, in the player's font", entry.StatusBar.Name.r == 1
+        and entry.StatusBar.Name.g == 0.82 and entry.StatusBar.Name.path == FONT)
+    store.Set("damageMeterHeaderColor", false)
+    store.Set("damageMeterBarBgColor", false)
+    store.Set("damageMeterPanelColor", false)
+    store.Set("damageMeterButtons", "game")
+    store.Set("damageMeterScrollBar", "game")
+    store.Set("damageMeterBorder", false)
+    check("the picks cleared: all of the game's art, the buttons and the scroll bar are back",
+        window.Header.atlas == headerArt and c.SourceWindow.Background.atlas == "common-dropdown-bg"
+        and c.SourceWindow.Background.alpha == 1 and entry.StatusBar.Background.atlas == "ui-damagemeters-bar-shadowbg"
+        and entry.StatusBar.BackgroundEdge.alpha == 1 and window.MinimizeButton.glyph.desaturated == false
+        and SameRgb(c.ScrollBar.thumb.vertex, { r = 1, g = 1, b = 1 }) and s.borders[1]._frame.shown == false)
+    entry:UpdateStyle()
+    check("a refresh by the game leaves its art", entry.StatusBar.Background.atlas == "ui-damagemeters-bar-shadowbg")
+    store.Set("damageMeterSkin", false)
+    check("the reskin off: every one of them is the game's, the font too", entry.StatusBar.Name.path == GAME_FONT
+        and window.SessionTimer.path == GAME_FONT and entry.barTexture.atlas == "UI-HUD-CoolDownManager-Bar")
+end
+
+-- Theme: each of the themes paints what is not picked, at once, and the card shows its colors
+do
+    local GREY = { r = 0.4, g = 0.4, b = 0.4 }
+    local s, store, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterTheme = "midnight" }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    local c = window.MinimizeContainer
+    local entry = c.ScrollBox.frames[1]
+    local P = s.palettes
+    check("a theme: the title bar, window and spell panel are its Panels and Background",
+        SameRgb(window.Header.solid, P.midnight[2]) and SameRgb(c.Background.solid, P.midnight[1])
+        and SameRgb(c.SourceWindow.Background.solid, P.midnight[1]))
+    check("its text colors: the names its Text, the amounts its Secondary Text", entry.StatusBar.Name.r == P.midnight[4].r
+        and entry.StatusBar.Name.g == P.midnight[4].g and entry.StatusBar.Value.r == P.midnight[5].r
+        and entry.StatusBar.Value.g == P.midnight[5].g)
+    check("not the current theme's", not SameRgb(window.Header.solid, THEME.panel))
+    local refreshed = s.refreshes or 0
+    store.Set("damageMeterTheme", "default")
+    check("another theme: repainted at once", SameRgb(window.Header.solid, P.default[2])
+        and SameRgb(c.Background.solid, P.default[1]) and entry.StatusBar.Name.r == P.default[4].r)
+    check("and the card is drawn again, so its colors show the theme", (s.refreshes or 0) > refreshed)
+    store.Set("damageMeterTheme", "custom")
+    check("Custom is the colors picked for it in Settings > Colors", SameRgb(window.Header.solid, P.custom[2]))
+    store.Set("damageMeterTheme", "classic")
+    check("a preset", SameRgb(window.Header.solid, P.classic[2]))
+    store.Set("damageMeterTheme", "custom")
+    s.palettes.custom = { { r = 0.7, g = 0, b = 0 }, { r = 0, g = 0.7, b = 0 }, { r = 0, g = 0, b = 0.7 },
+        { r = 0.7, g = 0.7, b = 0 }, { r = 0.7, g = 0, b = 0.7 }, { r = 0, g = 0.7, b = 0.7 } }
+    store.Set("damageMeterBarAlpha", 90)
+    check("Custom edited since: read again at the next change", SameRgb(window.Header.solid, s.palettes.custom[2]))
+    store.Set("damageMeterBarAlpha", 100)
+    store.Set("damageMeterTheme", "nonsense")
+    check("a theme that is not known reads as the default one", SameRgb(window.Header.solid, P.default[2]))
+    store.Set("damageMeterTheme", "current")
+    check("the current theme: the addon's own", SameRgb(window.Header.solid, THEME.panel)
+        and SameRgb(c.Background.solid, THEME.bg))
+
+    -- the card's color rows show the chosen theme's, until one is picked
+    local rows = {}
+    for _, row in ipairs(s.cards[1].rows) do
+        if row.key then rows[row.key] = row end
+    end
+    store.Set("damageMeterTheme", "midnight")
+    local r, g, b = rows.damageMeterWindowColor.get()
+    check("the Window Color row shows the theme's Background", r == P.midnight[1].r and g == P.midnight[1].g
+        and b == P.midnight[1].b)
+    r, g, b = rows.damageMeterHeaderColor.get()
+    check("the Title Bar Color row its Panels", r == P.midnight[2].r and g == P.midnight[2].g)
+    r, g, b = rows.damageMeterNameColor.get()
+    check("the Name Color row its Text", r == P.midnight[4].r and g == P.midnight[4].g)
+    rows.damageMeterWindowColor.set(GREY.r, GREY.g, GREY.b)
+    check("a pick stays the pick, whatever the theme", SameRgb(c.Background.solid, GREY)
+        and SameRgb(window.Header.solid, P.midnight[2]))
+    store.Set("damageMeterTheme", "classic")
+    check("and a theme chosen after it changes the rest only", SameRgb(c.Background.solid, GREY)
+        and SameRgb(window.Header.solid, P.classic[2]))
+    r = rows.damageMeterWindowColor.get()
+    check("the row shows the pick", r == GREY.r)
+
+    -- a border, with no color picked, uses the chosen theme's
+    local function WindowBorderColor()
+        for _, border in ipairs(s.borders) do
+            if border.frame == window then return border.color end
+        end
+    end
+    store.Set("damageMeterWindowColor", false)
+    store.Set("damageMeterBorder", true)
+    store.Set("damageMeterTheme", "midnight")
+    local line = WindowBorderColor()
+    check("the border is the theme's Borders & Lines", line and line[1] == P.midnight[3].r
+        and line[2] == P.midnight[3].g)
+    store.Set("damageMeterBorder", false)
+    store.Set("damageMeterTheme", "game")
+    store.Set("damageMeterBorder", true)
+    line = WindowBorderColor()
+    check("with Blizzard, a border that is asked for is the current theme's line",
+        line and line[1] == THEME.line.r and line[2] == THEME.line.g)
+    check("and the colors are the game's again", window.Header.atlas == "ui-damagemeters-header-bar"
+        and c.Background.atlas == "damagemeters-background")
 end
 
 print("PASS damage meter skin: " .. checks .. " checks")

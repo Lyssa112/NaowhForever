@@ -120,6 +120,15 @@ NaowhForever_QoL/
   `SetVertexColor`, their first look remembered to give back; sizes are one setting each for the
   names, the amounts and the title, 0 keeping the game's own, which Edit Mode's Text Size still
   scales.
+- Theme (`damageMeterTheme`) is only where a color that was not picked comes from (`Resolve`): the game's own
+  (Blizzard), the addon's current theme (`ns.THEME`, the default), or the palette of one of the themes, read
+  from `ns.ThemePalette` and kept until the next apply (`Token`, `palettes`). A color that is picked applies
+  whichever it is, so every row works in all of them, and choosing a theme repaints at once with no reload,
+  since the meter reads the palette as it paints. With Blizzard a flat texture that has no color goes back to
+  its atlas (`Unflat`), a text keeps the color it had, the bar's shadow and edge stay, and the spell panel's
+  opacity waits for a color of its own or the Window Color. That look has its own Bar Color, Bar Texture and
+  Icon Border (`damageMeterGameBars`, `damageMeterGameTexture`, `damageMeterGameIconEdge`), which start as the
+  game's own, so it does not leave the bars in the theme's accent or its gradient, nor the icons bordered.
 - The card is in sections (Window, Bars, Text, Title Bar, Spell Panel, Reset) that mix the reskin's rows, which wait
   for the Reskin switch, with the game's own settings, which do not.
 - The game's own settings in it (`DamageMeterLayout.lua`) are the game's list for its damage

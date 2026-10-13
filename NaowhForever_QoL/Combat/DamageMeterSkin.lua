@@ -1,4 +1,4 @@
--- DamageMeterSkin.lua: Damage Meter Skin, the game's damage meter in the theme's colors, texture and font.
+-- DamageMeterSkin.lua: Default Damage Meter, the game's damage meter in its own look or a theme's, with a texture and font.
 local ns = _G.NaowhForever
 
 local S = ns.QoLSettings
@@ -41,6 +41,10 @@ local BUTTONS = { { game = TEXT_GAME_DEFAULT, themed = "Themed" }, { BUTTONS_GAM
 local TEXT_NEEDS_THEMED = "Set Buttons to Themed"
 local TEXT_NEEDS_BORDER, TEXT_NEEDS_FADE = "Turn on Window Border", "Set Title Bar to Shown on Hover"
 local SETTING_PREFIX, POSITION_KEY = "^damageMeter", "damageMeterPos"
+local THEME_KEY = "damageMeterTheme"
+local LOOK_GAME, LOOK_CURRENT, LOOK_DEFAULT, LOOK_CUSTOM = "game", "current", "default", "custom"
+local TEXT_LOOK_GAME, TEXT_LOOK_CURRENT = "Blizzard (Default)", "Current Theme"
+local TEXT_LOOK_DEFAULT, TEXT_LOOK_CUSTOM = "Naowh (default)", "Custom"
 
 local HUD_NAMES, HUD_ORDER = unpack(Parts.HUD_OUTLINES)
 local OUTLINE_NAMES, OUTLINE_ORDER = { [OUTLINE_GAME] = TEXT_GAME_DEFAULT }, { OUTLINE_GAME }
@@ -58,6 +62,7 @@ local looks, hooked, edges, entries = Weak(), Weak(), Weak(), Weak()
 local arts, swapped, faced, faded = Weak(), Weak(), Weak(), Weak()
 local scrolled, tints, glyphs, buttoned, alphas, watched = Weak(), Weak(), Weak(), Weak(), Weak(), Weak()
 local gameSizes = {}
+local palettes = {}
 local placementNote
 local fader
 local sinceTick = 0
@@ -74,6 +79,14 @@ end
 local function Watched(key)
     if key == "enabled" then return true end
     return type(key) == "string" and key ~= POSITION_KEY and key:find(SETTING_PREFIX) ~= nil
+end
+
+local function Blizzard()
+    return S.Get(THEME_KEY) == LOOK_GAME
+end
+
+local function NotBlizzard()
+    return not Blizzard()
 end
 
 local function ThemedButtons()
@@ -122,10 +135,34 @@ local function Watch(frame, depth)
     end
 end
 
+local function Palette(look)
+    local list = palettes[look]
+    if not list then
+        list = {}
+        local palette = ns.ThemePalette(look)
+        for i, name in ipairs(ns.THEME_EDITABLE) do list[name] = palette[i] end
+        palettes[look] = list
+    end
+    return list
+end
+
+local function Token(token)
+    local look = S.Get(THEME_KEY)
+    if look == LOOK_GAME then return nil end
+    if look == LOOK_CURRENT or type(look) ~= "string" then return T[token] end
+    return Palette(look)[token]
+end
+
 local function Pick(key, token)
     local c = S.Get(key)
     if type(c) == "table" then return c end
-    return T[token]
+    return Token(token) or T[token]
+end
+
+local function Resolve(key, token)
+    local c = S.Get(key)
+    if type(c) == "table" then return c end
+    return Token(token)
 end
 
 local function Fraction(key)
@@ -137,7 +174,7 @@ local function Fraction(key)
 end
 
 local function WindowColor()
-    return Pick("damageMeterWindowColor", "bg")
+    return Resolve("damageMeterWindowColor", "bg")
 end
 
 local function Chosen(key, fallback)
@@ -154,8 +191,21 @@ local function PanelColor()
     return Chosen("damageMeterPanelColor", WindowColor)
 end
 
+local function BarsKey()
+    return Blizzard() and "damageMeterGameBars" or "damageMeterBars"
+end
+
+local function EdgeKey()
+    return Blizzard() and "damageMeterGameIconEdge" or "damageMeterIconEdge"
+end
+
+local function TextureFile()
+    if Blizzard() then return ns.UI.TexturePath(S.Get("damageMeterGameTexture")) end
+    return ns.UI.TexturePath(S.Get("damageMeterTexture"), GRADIENT_TEX)
+end
+
 local function BarColor()
-    local choice = S.Get("damageMeterBars")
+    local choice = S.Get(BarsKey())
     if choice == BAR_ACCENT then return T.accent end
     if choice == BAR_CUSTOM then return Pick("damageMeterBarColor", "accent") end
 end
@@ -171,6 +221,16 @@ local function Flat(texture, c)
     local atlas = Has(texture, "GetAtlas") and texture:GetAtlas() or nil
     if atlas or looks[texture] == nil then looks[texture] = atlas or false end
     texture:SetColorTexture(c.r, c.g, c.b, 1)
+end
+
+local function Unflat(texture)
+    local was = looks[texture]
+    if type(was) ~= "string" or not Has(texture, "SetAtlas") then return end
+    if not (Has(texture, "GetAtlas") and texture:GetAtlas() == was) then texture:SetAtlas(was) end
+end
+
+local function Paint(texture, c)
+    if c then Flat(texture, c) else Unflat(texture) end
 end
 
 local function Remember(fontString)
@@ -216,12 +276,13 @@ local function Text(fontString, c, sizeKey)
         faced[fontString] = generation
         Face(fontString, was, sizeKey)
     end
+    c = c or was
     fontString:SetTextColor(c.r, c.g, c.b)
 end
 
 local function Edge(frame)
     if not Has(frame, "GetFrameLevel") then return end
-    if S.Get("damageMeterIconEdge") == false then
+    if S.Get(EdgeKey()) == false then
         if edges[frame] then edges[frame]._frame:Hide() end
         return
     end
@@ -245,7 +306,7 @@ local function BarTexture(entry)
     local bar = entry.StatusBar
     if not (Has(bar, "SetStatusBarTexture") and Has(entry, "GetStatusBarTexture")) then return end
     local art = entry:GetStatusBarTexture()
-    local file = ns.UI.TexturePath(S.Get("damageMeterTexture"), GRADIENT_TEX)
+    local file = TextureFile()
     if file then
         if arts[entry] == nil then arts[entry] = Has(art, "GetAtlas") and art:GetAtlas() or false end
         if swapped[entry] ~= file then
@@ -264,16 +325,21 @@ local function Fill(entry, alpha)
     if Has(texture, "SetAlpha") then texture:SetAlpha(alpha) end
 end
 
+local function Backdrop(bar)
+    local c = BarBackground()
+    Paint(bar.Background, c)
+    if Has(bar.Background, "SetAlpha") then bar.Background:SetAlpha(Fraction("damageMeterBarBgAlpha")) end
+    if Has(bar.BackgroundEdge, "SetAlpha") then bar.BackgroundEdge:SetAlpha(c and 0 or 1) end
+end
+
 local function Restyle(entry)
     if not On() then return end
     if ScrollHidden() then Wake() end
     local bar = entry.StatusBar
     if type(bar) ~= "table" then return end
-    Flat(bar.Background, BarBackground())
-    if Has(bar.Background, "SetAlpha") then bar.Background:SetAlpha(Fraction("damageMeterBarBgAlpha")) end
-    if Has(bar.BackgroundEdge, "SetAlpha") then bar.BackgroundEdge:SetAlpha(0) end
-    Text(bar.Name, Pick("damageMeterNameColor", "fg"), "damageMeterNameSize")
-    Text(bar.Value, Pick("damageMeterValueColor", "muted"), "damageMeterValueSize")
+    Backdrop(bar)
+    Text(bar.Name, Resolve("damageMeterNameColor", "fg"), "damageMeterNameSize")
+    Text(bar.Value, Resolve("damageMeterValueColor", "muted"), "damageMeterValueSize")
     Edge(entry.Icon)
     BarTexture(entry)
     Tint(entry)
@@ -303,7 +369,7 @@ local function Entries(scrollBox)
 end
 
 local function Opacity(region, alpha)
-    if not Has(region, "SetAlpha") then return end
+    if alpha == nil or not Has(region, "SetAlpha") then return end
     if alphas[region] == nil then alphas[region] = Has(region, "GetAlpha") and region:GetAlpha() or 1 end
     region:SetAlpha(alpha)
 end
@@ -396,8 +462,8 @@ local function Label(fontString)
 end
 
 local function SkinWindow(window)
-    local titles, values = Pick("damageMeterTitleColor", "fg"), Pick("damageMeterValueColor", "muted")
-    Flat(window.Header, Pick("damageMeterHeaderColor", "panel"))
+    local titles, values = Resolve("damageMeterTitleColor", "fg"), Resolve("damageMeterValueColor", "muted")
+    Paint(window.Header, Resolve("damageMeterHeaderColor", "panel"))
     Text(window.SessionTimer, values, "damageMeterValueSize")
     Label(Dig(window, "SessionDropdown", "SessionName"))
     Text(Dig(window, "DamageMeterTypeDropdown", "TypeName"), titles, "damageMeterTitleSize")
@@ -406,14 +472,15 @@ local function SkinWindow(window)
     if Needed() then Watch(window, WATCH_DEPTH) end
     local container = window.MinimizeContainer
     if type(container) ~= "table" then return end
-    Flat(container.Background, WindowColor())
+    Paint(container.Background, WindowColor())
     ScrollBar(window, S.Get("damageMeterScrollBar"))
     Skin(container.LocalPlayerEntry)
     Entries(container.ScrollBox)
     local source = container.SourceWindow
     if type(source) == "table" then
-        Flat(source.Background, PanelColor())
-        Opacity(source.Background, Fraction("damageMeterPanelAlpha"))
+        local panel = PanelColor()
+        Paint(source.Background, panel)
+        Opacity(source.Background, panel and Fraction("damageMeterPanelAlpha") or alphas[source.Background])
         WindowBorder(source)
         Entries(source.ScrollBox)
     end
@@ -427,7 +494,7 @@ local function RestoreWindow(window)
     if scrolled[window] then ScrollBar(window, SCROLL_GAME) end
     if buttoned[window] then Buttons(window, false) end
     local panel = Dig(window, "MinimizeContainer", "SourceWindow", "Background")
-    if panel and alphas[panel] ~= nil then Opacity(panel, alphas[panel]) end
+    Opacity(panel, alphas[panel])
 end
 
 local function GiveBack()
@@ -622,6 +689,7 @@ local function Pace()
 end
 
 local function Apply()
+    for look in pairs(palettes) do palettes[look] = nil end
     if not meter then return end
     generation = generation + 1
     if not On() then
@@ -658,6 +726,7 @@ hooksecurefunc(S, "Set", function(key)
     if not Watched(key) then return end
     Start()
     Apply()
+    if key == THEME_KEY and ns.UI and ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
 end)
 hooksecurefunc(ns, "Apply", function()
     Start()
@@ -669,7 +738,7 @@ boot:RegisterEvent("PLAYER_LOGIN")
 boot:SetScript("OnEvent", Start)
 
 local function CustomBars()
-    return S.Get("damageMeterBars") == BAR_CUSTOM
+    return S.Get(BarsKey()) == BAR_CUSTOM
 end
 
 local function Bordered()
@@ -704,12 +773,33 @@ local function SizeRow(key, label, help)
         set = function(v) S.Set(key, v) end }
 end
 
+local function Own(keyOf)
+    return function() return S.Get(keyOf()) end, function(v) S.Set(keyOf(), v) end
+end
+
+local barsGet, barsSet = Own(BarsKey)
+local edgeGet, edgeSet = Own(EdgeKey)
+
+local function LookChoices()
+    local values = { [LOOK_GAME] = TEXT_LOOK_GAME, [LOOK_CURRENT] = TEXT_LOOK_CURRENT,
+        [LOOK_DEFAULT] = TEXT_LOOK_DEFAULT, [LOOK_CUSTOM] = TEXT_LOOK_CUSTOM }
+    local order = { LOOK_GAME, LOOK_CURRENT, LOOK_DEFAULT }
+    for _, key in ipairs(ns.THEME_PRESET_ORDER) do
+        values[key] = ns.THEME_PRESETS[key].name
+        order[#order + 1] = key
+    end
+    order[#order + 1] = LOOK_CUSTOM
+    return values, order
+end
+
 local skin = {
-    barColor = { key = "damageMeterBars", label = "Bar Color", choice = BARS },
+    barColor = { key = "damageMeterBars", label = "Bar Color", choice = BARS, get = barsGet, set = barsSet },
     customBarColor = ColorRow("damageMeterBarColor", "Custom Bar Color", "accent",
         "The bars' color when Bar Color is Custom Color.", CustomBars, TEXT_NEEDS_CUSTOM),
-    texture = { key = "damageMeterTexture", label = "Bar Texture", texture = TEXT_GRADIENT },
-    iconEdge = { key = "damageMeterIconEdge", label = "Icon Border", toggle = true,
+    texture = { key = "damageMeterTexture", label = "Bar Texture", texture = TEXT_GRADIENT, hidden = Blizzard },
+    gameTexture = { key = "damageMeterGameTexture", label = "Bar Texture", texture = TEXT_GAME_DEFAULT,
+      hidden = NotBlizzard },
+    iconEdge = { key = "damageMeterIconEdge", label = "Icon Border", toggle = true, get = edgeGet, set = edgeSet,
       help = "A thin border round each bar's icon." },
     barAlpha = { key = "damageMeterBarAlpha", label = "Bar Opacity", slider = PERCENT_RANGE, unit = "%",
       help = "How solid the bars are." },
@@ -775,6 +865,8 @@ end
 
 Add({ key = "damageMeterSkin", label = "Reskin", toggle = true,
     help = "Draws the game's damage meter in your theme; the rows that need it wait for this." })
+Add({ key = THEME_KEY, label = "Theme", choice = LookChoices, needs = "damageMeterSkin",
+    help = "The colors you have not picked: the game's own, your current theme, or a theme." })
 Add(Settings.Group("Window"))
 Add(game.Visibility, game.FrameWidth, game.FrameHeight)
 Add({ key = "damageMeterFree", label = "Move and Resize", toggle = true,
@@ -782,8 +874,9 @@ Add({ key = "damageMeterFree", label = "Move and Resize", toggle = true,
     help = "Drag the window and its corner here, without Edit Mode." })
 Add(game.Transparency, game.BackgroundTransparency, skin.windowColor, skin.border, skin.borderColor)
 Add(Settings.Group("Bars"))
-Add(game.Style, game.BarHeight, game.Padding, skin.texture, skin.barColor, skin.customBarColor, skin.barAlpha,
-    skin.barBgColor, skin.barBgAlpha, game.ShowSpecIcon, game.ShowClassColor, skin.iconEdge, skin.scrollBar)
+Add(game.Style, game.BarHeight, game.Padding, skin.texture, skin.gameTexture, skin.barColor, skin.customBarColor,
+    skin.barAlpha, skin.barBgColor, skin.barBgAlpha, game.ShowSpecIcon, game.ShowClassColor, skin.iconEdge,
+    skin.scrollBar)
 Add(Settings.Group("Text"))
 Add(skin.font, skin.outline, game.TextSize, game.Numbers, skin.nameColor, skin.nameSize, skin.valueColor,
     skin.valueSize)
@@ -809,6 +902,7 @@ end
 Settings.Page("QoL/Combat", S):Card({
     id = "damageMeterSkin", name = "Default Damage Meter", order = CARD_ORDER, note = OtherMeters,
     help = "The game's own damage meter: in your theme, sized and set here instead of in Edit Mode.",
-    search = "damage meter skin reskin blizzard default bar height move resize edit mode style numbers padding",
+    search = "damage meter skin reskin blizzard default look theme colors bar height move resize edit mode style "
+        .. "numbers padding",
     rows = card,
 })
