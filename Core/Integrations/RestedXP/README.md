@@ -21,6 +21,18 @@ Core/Integrations/RestedXP/
   a saved theme of ours it fell back from is reloaded at login.
 - The hooks need RestedXP's frames, so they wait for PLAYER_LOGIN. Each checks what it needs and
   does nothing without it.
+- Nothing here raises through RestedXP, whose frames and functions change with its releases and
+  whose own code calls our hooks. Every hook, every installer and every call into RestedXP's
+  functions runs under `pcall` (`Quiet` and `Guarded`), so one that fails neither breaks RestedXP's
+  call nor keeps the others from being made. What failed is kept, the last of each by name, in
+  `ns.RXPFailures` (`/dump NaowhForever.RXPFailures`) and nothing is printed. Rows are remembered
+  only when a pass got to the end, so one that failed is tried again.
+- RestedXP's UI v2 hides its legacy window (`DisableLegacyGuideWindow`) but leaves the cog showing,
+  as the cog hangs from the window and not from the footer. The banners, cog, grip, scroll bar and
+  rules are therefore painted only while their part is visible (`Visible`), and again when it is
+  shown: an OnShow hook on the window and on each part (`HookShown`), so a window that was closed
+  and opened keeps no stale look. The look is not adapted to UI v2 yet; its windows get the colors
+  through RestedXP's own conversion of the themes (`RXP.v2.themes`, from the fields in `Theme`).
 - RestedXP's theme reload scales its protected target frame, so in combat it waits for the end.
 - Naowh (current) is read from `ns.THEME`, the colors the addon itself is drawn in, not from the
   theme picked: the Classic+ skin overrides that pick (`ThemeSource` in Core.lua). The fixed themes
@@ -38,6 +50,8 @@ Core/Integrations/RestedXP/
   strength, so the dark arrow still shades it. It follows the arrow's rotation through a post-hook
   on its SetRotation.
 - RestedXP only sets the distance text, never shows or hides it, so hiding it is ours to undo.
+  Moving it needs the anchor RestedXP gave it; a text with none has nothing to move or to give
+  back, so it is left alone.
 - The title bar and footer banners are plain black in DarkMode, so they are faded with SetAlpha to
   let the fill show; RestedXP sets them again whenever it draws its theme, so SetTexture is
   watched.

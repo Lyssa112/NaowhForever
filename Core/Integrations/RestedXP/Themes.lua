@@ -97,6 +97,24 @@ local function Ours(name)
     return type(name) == "string" and name:find(NAME_PREFIX, 1, true) == 1
 end
 
+ns.RXPFailures = {}
+
+local function Quiet(name, fn, ...)
+    local ok, problem = pcall(fn, ...)
+    if not ok then ns.RXPFailures[name] = tostring(problem) end
+    return ok
+end
+
+local function Guarded(name, fn)
+    return function(...) Quiet(name, fn, ...) end
+end
+
+local function Visible(region)
+    if Has(region, "IsVisible") then return region:IsVisible() == true end
+    if Has(region, "IsShown") then return region:IsShown() == true end
+    return true
+end
+
 local function Reload()
     local rxp = _G.RXP
     if not Has(rxp, "ReloadTheme") then return end
@@ -104,7 +122,7 @@ local function Reload()
         boot:RegisterEvent("PLAYER_REGEN_ENABLED")
         return
     end
-    rxp:ReloadTheme()
+    Quiet("ReloadTheme", rxp.ReloadTheme, rxp)
 end
 
 function ns.RXPThemesReady()
@@ -273,7 +291,7 @@ local function Register()
     local rxp = _G.RXP
     if Has(rxp, "RegisterTheme") and type(rxp.activeTheme) == "table" then
         late = true
-        for _, theme in pairs(themes) do rxp:RegisterTheme(theme) end
+        for _, theme in pairs(themes) do Quiet("RegisterTheme", rxp.RegisterTheme, rxp, theme) end
         return
     end
     local list = _G.RXPGuides_Themes
@@ -309,7 +327,7 @@ local hookedArrow
 
 local function BuildLayer(arrow)
     local texture = arrow.texture
-    if not Has(texture, "SetRotation") then return nil end
+    if not (Has(texture, "SetRotation") and Has(arrow, "GetFrameLevel") and Has(arrow, "GetSize")) then return nil end
     local f = CreateFrame("Frame", nil, arrow)
     f:SetAllPoints()
     f:SetFrameLevel(arrow:GetFrameLevel() + 1)
@@ -319,19 +337,20 @@ local function BuildLayer(arrow)
     f.mask = f:CreateMaskTexture()
     f.mask:SetAllPoints()
     f.color:AddMaskTexture(f.mask)
-    hooksecurefunc(texture, "SetRotation", function(_, radians) f.mask:SetRotation(radians) end)
+    hooksecurefunc(texture, "SetRotation", Guarded("Rotation", function(_, radians) f.mask:SetRotation(radians) end))
     -- A turned arrow reaches past its square frame, so the colour covers the square's diagonal and the
     -- mask cuts it to the arrow; at the frame's own size its tips lost their colour.
     local function Cover(self, w, h)
         local side = math.max(w, h) * DIAGONAL
         self.color:SetSize(side, side)
     end
-    f:SetScript("OnSizeChanged", Cover)
+    f:SetScript("OnSizeChanged", Guarded("LayerSize", Cover))
     Cover(f, arrow:GetSize())
     return f
 end
 
 local function ShowLayer(arrow, c)
+    if not Has(arrow.texture, "GetTexture") then return end
     layer = layer or BuildLayer(arrow)
     if not layer then return end
     layer.color:SetColorTexture(1, 1, 1, 1)
@@ -346,14 +365,18 @@ end
 
 local function MoveText(arrow, down)
     local text = arrow.text
-    if not Has(text, "GetPoint") then return end
+    if not (Has(text, "GetPoint") and Has(text, "SetPoint")) then return end
     textHome = textHome or { text:GetPoint() }
     local point, relativeTo, relativePoint, x, y = unpack(textHome)
+    if point == nil or type(x) ~= "number" or type(y) ~= "number" then
+        textHome = nil
+        return
+    end
     text:SetPoint(point, relativeTo, relativePoint, x, y - down)
 end
 
 local function Fit(arrow, texture, scale)
-    if not (Has(texture, "ClearAllPoints") and Has(arrow, "GetSize")) then return end
+    if not (Has(texture, "ClearAllPoints") and Has(texture, "SetPoint") and Has(arrow, "GetSize")) then return end
     local w, h = arrow:GetSize()
     local dx, dy = w * (scale - 1) / 2, h * (scale - 1) / 2
     texture:ClearAllPoints()
@@ -363,6 +386,7 @@ local function Fit(arrow, texture, scale)
 end
 
 local function ShowImage(arrow, texture, c)
+    if not (Has(texture, "SetTexture") and Has(texture, "SetVertexColor")) then return end
     texture:SetTexture(ARROW_IMAGES[ns.RXPArrowShape()][ns.RXPArrowGlow()])
     texture:SetVertexColor(c[1], c[2], c[3], 1)
     fitted = ns.RXPArrowSize() / PERCENT / (ns.RXPArrowGlow() and GLOW_FILL or 1)
@@ -377,18 +401,18 @@ local function HandBack(arrow, texture)
             texture:ClearAllPoints()
             texture:SetAllPoints()
         end
-        if textHome then arrow.text:SetPoint(unpack(textHome)) end
-        texture:SetVertexColor(1, 1, 1, 1)
+        if textHome and Has(arrow.text, "SetPoint") then arrow.text:SetPoint(unpack(textHome)) end
+        if Has(texture, "SetVertexColor") then texture:SetVertexColor(1, 1, 1, 1) end
     end
     if swapped then
-        if rxpImage then texture:SetTexture(rxpImage) end
+        if rxpImage and Has(texture, "SetTexture") then texture:SetTexture(rxpImage) end
         swapped = false
     end
 end
 
 local function PaintText(arrow, theme)
     local text = arrow.text
-    if not Has(text, "Hide") then return end
+    if not (Has(text, "Hide") and Has(text, "Show")) then return end
     local hide = theme ~= nil and not ns.RXPArrowTextEnabled()
     if hide and not textHidden then
         text:Hide()
@@ -398,10 +422,10 @@ local function PaintText(arrow, theme)
     textHidden = hide
 end
 
-function PaintArrow()
+local function DrawArrow()
     local arrow = _G.RXPG_ARROW
-    local texture = arrow and arrow.texture
-    if not texture then return end
+    local texture = Dig(arrow, "texture")
+    if type(texture) ~= "table" then return end
     local theme = ActiveTheme()
     local style = theme and ns.RXPArrowStyle() or "off"
     if style == "layer" then
@@ -417,10 +441,14 @@ function PaintArrow()
     PaintText(arrow, theme)
 end
 
+function PaintArrow()
+    Quiet("PaintArrow", DrawArrow)
+end
+
 local function OnRxpUpdate()
-    local arrow = _G.RXPG_ARROW
+    local texture = Dig(_G.RXPG_ARROW, "texture")
     swapped = false
-    rxpImage = arrow and arrow.texture and arrow.texture:GetTexture()
+    rxpImage = Has(texture, "GetTexture") and texture:GetTexture() or nil
     PaintArrow()
 end
 
@@ -430,16 +458,16 @@ end
 
 local function HookArrow()
     local arrow = _G.RXPG_ARROW
-    if not (arrow and arrow.texture and Has(arrow, "UpdateVisuals")) then return end
-    hooksecurefunc(arrow, "UpdateVisuals", OnRxpUpdate)
+    if type(Dig(arrow, "texture")) ~= "table" or not Has(arrow, "UpdateVisuals") then return end
+    hooksecurefunc(arrow, "UpdateVisuals", Guarded("UpdateVisuals", OnRxpUpdate))
     if Has(arrow, "HookScript") then
         hookedArrow = arrow
-        arrow:HookScript("OnSizeChanged", OnArrowSize)
+        arrow:HookScript("OnSizeChanged", Guarded("ArrowSize", OnArrowSize))
     end
     OnRxpUpdate()
 end
 
-local barsHidden
+local faded = setmetatable({}, { __mode = "k" })
 
 local function Banner(name)
     local banner = Dig(_G.RXPFrame, name, "bg")
@@ -448,23 +476,24 @@ end
 
 local function PaintBars()
     local hide = ActiveTheme() ~= nil
-    if not hide and not barsHidden then return end
     for _, name in ipairs(BARS) do
         local banner = Banner(name)
-        if Has(banner, "SetAlpha") then banner:SetAlpha(hide and 0 or 1) end
+        if Has(banner, "SetAlpha") and (hide or faded[banner]) and Visible(banner) then
+            banner:SetAlpha(hide and 0 or 1)
+            faded[banner] = hide or nil
+        end
     end
-    barsHidden = hide
 end
 
 local function HookBars()
     for _, name in ipairs(BARS) do
         local banner = Banner(name)
-        if Has(banner, "SetTexture") then hooksecurefunc(banner, "SetTexture", PaintBars) end
+        if Has(banner, "SetTexture") then hooksecurefunc(banner, "SetTexture", Guarded("Banners", PaintBars)) end
     end
     PaintBars()
 end
 
-local chromeTinted, gripOriginal, thumbSize
+local footerTinted, scrollTinted, gripOriginal, thumbSize
 
 local function Skin(texture, path, color)
     if not Has(texture, "SetVertexColor") then return end
@@ -480,7 +509,11 @@ end
 
 local function PaintThumb(thumb, color)
     if not (Has(thumb, "SetSize") and Has(thumb, "GetSize")) then return end
-    thumbSize = thumbSize or { thumb:GetSize() }
+    if not thumbSize then
+        local w, h = thumb:GetSize()
+        if type(w) ~= "number" or type(h) ~= "number" then return end
+        thumbSize = { w, h }
+    end
     if color and Has(thumb, "SetColorTexture") then
         thumb:SetColorTexture(color[1], color[2], color[3], color[4])
         thumb:SetSize(THUMB_W, THUMB_H)
@@ -489,17 +522,16 @@ local function PaintThumb(thumb, color)
     end
 end
 
-local function PaintChrome()
-    local theme = ActiveTheme()
-    local color = theme and type(theme.chromeColor) == "table" and theme.chromeColor or nil
-    if not color and not chromeTinted then return end
-    chromeTinted = color ~= nil
+local function PaintFooter(color)
     local frame = _G.RXPFrame
     local grip = Normal(Dig(frame, "Footer", "icon"))
     if Has(grip, "GetTexture") then gripOriginal = gripOriginal or grip:GetTexture() end
     Skin(Normal(Dig(frame, "Footer", "cog")), color and COG, color)
     Skin(grip, color and GRIP or gripOriginal, color)
-    local bar = Dig(frame, "ScrollFrame", "ScrollBar")
+end
+
+local function PaintScrollBar(color)
+    local bar = Dig(_G.RXPFrame, "ScrollFrame", "ScrollBar")
     PaintThumb(Has(bar, "GetThumbTexture") and bar:GetThumbTexture() or nil, color)
     for _, name in ipairs(ARROWS) do
         for _, part in ipairs(ARROW_PARTS) do
@@ -509,9 +541,23 @@ local function PaintChrome()
     end
 end
 
+local function PaintChrome()
+    local theme = ActiveTheme()
+    local color = theme and type(theme.chromeColor) == "table" and theme.chromeColor or nil
+    local frame = _G.RXPFrame
+    if (color or footerTinted) and Visible(Dig(frame, "Footer")) then
+        footerTinted = color ~= nil
+        PaintFooter(color)
+    end
+    if (color or scrollTinted) and Visible(Dig(frame, "ScrollFrame", "ScrollBar")) then
+        scrollTinted = color ~= nil
+        PaintScrollBar(color)
+    end
+end
+
 local function HookChrome()
     local frame = _G.RXPFrame
-    if Has(frame, "UpdateScrollBar") then hooksecurefunc(frame, "UpdateScrollBar", PaintChrome) end
+    if Has(frame, "UpdateScrollBar") then hooksecurefunc(frame, "UpdateScrollBar", Guarded("Chrome", PaintChrome)) end
     PaintChrome()
 end
 
@@ -520,10 +566,9 @@ local ruleTheme, ruleRows
 
 local function PaintRules()
     local list = Dig(_G.RXPFrame, "ScrollChild", "framePool")
-    if type(list) ~= "table" then return end
+    if type(list) ~= "table" or not Visible(Dig(_G.RXPFrame, "ScrollChild")) then return end
     local theme = ActiveTheme()
     if theme == ruleTheme and #list == ruleRows then return end
-    ruleTheme, ruleRows = theme, #list
     local color = theme and theme.dividerColor
     if type(color) ~= "table" then color = nil end
     for _, row in ipairs(list) do
@@ -542,12 +587,28 @@ local function PaintRules()
             rule:Hide()
         end
     end
+    ruleTheme, ruleRows = theme, #list
 end
 
 local function HookRules()
     local rxp = _G.RXP
-    if Has(rxp, "SetStep") then hooksecurefunc(rxp, "SetStep", PaintRules) end
+    if Has(rxp, "SetStep") then hooksecurefunc(rxp, "SetStep", Guarded("Rules", PaintRules)) end
     PaintRules()
+end
+
+local SHOWN = { {}, { "GuideName" }, { "Footer" }, { "ScrollChild" }, { "ScrollFrame", "ScrollBar" } }
+
+local function PaintLegacy()
+    Quiet("Banners", PaintBars)
+    Quiet("Chrome", PaintChrome)
+    Quiet("Rules", PaintRules)
+end
+
+local function HookShown()
+    for _, path in ipairs(SHOWN) do
+        local part = Dig(_G.RXPFrame, unpack(path))
+        if Has(part, "HookScript") then part:HookScript("OnShow", Guarded("Shown", PaintLegacy)) end
+    end
 end
 
 local function OnBootEvent(self, event, name)
@@ -555,7 +616,7 @@ local function OnBootEvent(self, event, name)
         if name ~= ns.MODULE_KEY then return end
         self:UnregisterEvent("ADDON_LOADED")
         if ns.RXPThemesEnabled() and ns.RXPThemesAvailable() then
-            Register()
+            Quiet("Register", Register)
             self:RegisterEvent("PLAYER_LOGIN")
         end
     elseif event == "PLAYER_REGEN_ENABLED" then
@@ -563,11 +624,12 @@ local function OnBootEvent(self, event, name)
         Reload()
     else
         self:UnregisterAllEvents()
-        if late then Resume() end
-        HookArrow()
-        HookBars()
-        HookChrome()
-        HookRules()
+        if late then Quiet("Resume", Resume) end
+        Quiet("HookArrow", HookArrow)
+        Quiet("HookBars", HookBars)
+        Quiet("HookChrome", HookChrome)
+        Quiet("HookRules", HookRules)
+        Quiet("HookShown", HookShown)
     end
 end
 
