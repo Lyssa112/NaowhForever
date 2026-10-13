@@ -14,8 +14,8 @@ local OTHER_METERS = { { addon = "Details", name = "Details" },
 local TEXT_OTHERS = "Turn off every other damage meter first."
 local TEXT_OTHERS_NAMED = "Turn off %s first."
 local CARD_ORDER = 110
-local GRADIENT_TEX = ns.MEDIA .. "NaowhGradient.tga"
-local TEXT_GRADIENT, TEXT_NEEDS_NOT_FREE = "Naowh Gradient", "Turn off Move and Resize"
+local GRADIENT_TEX = ns.MEDIA .. "NaowhReverseGradient.tga"
+local TEXT_GRADIENT, TEXT_NEEDS_NOT_FREE = "Naowh Reverse Gradient", "Turn off Move and Resize"
 local TEXT_NO_WINDOW = "The game's meter has no window to place."
 local TEXT_NO_PLACE = "Show the game's meter first, then switch this off and on."
 local BAR_CLASS, BAR_ACCENT, BAR_CUSTOM = "class", "accent", "custom"
@@ -31,6 +31,14 @@ local FADE_ALWAYS, FADE_HOVER = "always", "hover"
 local FADES = { { always = "Always Shown", hover = "Shown on Hover" }, { FADE_ALWAYS, FADE_HOVER } }
 local TITLE_PARTS = { "Header", "MinimizeButton", "SettingsDropdown", "SessionDropdown",
     "DamageMeterTypeDropdown", "SessionTimer" }
+local Title = { switches = { SessionTimer = "damageMeterShowTimer", SessionDropdown = "damageMeterShowSession",
+    SettingsDropdown = "damageMeterShowCog", MinimizeButton = "damageMeterShowMinimize" },
+    titleKey = "damageMeterShowTitle", arrowKey = "damageMeterShowDropdown", menuKey = "damageMeterMenu",
+    shiftKey = "damageMeterTitleX", timerKey = "damageMeterTimerX", shiftRange = { -200, 200, 1 },
+    menuTitle = "Damage Meter Title Bar", collapsed = 1 }
+Title.items = { { "Title", Title.titleKey }, { "Dropdown Button", Title.arrowKey },
+    { "Timer", Title.switches.SessionTimer }, { "Session Button", Title.switches.SessionDropdown },
+    { "Settings Button", Title.switches.SettingsDropdown }, { "Minimize Button", Title.switches.MinimizeButton } }
 local FADE_EVERY, FADE_STEP, SETTLE, WATCH_DEPTH, SCROLL_DEPTH, PERCENT = 0.1, 0.35, 1, 5, 3, 100
 local PERCENT_RANGE = { 0, PERCENT, 5 }
 local FONT_SIZE_RANGE, FONT_SIZE_DEFAULT = { 0, 24, 1 }, 12
@@ -61,6 +69,7 @@ local generation = 0
 local looks, hooked, edges, entries = Weak(), Weak(), Weak(), Weak()
 local arts, swapped, faced, faded = Weak(), Weak(), Weak(), Weak()
 local scrolled, tints, glyphs, buttoned, alphas, watched = Weak(), Weak(), Weak(), Weak(), Weak(), Weak()
+Title.menued, Title.widths, Title.kept, Title.sized, Title.homes = Weak(), Weak(), Weak(), Weak(), Weak()
 local gameSizes = {}
 local palettes = {}
 local placementNote
@@ -446,11 +455,205 @@ local function Buttons(window, themed)
     end
 end
 
-local function TitleAlpha(window, alpha)
+function Title.Shown(key)
+    local switch = Title.switches[key]
+    return switch == nil or S.Get(switch) ~= false
+end
+
+local function TitleAlpha(window, alpha, whole)
     for _, key in ipairs(TITLE_PARTS) do
         local part = window[key]
-        if Has(part, "SetAlpha") then part:SetAlpha(alpha) end
+        if Has(part, "SetAlpha") then part:SetAlpha((whole or Title.Shown(key)) and alpha or 0) end
     end
+end
+
+function Title.DropdownGone()
+    return On() and S.Get(Title.titleKey) == false and S.Get(Title.arrowKey) == false
+end
+
+-- Some of the window's numbers are secret in a restricted state of the game: they can only be handed back.
+function Title.Secret(value)
+    return issecretvalue ~= nil and issecretvalue(value) == true
+end
+
+function Title.Plain(value)
+    if type(value) ~= "number" or Title.Secret(value) then return nil end
+    return value
+end
+
+function Title.KeepAlpha(part, hiddenNow)
+    if Title.kept[part] or not Has(part, "SetAlpha") then return end
+    Title.kept[part] = true
+    hooksecurefunc(part, "SetAlpha", function(self, alpha)
+        if alpha ~= 0 and On() and hiddenNow() then self:SetAlpha(0) end
+    end)
+end
+
+function Title.KeepSize(part, hiddenNow)
+    if Title.sized[part] or not Has(part, "SetWidth") then return end
+    Title.sized[part] = true
+    hooksecurefunc(part, "SetWidth", function(self, width)
+        if Title.Plain(width) ~= nil and width ~= Title.collapsed and On() and hiddenNow() then
+            self:SetWidth(Title.collapsed)
+        end
+    end)
+end
+
+function Title.Collapse(part, hide)
+    if not (Has(part, "SetWidth") and Has(part, "GetWidth")) then return end
+    if hide then
+        if Title.widths[part] == nil then
+            local width = Title.Plain(part:GetWidth())
+            if width == nil then return end
+            Title.widths[part] = width
+        end
+        part:SetWidth(Title.collapsed)
+    elseif Title.widths[part] ~= nil then
+        local width = Title.widths[part]
+        Title.widths[part] = nil
+        part:SetWidth(width)
+    end
+end
+
+function Title.Fit(window)
+    for key in pairs(Title.switches) do
+        if key ~= "SessionTimer" then Title.Collapse(window[key], On() and not Title.Shown(key)) end
+    end
+    Title.Collapse(window.DamageMeterTypeDropdown, Title.DropdownGone())
+end
+
+function Title.Remember(part)
+    local home = Title.homes[part]
+    if home then return home end
+    if not (Has(part, "GetNumPoints") and Has(part, "GetPoint") and Has(part, "SetPoint")
+            and Has(part, "ClearAllPoints")) then
+        return nil
+    end
+    home = {}
+    for i = 1, part:GetNumPoints() do
+        local point, relativeTo, relativePoint, x, y = part:GetPoint(i)
+        -- offsets the game keeps secret cannot be added to: the part stays where the game has it
+        if Title.Secret(x) or Title.Secret(y) then return nil end
+        home[i] = { point, relativeTo, relativePoint, x or 0, y or 0 }
+    end
+    if #home == 0 then return nil end
+    Title.homes[part] = home
+    return home
+end
+
+-- dx is a number, or a function of the anchor that gives the number for each one
+function Title.Put(part, home, dx, firstOnly)
+    part:ClearAllPoints()
+    for i, anchor in ipairs(home) do
+        if i == 1 or not firstOnly then
+            local by = type(dx) == "function" and dx(anchor) or dx
+            part:SetPoint(anchor[1], anchor[2], anchor[3], anchor[4] + by, anchor[5])
+        end
+    end
+end
+
+-- The game hangs the list's button from the timer's right edge, so the timer is in front and the title after it.
+-- The timer is one anchor and a width of 0, so it is as wide as its text and the title is at the far left when
+-- there is no time. Its X offset moves it alone: the button, which hangs from it, is given the same back, and the
+-- title's offset moves the text only. Nothing here reads a position, the game's own anchors are all that is
+-- added to: the positions are secret in some states of the game.
+function Title.Arrange(window)
+    local dropdown, timer = window.DamageMeterTypeDropdown, window.SessionTimer
+    local text = Dig(dropdown, "TypeName")
+    local dropHome, timerHome, textHome = Title.Remember(dropdown), Title.Remember(timer), Title.Remember(text)
+    local themed = On()
+    local function Offset(key)
+        local value = S.Get(key)
+        if not themed or type(value) ~= "number" then return 0 end
+        return value
+    end
+    local pull = timerHome and Offset(Title.timerKey) or 0
+    -- the part the others hang from goes first: no anchor ever depends on itself
+    if timerHome then Title.Put(timer, timerHome, pull, themed) end
+    if dropHome then
+        Title.Put(dropdown, dropHome, function(anchor) return anchor[2] == timer and -pull or 0 end)
+    end
+    if textHome then Title.Put(text, textHome, Offset(Title.shiftKey)) end
+    if timerHome then timer:SetWidth((themed and not Title.Shown("SessionTimer")) and Title.collapsed or 0) end
+end
+
+-- A layout that fails is reported, not raised: the rest of the skin goes on whatever the title bar did.
+function Title.Layout(window)
+    if Title.placing then return end
+    Title.placing = true
+    local ok, problem = pcall(Title.Arrange, window)
+    Title.placing = false
+    if ok then return end
+    local report = geterrorhandler and geterrorhandler()
+    if report then report(problem) else error(problem, 0) end
+end
+
+function Title.KeepTimer(window)
+    local timer = window.SessionTimer
+    if Title.sized[timer] then return end
+    if Has(timer, "SetWidth") then
+        hooksecurefunc(timer, "SetWidth", function(_, width)
+            if Title.placing or not On() then return end
+            if Title.Plain(width) == nil or width ~= (Title.Shown("SessionTimer") and 0 or Title.collapsed) then
+                Title.Layout(window)
+            end
+        end)
+    end
+    if Has(timer, "SetPoint") then
+        hooksecurefunc(timer, "SetPoint", function()
+            if not Title.placing and On() then Title.Layout(window) end
+        end)
+    end
+    local text = Dig(window, "DamageMeterTypeDropdown", "TypeName")
+    if Has(text, "SetText") then
+        hooksecurefunc(text, "SetText", function()
+            if not Title.placing and On() then Title.Layout(window) end
+        end)
+    end
+    local dropdown = window.DamageMeterTypeDropdown
+    if Has(dropdown, "SetPoint") then
+        hooksecurefunc(dropdown, "SetPoint", function()
+            if not Title.placing and On() then Title.Layout(window) end
+        end)
+    end
+    if type(timer) == "table" then Title.sized[timer] = true end
+end
+
+function Title.IsText(region)
+    return Has(region, "GetObjectType") and region:GetObjectType() == "FontString"
+end
+
+function Title.Inner(window)
+    local dropdown = window.DamageMeterTypeDropdown
+    local text = Dig(dropdown, "TypeName")
+    if Has(text, "SetAlpha") then text:SetAlpha((On() and S.Get(Title.titleKey) == false) and 0 or 1) end
+    if not Has(dropdown, "GetRegions") then return end
+    local hide = On() and S.Get(Title.arrowKey) == false
+    for _, region in ipairs(Textures(dropdown, BUTTON_DEPTH, {})) do
+        if not Title.IsText(region) then Opacity(region, hide and 0 or alphas[region]) end
+    end
+end
+
+function Title.Menu(owner)
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+        root:CreateTitle(Title.menuTitle)
+        for _, item in ipairs(Title.items) do
+            local key = item[2]
+            root:CreateCheckbox(item[1], function() return S.Get(key) == true end,
+                function() S.Set(key, S.Get(key) ~= true) end)
+        end
+    end)
+end
+
+function Title.HookMenu(window)
+    if Title.menued[window] or not Has(window, "HookScript") then return end
+    Title.menued[window] = true
+    window:HookScript("OnMouseUp", function(self, button)
+        if button ~= "RightButton" or not (On() and S.Get(Title.menuKey) == true) then return end
+        local header = self.Header
+        if Has(header, "IsMouseOver") and not header:IsMouseOver() then return end
+        Title.Menu(self)
+    end)
 end
 
 local function Label(fontString)
@@ -469,6 +672,21 @@ local function SkinWindow(window)
     Text(Dig(window, "DamageMeterTypeDropdown", "TypeName"), titles, "damageMeterTitleSize")
     WindowBorder(window)
     Buttons(window, ThemedButtons())
+    for key, switch in pairs(Title.switches) do
+        local function Off() return S.Get(switch) == false end
+        Title.KeepAlpha(window[key], Off)
+        if key ~= "SessionTimer" then Title.KeepSize(window[key], Off) end
+    end
+    Title.KeepAlpha(Dig(window, "DamageMeterTypeDropdown", "TypeName"), function()
+        return S.Get(Title.titleKey) == false
+    end)
+    Title.KeepSize(window.DamageMeterTypeDropdown, Title.DropdownGone)
+    Title.KeepTimer(window)
+    TitleAlpha(window, faded[window] or 1)
+    Title.Inner(window)
+    Title.Fit(window)
+    Title.Layout(window)
+    if S.Get(Title.menuKey) == true then Title.HookMenu(window) end
     if Needed() then Watch(window, WATCH_DEPTH) end
     local container = window.MinimizeContainer
     if type(container) ~= "table" then return end
@@ -487,10 +705,11 @@ local function SkinWindow(window)
 end
 
 local function RestoreWindow(window)
-    if faded[window] then
-        faded[window] = nil
-        TitleAlpha(window, 1)
-    end
+    faded[window] = nil
+    TitleAlpha(window, 1, true)
+    Title.Inner(window)
+    Title.Fit(window)
+    Title.Layout(window)
     if scrolled[window] then ScrollBar(window, SCROLL_GAME) end
     if buttoned[window] then Buttons(window, false) end
     local panel = Dig(window, "MinimizeContainer", "SourceWindow", "Background")
@@ -833,6 +1052,24 @@ local skin = {
       help = "The title bar's buttons: the game's own, or in your theme." },
     buttonColor = ColorRow("damageMeterButtonColor", "Button Color", "accent", "The buttons, when they are Themed.",
         ThemedButtons, TEXT_NEEDS_THEMED),
+    showTitle = { key = Title.titleKey, label = "Show Title", toggle = true,
+      help = "The list's name in the title bar." },
+    showArrow = { key = Title.arrowKey, label = "Show Dropdown Button", toggle = true,
+      help = "The arrow button that picks the list." },
+    showTimer = { key = Title.switches.SessionTimer, label = "Show Timer", toggle = true,
+      help = "The fight time in the title bar." },
+    showSession = { key = Title.switches.SessionDropdown, label = "Show Session Button", toggle = true,
+      help = "The button that picks Current, Overall or a past fight." },
+    showCog = { key = Title.switches.SettingsDropdown, label = "Show Settings Button", toggle = true,
+      help = "The game's own settings button in the title bar." },
+    showMinimize = { key = Title.switches.MinimizeButton, label = "Show Minimize Button", toggle = true,
+      help = "The button that folds the window away." },
+    titleX = { key = Title.shiftKey, label = "Title X Offset", slider = Title.shiftRange, unit = "px",
+      help = "Moves the title left (below 0) or right." },
+    timerX = { key = Title.timerKey, label = "Timer X Offset", slider = Title.shiftRange, unit = "px",
+      help = "Moves the fight time left (below 0) or right; the title stays." },
+    menu = { key = Title.menuKey, label = "Right-Click Menu", toggle = true,
+      help = "A right click on the title bar opens a menu to switch these." },
     titleFade = { key = "damageMeterTitleFade", label = "Title Bar", choice = FADES,
       help = "Always shown, or faded until the mouse is over the window." },
     titleFadeAlpha = { key = "damageMeterTitleFadeAlpha", label = "Faded Title Opacity", slider = PERCENT_RANGE,
@@ -881,8 +1118,9 @@ Add(Settings.Group("Text"))
 Add(skin.font, skin.outline, game.TextSize, game.Numbers, skin.nameColor, skin.nameSize, skin.valueColor,
     skin.valueSize)
 Add(Settings.Group("Title Bar"))
-Add(skin.titleColor, skin.titleSize, skin.headerColor, skin.buttons, skin.buttonColor, skin.titleFade,
-    skin.titleFadeAlpha)
+Add(skin.titleColor, skin.titleSize, skin.titleX, skin.timerX, skin.headerColor, skin.buttons, skin.buttonColor,
+    skin.showTitle, skin.showArrow, skin.showTimer, skin.showSession, skin.showCog, skin.showMinimize, skin.menu,
+    skin.titleFade, skin.titleFadeAlpha)
 Add(Settings.Group("Spell Panel"))
 Add(skin.panelColor, skin.panelAlpha)
 Add(Settings.Group("Reset"))

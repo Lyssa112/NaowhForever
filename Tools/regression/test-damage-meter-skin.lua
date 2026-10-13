@@ -33,6 +33,8 @@ local function FontString()
     local f = { path = GAME_FONT, size = GAME_SIZE, flags = GAME_FLAGS, r = 1, g = 0.82, b = 0, sx = 1, sy = -1,
         shadow = { 0, 0, 0, 0.5 } }
     function f:GetFont() return self.path, self.size, self.flags end
+    function f:GetStringWidth() return self.stringWidth or 80 end
+    function f:SetText(text) self.text = text end
     function f:SetFont(path, size, flags)
         self.path, self.size, self.flags = path, size, flags
         self.fontSets = (self.fontSets or 0) + 1
@@ -109,8 +111,14 @@ end
 local function Window()
     local source = { Background = Texture("common-dropdown-bg"), ScrollBox = ScrollBox({ Entry() }) }
     function source:GetFrameLevel() return 1 end
+    local function Sized(object, width)
+        object.width = width
+        function object:SetWidth(w) self.width = w end
+        function object:GetWidth() return self.width end
+        return object
+    end
     local function Part()
-        local part = { alpha = 1, glyph = Texture("glyph") }
+        local part = Sized({ alpha = 1, glyph = Texture("glyph") }, 24)
         function part:SetAlpha(a) self.alpha = a end
         function part:GetRegions() return self.glyph end
         function part:GetChildren() end
@@ -134,9 +142,46 @@ local function Window()
         MinimizeButton = Part(), SettingsDropdown = Part(),
         points = {}, left = 100, top = 500, width = 300, height = 200, editLeft = 100, editTop = 500 }
     function w.SessionDropdown:SetAlpha(a) self.alpha = a end
+    Sized(w.SessionDropdown, 62)
+    Sized(w.DamageMeterTypeDropdown, 140)
+    local function Hangs(object, from, seen)
+        if object == nil or seen[object] then return false end
+        seen[object] = true
+        if object == from then return true end
+        if object.parentFrame and Hangs(object.parentFrame, from, seen) then return true end
+        for _, p in ipairs(object.points or {}) do
+            if Hangs(p[2], from, seen) then return true end
+        end
+        return false
+    end
+    local function Anchored(object, points, parentFrame)
+        object.points, object.parentFrame = points, parentFrame
+        function object:GetNumPoints() return #self.points end
+        function object:GetPoint(i)
+            local p = self.points[i]
+            return p[1], p[2], p[3], p[4], p[5]
+        end
+        function object:ClearAllPoints() self.points = {} end
+        function object:SetPoint(point, relativeTo, relativePoint, x, y)
+            if relativeTo ~= nil and Hangs(relativeTo, self, {}) then
+                error("Cannot anchor to a region dependent on it")
+            end
+            self.points[#self.points + 1] = { point, relativeTo, relativePoint, x, y }
+        end
+    end
+    Anchored(w.DamageMeterTypeDropdown, { { "TOPLEFT", w.SessionTimer, "TOPRIGHT", 0, 6 } })
+    Anchored(w.DamageMeterTypeDropdown.TypeName, { { "LEFT", w.DamageMeterTypeDropdown, "LEFT", 28, 0 } },
+        w.DamageMeterTypeDropdown)
+    Anchored(w.SessionTimer, { { "TOPLEFT", w.Header, "TOPLEFT", 1, -9 },
+        { "TOPRIGHT", w.SessionDropdown, "TOPLEFT", -4, -9 } })
+    Sized(w.SessionTimer, 0)
     function w.DamageMeterTypeDropdown:SetAlpha(a) self.alpha = a end
     w.DamageMeterTypeDropdown.glyph = Texture("arrow")
-    function w.DamageMeterTypeDropdown:GetRegions() return self.glyph end
+    w.DamageMeterTypeDropdown.highlight = Texture("highlight")
+    w.DamageMeterTypeDropdown.highlight.alpha = 0
+    w.DamageMeterTypeDropdown.label = Texture("label")
+    function w.DamageMeterTypeDropdown.label:GetObjectType() return "FontString" end
+    function w.DamageMeterTypeDropdown:GetRegions() return self.glyph, self.highlight, self.label end
     function w.DamageMeterTypeDropdown:GetChildren() end
     function w:IsMouseOver() return self.mouseOver == true end
     function w:GetFrameLevel() return 1 end
@@ -183,7 +228,10 @@ local function Boot(settings, loaded, windows)
         damageMeterNameSize = 0, damageMeterValueSize = 0, damageMeterTitleSize = 0, damageMeterButtons = "game",
         damageMeterButtonColor = false, damageMeterPanelColor = false, damageMeterPanelAlpha = 70,
         damageMeterTheme = "current", damageMeterGameBars = "class", damageMeterGameTexture = "",
-        damageMeterGameIconEdge = false }
+        damageMeterGameIconEdge = false, damageMeterShowTimer = true, damageMeterShowSession = true,
+        damageMeterShowCog = true, damageMeterShowTitle = true, damageMeterShowDropdown = true,
+        damageMeterShowMinimize = true, damageMeterMenu = false, damageMeterTitleX = 0,
+        damageMeterTimerX = 0 }
     local store = {}
     function store.Get(k)
         local v = s.settings[k]
@@ -253,7 +301,7 @@ local function Boot(settings, loaded, windows)
                 function page:Card(def) s.cards[#s.cards + 1] = def; return self end
                 return page
             end } } }
-    local env = { unpack = unpack, ipairs = ipairs, pairs = pairs, type = type, select = select,
+    local env = { unpack = unpack, ipairs = ipairs, pairs = pairs, type = type, select = select, pcall = pcall, error = error,
         UIParent = { name = "UIParent" },
         setmetatable = setmetatable, tostring = tostring, NaowhForever = ns,
         hooksecurefunc = function(tbl, name, fn)
@@ -270,6 +318,15 @@ local function Boot(settings, loaded, windows)
             return (loaded and name == ADDON) or s.others[name] == true
         end },
         EventUtil = { ContinueOnAddOnLoaded = function(name, fn) s.waiting[name] = fn end },
+        MenuUtil = { CreateContextMenu = function(owner, generator)
+            local root = { items = {} }
+            function root:CreateTitle(text) self.items[#self.items + 1] = { kind = "title", text = text } end
+            function root:CreateCheckbox(text, isSelected, set)
+                self.items[#self.items + 1] = { kind = "check", text = text, selected = isSelected, set = set }
+            end
+            generator(owner, root)
+            s.menu = root
+        end },
         CreateFrame = function()
             local f = { events = {}, scripts = {}, shown = true }
             function f:RegisterEvent(e) self.events[e] = true end
@@ -478,7 +535,7 @@ do
     store.Set("damageMeterTexture", "Other")
     check("texture: a new pick is written once", first.StatusBar.file == "Textures\\Other" and first.StatusBar.fileSets == 2)
     store.Set("damageMeterTexture", "")
-    check("texture: not picked is the Naowh Gradient", first.StatusBar.file == "Media\\NaowhGradient.tga")
+    check("texture: not picked is the Naowh Reverse Gradient", first.StatusBar.file == "Media\\NaowhReverseGradient.tga")
     store.Set("damageMeterTexture", "Flat")
     store.Set("damageMeterSkin", false)
     check("texture: switched off, the game's art is back", first.barTexture.atlas == "UI-HUD-CoolDownManager-Bar")
@@ -581,7 +638,8 @@ do
     check("the outline choice leads with the game's own, then the shared four",
         rows.damageMeterOutline.choice[2][1] == "game" and #rows.damageMeterOutline.choice[2] == 5
         and rows.damageMeterOutline.choice[1].game == "Game Default")
-    check("the texture row names the Naowh Gradient as its default", rows.damageMeterTexture.texture == "Naowh Gradient")
+    check("the texture row names the Naowh Reverse Gradient as its default",
+        rows.damageMeterTexture.texture == "Naowh Reverse Gradient")
     for key, row in pairs(rows) do
         check(key .. ": help is one short sentence", row.help == nil or #row.help < 100)
     end
@@ -1114,7 +1172,7 @@ do
     store.Set("damageMeterBorder", true)
     check("each look shows its own Bar Texture row, named as the game's own or the Naowh Gradient",
         rows.damageMeterGameTexture.hidden() == false and rows.damageMeterTexture.hidden() == true
-        and rows.damageMeterGameTexture.texture == "Game Default" and rows.damageMeterTexture.texture == "Naowh Gradient")
+        and rows.damageMeterGameTexture.texture == "Game Default" and rows.damageMeterTexture.texture == "Naowh Reverse Gradient")
     check("Bar Color and Icon Border read and write the look's own setting", rows.damageMeterBars.get() == "class"
         and rows.damageMeterIconEdge.get() == true)
     rows.damageMeterBars.set("custom")
@@ -1242,6 +1300,343 @@ do
         line and line[1] == THEME.line.r and line[2] == THEME.line.g)
     check("and the colors are the game's again", window.Header.atlas == "ui-damagemeters-header-bar"
         and c.Background.atlas == "damagemeters-background")
+end
+
+-- the title bar's timer, session button and settings button can be switched off
+do
+    local s, store, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterShowTimer = false }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    check("a hidden timer is see-through, the rest of the title bar is as it was", window.SessionTimer.alpha == 0
+        and window.SessionDropdown.alpha == 1 and window.SettingsDropdown.alpha == 1 and window.Header.alpha == 1)
+    window.SessionTimer:SetAlpha(1)
+    check("and stays so when the game raises its opacity", window.SessionTimer.alpha == 0)
+    store.Set("damageMeterShowSession", false)
+    store.Set("damageMeterShowCog", false)
+    check("the session button and the settings button the same way", window.SessionDropdown.alpha == 0
+        and window.SettingsDropdown.alpha == 0 and window.MinimizeButton.alpha == 1)
+    store.Set("damageMeterShowTimer", true)
+    check("shown again: whole", window.SessionTimer.alpha == 1 and window.SessionDropdown.alpha == 0)
+    store.Set("damageMeterShowTimer", false)
+    store.Set("damageMeterSkin", false)
+    check("the reskin off: every part is the game's and shown", window.SessionTimer.alpha == 1
+        and window.SessionDropdown.alpha == 1 and window.SettingsDropdown.alpha == 1)
+    window.SessionTimer:SetAlpha(0.5)
+    check("and the game's own opacity is left alone", window.SessionTimer.alpha == 0.5)
+    local rows = {}
+    for _, row in ipairs(s.cards[1].rows) do
+        if row.key then rows[row.key] = row end
+    end
+    check("rows: a toggle each, waiting for the reskin", rows.damageMeterShowTimer.toggle == true
+        and rows.damageMeterShowSession.toggle == true and rows.damageMeterShowCog.toggle == true
+        and rows.damageMeterShowTimer.needs == "damageMeterSkin"
+        and rows.damageMeterMenu.toggle == true and rows.damageMeterShowTitle.toggle == true
+        and rows.damageMeterShowMinimize.toggle == true and rows.damageMeterShowDropdown.toggle == true)
+end
+
+-- a part that is switched off closes up, so the others do not keep its room
+do
+    local _, store, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterShowTimer = false }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    check("a hidden timer takes one pixel, the rest are as wide as they were", window.SessionTimer.width == 1
+        and window.SessionDropdown.width == 62 and window.SettingsDropdown.width == 24
+        and window.MinimizeButton.width == 24 and window.DamageMeterTypeDropdown.width == 140)
+    store.Set("damageMeterShowCog", false)
+    store.Set("damageMeterShowMinimize", false)
+    store.Set("damageMeterShowSession", false)
+    check("each button the same way", window.SettingsDropdown.width == 1 and window.MinimizeButton.width == 1
+        and window.SessionDropdown.width == 1 and window.MinimizeButton.alpha == 0)
+    local text, arrow = window.DamageMeterTypeDropdown.TypeName, window.DamageMeterTypeDropdown.glyph
+    store.Set("damageMeterShowTitle", false)
+    check("the list's title: only its text goes, the arrow button and its room stay", text.alpha == 0
+        and arrow.alpha == 1 and window.DamageMeterTypeDropdown.width == 140)
+    store.Set("damageMeterShowTitle", true)
+    store.Set("damageMeterShowDropdown", false)
+    check("the list's dropdown button: only the arrow goes, the text and its room stay", text.alpha == 1
+        and arrow.alpha == 0 and window.DamageMeterTypeDropdown.width == 140)
+    check("a text among its regions that answers to SetVertexColor is not hidden with it",
+        window.DamageMeterTypeDropdown.label.alpha == 1)
+    store.Set("damageMeterShowTitle", false)
+    check("both: it closes up", text.alpha == 0 and arrow.alpha == 0 and window.DamageMeterTypeDropdown.width == 1)
+    window.DamageMeterTypeDropdown:SetWidth(150)
+    check("and the game making it wider does not open it", window.DamageMeterTypeDropdown.width == 1)
+    store.Set("damageMeterShowTitle", true)
+    check("one of them back: its room is back, the other stays off", text.alpha == 1 and arrow.alpha == 0
+        and window.DamageMeterTypeDropdown.width == 140)
+    store.Set("damageMeterShowDropdown", true)
+    check("the arrow back to the opacity it had, and a highlight that was see-through still is",
+        arrow.alpha == 1 and window.DamageMeterTypeDropdown.highlight.alpha == 0)
+    store.Set("damageMeterShowDropdown", false)
+    window.SessionDropdown:SetWidth(80)
+    check("and the game making one wider again does not open the gap", window.SessionDropdown.width == 1)
+    store.Set("damageMeterShowSession", true)
+    store.Set("damageMeterShowCog", true)
+    check("shown again: the width it had, and its opacity", window.SessionDropdown.width == 62
+        and window.SettingsDropdown.width == 24 and window.SessionDropdown.alpha == 1)
+    store.Set("damageMeterSkin", false)
+    check("the reskin off: every part has the game's width again", window.SessionTimer.width == 0
+        and window.MinimizeButton.width == 24 and window.DamageMeterTypeDropdown.width == 140)
+    check("and the arrow and the text are the game's", arrow.alpha == 1 and text.alpha == 1
+        and window.DamageMeterTypeDropdown.highlight.alpha == 0)
+end
+
+-- the fade leaves a part that is hidden hidden
+do
+    local _, _, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterTitleFade = "hover",
+        damageMeterTitleFadeAlpha = 20, damageMeterShowTimer = false }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    local fader = frames[#frames]
+    for _ = 1, 5 do fader.scripts.OnUpdate(fader, 0.1) end
+    check("away from the window: the others fade, the timer is still hidden", window.Header.alpha == 0.2
+        and window.SessionDropdown.alpha == 0.2 and window.SessionTimer.alpha == 0)
+    window.mouseOver = true
+    for _ = 1, 5 do fader.scripts.OnUpdate(fader, 0.1) end
+    check("with the mouse over: whole, but not the timer", window.Header.alpha == 1 and window.SessionDropdown.alpha == 1
+        and window.SessionTimer.alpha == 0)
+end
+
+-- a right click on the title bar opens a menu of them, when it is asked for
+do
+    local s, store, meter, _, frames = Boot({ damageMeterSkin = true }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    check("not asked for: nothing is hooked", window.scripts == nil)
+    store.Set("damageMeterMenu", true)
+    check("asked for: the window is hooked", window.scripts and window.scripts.OnMouseUp ~= nil)
+    window.scripts.OnMouseUp(window, "LeftButton")
+    check("a left click opens nothing", s.menu == nil)
+    window.scripts.OnMouseUp(window, "RightButton")
+    check("a right click opens a menu: a title and a switch for each part", s.menu and #s.menu.items == 7
+        and s.menu.items[1].kind == "title" and s.menu.items[2].text == "Title"
+        and s.menu.items[3].text == "Dropdown Button" and s.menu.items[4].text == "Timer"
+        and s.menu.items[5].text == "Session Button" and s.menu.items[6].text == "Settings Button"
+        and s.menu.items[7].text == "Minimize Button")
+    check("each shows its setting", s.menu.items[4].selected() == true and s.menu.items[2].selected() == true)
+    s.menu.items[4].set()
+    s.menu.items[3].set()
+    check("and writes it", store.Get("damageMeterShowTimer") == false and window.SessionTimer.alpha == 0
+        and store.Get("damageMeterShowDropdown") == false)
+    window.Header.IsMouseOver = function() return false end
+    s.menu = nil
+    window.scripts.OnMouseUp(window, "RightButton")
+    check("not from outside the title bar", s.menu == nil)
+    window.Header.IsMouseOver = nil
+    store.Set("damageMeterMenu", false)
+    window.scripts.OnMouseUp(window, "RightButton")
+    check("and not once it is off again", s.menu == nil)
+end
+
+-- the title's text moves left and right, and the dropdown button stays
+do
+    local s, store, meter, _, frames = Boot({ damageMeterSkin = true }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    local dropdown, text = window.DamageMeterTypeDropdown, window.DamageMeterTypeDropdown.TypeName
+    check("no offset: the text where the game put it", #text.points == 1 and text.points[1][4] == 28
+        and text.points[1][5] == 0 and text.points[1][2] == dropdown)
+    check("and the dropdown button after the timer, as the game has it",
+        #dropdown.points == 1 and dropdown.points[1][1] == "TOPLEFT" and dropdown.points[1][2] == window.SessionTimer
+        and dropdown.points[1][3] == "TOPRIGHT" and dropdown.points[1][4] == 0 and dropdown.points[1][5] == 6)
+    store.Set("damageMeterTitleX", 30)
+    check("to the right: the text, from where the game put it, the same place vertically", text.points[1][4] == 58
+        and text.points[1][5] == 0 and text.points[1][2] == dropdown)
+    check("the dropdown button does not move with it", dropdown.points[1][4] == 0 and dropdown.points[1][5] == 6)
+    store.Set("damageMeterTitleX", -10)
+    check("to the left, from where the game put it and not from the last place", text.points[1][4] == 18)
+    store.Set("damageMeterTitleX", 0)
+    check("0 puts it back", text.points[1][4] == 28)
+    store.Set("damageMeterTitleX", 20)
+    store.Set("damageMeterSkin", false)
+    check("the reskin off puts both back as the game had them", text.points[1][4] == 28 and #text.points == 1
+        and dropdown.points[1][2] == window.SessionTimer and dropdown.points[1][1] == "TOPLEFT"
+        and dropdown.points[1][3] == "TOPRIGHT" and dropdown.points[1][5] == 6)
+    store.Set("damageMeterSkin", true)
+    check("and on again the text is moved again", text.points[1][4] == 48
+        and dropdown.points[1][2] == window.SessionTimer)
+    local row
+    for _, item in ipairs(s.cards[1].rows) do
+        if item.key == "damageMeterTitleX" then row = item end
+    end
+    check("a Title X Offset row, from left to right, waiting for the reskin", row and row.slider[1] == -200
+        and row.slider[2] == 200 and row.unit == "px" and row.needs == "damageMeterSkin")
+end
+
+-- the timer stays in front of the title, as wide as its text, and has an X offset of its own
+do
+    local s, store, meter, _, frames = Boot({ damageMeterSkin = true }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    local timer, dropdown = window.SessionTimer, window.DamageMeterTypeDropdown
+    local text = dropdown.TypeName
+    check("the timer first on the header as the game has it, one anchor and as wide as its text",
+        #timer.points == 1 and timer.points[1][1] == "TOPLEFT" and timer.points[1][2] == window.Header
+        and timer.points[1][4] == 1 and timer.points[1][5] == -9 and timer.width == 0)
+    check("the dropdown button after it, where the game put it", #dropdown.points == 1
+        and dropdown.points[1][2] == timer and dropdown.points[1][1] == "TOPLEFT"
+        and dropdown.points[1][3] == "TOPRIGHT" and dropdown.points[1][4] == 0 and dropdown.points[1][5] == 6)
+    store.Set("damageMeterTimerX", 30)
+    check("the timer's offset moves the timer", timer.points[1][4] == 31 and timer.points[1][5] == -9)
+    check("and nothing else: the button is given it back and the text is where it was",
+        dropdown.points[1][4] == -30 and dropdown.points[1][5] == 6 and text.points[1][4] == 28)
+    store.Set("damageMeterTimerX", -20)
+    check("to the left from where the game put it, not from the last place", timer.points[1][4] == -19
+        and dropdown.points[1][4] == 20)
+    store.Set("damageMeterTitleX", 40)
+    check("the title's offset is its own", text.points[1][4] == 68 and timer.points[1][4] == -19
+        and dropdown.points[1][4] == 20)
+    store.Set("damageMeterTimerX", 0)
+    store.Set("damageMeterTitleX", 0)
+    check("0 puts both back", timer.points[1][4] == 1 and dropdown.points[1][4] == 0 and text.points[1][4] == 28)
+    store.Set("damageMeterTimerX", 15)
+    text:SetText("Healing Done")
+    check("the title changing lays it out the same", timer.points[1][4] == 16 and dropdown.points[1][4] == -15)
+    timer:ClearAllPoints()
+    timer:SetPoint("TOPLEFT", window.Header, "TOPLEFT", 1, -9)
+    timer:SetPoint("TOPRIGHT", window.SessionDropdown, "TOPLEFT", -4, -9)
+    check("the game anchoring it on both sides again does not stretch it, and the offset stays", #timer.points == 1
+        and timer.points[1][2] == window.Header and timer.points[1][4] == 16)
+    timer:SetWidth(300)
+    check("nor a width it sets", timer.width == 0)
+    dropdown:ClearAllPoints()
+    dropdown:SetPoint("TOPLEFT", timer, "TOPRIGHT", 0, 6)
+    check("nor the game putting the button back after the timer", #dropdown.points == 1
+        and dropdown.points[1][2] == timer and dropdown.points[1][4] == -15)
+    store.Set("damageMeterShowTimer", false)
+    check("hidden: one pixel, see-through, and the title still after it", timer.width == 1 and timer.alpha == 0
+        and dropdown.points[1][2] == timer)
+    store.Set("damageMeterShowTimer", true)
+    check("shown again: its text's width", timer.width == 0 and timer.alpha == 1)
+    store.Set("damageMeterSkin", false)
+    check("the reskin off: both of the game's anchors and the button as it had it", #timer.points == 2
+        and timer.points[1][4] == 1 and timer.points[2][1] == "TOPRIGHT" and timer.width == 0
+        and dropdown.points[1][2] == timer and dropdown.points[1][4] == 0)
+    timer:SetWidth(300)
+    check("and what the game does then is left alone", timer.width == 300 and #timer.points == 2)
+    store.Set("damageMeterSkin", true)
+    check("on again: the offset is applied again", timer.points[1][4] == 16 and #timer.points == 1
+        and dropdown.points[1][4] == -15)
+    local row
+    for _, item in ipairs(s.cards[1].rows) do
+        if item.key == "damageMeterTimerX" then row = item end
+    end
+    check("a Timer X Offset row, from left to right, waiting for the reskin", row and row.slider[1] == -200
+        and row.slider[2] == 200 and row.unit == "px" and row.needs == "damageMeterSkin")
+end
+
+-- numbers the game keeps secret are never added, compared or measured
+do
+    local SECRET = 424242
+    local _, store, meter, _, frames, env = Boot({ damageMeterSkin = true, damageMeterShowSession = false,
+        damageMeterTimerX = 10 }, true)
+    env.issecretvalue = function(value) return value == SECRET end
+    local window = meter.windows[1]
+    local timer, dropdown, text = window.SessionTimer, window.DamageMeterTypeDropdown, window.DamageMeterTypeDropdown.TypeName
+    dropdown.points[1][5] = SECRET
+    window.SessionDropdown.width = SECRET
+    Login(frames)
+    check("the dropdown's offset is secret: it stays where the game has it, hanging from the timer",
+        #dropdown.points == 1 and dropdown.points[1][2] == timer and dropdown.points[1][4] == 0
+        and dropdown.points[1][5] == SECRET)
+    check("the timer is laid out all the same: one anchor, moved by its offset", #timer.points == 1
+        and timer.points[1][2] == window.Header and timer.points[1][4] == 11)
+    check("the rest of the title bar is laid out and the skin went on", text.points[1][4] == 28
+        and window.MinimizeContainer.Background.solid ~= nil)
+    check("a secret width is not collapsed on (it could not be given back)", window.SessionDropdown.width == SECRET)
+    store.Set("damageMeterTitleX", 10)
+    check("and the next layout is as unharmed", text.points[1][4] == 38 and window.SessionDropdown.width == SECRET)
+    dropdown.points[1][5] = 6
+    env.issecretvalue = function() return false end
+    store.Set("damageMeterTitleX", 0)
+    check("the numbers plain again: the button is given the timer's offset back", dropdown.points[1][2] == timer
+        and dropdown.points[1][4] == -10)
+end
+
+-- a timer whose offset is secret stays where the game has it, and the button is given nothing back
+do
+    local SECRET = 424242
+    local _, _, meter, _, frames, env = Boot({ damageMeterSkin = true, damageMeterTimerX = 10 }, true)
+    env.issecretvalue = function(value) return value == SECRET end
+    local window = meter.windows[1]
+    local timer, dropdown = window.SessionTimer, window.DamageMeterTypeDropdown
+    timer.points[1][5] = SECRET
+    Login(frames)
+    check("the timer is the game's: both anchors, its offset unchanged", #timer.points == 2
+        and timer.points[1][4] == 1 and timer.points[1][5] == SECRET)
+    check("and the button is not given an offset for a move that did not happen", dropdown.points[1][2] == timer
+        and dropdown.points[1][4] == 0)
+end
+
+-- a button hung from something else than the timer is not given the timer's offset back
+do
+    local _, _, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterTimerX = 25 }, true)
+    local window = meter.windows[1]
+    local dropdown = window.DamageMeterTypeDropdown
+    dropdown.points[1][2] = window.Header
+    Login(frames)
+    check("a button hung from the header is not given an offset for a move it did not follow",
+        dropdown.points[1][2] == window.Header and dropdown.points[1][4] == 0 and window.SessionTimer.points[1][4] == 26)
+end
+
+-- a stored value that is not a number is no offset
+do
+    local _, _, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterTimerX = "wide",
+        damageMeterTitleX = "far" }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    check("a value that is not a number moves nothing", window.SessionTimer.points[1][4] == 1
+        and window.DamageMeterTypeDropdown.points[1][4] == 0 and window.DamageMeterTypeDropdown.TypeName.points[1][4] == 28)
+end
+
+-- a layout that fails is reported and the skin goes on
+do
+    local _, store, meter, _, frames, env = Boot({ damageMeterSkin = false }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    local reported
+    env.geterrorhandler = function() return function(message) reported = message end end
+    window.SessionTimer.SetWidth = function() error("boom") end
+    local ok = pcall(store.Set, "damageMeterSkin", true)
+    check("the reskin on with a layout that fails: no error raised, reported through the handler", ok
+        and reported ~= nil and reported:find("boom") ~= nil)
+    check("and the rest of the skin is applied", window.MinimizeContainer.Background.solid ~= nil
+        and window.Header.solid ~= nil)
+end
+
+-- the title and the timer are anchored in an order the game accepts, whichever way the settings are changed
+do
+    local _, store, meter, _, frames = Boot({ damageMeterSkin = true }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    local timer, dropdown = window.SessionTimer, window.DamageMeterTypeDropdown
+    for round = 1, 3 do
+        store.Set("damageMeterSkin", false)
+        store.Set("damageMeterSkin", true)
+        store.Set("damageMeterTitleX", round * 10)
+        store.Set("damageMeterTimerX", round * 7)
+        store.Set("damageMeterShowTitle", round ~= 2)
+        store.Set("damageMeterShowTimer", round ~= 3)
+        store.Set("damageMeterTheme", round == 2 and "game" or "current")
+    end
+    check("on, off and on again, with every switch changed between, raises no error", true)
+    store.Set("damageMeterSkin", false)
+    check("the game's order is back: the dropdown after the timer, the timer on its own anchors",
+        dropdown.points[1][2] == timer and #timer.points == 2 and timer.points[1][2] == window.Header)
+    -- the game puts the timer back on its own anchor
+    store.Set("damageMeterSkin", true)
+    timer:ClearAllPoints()
+    timer:SetPoint("TOPLEFT", window.Header, "TOPLEFT", 1, -9)
+    check("and when it does that with the reskin on, it is one anchor again and the title after it",
+        #timer.points == 1 and timer.points[1][2] == window.Header and #dropdown.points == 1
+        and dropdown.points[1][2] == timer)
+    -- a layout that fails must not leave the next one locked out
+    local setWidth = timer.SetWidth
+    timer.SetWidth = function() error("boom") end
+    check("a failing layout raises its error", not pcall(store.Set, "damageMeterTitleX", 5))
+    timer.SetWidth = setWidth
+    store.Set("damageMeterTitleX", 6)
+    check("and the next one is not locked out", dropdown.TypeName.points[1][4] == 34)
 end
 
 print("PASS damage meter skin: " .. checks .. " checks")

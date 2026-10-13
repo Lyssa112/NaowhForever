@@ -129,6 +129,34 @@ NaowhForever_QoL/
   opacity waits for a color of its own or the Window Color. That look has its own Bar Color, Bar Texture and
   Icon Border (`damageMeterGameBars`, `damageMeterGameTexture`, `damageMeterGameIconEdge`), which start as the
   game's own, so it does not leave the bars in the theme's accent or its gradient, nor the icons bordered.
+- The title bar's timer, session button, settings button and minimize button are each switched off with
+  `SetAlpha(0)`, never a Hide, and a post-hook on each one's `SetAlpha` puts a part the game raises back to 0
+  (`Title.KeepAlpha`); the title fade keeps them at 0 (`TitleAlpha`) and the reskin off gives them back. The
+  list's button is two switches, since it is a text and an arrow: the text is `TypeName`'s own opacity, and the
+  arrow is every texture of the dropdown but its texts (`Title.Inner`: a text answers to `SetVertexColor` as a
+  texture does, so the object type is asked, and each is given back its own opacity, since a highlight
+  starts at 0). A hidden part is also made one pixel wide (`Title.Fit`, its width kept to give back, and a
+  post-hook on `SetWidth` for the game's own), so what the game anchors to its edge closes the gap instead of
+  leaving the room it had; the list's button closes only when both of its switches are off. A hidden button
+  still takes a click where it was, as an opacity of 0 does not turn the mouse off.
+  The game hangs the list's button from the timer's right edge, so the timer is in front and the title after it,
+  and `Title.Layout` leaves that order: the timer is one anchor of its own and a width of 0, so it is as wide as
+  its text and the title is at the far left when there is no time, and a post-hook on the timer's `SetPoint` and
+  `SetWidth`, on the dropdown's `SetPoint` and on the title's `SetText` lays it out again when the game or the
+  list changes. The two X offsets move one part each: the timer's moves the timer, and the button, which hangs
+  from it, is given the same offset the other way so the title stays; the title's moves the text only. Only the
+  game's own anchors are added to (`Title.homes`, read once and given back with the reskin off, and not read at
+  all when an offset is secret: the part then stays where the game has it), and nothing is measured: where a
+  text starts and how wide it is are numbers the game keeps secret in some states, and adding them raised
+  "arithmetic on a secret number value" and cut the rest of the skin short. A timer hung after the title was
+  tried and dropped: the title's frame can be as wide as the window, so the end of it is not the end of the text,
+  which could not be measured. The timer's offset puts it there when it is wanted. The parts are anchored in an
+  order where no anchor depends on what depends on it (the game raises "Cannot anchor to a region dependent on
+  it" otherwise). A layout that fails is reported through the error handler and does not stop the rest of the
+  skin.
+  The right-click menu is a hook on the window's
+  `OnMouseUp`, made only when Right-Click Menu is on, that opens `MenuUtil.CreateContextMenu` with a checkbox for
+  each switch, so a part that was switched off can be switched on from the window.
 - The card is in sections (Window, Bars, Text, Title Bar, Spell Panel, Reset) that mix the reskin's rows, which wait
   for the Reskin switch, with the game's own settings, which do not.
 - The game's own settings in it (`DamageMeterLayout.lua`) are the game's list for its damage
