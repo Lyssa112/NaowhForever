@@ -87,3 +87,27 @@ Core/Integrations/RestedXP/
   The lines after the active step are plain text (`Plain`: no icons, colors or links), as the active
   step's rows are what carries them. The small button below the list opens RestedXP's menu, as a right
   click on a window with no panel is hard to find.
+- The window's size is one scale (`SetScale`) for the whole of it, text included, and the width is the
+  room the text has inside it. Changing the scale keeps the window in the same place on the screen:
+  its anchor is kept in the scaled units, so it is multiplied by the old scale over the new one, in the
+  saved place too when the window is off.
+- The arrow's text is RestedXP's step title and its distance, set again every time the distance
+  changes. With Arrow Shows Objective the text is put again after RestedXP's own (a post-hook on its
+  `SetText`, which `composing` keeps from calling itself): the distance, then the words of the
+  objective the waypoint belongs to, as RestedXP shows them in its own row when it has one, as plain
+  words (`Plain`: no texture or atlas, which RestedXP puts in a row of its own and in the text of
+  some lines). A guide often writes the place first and what to do there after it, so the waypoint has no
+  `element.parent` (the line above it, `addon.lastObjective`): its own words come next, then the
+  lines of its step after it, then the ones before it, leaving out one that is done or has no tooltip. A waypoint with no words says only the distance, and RestedXP's "~" on the
+  wrong continent is left. It does not wait for one of the Naowh themes to be picked in RestedXP, as the
+  words are not part of how the arrow is drawn. Turning it off makes RestedXP say its own text again by clearing
+  `arrow.distance`, which RestedXP compares before it sets the text.
+- The arrow's font is set by RestedXP's `SetupArrow` and by its Arrow Text Size setting, from
+  the font of the theme picked, which is ours only when one of ours is picked. With Use Addon
+  Font on, a post-hook on its `SetFont` puts it in the Addon Font, and in Naowh's size for it (13 to
+  start, RestedXP's own is 9, Arrow Text Size), with the outline RestedXP gave it, so it is in the Addon
+  Font at that size whichever theme is picked and whatever RestedXP sets next. A path the client
+  hands back spelled differently would make the font chase itself, so a flag (`keeping`) holds the
+  hook while it sets one. With the switch off RestedXP's own font (`RXP.font`) is given back. The
+  window uses `ns.AddonFontPath`, which is read live, and not `ns.UIFontPath`, which keeps the first
+  path it found.

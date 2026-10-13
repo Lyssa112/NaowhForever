@@ -6,13 +6,14 @@ local Has, Dig, Quiet, Guarded = Safe.Has, Safe.Dig, Safe.Quiet, Safe.Guarded
 
 local WINDOW_NAME = "NaowhRXPWindow"
 local STRATA = "MEDIUM"
-local WIDTH_MIN, WIDTH_MAX, WIDTH_STEP, DEFAULT_WIDTH = 240, 480, 10, 300
+local WIDTH_MIN, WIDTH_MAX, WIDTH_STEP, DEFAULT_WIDTH = 260, 640, 10, 380
+local SCALE_MIN, SCALE_MAX, SCALE_STEP, DEFAULT_SCALE = 60, 200, 5, 100
 local STEPS_MIN, STEPS_MAX, DEFAULT_STEPS = 0, 12, 6
 local ACTIVE_SHOWN = 3
 local PERCENT, ROUND, CHANNEL_MAX = 100, 0.5, 255
-local PAD, GAP, BOX_PAD, HEAD_H, FOLD_W, PROGRESS_W = 8, 4, 6, 22, 14, 100
-local BAR_W, ICON_W, LIST_H, MENU_SIZE = 2, 16, 16, 20
-local FONT_HEAD, FONT_TEXT, FONT_LIST = 14, 12, 11
+local PAD, GAP, BOX_PAD, HEAD_H, FOLD_W, PROGRESS_W = 10, 5, 7, 26, 16, 120
+local BAR_W, ICON_W, LIST_H, MENU_SIZE = 2, 18, 18, 22
+local FONT_HEAD, FONT_TEXT, FONT_LIST = 16, 13, 12
 local EDGE_ALPHA, BOX_ALPHA, RULE_ALPHA, MUTED_ALPHA = 0.8, 0.55, 0.5, 0.9
 local SHADOW, SHADOW_ALPHA = 1, 0.9
 local GOLD = { r = 1, g = 0.82, b = 0 }
@@ -46,6 +47,13 @@ end
 function ns.RXPWindowWidthRange() return WIDTH_MIN, WIDTH_MAX, WIDTH_STEP end
 
 function ns.RXPWindowStepsRange() return STEPS_MIN, STEPS_MAX, 1 end
+
+function ns.RXPWindowScaleRange() return SCALE_MIN, SCALE_MAX, SCALE_STEP end
+
+function ns.RXPWindowScale()
+    local scale = tonumber(Settings().rxpWindowScale)
+    return scale and Snap(scale, SCALE_MIN, SCALE_MAX, SCALE_STEP) or DEFAULT_SCALE
+end
 
 function ns.RXPWindowWidth()
     local width = tonumber(Settings().rxpWindowWidth)
@@ -260,7 +268,7 @@ end
 
 local function Text(parent, size, justify)
     local fs = parent:CreateFontString(nil, "OVERLAY")
-    fs:SetFont(ns.UIFontPath(), size, "")
+    fs:SetFont(ns.AddonFontPath(), size, "")
     fs:SetShadowOffset(SHADOW, -SHADOW)
     fs:SetShadowColor(0, 0, 0, SHADOW_ALPHA)
     fs:SetJustifyH(justify or "LEFT")
@@ -281,6 +289,7 @@ local function Build()
     local T = ns.THEME
     local f = CreateFrame("Frame", WINDOW_NAME, UIParent)
     f:SetFrameStrata(STRATA)
+    f:SetScale(ns.RXPWindowScale() / PERCENT)
     f:SetClampedToScreen(true)
     f:SetMovable(true)
     f:EnableMouse(true)
@@ -546,6 +555,26 @@ function ns.SetRXPWindowWidth(width)
     width = width and Snap(width, WIDTH_MIN, WIDTH_MAX, WIDTH_STEP)
     Settings().rxpWindowWidth = width ~= DEFAULT_WIDTH and width or nil
     Refresh()
+end
+
+function ns.SetRXPWindowScale(scale)
+    local was = window and window:GetScale() or ns.RXPWindowScale() / PERCENT
+    scale = tonumber(scale)
+    scale = scale and Snap(scale, SCALE_MIN, SCALE_MAX, SCALE_STEP)
+    Settings().rxpWindowScale = scale ~= DEFAULT_SCALE and scale or nil
+    local now = ns.RXPWindowScale() / PERCENT
+    local saved = Settings().rxpWindowPos
+    if window then
+        local point, _, relativePoint, x, y = window:GetPoint(1)
+        window:SetScale(now)
+        if point then
+            window:ClearAllPoints()
+            window:SetPoint(point, UIParent, relativePoint, x * was / now, y * was / now)
+            Save(window)
+        end
+    elseif type(saved) == "table" and type(saved[3]) == "number" and type(saved[4]) == "number" then
+        saved[3], saved[4] = saved[3] * was / now, saved[4] * was / now
+    end
 end
 
 function ns.SetRXPWindowSteps(steps)

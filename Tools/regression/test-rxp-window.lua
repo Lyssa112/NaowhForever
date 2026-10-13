@@ -38,6 +38,7 @@ local function Object(everything)
     function o:SetScript(name, fn) self.scripts[name] = fn end
     function o:SetTextColor(r, g, b) self.color = { r, g, b } end
     function o:SetColorTexture(r, g, b, a) self.solid = { r, g, b, a } end
+    function o:SetFont(path, size, flags) self.font, self.fontSize, self.fontFlags = path, size, flags end
     function o:SetAlpha(a) self.alpha = a end
     function o:GetAlpha() return self.alpha or 1 end
     function o:EnableMouse(on) self.mouse = on end
@@ -57,6 +58,8 @@ local function Object(everything)
         return t
     end
     function o:Click() self.clicks = (self.clicks or 0) + 1 end
+    function o:SetScale(scale) self.scale = scale end
+    function o:GetScale() return self.scale or 1 end
     function o:StartMoving() self.moving = true end
     function o:StopMovingOrSizing() self.moving = false end
     return o
@@ -115,7 +118,7 @@ local function World(account, opts)
         return {}
     end
     ns.Hairline = function() end
-    ns.UIFontPath = function() return "Fonts\\Naowh.ttf" end
+    ns.AddonFontPath = function() return "Fonts\\Naowh.ttf" end
     for _, part in ipairs({ { themesSource, "Themes" }, { windowSource, "Window" } }) do
         local chunk = assert(loadstring(part[1], part[2]))
         setfenv(chunk, env)
@@ -234,12 +237,14 @@ do
     Check(Window(w) == nil, "the window is off by default: nothing is built")
     Check(w.guide.frame.alpha == nil and w.steps.frame.alpha == nil and w.guide.frame.mouse == nil,
         "and RestedXP's windows are left alone")
-    Check(w.ns.RXPWindowEnabled() == false and w.ns.RXPWindowWidth() == 300 and w.ns.RXPWindowSteps() == 6,
-        "the defaults: off, 300 wide, six steps after the active one")
-    local wild = Start({ rxpWindowWidth = 9999, rxpWindowSteps = -5 })
-    Check(wild.ns.RXPWindowWidth() == 480 and wild.ns.RXPWindowSteps() == 0, "a width and a count out of range are held")
-    local odd = Start({ rxpWindowWidth = "wide", rxpWindowSteps = "many" })
-    Check(odd.ns.RXPWindowWidth() == 300 and odd.ns.RXPWindowSteps() == 6, "and what is no number is the default")
+    Check(w.ns.RXPWindowEnabled() == false and w.ns.RXPWindowWidth() == 380 and w.ns.RXPWindowSteps() == 6
+        and w.ns.RXPWindowScale() == 100, "the defaults: off, 380 wide, six steps after the active one, full size")
+    local wild = Start({ rxpWindowWidth = 9999, rxpWindowSteps = -5, rxpWindowScale = 900 })
+    Check(wild.ns.RXPWindowWidth() == 640 and wild.ns.RXPWindowSteps() == 0 and wild.ns.RXPWindowScale() == 200,
+        "a width, a count and a scale out of range are held")
+    local odd = Start({ rxpWindowWidth = "wide", rxpWindowSteps = "many", rxpWindowScale = "big" })
+    Check(odd.ns.RXPWindowWidth() == 380 and odd.ns.RXPWindowSteps() == 6 and odd.ns.RXPWindowScale() == 100,
+        "and what is no number is the default")
 end
 
 -- on: the heading, the progress, the active step and the steps after it
@@ -247,7 +252,7 @@ do
     local account = { rxpWindow = true }
     local w = Start(account)
     local f = Window(w)
-    Check(f ~= nil and f.shown and f.width == 300, "on: the window is built, shown, at its width")
+    Check(f ~= nil and f.shown and f.width == 380 and f.scale == 1, "on: the window is built, shown, at its width and size")
     Check(w.ns.RXPWindowReady() == true, "RestedXP's V2 interface is on: ready")
     local heading, progress
     for _, o in ipairs(w.everything) do
@@ -312,6 +317,19 @@ do
     Check(account.rxpWindowSteps == nil, "the default is not stored")
     w.ns.SetRXPWindowSteps(40)
     Check(w.ns.RXPWindowSteps() == 12 and account.rxpWindowSteps == 12, "and the most is held to its range")
+end
+
+-- every text of the window is in the Addon Font
+do
+    local w = Start({ rxpWindow = true })
+    local texts, other = 0, 0
+    for _, o in ipairs(w.everything) do
+        if o.font ~= nil then
+            texts = texts + 1
+            if o.font ~= "Fonts\\Naowh.ttf" then other = other + 1 end
+        end
+    end
+    Check(texts >= 10 and other == 0, "every text the window makes is in the Addon Font")
 end
 
 -- RestedXP's two windows are kept alive, and out of sight and out of the way
@@ -390,6 +408,31 @@ do
     Check(w.menus == 1, "a right click opens RestedXP's own menu")
     f.scripts.OnMouseUp(f, "LeftButton")
     Check(w.menus == 1, "a left click does not")
+end
+
+-- the size: the window scales as a whole and stays in the same place on the screen
+do
+    local account = { rxpWindow = true, rxpWindowPos = { "TOPLEFT", "TOPLEFT", 300, -100 } }
+    local w = Start(account)
+    local f = Window(w)
+    Check(f.scale == 1 and f.points[1][4] == 300 and f.points[1][5] == -100, "at full size: where it was kept")
+    w.ns.SetRXPWindowScale(150)
+    Check(f.scale == 1.5 and account.rxpWindowScale == 150, "bigger: scaled, and stored")
+    Check(math.abs(f.points[1][4] - 200) < 1e-9 and math.abs(f.points[1][5] + 100 / 1.5) < 1e-9,
+        "and held in the same place on the screen")
+    Check(math.abs(account.rxpWindowPos[3] - 200) < 1e-9, "and the place is kept in the new size's units")
+    w.ns.SetRXPWindowScale(100)
+    Check(f.scale == 1 and account.rxpWindowScale == nil and math.abs(f.points[1][4] - 300) < 1e-9,
+        "back to full size: the default is not stored")
+    w.ns.SetRXPWindowScale(900)
+    Check(account.rxpWindowScale == 200 and f.scale == 2, "and the biggest is held to its range")
+    local off = { rxpWindowPos = { "TOPLEFT", "TOPLEFT", 300, -100 } }
+    local o = Start(off)
+    o.ns.SetRXPWindowScale(200)
+    Check(off.rxpWindowScale == 200 and off.rxpWindowPos[3] == 150 and off.rxpWindowPos[4] == -50,
+        "with the window off the place that was kept follows the size")
+    local sized = Start({ rxpWindow = true, rxpWindowScale = 125 })
+    Check(Window(sized).scale == 1.25, "a saved size is the size it is built at")
 end
 
 -- a row's click is RestedXP's own, on its own hidden button

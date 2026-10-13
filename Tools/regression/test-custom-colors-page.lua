@@ -366,15 +366,22 @@ do
     Check(a.rxpWindow == true, "on is stored")
     e.build()
     local width, steps = Pair(e, "Naowh Window Width")
-    Check(width and width.type == "slider" and width.min == 240 and width.max == 480 and width.step == 10
+    Check(width and width.type == "slider" and width.min == 260 and width.max == 640 and width.step == 10
         and steps and steps.text == "Upcoming Steps" and steps.min == 0 and steps.max == 12 and steps.step == 1,
         "on: the window's width and the steps listed after the active one")
-    width.setValue(500)
+    local scale = Pair(e, "Naowh Window Scale")
+    Check(scale and scale.type == "slider" and scale.min == 60 and scale.max == 200 and scale.step == 5,
+        "and its size, as a percent of its own")
+    width.setValue(900)
     steps.setValue(3)
-    Check(a.rxpWindowWidth == 480 and a.rxpWindowSteps == 3, "a width is held to its range and a step count is stored")
-    width.setValue(300)
+    scale.setValue(150)
+    Check(a.rxpWindowWidth == 640 and a.rxpWindowSteps == 3 and a.rxpWindowScale == 150,
+        "a width is held to its range and a step count and a scale are stored")
+    width.setValue(380)
     steps.setValue(6)
-    Check(a.rxpWindowWidth == nil and a.rxpWindowSteps == nil, "and the defaults are not stored")
+    scale.setValue(100)
+    Check(a.rxpWindowWidth == nil and a.rxpWindowSteps == nil and a.rxpWindowScale == nil,
+        "and the defaults are not stored")
     Pair(e, "Naowh Guide Window").setValue(false)
     Check(a.rxpWindow == nil, "off is not stored")
     Check(#e.notes == 0, "no hint before a change")
@@ -385,16 +392,16 @@ do
     Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == RXP_HINT, "it reads back, and the RestedXP reload hint shows")
     Check(not Hidden(e), "and the choices are shown")
 
-    Check(Layout(e) == "Add Themes to RestedXP|Reload UI to pick a theme., RestedXP Arrow|, Show Arrow Text|, Use Addon Font|Use Theme Text Color, Naowh Guide Window|" .. NEEDS,
-        "with the themes just turned on: a note beside the toggle in place of the theme, then the arrow choice, the arrow text, the font and text color, and the window")
+    Check(Layout(e) == "Add Themes to RestedXP|Reload UI to pick a theme., RestedXP Arrow|, Show Arrow Text|, Arrow Shows Objective|Arrow Text Size, Use Addon Font|Use Theme Text Color, Naowh Guide Window|" .. NEEDS,
+        "with the themes just turned on: a note beside the toggle in place of the theme, then the arrow choice, the arrow text, what it says, the font and text color, and the window")
     local _, waiting = Pair(e, "Add Themes to RestedXP")
     Check(waiting.type == "label" and waiting.getValue == nil, "RestedXP has not started with the themes yet: a note, not a dropdown")
 
     -- RestedXP up with the themes in its list: the dropdown, which is RestedXP's own setting
     local up = RxpStub("RXP Blue")
     local u = Page({ rxpThemes = true }, true, up)
-    Check(Layout(u) == "Add Themes to RestedXP|RestedXP Theme, RestedXP Arrow|, Show Arrow Text|, Use Addon Font|Use Theme Text Color, Naowh Guide Window|" .. NEEDS,
-        "with RestedXP started: the toggle with the theme beside it, the arrow choice, the arrow text, and the font and text color")
+    Check(Layout(u) == "Add Themes to RestedXP|RestedXP Theme, RestedXP Arrow|, Show Arrow Text|, Arrow Shows Objective|Arrow Text Size, Use Addon Font|Use Theme Text Color, Naowh Guide Window|" .. NEEDS,
+        "with RestedXP started: the toggle with the theme beside it, the arrow choice, the arrow text, what it says, and the font and text color")
     local switch, picker = Pair(u, "Add Themes to RestedXP")
     Check(switch and picker.type == "dropdown" and picker.text == "RestedXP Theme", "the theme is a dropdown beside the toggle")
     Check(picker.getValue() == "" and u.account.rxpTheme == nil, "RestedXP's own while RestedXP is on its own, and nothing stored")
@@ -442,8 +449,8 @@ do
         "with the layer as the arrow style, the choices for Naowh's arrow are not shown")
     local imaged = Page({ rxpThemes = true, rxpArrow = "image" }, true, RxpStub("RXP Blue"))
     Check(Layout(imaged) == "Add Themes to RestedXP|RestedXP Theme, RestedXP Arrow|Naowh Arrow Shape, Naowh Arrow Glow|Naowh Arrow Size, "
-        .. "Show Arrow Text|Naowh Arrow Text Gap, Use Addon Font|Use Theme Text Color, Naowh Guide Window|" .. NEEDS,
-        "with Naowh arrow picked: the arrow and its shape, its glow and size, the arrow text and its gap, then the font and text color")
+        .. "Show Arrow Text|Naowh Arrow Text Gap, Arrow Shows Objective|Arrow Text Size, Use Addon Font|Use Theme Text Color, Naowh Guide Window|" .. NEEDS,
+        "with Naowh arrow picked: the arrow and its shape, its glow and size, the arrow text and its gap, what it says, then the font and text color")
     local _, shape = Pair(imaged, "RestedXP Arrow")
     local glow, size = Pair(imaged, "Naowh Arrow Glow")
     Check(shape.type == "dropdown" and glow.type == "toggle" and size.type == "slider", "a dropdown, a toggle and a slider")
@@ -538,10 +545,23 @@ do
     Check(Toggle(custom) and #custom.rows == plain + 2, "with Custom and the themes off, RestedXP adds the toggle row and the window's")
     Check(custom.rows[#custom.rows][1].text == "Naowh Guide Window", "and the window's is the last, above the Reload button")
     local onCustom = Page({ themePreset = "custom", rxpThemes = true }, true)
-    Check(#onCustom.rows == plain + 5, "with the themes on, RestedXP adds five rows: the toggle and theme, the arrow, the arrow text, the font and text, and the window")
+    Check(#onCustom.rows == plain + 6, "with the themes on, RestedXP adds six rows: the toggle and theme, the arrow, the arrow text, what it says, the font and text, and the window")
     Check(onCustom.rows[#onCustom.rows][1].text == "Naowh Guide Window", "and the window row is the last, above the Reload button")
     local onImage = Page({ themePreset = "custom", rxpThemes = true, rxpArrow = "image" }, true)
-    Check(#onImage.rows == plain + 6, "with Naowh arrow picked, one more: the glow and size")
+    Check(#onImage.rows == plain + 7, "with Naowh arrow picked, one more: the glow and size")
+    local objective, size = Pair(onImage, "Arrow Shows Objective")
+    Check(objective and objective.type == "toggle" and objective.getValue() == false and onImage.account.rxpArrowObjective == nil,
+        "an Arrow Shows Objective toggle, off by default")
+    Check(size and size.type == "slider" and size.text == "Arrow Text Size" and size.min == 8 and size.max == 24
+        and size.step == 1 and size.getValue() == 13, "and the arrow text's size beside it, 13 to start")
+    size.setValue(18)
+    Check(onImage.account.rxpArrowTextSize == 18, "a size is stored")
+    size.setValue(13)
+    Check(onImage.account.rxpArrowTextSize == nil, "and the default is not")
+    objective.setValue(true)
+    Check(onImage.account.rxpArrowObjective == true, "on is stored")
+    objective.setValue(false)
+    Check(onImage.account.rxpArrowObjective == nil, "and off is not")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

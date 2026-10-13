@@ -410,6 +410,18 @@ local function ArrowTextRow(image)
           setValue = function(v) ns.SetRXPArrowGap(v) end } or Empty()
 end
 
+local function ArrowObjectiveRow()
+    local sizeMin, sizeMax, sizeStep = ns.RXPArrowTextSizeRange()
+    return { type = "toggle", text = "Arrow Shows Objective",
+          tooltip = "The objective under RestedXP's arrow, as in Talk to Duokna, in place of the step number.",
+          getValue = ns.RXPArrowObjective,
+          setValue = function(v) ns.SetRXPArrowObjective(v) end },
+        { type = "slider", text = "Arrow Text Size", min = sizeMin, max = sizeMax, step = sizeStep,
+          tooltip = "How big the text under RestedXP's arrow is.",
+          getValue = ns.RXPArrowTextSize,
+          setValue = function(v) ns.SetRXPArrowTextSize(v) end }
+end
+
 local function RxpThemeRows(W, parent, y)
     local image = ns.RXPArrowStyle() == "image"
     local _, h = W:DualRow(parent, y, ArrowStyleRow(image)); y = y - h
@@ -417,6 +429,7 @@ local function RxpThemeRows(W, parent, y)
         _, h = W:DualRow(parent, y, ArrowLookRow()); y = y - h
     end
     _, h = W:DualRow(parent, y, ArrowTextRow(image)); y = y - h
+    _, h = W:DualRow(parent, y, ArrowObjectiveRow()); y = y - h
     _, h = W:DualRow(parent, y,
         RxpSwitch("Use Addon Font", "RestedXP's text uses your Addon Font.", ns.RXPFontEnabled, ns.SetRXPFont),
         RxpSwitch("Use Theme Text Color", "RestedXP's text uses the theme's Text color.",
@@ -439,6 +452,7 @@ local function RxpWindowRows(W, parent, y)
     if not ns.RXPWindowEnabled() then return y end
     local widthMin, widthMax, widthStep = ns.RXPWindowWidthRange()
     local stepsMin, stepsMax, stepsStep = ns.RXPWindowStepsRange()
+    local scaleMin, scaleMax, scaleStep = ns.RXPWindowScaleRange()
     _, h = W:DualRow(parent, y,
         { type = "slider", text = "Naowh Window Width", min = widthMin, max = widthMax, step = widthStep,
           tooltip = "How wide the Naowh guide window is.",
@@ -448,6 +462,13 @@ local function RxpWindowRows(W, parent, y)
           tooltip = "How many of the steps after the active one are listed.",
           getValue = ns.RXPWindowSteps,
           setValue = function(v) ns.SetRXPWindowSteps(v) end }
+    ); y = y - h
+    _, h = W:DualRow(parent, y,
+        { type = "slider", text = "Naowh Window Scale", min = scaleMin, max = scaleMax, step = scaleStep,
+          tooltip = "How big the whole window is, its text with it.",
+          getValue = ns.RXPWindowScale,
+          setValue = function(v) ns.SetRXPWindowScale(v) end },
+        Empty()
     )
     return y - h
 end

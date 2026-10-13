@@ -34,8 +34,10 @@ local DEFAULT_ARROW = "layer"
 local SIZE_MIN, SIZE_MAX, SIZE_STEP, DEFAULT_SIZE = 60, 200, 5, 90
 local GLOW_FILL = 0.76
 local GAP_MIN, GAP_MAX, DEFAULT_GAP = 0, 20, 4
+local TEXT_MIN, TEXT_MAX, DEFAULT_TEXT = 8, 24, 13
 local GAP_STEP = 1
 local PERCENT = 100
+local ARROW_DISTANCE = "%d yd"
 local CHANNEL_MAX = 255
 local ROUND = 0.5
 local TOP_TOWARD_WHITE = 0.22
@@ -51,6 +53,7 @@ local ARROW_PARTS = { "Normal", "Highlight", "Pushed", "Disabled" }
 local THUMB_W, THUMB_H = 8, 40
 
 local PaintArrow
+local ApplyFont
 local boot
 
 function ns.RXPThemesAvailable()
@@ -165,7 +168,10 @@ end
 
 function ns.RXPFontEnabled() return Wanted("rxpFont") end
 
-function ns.SetRXPFont(on) Want("rxpFont", on) end
+function ns.SetRXPFont(on)
+    Want("rxpFont", on)
+    if ApplyFont then ApplyFont() end
+end
 
 function ns.RXPTextColorEnabled() return Wanted("rxpTextColor") end
 
@@ -223,11 +229,29 @@ function ns.SetRXPArrowGap(gap)
     PaintArrow()
 end
 
+function ns.RXPArrowTextSizeRange() return TEXT_MIN, TEXT_MAX, 1 end
+
+function ns.RXPArrowTextSize()
+    local size = tonumber(ns.AccountSettings().rxpArrowTextSize)
+    return size and Snap(size, TEXT_MIN, TEXT_MAX, 1) or DEFAULT_TEXT
+end
+
+function ns.SetRXPArrowTextSize(size)
+    size = tonumber(size)
+    size = size and Snap(size, TEXT_MIN, TEXT_MAX, 1)
+    ns.AccountSettings().rxpArrowTextSize = size ~= DEFAULT_TEXT and size or nil
+    if ApplyFont then ApplyFont() end
+end
+
 function ns.RXPArrowTextEnabled() return Wanted("rxpArrowText") end
 
 function ns.SetRXPArrowText(on)
     Want("rxpArrowText", on)
     PaintArrow()
+end
+
+function ns.RXPArrowObjective()
+    return ns.AccountSettings().rxpArrowObjective == true
 end
 
 function ns.RXPArrowGlow()
@@ -424,6 +448,117 @@ local function PaintText(arrow, theme)
     textHidden = hide
 end
 
+local objectiveHooked, composing
+
+local function Words(source)
+    if type(source) ~= "table" or source.completed or source.skip or source.hideTooltip then return nil end
+    local raw = source.text ~= " " and source.text or nil
+    raw = raw or source.tooltipText or source.rawtext
+    if type(raw) == "string" and raw ~= "" then return raw end
+end
+
+-- The waypoint's own objective first: the line it was written under, then its own words, then the lines
+-- of its step after it (a guide gives the place and then what to do there), then the ones before it.
+local function Source(element)
+    local sources = { element }
+    if type(element.parent) == "table" then table.insert(sources, 1, element.parent) end
+    local list = Dig(element, "step", "elements")
+    if type(list) == "table" then
+        local at = 0
+        for i, other in ipairs(list) do
+            if other == element then
+                at = i
+                break
+            end
+        end
+        for i = at + 1, #list do sources[#sources + 1] = list[i] end
+        for i = 1, at - 1 do sources[#sources + 1] = list[i] end
+    end
+    for _, source in ipairs(sources) do
+        if type(source) == "table" and Words(source) then return source end
+    end
+end
+
+local function Plain(text)
+    text = text:gsub("|T[^|]*|t", "")
+    text = text:gsub("|A[^|]*|a", "")
+    text = text:gsub("^%s+", "")
+    return text ~= "" and text or nil
+end
+
+local function Objective(arrow)
+    local element = arrow.element
+    if type(element) ~= "table" then return nil end
+    local source = Source(element)
+    local rxp = _G.RXP
+    if not source then return type(element.title) == "string" and Plain(element.title) or nil end
+    local shown = Dig(source, "frame", "text")
+    local text = Has(shown, "GetText") and shown:GetText()
+    if type(text) ~= "string" or text == "" or text == " " then
+        local raw = Words(source)
+        text = raw
+        if Has(rxp, "ReplaceNpcIds") then
+            local ok, replaced = pcall(rxp.ReplaceNpcIds, raw, source)
+            if ok and type(replaced) == "string" then text = replaced end
+        end
+    end
+    return Plain(text)
+end
+
+local keeping, fontHooked
+
+local function KeepFont(text, restore)
+    if keeping or not (Has(text, "GetFont") and Has(text, "SetFont")) then return end
+    local path, size, flags = text:GetFont()
+    local want = ns.RXPFontEnabled() and ns.AddonFontPath() or restore and Dig(_G.RXP, "font") or path
+    local wantSize = ns.RXPArrowTextSize()
+    if type(want) ~= "string" or type(size) ~= "number" or path == want and size == wantSize then return end
+    keeping = true
+    local ok, problem = pcall(text.SetFont, text, want, wantSize, flags)
+    keeping = false
+    if not ok then error(problem, 0) end
+end
+
+local function HookFont()
+    local text = Dig(_G.RXPG_ARROW, "text")
+    if not Has(text, "SetFont") then return end
+    if fontHooked ~= text then
+        fontHooked = text
+        hooksecurefunc(text, "SetFont", Guarded("ArrowFont", function() KeepFont(text) end))
+    end
+    KeepFont(text, true)
+end
+
+function ApplyFont()
+    Quiet("ArrowFont", HookFont)
+end
+
+local function OnArrowText(text)
+    if composing or not ns.RXPArrowObjective() or not ns.RXPArrowTextEnabled() then return end
+    local arrow = _G.RXPG_ARROW
+    if Dig(arrow, "text") ~= text or arrow.wrongContinent or type(arrow.distance) ~= "number" then return end
+    local line = ARROW_DISTANCE:format(arrow.distance)
+    local objective = Objective(arrow)
+    composing = true
+    local ok, problem = pcall(text.SetText, text, objective and (line .. "\n" .. objective) or line)
+    composing = false
+    if not ok then error(problem, 0) end
+end
+
+local function HookObjective()
+    local text = Dig(_G.RXPG_ARROW, "text")
+    if objectiveHooked == text or not Has(text, "SetText") then return end
+    objectiveHooked = text
+    hooksecurefunc(text, "SetText", Guarded("ArrowObjective", function() OnArrowText(text) end))
+end
+
+function ns.SetRXPArrowObjective(on)
+    ns.AccountSettings().rxpArrowObjective = on and true or nil
+    if on then Quiet("ArrowObjective", HookObjective) end
+    local arrow = _G.RXPG_ARROW
+    if type(arrow) == "table" then arrow.distance = nil end
+end
+
 local function DrawArrow()
     local arrow = _G.RXPG_ARROW
     local texture = Dig(arrow, "texture")
@@ -462,6 +597,8 @@ local function HookArrow()
     local arrow = _G.RXPG_ARROW
     if type(Dig(arrow, "texture")) ~= "table" or not Has(arrow, "UpdateVisuals") then return end
     hooksecurefunc(arrow, "UpdateVisuals", Guarded("UpdateVisuals", OnRxpUpdate))
+    if ns.RXPArrowObjective() then Quiet("ArrowObjective", HookObjective) end
+    ApplyFont()
     if Has(arrow, "HookScript") then
         hookedArrow = arrow
         arrow:HookScript("OnSizeChanged", Guarded("ArrowSize", OnArrowSize))

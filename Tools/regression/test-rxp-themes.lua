@@ -1335,6 +1335,191 @@ do
     Check(On(7, 24, 0) and On(7, 0, 17) and On(7, 24, 17) and Off(7, 29, 17) and Off(7, 24, 22) and Off(7, 10, 5), "bottom right")
 end
 
+-- The arrow's text says the objective, as in Talk to Duokna, where RestedXP says the step
+do
+    local ACTIVE = "NaowhForever:rosenoir"
+    local ICON = "|TInterface\\Icons\\Talk:0|t"
+    local ARIAL = "Fonts\\ARIALN.TTF"
+    -- RestedXP's arrow: its text is set again each time the distance changes, as it is in RestedXP
+    local function Up(account, setup)
+        local env, ns, frames, boot = Load(account, true)
+        env.hooksecurefunc = function(tbl, name, fn)
+            local original = tbl[name]
+            tbl[name] = function(...)
+                local results = { original(...) }
+                fn(...)
+                return unpack(results)
+            end
+        end
+        local arrow = { orientation = 0, distance = 0, wrongContinent = false }
+        arrow.texture = { path = "Interface/x" }
+        function arrow.texture:GetTexture() return self.path end
+        function arrow.texture:SetTexture(path) self.path = path end
+        function arrow.texture:SetVertexColor() end
+        function arrow.texture:SetRotation() end
+        function arrow.texture:ClearAllPoints() end
+        function arrow.texture:SetPoint() end
+        function arrow.texture:SetAllPoints() end
+        arrow.text = { sets = 0 }
+        function arrow.text:SetText(text) self.shown, self.sets = text, self.sets + 1 end
+        function arrow.text:GetText() return self.shown end
+        arrow.text.font = { ARIAL, 9, "OUTLINE" }
+        function arrow.text:GetFont() return unpack(self.font) end
+        function arrow.text:SetFont(path, size, flags)
+            self.font = { self.normalize and path:upper() or path, size, flags }
+        end
+        function arrow.text:Hide() end
+        function arrow.text:Show() end
+        function arrow.text:GetPoint() return "TOP", arrow, "BOTTOM", 0, -5 end
+        function arrow.text:SetPoint() end
+        function arrow:GetSize() return 32, 32 end
+        function arrow:GetFrameLevel() return 1 end
+        function arrow:HookScript() end
+        function arrow.UpdateVisuals() end
+        arrow.element = { step = { index = 36 },
+            parent = { text = "Talk to Duokna", tag = "target", step = { active = true } } }
+        env.RXPG_ARROW = arrow
+        Fire(frames, "NaowhForever")
+        local list = env.RXPGuides_Themes
+        env.RXP = { activeTheme = list[ACTIVE], icons = { target = ICON },
+            ReplaceNpcIds = function(text) return text end }
+        if setup then setup(env, arrow, list) end
+        Login(boot)
+        -- RestedXP moves: it says the step and the distance
+        local function Moved(distance)
+            arrow.distance = distance
+            arrow.text:SetText(("Step 36\n(%dyd)"):format(distance))
+            return arrow.text.shown
+        end
+        return env, ns, arrow, Moved, list
+    end
+
+    local env0, ns, arrow, Moved = Up({ rxpThemes = true })
+    Check(ns.RXPArrowObjective() == false, "the arrow says the step by default")
+    Check(Moved(1577) == "Step 36\n(1577yd)", "and RestedXP's own text is left alone")
+
+    -- the font and its size
+    Check(ns.RXPArrowTextSize() == 13, "the arrow's text is 13 by default, RestedXP's is 9")
+    Check(arrow.text.font[1] == ns.AddonFontPath() and arrow.text.font[2] == 13 and arrow.text.font[3] == "OUTLINE",
+        "in the Addon Font at that size from login, with the outline RestedXP gave it")
+    arrow.text:SetFont(ARIAL, 14, "OUTLINE")
+    Check(arrow.text.font[1] == ns.AddonFontPath() and arrow.text.font[2] == 13,
+        "and when RestedXP sets its font again, with a size, it is put back")
+    ns.SetRXPArrowTextSize(18)
+    Check(ns.AccountSettings().rxpArrowTextSize == 18 and arrow.text.font[2] == 18 and arrow.text.font[3] == "OUTLINE",
+        "a size picked is used at once, and kept")
+    ns.SetRXPArrowTextSize(13)
+    Check(ns.AccountSettings().rxpArrowTextSize == nil and arrow.text.font[2] == 13, "the default is not stored")
+    ns.SetRXPArrowTextSize(90)
+    Check(ns.RXPArrowTextSize() == 24 and arrow.text.font[2] == 24, "the biggest is held to its range")
+    ns.SetRXPArrowTextSize(1)
+    Check(ns.RXPArrowTextSize() == 8 and arrow.text.font[2] == 8, "and the smallest")
+    ns.SetRXPArrowTextSize("big")
+    Check(ns.RXPArrowTextSize() == 13 and arrow.text.font[2] == 13, "what is no number is the default")
+
+    ns.SetRXPArrowObjective(true)
+    Check(ns.AccountSettings().rxpArrowObjective == true and arrow.distance == nil,
+        "objective on: stored, and RestedXP is made to say its text again")
+    Check(Moved(1577) == "1577 yd\nTalk to Duokna", "the distance, then the objective, with no icon")
+    Check(arrow.text.font[1] == ns.AddonFontPath() and arrow.text.font[2] == 13 and arrow.text.font[3] == "OUTLINE",
+        "still in the Addon Font at that size")
+
+    arrow.text.font = { ARIAL, 12, "" }
+    ns.SetRXPFont(false)
+    Moved(1576)
+    Check(arrow.text.font[1] == ARIAL and arrow.text.font[2] == 13, "with Use Addon Font off the face is left, the size is not")
+    env0.RXP.font = "Fonts\\SKURRI.TTF"
+    arrow.text:SetFont(ARIAL, 10, "")
+    Check(arrow.text.font[1] == ARIAL and arrow.text.font[2] == 13, "also when RestedXP sets it")
+    ns.SetRXPFont(true)
+    Check(arrow.text.font[1] == ns.AddonFontPath() and arrow.text.font[2] == 13, "back on: in the Addon Font at once")
+    ns.SetRXPFont(false)
+    Check(arrow.text.font[1] == "Fonts\\SKURRI.TTF" and arrow.text.font[2] == 13, "turned off, RestedXP's own face is given back")
+    ns.SetRXPFont(true)
+    Check(Moved(1500) == "1500 yd\nTalk to Duokna", "and it follows the distance")
+    local sets = arrow.text.sets
+    Moved(1499)
+    Check(arrow.text.sets == sets + 2, "RestedXP's text and ours, and ours does not set itself again")
+
+    -- icons are left out, wherever they come from
+    arrow.element.parent.frame = { text = { GetText = function() return "Talk to |cff00ff00Duokna|r" end } }
+    Check(Moved(10) == "10 yd\nTalk to |cff00ff00Duokna|r", "the row RestedXP shows it in, as it reads now")
+    arrow.element.parent.frame = { text = { GetText = function() return ICON .. " Talk to Duokna" end } }
+    Check(Moved(10) == "10 yd\nTalk to Duokna", "an icon in the row's text is left out")
+    arrow.element.parent.frame = nil
+    arrow.element.parent.icon = ICON
+    arrow.element.parent.text = ICON .. " Talk to Duokna"
+    Check(Moved(10) == "10 yd\nTalk to Duokna", "and one in the line's own text, and the one it is given as its icon")
+    arrow.element.parent.text = "|Aquestlog:0|a Talk to Duokna"
+    Check(Moved(10) == "10 yd\nTalk to Duokna", "an atlas too")
+    arrow.element.parent.text = ICON
+    Check(Moved(10) == "10 yd", "a line that is only an icon says nothing, only the distance")
+    arrow.element.parent = nil
+    arrow.element.title = ICON .. " Razor Hill"
+    Check(Moved(10) == "10 yd\nRazor Hill", "with no objective, the waypoint's own title, as plain")
+    arrow.element.title = nil
+    Check(Moved(10) == "10 yd", "and with none of them, only the distance")
+    arrow.element = nil
+    Check(Moved(10) == "10 yd", "with no waypoint, the same")
+
+    -- a waypoint written before its objective has no parent: the lines of its step are its words
+    local say = { text = "Talk to Duokna", tag = "target" }
+    local place = { arrow = true }
+    local step = { index = 36, active = true, elements = { place, say } }
+    place.step, say.step = step, step
+    arrow.element = place
+    Check(Moved(10) == "10 yd\nTalk to Duokna", "no line above it: the step's line after it")
+    step.elements = { say, place }
+    Check(Moved(10) == "10 yd\nTalk to Duokna", "or the one before it")
+    local other = { text = "Kill Boars", tag = "kill", step = step }
+    step.elements = { place, other, say }
+    Check(Moved(10) == "10 yd\nKill Boars", "the first line after it, when there are two")
+    step.elements = { say, place, other }
+    Check(Moved(10) == "10 yd\nKill Boars", "the one after it before the one before it")
+    other.completed = true
+    Check(Moved(10) == "10 yd\nTalk to Duokna", "a line that is done is not the objective")
+    say.hideTooltip = true
+    Check(Moved(10) == "10 yd", "nor one that is not for the tooltip, and with none left only the distance")
+    say.hideTooltip, other.completed = nil, nil
+    place.text = "Run to the cave"
+    step.elements = { say, place, other }
+    Check(Moved(10) == "10 yd\nRun to the cave", "the waypoint's own words, before the step's")
+    place.parent = say
+    Check(Moved(10) == "10 yd\nTalk to Duokna", "and its parent before those")
+
+    arrow.element = { step = { index = 36 }, parent = { text = "Talk to Duokna", tag = "target", step = { active = true } } }
+    arrow.wrongContinent = true
+    arrow.distance = 5
+    arrow.text:SetText("~")
+    Check(arrow.text.shown == "~", "on the wrong continent RestedXP's mark is left")
+    arrow.wrongContinent = false
+    ns.SetRXPArrowText(false)
+    Check(Moved(10) == "Step 36\n(10yd)", "with the arrow's text off it is left alone")
+    ns.SetRXPArrowText(true)
+    ns.SetRXPArrowObjective(false)
+    Check(ns.AccountSettings().rxpArrowObjective == nil and arrow.distance == nil, "off: not stored, RestedXP's text again")
+    Check(Moved(10) == "Step 36\n(10yd)", "and the step is said again")
+
+    -- on at login, and with one of RestedXP's themes
+    local env, ns2, arrow2, Moved2, list = Up({ rxpThemes = true, rxpArrowObjective = true, rxpArrowTextSize = 16 })
+    Check(Moved2(88) == "88 yd\nTalk to Duokna", "saved on: it is hooked at login")
+    Check(arrow2.text.font[2] == 16, "and the size saved is the size at login")
+    local _, wild, arrowWild = Up({ rxpThemes = true, rxpArrowTextSize = 99 })
+    Check(wild.RXPArrowTextSize() == 24 and arrowWild.text.font[2] == 24, "a saved size out of range is held to it")
+    env.RXP.activeTheme = { name = "DarkMode" }
+    Check(Moved2(77) == "77 yd\nTalk to Duokna",
+        "with a theme of RestedXP's it says the same: the words do not wait for one of ours")
+    env.RXP.activeTheme = list[ACTIVE]
+    env.RXP.ReplaceNpcIds = function() error("no npc names yet") end
+    Check(Moved2(66) == "66 yd\nTalk to Duokna", "a name lookup that fails leaves the text as written")
+    Check(ns2.RXPFailures.ArrowObjective == nil, "and is not a failure")
+    -- a client that hands the path back in another spelling must not make the font chase itself
+    arrow2.text.normalize = true
+    arrow2.text:SetFont(ARIAL, 11, "")
+    Check(arrow2.text.font[1] == ns2.AddonFontPath():upper() and arrow2.text.font[2] == 16 and ns2.RXPFailures.ArrowFont == nil,
+        "a font that comes back spelled differently is set once, with nothing raised")
+end
+
 -- RestedXP's pieces missing, renamed or shaped like its UI v2: nothing raises through RestedXP, the hooks that
 -- can be made are made, and what failed is kept by name in ns.RXPFailures.
 do
