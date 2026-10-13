@@ -1,9 +1,12 @@
-# RestedXP themes
+# RestedXP themes and guide window
 
 Naowh's theme, the eight theme presets and the player's current theme in RestedXP Guides, and the
 hooks that style its arrow, title bar, quest list and scroll bar. Off unless Settings > RESTEDXP
 turns it on (`ns.FEATURES.account.rxpThemes`), and only with RestedXP Guides installed. Loads
 through `RestedXP.xml`, after `Core/Core.xml`.
+
+The Naowh guide window (`ns.FEATURES.account.rxpWindow`, also off by default) draws RestedXP's guide
+in one Naowh window: the guide and its progress, the active step and the steps after it.
 
 ## Layout
 
@@ -11,6 +14,7 @@ through `RestedXP.xml`, after `Core/Core.xml`.
 Core/Integrations/RestedXP/
   RestedXP.xml                what loads
   Themes.lua     the themes, the settings behind the RESTEDXP card, and the hooks
+  Window.lua     the Naowh guide window, its settings and what it reads from RestedXP
   Media/         the themes' arrow, frame and grip art (rxp_*.tga), drawn by Tools/media/make_media.py
 ```
 
@@ -61,3 +65,25 @@ Core/Integrations/RestedXP/
 - Quest rows are 3 apart and the rule sits at the far edge of that gap. Rows are made when a guide
   loads, which ends in SetStep, so that is watched; rules are redrawn only when the theme or the
   row count changes.
+- The guide window only reads RestedXP's data and never writes it, and RestedXP's own two v2 windows
+  (the guide window and the active steps) are kept alive and out of sight: their rows are what
+  RestedXP's step handlers write to (`BindActiveStepElement` sets `element.frame`, and the handlers
+  set its text, icon and checkbox), so a second set of rows would not be updated. They are made
+  see-through with `SetAlpha(0)`, held there by a post-hook on `SetAlpha`, and they and every frame
+  in them take no clicks (`EnableMouse(false)`), the alpha and mouse kept to give back when the
+  window is turned off. They are not hidden, as RestedXP shows and lays them out itself.
+- A row shows the text RestedXP has in its own row now (`element.frame.text`), so counters such as
+  "5/5" follow it; a post-hook on that text asks for a redraw. A click on a row is a click on
+  RestedXP's own checkbox, so what it does for a skipped step is RestedXP's.
+- Everything that changes asks for a redraw, and the redraw is one per frame (`C_Timer.After(0)`):
+  `SetStep`, `UpdateGuideWindow`, `UpdateActiveStepsFrame`, `UpdatePlayerActiveStepItem` and the
+  rows' text. The window needs RestedXP's V2 interface (`v2:IsGuideWindowEnabled()`): the active
+  step rows and the guide's rows are built for it.
+- Steps after the active one come from `v2:BuildGuideStepsSnapshot`, which is what RestedXP's own
+  v2 guide window lists, so a step it hides or has done is not listed here either.
+- The window has no panel of its own, as RestedXP's coming layout has none: a header with a rule under
+  it, the active step in a box (the only thing with a background), and the steps after it as plain
+  shadowed lines over the world, so every text carries a shadow (`SHADOW`) to be read on any ground.
+  The lines after the active step are plain text (`Plain`: no icons, colors or links), as the active
+  step's rows are what carries them. The small button below the list opens RestedXP's menu, as a right
+  click on a window with no panel is hard to find.

@@ -109,6 +109,8 @@ local function Guarded(name, fn)
     return function(...) Quiet(name, fn, ...) end
 end
 
+ns.RXPSafe = { Has = Has, Dig = Dig, Quiet = Quiet, Guarded = Guarded }
+
 local function Visible(region)
     if Has(region, "IsVisible") then return region:IsVisible() == true end
     if Has(region, "IsShown") then return region:IsShown() == true end
@@ -611,12 +613,16 @@ local function HookShown()
     end
 end
 
+local function WindowWanted()
+    return type(ns.RXPWindowEnabled) == "function" and ns.RXPWindowEnabled()
+end
+
 local function OnBootEvent(self, event, name)
     if event == "ADDON_LOADED" then
         if name ~= ns.MODULE_KEY then return end
         self:UnregisterEvent("ADDON_LOADED")
-        if ns.RXPThemesEnabled() and ns.RXPThemesAvailable() then
-            Quiet("Register", Register)
+        if ns.RXPThemesAvailable() and (ns.RXPThemesEnabled() or WindowWanted()) then
+            if ns.RXPThemesEnabled() then Quiet("Register", Register) end
             self:RegisterEvent("PLAYER_LOGIN")
         end
     elseif event == "PLAYER_REGEN_ENABLED" then
@@ -624,12 +630,15 @@ local function OnBootEvent(self, event, name)
         Reload()
     else
         self:UnregisterAllEvents()
-        if late then Quiet("Resume", Resume) end
-        Quiet("HookArrow", HookArrow)
-        Quiet("HookBars", HookBars)
-        Quiet("HookChrome", HookChrome)
-        Quiet("HookRules", HookRules)
-        Quiet("HookShown", HookShown)
+        if ns.RXPThemesEnabled() then
+            if late then Quiet("Resume", Resume) end
+            Quiet("HookArrow", HookArrow)
+            Quiet("HookBars", HookBars)
+            Quiet("HookChrome", HookChrome)
+            Quiet("HookRules", HookRules)
+            Quiet("HookShown", HookShown)
+        end
+        if WindowWanted() then Quiet("Window", ns.RXPWindowStart) end
     end
 end
 

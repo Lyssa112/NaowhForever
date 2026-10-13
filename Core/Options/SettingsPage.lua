@@ -30,6 +30,7 @@ local TEXT_REPLACE = ns.L("Replace your custom colors with %s?")
 local TEXT_COLORS_RELOAD = ns.L("Reload UI to apply your color changes.")
 local TEXT_RXP_RELOAD = ns.L("Reload UI to apply your RestedXP changes.")
 local TEXT_RXP_PICK_RELOAD = "Reload UI to pick a theme."
+local TEXT_RXP_WINDOW_NEEDS = "Turn on RestedXP's Beta Features and V2 interface."
 local TEXT_SKIN_TIP = ns.L("Classic+ dresses the addon's windows like the game's own, in gold and bronze. "
     .. "It has its own colors and uses the game's fonts unless you pick an Addon Font. Saved "
     .. "for this computer.|n|nTakes effect after a /reload.")
@@ -424,6 +425,33 @@ local function RxpThemeRows(W, parent, y)
     return y - h
 end
 
+local function RxpWindowRows(W, parent, y)
+    local _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Naowh Guide Window",
+          tooltip = "RestedXP's guide and active steps in one Naowh window, with RestedXP's own two hidden.",
+          getValue = ns.RXPWindowEnabled,
+          setValue = function(v)
+              ns.SetRXPWindow(v)
+              UI:RefreshPage(true)
+          end },
+        ns.RXPWindowReady() and Empty() or { type = "label", text = TEXT_RXP_WINDOW_NEEDS }
+    ); y = y - h
+    if not ns.RXPWindowEnabled() then return y end
+    local widthMin, widthMax, widthStep = ns.RXPWindowWidthRange()
+    local stepsMin, stepsMax, stepsStep = ns.RXPWindowStepsRange()
+    _, h = W:DualRow(parent, y,
+        { type = "slider", text = "Naowh Window Width", min = widthMin, max = widthMax, step = widthStep,
+          tooltip = "How wide the Naowh guide window is.",
+          getValue = ns.RXPWindowWidth,
+          setValue = function(v) ns.SetRXPWindowWidth(v) end },
+        { type = "slider", text = "Upcoming Steps", min = stepsMin, max = stepsMax, step = stepsStep,
+          tooltip = "How many of the steps after the active one are listed.",
+          getValue = ns.RXPWindowSteps,
+          setValue = function(v) ns.SetRXPWindowSteps(v) end }
+    )
+    return y - h
+end
+
 local function RestedXPSection(W, parent, y)
     if not (ns.RXPThemesAvailable and ns.RXPThemesAvailable()) then return y end
     local _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
@@ -431,6 +459,7 @@ local function RestedXPSection(W, parent, y)
         ns.RXPThemesEnabled, ns.SetRXPThemes)
     _, h = W:DualRow(parent, y, themesSwitch, RxpThemeChoice()); y = y - h
     if ns.RXPThemesEnabled() then y = RxpThemeRows(W, parent, y) end
+    y = RxpWindowRows(W, parent, y)
     if rxpPending then
         _, h = W:Note(parent, TEXT_RXP_RELOAD, y); y = y - h
     end

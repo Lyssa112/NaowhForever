@@ -1,4 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
-    <!-- RestedXP.xml: the Naowh themes in RestedXP Guides. -->
+    <!-- RestedXP.xml: the Naowh themes and guide window for RestedXP Guides. -->
     <Script file="Themes.lua"/>
+    <Script file="Window.lua"/>
 </Ui>

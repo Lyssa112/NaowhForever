@@ -213,6 +213,7 @@ ns.FEATURES = {
     account = {
         gameMenuButton = true,
         rxpThemes = false,
+        rxpWindow = false,
     },
 }
 
