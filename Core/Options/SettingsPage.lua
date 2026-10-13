@@ -31,6 +31,7 @@ local TEXT_COLORS_RELOAD = ns.L("Reload UI to apply your color changes.")
 local TEXT_RXP_RELOAD = ns.L("Reload UI to apply your RestedXP changes.")
 local TEXT_RXP_PICK_RELOAD = "Reload UI to pick a theme."
 local TEXT_RXP_WINDOW_NEEDS = "Turn on RestedXP's Beta Features and V2 interface."
+local TEXT_FLAT = "Flat"
 local TEXT_SKIN_TIP = ns.L("Classic+ dresses the addon's windows like the game's own, in gold and bronze. "
     .. "It has its own colors and uses the game's fonts unless you pick an Addon Font. Saved "
     .. "for this computer.|n|nTakes effect after a /reload.")
@@ -438,6 +439,59 @@ local function RxpThemeRows(W, parent, y)
     return y - h
 end
 
+local function WindowOptionCell(option)
+    local key = option.key
+    local function Get() return ns.RXPWindowOption(key) end
+    local function Set(v) ns.SetRXPWindowOption(key, v) end
+    if option.kind == "toggle" then
+        return { type = "toggle", text = option.label, tooltip = option.tip, getValue = Get, setValue = Set }
+    elseif option.kind == "number" then
+        return { type = "slider", text = option.label, min = option.min, max = option.max, step = 1,
+          tooltip = option.tip, getValue = Get, setValue = Set }
+    elseif option.kind == "choice" then
+        return { type = "dropdown", text = option.label, values = option.values, order = option.order,
+          tooltip = option.tip, getValue = Get, setValue = Set }
+    elseif option.kind == "font" then
+        local values, order = UI.FontChoices(Get())
+        return { type = "dropdown", text = option.label, values = values, order = order, tooltip = option.tip,
+          getValue = Get, setValue = Set }
+    end
+    local values, order = UI.TextureChoices(Get(), TEXT_FLAT)
+    return { type = "dropdown", text = option.label, values = values, order = order, tooltip = option.tip,
+      getValue = Get, setValue = Set }
+end
+
+local function WindowColorCell(color)
+    local name = color.name
+    return { type = "colorpicker", text = color.label, hasAlpha = true, tooltip = color.tip,
+      getValue = function() return ns.RXPWindowColor(name) end,
+      setValue = function(r, g, b, a) ns.SetRXPWindowColor(name, r, g, b, a) end }
+end
+
+local function RxpWindowStyleRows(W, parent, y)
+    local _, h = W:SectionHeader(parent, "GUIDE WINDOW", y); y = y - h
+    local cells = {}
+    for _, group in ipairs({ "Text", "Look", "Progress" }) do
+        for _, option in ipairs(ns.RXPWindowOptions()) do
+            if option.group == group then cells[#cells + 1] = WindowOptionCell(option) end
+        end
+    end
+    for _, color in ipairs(ns.RXPWindowColors()) do cells[#cells + 1] = WindowColorCell(color) end
+    for i = 1, #cells, 2 do
+        _, h = W:DualRow(parent, y, cells[i], cells[i + 1] or Empty()); y = y - h
+    end
+    _, h = W:DualRow(parent, y,
+        { type = "button", text = "Window Look", buttonText = "Reset",
+          tooltip = "Puts the window's text, colors and bars back as they were.",
+          onClick = function()
+              ns.ResetRXPWindowStyle()
+              UI:RefreshPage(true)
+          end },
+        Empty()
+    )
+    return y - h
+end
+
 local function RxpWindowRows(W, parent, y)
     local _, h = W:DualRow(parent, y,
         { type = "toggle", text = "Naowh Guide Window",
@@ -469,8 +523,8 @@ local function RxpWindowRows(W, parent, y)
           getValue = ns.RXPWindowScale,
           setValue = function(v) ns.SetRXPWindowScale(v) end },
         Empty()
-    )
-    return y - h
+    ); y = y - h
+    return RxpWindowStyleRows(W, parent, y)
 end
 
 local function RestedXPSection(W, parent, y)

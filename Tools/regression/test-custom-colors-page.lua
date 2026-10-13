@@ -73,7 +73,9 @@ local function Page(account, rxp, up)
     e.ns = ns
     ns.Confirm = function(text, onYes) e.confirms[#e.confirms + 1] = { text = text, yes = onYes } end
     local env = { ns = ns, W = {}, colorsPending = false, rxpPending = false,
-        UI = { RefreshPage = function() e.refreshes = e.refreshes + 1 end } }
+        UI = { RefreshPage = function() e.refreshes = e.refreshes + 1 end,
+            FontChoices = function() return { [""] = "Addon Font" }, { "" } end,
+            TextureChoices = function(_, label) return { [""] = label }, { "" } end } }
     function env.W:SectionHeader(_, text)
         e.headers[#e.headers + 1] = text
         return nil, 0
@@ -562,6 +564,55 @@ do
     Check(onImage.account.rxpArrowObjective == true, "on is stored")
     objective.setValue(false)
     Check(onImage.account.rxpArrowObjective == nil, "and off is not")
+end
+
+-- The Naowh guide window's look: a row for each thing it can be changed in, from its own list.
+do
+    -- the window's look: a row for each thing it can be changed in, from its own list
+    local styled = {}
+    local s = Page({ rxpWindow = true }, true)
+    Check(table.concat(s.headers, ","):find("GUIDE WINDOW", 1, true) ~= nil, "a GUIDE WINDOW section with it on")
+    Check(table.concat(Page({}, true).headers, ","):find("GUIDE WINDOW", 1, true) == nil, "and none with it off")
+    local cells = {}
+    for _, row in ipairs(s.rows) do
+        for _, cell in ipairs(row) do cells[#cells + 1] = cell end
+    end
+    local function Cell(text)
+        for _, cell in ipairs(cells) do
+            if cell.text == text then return cell end
+        end
+    end
+    for _, option in ipairs(s.ns.RXPWindowOptions()) do
+        local cell = Cell(option.label)
+        local want = { toggle = "toggle", number = "slider", choice = "dropdown", font = "dropdown",
+            texture = "dropdown" }
+        Check(cell and cell.type == want[option.kind] and cell.tooltip == option.tip, option.label .. ": its row")
+        styled[option.key] = cell
+    end
+    for _, color in ipairs(s.ns.RXPWindowColors()) do
+        local cell = Cell(color.label)
+        Check(cell and cell.type == "colorpicker" and cell.hasAlpha == true, color.label .. ": its swatch")
+        local r, g, b, alpha = cell.getValue()
+        Check(type(r) == "number" and type(g) == "number" and type(b) == "number" and type(alpha) == "number",
+            color.label .. ": it reads a color")
+        cell.setValue(0.25, 0.5, 0.75, 0.5)
+        Check(s.account.rxpWindowColors[color.name].g == 0.5 and select(4, cell.getValue()) == 0.5,
+            color.label .. ": and keeps one picked")
+    end
+    local size = styled.rxpWindowTitleSize
+    Check(size.min == 10 and size.max == 28 and size.step == 1 and size.getValue() == 16, "a size has its range and start")
+    size.setValue(20)
+    Check(s.account.rxpWindowTitleSize == 20 and size.getValue() == 20, "a size picked is kept")
+    local outline = styled.rxpWindowOutline
+    Check(outline.values.shadow == "Shadow" and outline.order[1] == "shadow", "a choice has its own words")
+    outline.setValue("outline")
+    Check(s.account.rxpWindowOutline == "outline", "and keeps the one picked")
+    local reset = Cell("Window Look")
+    Check(reset and reset.type == "button" and reset.buttonText == "Reset", "a button puts the look back")
+    local refreshed = s.refreshes
+    reset.onClick()
+    Check(s.account.rxpWindowColors == nil and s.account.rxpWindowTitleSize == nil
+        and s.account.rxpWindowOutline == nil and s.refreshes == refreshed + 1, "it clears them and redraws the page")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

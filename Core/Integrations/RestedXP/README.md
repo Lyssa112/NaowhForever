@@ -111,3 +111,18 @@ Core/Integrations/RestedXP/
   hook while it sets one. With the switch off RestedXP's own font (`RXP.font`) is given back. The
   window uses `ns.AddonFontPath`, which is read live, and not `ns.UIFontPath`, which keeps the first
   path it found.
+- What the window can be changed in is two lists in `Window.lua` (`OPTIONS` and `COLORS`), each with its
+  kind, default, range and tip, and the settings page draws its rows from them (`WindowOptionCell`,
+  `WindowColorCell`), so a new option is one entry. A value is kept only when it is not the default, and
+  a color whole (r, g, b, a) or not at all, so the theme's stays the default and follows it. Every text
+  is made with `Text` and set again with `Face` each time the window is drawn, which is what lets the face,
+  the outline and the three sizes change at once.
+- The progress bar is a `StatusBar`: the guide's under the title (the step over the number of steps, so
+  36 of 66) and one in the active step (the rows done over its rows). Its texture is a SharedMedia
+  statusbar picked in the page and flat to start, its track is the Line color and its fill the Bar color.
+- The window is resized from its corner (`StartSizing`). Its height is what it draws, so the height does
+  not set a height: it sets how many steps are listed. Draw keeps the height the window has without the
+  list (`chrome`) and the height of a line, and letting go of the grip turns the width and
+  `(height - chrome) / line` into the width and steps settings and draws again at the size that fits.
+  Its bounds are the smallest (no steps) and the tallest (all of them). Lock Window stops moving and
+  sizing, and a folded window has nothing to size.

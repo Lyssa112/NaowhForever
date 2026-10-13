@@ -39,6 +39,13 @@ local function Object(everything)
     function o:SetTextColor(r, g, b) self.color = { r, g, b } end
     function o:SetColorTexture(r, g, b, a) self.solid = { r, g, b, a } end
     function o:SetFont(path, size, flags) self.font, self.fontSize, self.fontFlags = path, size, flags end
+    function o:SetShown(on) self.shown = on and true or false end
+    function o:SetShadowOffset(x, y) self.shadowX, self.shadowY = x, y end
+    function o:SetValue(v) self.value = v end
+    function o:SetMinMaxValues(lo, hi) self.range = { lo, hi } end
+    function o:SetStatusBarTexture(path) self.barTexture = path end
+    function o:SetStatusBarColor(r, g, b, a) self.barColor = { r, g, b, a } end
+    function o:GetHeight() return self.height end
     function o:SetAlpha(a) self.alpha = a end
     function o:GetAlpha() return self.alpha or 1 end
     function o:EnableMouse(on) self.mouse = on end
@@ -61,6 +68,10 @@ local function Object(everything)
     function o:SetScale(scale) self.scale = scale end
     function o:GetScale() return self.scale or 1 end
     function o:StartMoving() self.moving = true end
+    function o:StartSizing(corner) self.sizing = corner end
+    function o:SetResizable(on) self.resizable = on and true or false end
+    function o:SetResizeBounds(a, b, c, d) self.resizeBounds = { a, b, c, d } end
+    function o:GetWidth() return self.width end
     function o:StopMovingOrSizing() self.moving = false end
     return o
 end
@@ -115,8 +126,13 @@ local function World(account, opts)
     end
     ns.Border = function(parent)
         w.borders[#w.borders + 1] = parent
-        return {}
+        local border = { _frame = Object(w.everything), parent = parent }
+        function border:SetColor(r, g, b, a) self.color = { r, g, b, a } end
+        parent.borderObject = border
+        return border
     end
+    ns.UI = { FontPath = function(name) return "Fonts\\" .. name .. ".ttf" end,
+        TexturePath = function(name) return "Textures\\" .. name end }
     ns.Hairline = function() end
     ns.AddonFontPath = function() return "Fonts\\Naowh.ttf" end
     for _, part in ipairs({ { themesSource, "Themes" }, { windowSource, "Window" } }) do
@@ -288,15 +304,12 @@ do
     Check(menu ~= nil and menu.shown, "a menu button sits below the list")
     menu.scripts.OnClick(menu)
     Check(w.menus == 1, "and it opens RestedXP's menu")
-    local backgrounds = 0
+    local panel
     for _, o in ipairs(w.solids) do
-        if o.parent == f and o.layer == "BACKGROUND" then backgrounds = backgrounds + 1 end
+        if o.parent == f and o.layer == "BACKGROUND" then panel = o end
     end
-    local edges = 0
-    for _, parent in ipairs(w.borders) do
-        if parent == f then edges = edges + 1 end
-    end
-    Check(backgrounds == 0 and edges == 0, "the window has no panel and no border, as RestedXP's v2 has none to hide")
+    Check(panel and panel.shown == false and f.borderObject._frame.shown == false,
+        "the window has a panel and a border to turn on, and both are off to start")
     local boxed = 0
     for _, parent in ipairs(w.borders) do
         if parent ~= f then boxed = boxed + 1 end
@@ -473,6 +486,318 @@ do
     Check(Window(w).shown == true, "no active steps: the heading and the steps after it are still drawn")
     w = Start({ rxpWindow = true }, { installed = false })
     Check(Window(w) == nil, "RestedXP not installed: nothing")
+end
+
+-- everything the window can be changed in: each setting is kept only when it is not the default
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local options = ns.RXPWindowOptions()
+    Check(#options >= 15, "the window lists what it can be changed in")
+    for _, option in ipairs(options) do
+        local label = option.key .. ": "
+        local default = ns.RXPWindowOption(option.key)
+        Check(option.label and option.tip and option.group, label .. "named, with a tip, in a group")
+        ns.SetRXPWindowOption(option.key, default)
+        Check(account[option.key] == nil, label .. "the default is not kept")
+        if option.kind == "number" then
+            ns.SetRXPWindowOption(option.key, option.max + 100)
+            Check(ns.RXPWindowOption(option.key) == option.max and account[option.key] == option.max,
+                label .. "held to its largest")
+            ns.SetRXPWindowOption(option.key, option.min - 100)
+            Check(ns.RXPWindowOption(option.key) == option.min, label .. "and its smallest")
+            ns.SetRXPWindowOption(option.key, "many")
+            Check(account[option.key] == nil and ns.RXPWindowOption(option.key) == option.default,
+                label .. "what is no number is the default")
+        elseif option.kind == "toggle" then
+            ns.SetRXPWindowOption(option.key, not default)
+            Check(ns.RXPWindowOption(option.key) == (not default) and account[option.key] == (not default),
+                label .. "flipped is kept")
+        elseif option.kind == "choice" then
+            for _, value in ipairs(option.order) do
+                ns.SetRXPWindowOption(option.key, value)
+                Check(ns.RXPWindowOption(option.key) == value, label .. value)
+            end
+            ns.SetRXPWindowOption(option.key, "bogus")
+            Check(account[option.key] == nil and ns.RXPWindowOption(option.key) == option.default,
+                label .. "what is not a choice is the default")
+        else
+            ns.SetRXPWindowOption(option.key, "Some Name")
+            Check(ns.RXPWindowOption(option.key) == "Some Name" and account[option.key] == "Some Name",
+                label .. "a name is kept")
+            ns.SetRXPWindowOption(option.key, "")
+            Check(account[option.key] == nil and ns.RXPWindowOption(option.key) == "", label .. "and none is not")
+        end
+        account[option.key] = nil
+    end
+    account.rxpWindowTitleSize, account.rxpWindowOutline, account.rxpWindowLine = 999, "bogus", 7
+    Check(ns.RXPWindowOption("rxpWindowTitleSize") == 28 and ns.RXPWindowOption("rxpWindowOutline") == "shadow"
+        and ns.RXPWindowOption("rxpWindowLine") == "bar", "a saved value that is out of range or no choice is held")
+    account.rxpWindowMenu = "no"
+    Check(ns.RXPWindowOption("rxpWindowMenu") == false, "and what is not true is off")
+end
+
+-- the colors: the theme's, until one is picked
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local T = ns.THEME
+    local r, g, b, a = ns.RXPWindowColor("title")
+    Check(r == T.fg.r and g == T.fg.g and b == T.fg.b and a == 1, "the title is the theme's text color")
+    r, g, b, a = ns.RXPWindowColor("range")
+    Check(r == 1 and math.abs(g - 0.82) < 1e-9 and b == 0 and a == 1, "the level range is gold")
+    r, g, b, a = ns.RXPWindowColor("list")
+    Check(r == T.muted.r and a == 0.9, "the list is the theme's muted, a little see-through")
+    r, g, b, a = ns.RXPWindowColor("panel")
+    Check(r == T.panel.r and a == 0.92, "the panel is the theme's panel color")
+    Check(#ns.RXPWindowColors() >= 10, "the colors it lists")
+    ns.SetRXPWindowColor("title", 0.1, 0.2, 0.3, 0.4)
+    r, g, b, a = ns.RXPWindowColor("title")
+    Check(r == 0.1 and g == 0.2 and b == 0.3 and a == 0.4 and account.rxpWindowColors.title.a == 0.4,
+        "a color picked is kept whole")
+    ns.SetRXPWindowColor("title", 0.5, 0.5, 0.5)
+    Check(select(4, ns.RXPWindowColor("title")) == 1, "with no opacity it is solid")
+    ns.SetRXPWindowColor("title", nil)
+    Check(account.rxpWindowColors == nil and ns.RXPWindowColor("title") == T.fg.r, "and none puts the theme's back")
+    ns.SetRXPWindowColor("nothing", 1, 1, 1, 1)
+    Check(account.rxpWindowColors == nil, "a color that is not one of them is not kept")
+    account.rxpWindowColors = { text = { r = "x" } }
+    Check(ns.RXPWindowColor("text") == T.fg.r, "a color saved wrongly is the theme's")
+    account.rxpWindowColors = nil
+    ns.SetRXPWindowOption("rxpWindowMenu", false)
+    ns.SetRXPWindowColor("fill", 1, 0, 0, 1)
+    ns.ResetRXPWindowStyle()
+    Check(account.rxpWindowMenu == nil and account.rxpWindowColors == nil, "reset puts the look back")
+    account.rxpWindowWidth, account.rxpWindowSteps, account.rxpWindowScale = 400, 3, 120
+    ns.ResetRXPWindowStyle()
+    Check(account.rxpWindowWidth == 400 and account.rxpWindowSteps == 3 and account.rxpWindowScale == 120,
+        "and leaves its size, its width and its steps")
+end
+
+-- the bars
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local f = Window(w)
+    local T = w.ns.THEME
+    Check(f.bar.shown == true and f.rule.shown == false, "under the title: the guide's progress bar to start")
+    Check(math.abs(f.bar.value - 36 / 66) < 1e-9 and f.bar.range[1] == 0 and f.bar.range[2] == 1,
+        "full as far as the guide is, steps 36 of 66")
+    Check(f.bar.height == 5 and f.bar.barTexture == "Interface\\Buttons\\WHITE8X8", "5 thick, flat")
+    Check(f.bar.barColor[1] == T.accent.r and f.bar.barColor[4] == 1, "in the accent")
+    Check(f.bar.track.solid[1] == T.fg.r and f.bar.track.solid[4] == 0.5, "over a track of the line's color")
+    local box
+    for _, o in ipairs(w.frames) do
+        if o.label and o.bar then box = o end
+    end
+    Check(box and box.bar.shown == true and math.abs(box.bar.value - 1 / 3) < 1e-9,
+        "the active step has a bar of its objectives done: one of three")
+    w.ns.SetRXPWindowOption("rxpWindowStepBar", false)
+    Flush(w)
+    Check(box.bar.shown == false, "off: not drawn")
+    w.ns.SetRXPWindowOption("rxpWindowStepBar", true)
+    w.ns.SetRXPWindowOption("rxpWindowLine", "rule")
+    Flush(w)
+    Check(f.bar.shown == false and f.rule.shown == true and f.rule.solid[4] == 0.5, "a line instead: the bar is not drawn")
+    w.ns.SetRXPWindowOption("rxpWindowLine", "none")
+    Flush(w)
+    Check(f.bar.shown == false and f.rule.shown == false, "or nothing")
+    w.ns.SetRXPWindowOption("rxpWindowLine", "bar")
+    w.ns.SetRXPWindowOption("rxpWindowBarHeight", 9)
+    w.ns.SetRXPWindowOption("rxpWindowBarTexture", "Flat Name")
+    w.ns.SetRXPWindowColor("fill", 1, 0, 0, 0.5)
+    w.ns.SetRXPWindowColor("line", 0, 0, 1, 1)
+    Flush(w)
+    Check(f.bar.height == 9 and f.bar.barTexture == "Textures\\Flat Name" and f.bar.barColor[1] == 1
+        and f.bar.barColor[4] == 0.5 and f.bar.track.solid[3] == 1, "the height, the texture and the colors are its own")
+    Check(box.bar.height == 9 and box.bar.barTexture == "Textures\\Flat Name", "and the active step's bar follows")
+    w.rows[1].complete = true
+    w.rxp.GetGuideProgress = function() return 66, "id" end
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(f.bar.value == 1, "the last step is a full bar")
+    w.rxp.GetGuideProgress = function() return 0, "id" end
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(f.bar.value == 0, "and none an empty one")
+    w.vendor.frame.button.GetChecked = function() return true end
+    w.talk.frame.button.GetChecked = function() return true end
+    w.buy.frame.button.GetChecked = function() return true end
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(box.bar.value == 1, "all three objectives done is a full bar")
+    w.ns.SetRXPWindowOption("rxpWindowProgressText", false)
+    Flush(w)
+    Check(f.progress.text == "", "the progress text can be left out")
+end
+
+-- the look: panel, borders, menu, spacing and the colors of every text
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local f = Window(w)
+    local T = ns.THEME
+    ns.SetRXPWindowOption("rxpWindowPanel", true)
+    ns.SetRXPWindowColor("panel", 0.1, 0.2, 0.3, 0.4)
+    ns.SetRXPWindowOption("rxpWindowBorder", true)
+    ns.SetRXPWindowColor("edge", 0.9, 0.8, 0.7, 0.6)
+    Flush(w)
+    Check(f.back.shown == true and f.back.solid[1] == 0.1 and f.back.solid[4] == 0.4, "a panel behind the window, in its color")
+    Check(f.borderObject._frame.shown == true and f.borderObject.color[1] == 0.9 and f.borderObject.color[4] == 0.6,
+        "a border round it, in its color")
+    local box
+    for _, o in ipairs(w.frames) do
+        if o.label and o.bar then box = o end
+    end
+    Check(box.borderObject._frame.shown == true and box.borderObject.color[1] == T.line.r, "the step's box has its own border")
+    ns.SetRXPWindowOption("rxpWindowBoxBorder", false)
+    ns.SetRXPWindowColor("box", 0.3, 0.3, 0.3, 0.3)
+    ns.SetRXPWindowColor("boxEdge", 1, 1, 0, 1)
+    Flush(w)
+    Check(box.borderObject._frame.shown == false and box.back.solid[1] == 0.3 and box.borderObject.color[1] == 1,
+        "which can be turned off, and has its colors")
+    ns.SetRXPWindowOption("rxpWindowMenu", false)
+    Flush(w)
+    Check(f.menu.shown == false, "the menu button can be left out")
+    local before = f.height
+    ns.SetRXPWindowOption("rxpWindowSpacing", 12)
+    Flush(w)
+    Check(f.height > before, "more spacing, a taller window")
+    ns.SetRXPWindowOption("rxpWindowSpacing", 0)
+    Flush(w)
+    Check(f.height < before, "less, a shorter one")
+
+    -- every text has its color
+    ns.SetRXPWindowColor("title", 1, 0, 0, 1)
+    ns.SetRXPWindowColor("label", 0, 1, 0, 1)
+    ns.SetRXPWindowColor("text", 0, 0, 1, 1)
+    ns.SetRXPWindowColor("done", 1, 1, 0, 1)
+    ns.SetRXPWindowColor("list", 0, 1, 1, 1)
+    Flush(w)
+    Check(f.title.color[1] == 1 and f.title.color[2] == 0, "the title's color")
+    Check(box.label.color[2] == 1 and box.label.color[1] == 0, "the step label's")
+    local rowText, doneText, listText
+    for _, o in ipairs(w.everything) do
+        if o.text == "Talk to |cff00ff00Duokna|r" then rowText = o end
+        if o.text == "Vendor Trash" then doneText = o end
+        if o.text and o.text:find("^37  ") then listText = o end
+    end
+    Check(rowText and rowText.color[3] == 1, "a row's")
+    Check(doneText and doneText.color[1] == 1 and doneText.color[2] == 1 and doneText.color[3] == 0, "a done row's")
+    Check(listText and listText.color[2] == 1 and listText.color[3] == 1, "and a line in the list")
+end
+
+-- the text: its face, its size and how it is kept readable
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local f = Window(w)
+    local function Texts(of)
+        local out = {}
+        for _, o in ipairs(w.everything) do
+            if o.font ~= nil and (of == nil or o.sizeKey == of) then out[#out + 1] = o end
+        end
+        return out
+    end
+    local all = Texts()
+    Check(#all >= 10, "texts to look at")
+    local plain = 0
+    for _, o in ipairs(all) do
+        if o.font == "Fonts\\Naowh.ttf" and o.fontFlags == "" and o.shadowX == 1 and o.shadowY == -1 then
+            plain = plain + 1
+        end
+    end
+    Check(plain == #all, "every text is in the Addon Font with a shadow to start")
+    ns.SetRXPWindowOption("rxpWindowFont", "Fira")
+    ns.SetRXPWindowOption("rxpWindowOutline", "outline")
+    ns.SetRXPWindowOption("rxpWindowTitleSize", 20)
+    ns.SetRXPWindowOption("rxpWindowTextSize", 15)
+    ns.SetRXPWindowOption("rxpWindowListSize", 9)
+    Flush(w)
+    for _, size in ipairs({ { "rxpWindowTitleSize", 20 }, { "rxpWindowTextSize", 15 }, { "rxpWindowListSize", 9 } }) do
+        local group = Texts(size[1])
+        Check(#group > 0, size[1] .. " has texts")
+        for _, o in ipairs(group) do
+            Check(o.font == "Fonts\\Fira.ttf" and o.fontSize == size[2] and o.fontFlags == "OUTLINE" and o.shadowX == 0,
+                size[1] .. ": its face, size and outline")
+        end
+    end
+    ns.SetRXPWindowOption("rxpWindowOutline", "none")
+    Flush(w)
+    Check(Texts("rxpWindowListSize")[1].fontFlags == "" and Texts("rxpWindowListSize")[1].shadowX == 0,
+        "with none, neither outline nor shadow")
+    ns.SetRXPWindowOption("rxpWindowFont", "")
+    ns.SetRXPWindowOption("rxpWindowOutline", "shadow")
+    Flush(w)
+    Check(Texts("rxpWindowTitleSize")[1].font == "Fonts\\Naowh.ttf" and Texts("rxpWindowTitleSize")[1].shadowX == 1,
+        "back to the Addon Font and the shadow")
+    Check(f.title.fontSize == 20, "the sizes stay")
+end
+
+-- the window is resized from its corner: the width, and the steps listed from how tall it is made
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local f = Window(w)
+    local ns = w.ns
+    local function Lines()
+        local count = 0
+        for _, o in ipairs(w.everything) do
+            if Seen(o) and o.text and o.text:find("^%d+  ") then count = count + 1 end
+        end
+        return count
+    end
+    Check(f.resizable == true and f.grip ~= nil and f.grip.shown == true, "resizable, with a grip in its corner")
+    local base, line = f.chrome, f.lineHeight
+    Check(base > 0 and line > 0 and math.abs((f.height - base) / line - 6) < 1e-9,
+        "the height without the list and the height of a line are known: six lines drawn")
+    Check(f.resizeBounds[1] == 260 and f.resizeBounds[2] == base and f.resizeBounds[3] == 640
+        and f.resizeBounds[4] == base + 12 * line, "its smallest has no steps listed and its biggest all of them")
+    f.grip.scripts.OnMouseDown(f.grip)
+    Check(f.sizing == "BOTTOMRIGHT", "the grip starts the sizing from its corner")
+    f.width, f.height = 500, base + 3 * line + line / 2
+    f.points = { { "TOPLEFT", w.env.UIParent, "TOPLEFT", 40, -60 } }
+    f.grip.scripts.OnMouseUp(f.grip)
+    Check(f.moving == false and account.rxpWindowWidth == 500 and account.rxpWindowSteps == 3,
+        "let go: the width and the steps that fit, and a part of a line is not one")
+    Check(f.width == 500 and Lines() == 3 and math.abs(f.height - (base + 3 * line)) < 1e-9,
+        "and the window is drawn at that size")
+    Check(account.rxpWindowPos and account.rxpWindowPos[3] == 40 and account.rxpWindowPos[4] == -60,
+        "the place it ended up in is kept")
+    f.width, f.height = 900, base + 40 * line
+    f.grip.scripts.OnMouseUp(f.grip)
+    Check(account.rxpWindowWidth == 640 and account.rxpWindowSteps == 12 and f.width == 640 and Lines() == 12,
+        "bigger than it can be: held to the most")
+    f.width, f.height = 100, 5
+    f.grip.scripts.OnMouseUp(f.grip)
+    Check(account.rxpWindowWidth == 260 and account.rxpWindowSteps == 0 and Lines() == 0,
+        "smaller than it can be: held to the least, with no steps listed")
+    f.width, f.height = 380, base + 6 * line
+    f.grip.scripts.OnMouseUp(f.grip)
+    Check(account.rxpWindowWidth == nil and account.rxpWindowSteps == nil, "back to the start: nothing is kept")
+
+    -- locked, and the grip left out
+    ns.SetRXPWindowOption("rxpWindowLock", true)
+    Flush(w)
+    f.sizing = nil
+    f.moving = nil
+    f.grip.scripts.OnMouseDown(f.grip)
+    f.scripts.OnDragStart(f)
+    Check(f.sizing == nil and f.moving == nil and f.resizable == false,
+        "locked: it is not sized or moved, and is not resizable")
+    ns.SetRXPWindowOption("rxpWindowLock", false)
+    ns.SetRXPWindowOption("rxpWindowGrip", false)
+    Flush(w)
+    Check(f.grip.shown == false and f.resizable == true, "the grip can be left out, and the window is still resizable")
+    ns.SetRXPWindowOption("rxpWindowGrip", true)
+    account.rxpWindowCollapsed = true
+    ns.SetRXPWindowOption("rxpWindowGrip", true)
+    Flush(w)
+    Check(f.grip.shown == false and f.resizable == false, "folded: there is no list to size, and no grip")
 end
 
 print("PASS rxp window: " .. cases .. " checks")
