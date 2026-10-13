@@ -228,6 +228,13 @@ NaowhForever_DamageMeter/
   name whole, as the game gives it.
 - Interrupts, Dispels and Deaths have no per-second figure, so a Per Second column skips them. Deaths has
   no spells either.
+- The game gives a death's `totalAmount` as 0: one source is one death, and what it carries is
+  `deathTimeSeconds` (when, in the session) and `deathRecapID`. So the Deaths list's figure is the time of the
+  death (`DM.DeathClock`, titled Time), its bar is whole, its summary counts the rows and has no rank, a
+  report says when, and the Deaths column of another list counts the player's rows (`Held`). A click on a
+  death opens the game's Death Recap for its id (`OpenDeathRecapUI`, or `DeathRecapFrame_OpenRecap`): outside
+  combat only, through `pcall`, from a click, and for a plain id only, since it is the game's own function
+  that fills and shows its frame.
 - Windows 2 and 3 use the first window's keys with their number added (`mode2`, `width3`,
   `meterPos2`), so the window code takes an index and reads `DM.Key(base, index)`.
 - A past fight is a field of the window (`fight`), not a setting: the game's fight ids do not outlive

@@ -50,10 +50,13 @@ function DM.ReportLines(session, mode, sessionName, count, withRate)
         if #lines > count then break end
         local source = sources[i]
         local name, total, rate = DM.DisplayName(source), source.totalAmount, source.amountPerSecond
-        if Plain(name, "string") and Plain(total, "number") then
-            local value = Figures(total, rate, withRate and mode.rate)
-            if value then lines[#lines + 1] = LINE:format(#lines, name, value) end
+        local value
+        if mode.deathTime == true then
+            value = DM.DeathClock(source)
+        elseif Plain(total, "number") then
+            value = Figures(total, rate, withRate and mode.rate)
         end
+        if Plain(name, "string") and value then lines[#lines + 1] = LINE:format(#lines, name, value) end
     end
     return lines
 end

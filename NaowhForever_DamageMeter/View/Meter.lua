@@ -327,7 +327,7 @@ end
 
 local function ColumnTitle(mode, kind)
     if kind == "rate" then return mode.perSecond or TEXT_RATE end
-    return mode.total or TEXT_TOTAL
+    return mode.totalHead or mode.total or TEXT_TOTAL
 end
 
 local function TitleWidths(pane, g)
@@ -667,10 +667,16 @@ local function ExtraOf(lookup, source)
     return other and other.totalAmount
 end
 
-local function PaintValues(row, source, cols, session, extras)
+local function PaintValues(row, source, cols, session, extras, mode)
     local rate = DM.RateSuffix()
     local suffixA, suffixB = cols.a == "rate" and rate or "", cols.b == "rate" and rate or ""
-    if cols.merged then
+    if mode.deathTime == true then
+        if cols.b then
+            local text = DM.DeathClock(source) or ""
+            row.colB:SetText(text)
+            row.written.B = text
+        end
+    elseif cols.merged then
         local first, second = ValueOf(source, cols.a), ValueOf(source, cols.b)
         local hasFirst, hasSecond = type(first) ~= "nil", type(second) ~= "nil"
         if hasFirst and hasSecond then
@@ -705,6 +711,15 @@ end
 local extraLists, extraPool = {}, {}
 local extrasSession, extrasFight
 
+local function Held(held, source, counted)
+    if not counted then return source end
+    if held then
+        held.totalAmount = held.totalAmount + 1
+        return held
+    end
+    return { totalAmount = 1 }
+end
+
 setmetatable(extraLists, { __index = function(lookups, kind)
     local lookup = extraPool[kind]
     if not lookup then
@@ -713,10 +728,11 @@ setmetatable(extraLists, { __index = function(lookups, kind)
     end
     lookup.own = nil
     for guid in pairs(lookup.byGuid) do lookup.byGuid[guid] = nil end
+    local counted = DM.Mode(kind).deathTime == true
     for _, source in ipairs(DM.Session(kind, extrasSession, extrasFight).combatSources) do
-        if source.isLocalPlayer == true then lookup.own = source end
+        if source.isLocalPlayer == true then lookup.own = Held(lookup.own, source, counted) end
         local guid = source.sourceGUID
-        if DM.Plain(guid, "string") then lookup.byGuid[guid] = source end
+        if DM.Plain(guid, "string") then lookup.byGuid[guid] = Held(lookup.byGuid[guid], source, counted) end
     end
     lookups[kind] = lookup
     return lookup
@@ -736,7 +752,11 @@ function Look.PaintSummary(f, session, mode, name, seconds)
     end
     if S.Get("summaryTotal") ~= false then
         parts[#parts + 1] = (mode.total or TEXT_TOTAL) .. " %s"
-        args[#args + 1] = Format(session.totalAmount)
+        if mode.deathTime == true then
+            args[#args + 1] = #session.combatSources
+        else
+            args[#args + 1] = Format(session.totalAmount)
+        end
     end
     local rate = S.Get("summaryRate") ~= false and mode.rate and DM.PerSecond(session.totalAmount, seconds)
     if rate then
@@ -744,7 +764,7 @@ function Look.PaintSummary(f, session, mode, name, seconds)
         args[#args + 1] = Format(rate)
     end
     local rank, count = DM.Rank(session)
-    if rank and S.Get("summaryRank") ~= false then
+    if rank and S.Get("summaryRank") ~= false and mode.deathTime ~= true then
         parts[#parts + 1] = TEXT_RANK:format(rank, count)
     end
     f.summary:SetFormattedText(table.concat(parts, SUMMARY_GAP), unpack(args))
@@ -867,8 +887,13 @@ local function PaintPane(pane, session, first, shown, mode, unavailable, extras)
             if not Known(source) then plain = false end
             local c = Look.BarColor(source, f.index)
             row:SetStatusBarColor(c.r, c.g, c.b, alpha)
-            row:SetMinMaxValues(0, MaxOf(source, session, byTotal))
-            row:SetValue(source.totalAmount)
+            if mode.deathTime == true then
+                row:SetMinMaxValues(0, 1)
+                row:SetValue(1)
+            else
+                row:SetMinMaxValues(0, MaxOf(source, session, byTotal))
+                row:SetValue(source.totalAmount)
+            end
             local e = own and source.isLocalPlayer == true and Look.EdgeColor(source) or c
             row.edge:SetColorTexture(e.r, e.g, e.b, 1)
             row.track:SetShown(f.geo.barTrack)
@@ -886,7 +911,7 @@ local function PaintPane(pane, session, first, shown, mode, unavailable, extras)
             tint = f.valueColor
             if classValues and not labelled then tint = ClassColor(source.classFilename) end
             for _, id in ipairs(pane.cells) do row["col" .. id]:SetTextColor(tint.r, tint.g, tint.b) end
-            PaintValues(row, source, pane.cols, session, extras)
+            PaintValues(row, source, pane.cols, session, extras, mode)
         end
     end
     FitColumns(pane, shown, plain)

@@ -21,6 +21,7 @@ local FRAME_NAME = "NaowhForeverDamageMeter"
 local CARD, CARD_SECOND, CARD_THIRD = C.PAGE .. ":window", C.PAGE .. ":window2", C.PAGE .. ":window3"
 local GAME_CVAR, GAME_CVAR_OFF = "damageMeterEnabled", "0"
 local GAME_CVAR_SAVED = "damageMeterGameWas"
+local RECAP_ADDON = "Blizzard_DeathRecap"
 local DATA_EVENTS = { "DAMAGE_METER_COMBAT_SESSION_UPDATED", "DAMAGE_METER_CURRENT_SESSION_UPDATED",
     "DAMAGE_METER_RESET" }
 local STATE_EVENTS = { "PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE" }
@@ -306,6 +307,16 @@ local function CloseDetail(w)
     Update()
 end
 
+local function OpenRecap(source)
+    local id = source.deathRecapID
+    if not DM.Plain(id, "number") or id <= 0 or InCombatLockdown() then return end
+    if C_AddOns and C_AddOns.LoadAddOn and not C_AddOns.IsAddOnLoaded(RECAP_ADDON) then
+        C_AddOns.LoadAddOn(RECAP_ADDON)
+    end
+    local open = OpenDeathRecapUI or DeathRecapFrame_OpenRecap
+    if type(open) == "function" then pcall(open, id) end
+end
+
 local function OnRowClick(w, row, button)
     if button ~= "LeftButton" then return end
     if w.detail then
@@ -314,6 +325,10 @@ local function OnRowClick(w, row, button)
     end
     local source = row.source
     local mode = DM.Mode(row.modeKey or Get(w, "mode"))
+    if mode.deathTime == true and source ~= nil and not source.isHeader then
+        OpenRecap(source)
+        return
+    end
     if not S.Get("breakdown") or w.sample or source == nil or mode.spells == false then return end
     w.detail = { pane = row.pane or 1, modeKey = mode.key, source = source, me = source.isLocalPlayer == true,
         guid = DM.Plain(source.sourceGUID, "string") and source.sourceGUID or nil }

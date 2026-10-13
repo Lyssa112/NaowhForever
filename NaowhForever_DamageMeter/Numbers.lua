@@ -61,6 +61,12 @@ function DM.Clock(seconds)
     return ("%d:%02d"):format(math.floor(seconds / 60), seconds % 60)
 end
 
+function DM.DeathClock(source)
+    local seconds = source.deathTimeSeconds
+    if Plain(seconds, "number") then return DM.Clock(seconds) end
+    return nil
+end
+
 function DM.PerSecond(total, seconds)
     if not (Plain(total, "number") and Plain(seconds, "number")) or seconds <= 0 then return nil end
     return total / seconds

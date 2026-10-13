@@ -4336,7 +4336,8 @@ do
     -- the totals of other lists, for the same player
     s.byType = { [5] = { combatSources = { { name = "Aldrin", sourceGUID = "Player-2", totalAmount = 7 },
         { name = "You", sourceGUID = "Player-1", isLocalPlayer = true, totalAmount = 3 } } },
-        [9] = { combatSources = { { name = "Cara", sourceGUID = "Player-3", totalAmount = 2 } } } }
+        [9] = { combatSources = { { name = "Cara", sourceGUID = "Player-3", totalAmount = 0, deathTimeSeconds = 30 },
+            { name = "Cara", sourceGUID = "Player-3", totalAmount = 0, deathTimeSeconds = 90 } } } }
     s.store.Set("columns", "name,total,rate,interrupts,deaths"); s.Flush()
     local you = w.rows[2]
     check("another list's total as a column: found by guid, and yours as yours", row.colX1.text == "<7>"
@@ -4785,6 +4786,51 @@ do
     check("fights are ordered by their plain ids; a name or length that is secret is dropped, not compared",
         #fights == 3 and fights[1].id == 9 and fights[1].name == "Boss" and fights[1].seconds == nil
         and fights[2].id == 5 and fights[3].id == 3 and fights[3].name == nil and fights[3].seconds == 30)
+end
+
+-- Deaths: the game's total for a death is 0, so the list shows when each one was, and a click opens its recap
+do
+    local function Death(name, class, own, guid, at, recap)
+        return { name = name, classFilename = class, isLocalPlayer = own, sourceGUID = guid, totalAmount = 0,
+            amountPerSecond = 0, deathTimeSeconds = at, deathRecapID = recap, specIconID = 0 }
+    end
+    local s = Boot({ settings = { enabled = true, mode = "deaths", showSummary = true } })
+    s.session.combatSources = { Death("You", "ROGUE", true, "Player-1", 28, 3),
+        Death("Aldrin", "MAGE", false, "Player-2", 75, 4), Death("Zed", "MAGE", false, "Player-9", SECRET_NUMBER, SECRET_NUMBER) }
+    s.session.totalAmount, s.session.maxAmount = 0, 0
+    s.Login()
+    local w = s.Window()
+    check("when each death was, not the game's total of 0", w.rows[1].colB.text == "0:28" and w.rows[2].colB.text == "1:15")
+    check("a time the game keeps back is left empty", w.rows[3].colB.text == "")
+    check("no per-second figure, and the figure's title says what it is", w.rows[1].colA.shown == false
+        and w.panes[1].headB.text == "Time")
+    check("the bars are whole, so every death shows in its class color", w.rows[1].barMax == 1 and w.rows[1].barValue == 1)
+    check("the summary counts the deaths, with no rank", w.summary.text:find("Deaths 3", 1, true) ~= nil
+        and w.summary.text:find("Rank", 1, true) == nil)
+    local DM = s.DM
+    local lines = DM.ReportLines(s.session, DM.Mode("deaths"), "Current", 5, true)
+    check("a report says when", lines[1] == "Deaths, Current" and lines[2] == "1. You  0:28"
+        and lines[3] == "2. Aldrin  1:15" and #lines == 3)
+    s.recaps = {}
+    s.env.OpenDeathRecapUI = function(id) s.recaps[#s.recaps + 1] = id end
+    s.store.Set("breakdown", false)
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "LeftButton")
+    s.Flush()
+    check("a click opens its recap, whatever Spell Breakdown says", #s.recaps == 1 and s.recaps[1] == 3 and not w.detail)
+    w.rows[1].scripts.OnMouseUp(w.rows[1], "RightButton")
+    w.rows[3].scripts.OnMouseUp(w.rows[3], "LeftButton")
+    check("not for another button, nor for an id the game keeps back", #s.recaps == 1)
+    s.combat = true
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("not in combat", #s.recaps == 1)
+    s.combat = false
+    s.env.OpenDeathRecapUI = nil
+    s.env.DeathRecapFrame_OpenRecap = function(id) s.recaps[#s.recaps + 1] = id end
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("by the frame's own function where the other is not there", #s.recaps == 2 and s.recaps[2] == 4)
+    s.env.DeathRecapFrame_OpenRecap = nil
+    w.rows[2].scripts.OnMouseUp(w.rows[2], "LeftButton")
+    check("and nothing, with no error, where neither is", #s.recaps == 2)
 end
 
 print("PASS damage meter: " .. checks .. " checks")
