@@ -41,6 +41,13 @@ NaowhForever_DamageMeter/
   without asking `DM.IsSecret`: they go straight to `StatusBar:SetValue`, `SetMinMaxValues` and
   `SetText`, through the client's own `AbbreviateLargeNumbers`, which takes a secret. The class, the
   spec icon and `isLocalPlayer` are never secret, so those are read.
+- A FontString's `GetText` of a text made from a secret is a secret, which cannot be compared or
+  measured, so no text is read back: what a cell was given is kept beside it (`row.written`, and
+  `pane.heads` for the column titles), and only when `DM.Plain` says it is plain text. `FitColumns` and
+  the title widths read those, so a figure the client wrote as secret text, even from a number that read
+  as plain, is painted as it is and its column keeps the reserve width. A name, a surname, a class, a
+  total or an icon is tested with `DM.Plain` or `type()`, never with `==`, truthiness or `..`, and what
+  `Format` returns is not joined to anything: the per-second suffix is an argument of the format string.
 - The game returns its sources and spells already sorted, so the window draws them in order and ranks
   by position.
 - The API calls go through `pcall`: an error reads as no data and the window says so, not a Lua error.
@@ -295,5 +302,6 @@ NaowhForever_DamageMeter/
 
 - `lua Tools/regression/test-damage-meter.lua`: the API reads, the windows, the menus, the report,
   the spell panel, where it shows, the game's meter, updates and the settings page, with amounts that
-  fail on any arithmetic.
+  fail on any arithmetic and secret text (`SecretString`) that fails when it is joined, measured or read
+  back.
 - `lua Tools/regression/test-nf-commands.lua`: the reset binding and its stub.

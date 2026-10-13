@@ -68,7 +68,7 @@ local function ClassIcon(class)
 end
 
 local function IconOf(source, classOnly)
-    if source.icon ~= nil then return source.icon end
+    if type(source.icon) ~= "nil" then return source.icon end
     local id = source.specIconID
     if not classOnly and type(id) == "number" and id ~= 0 then return id end
     local class = source.classFilename
@@ -142,7 +142,8 @@ end
 
 local function NewPane(f, n)
     local pane = { f = f, n = n, rows = {}, cols = { x = {} }, order = {}, cells = {}, before = {}, after = {},
-        figures = {}, extras = {}, listing = {}, titleWidths = {}, beforeWidth = 0, afterWidth = 0, top = 0 }
+        figures = {}, extras = {}, listing = {}, titleWidths = {}, heads = {}, beforeWidth = 0, afterWidth = 0,
+        top = 0 }
     pane.headName = ns.Font(f, HEAD_SIZE, "OUTLINE", T.muted)
     pane.headName:SetJustifyH("LEFT"); pane.headName:SetWordWrap(false); pane.headName:SetText(TEXT_NAME_HEAD)
     for _, id in ipairs(CELLS) do
@@ -193,6 +194,7 @@ function Look.Row(pane, i)
     local f = pane.f
     local row = CreateFrame("StatusBar", nil, f)
     row.pane = pane.n
+    row.written = {}
     row:SetMinMaxValues(0, 1)
     row:EnableMouse(true); row:EnableMouseWheel(true)
     row:SetScript("OnEnter", function(self) if f.onRowEnter then f.onRowEnter(self) end end)
@@ -343,7 +345,7 @@ local function TitleWidths(pane, g)
     end
     local key = {}
     for _, id in ipairs(pane.cells) do
-        ruler:SetText(pane["head" .. id]:GetText())
+        ruler:SetText(pane.heads[id])
         widths[id] = math.ceil(ruler:GetStringWidth())
         key[#key + 1] = widths[id]
     end
@@ -513,7 +515,11 @@ local function LayPane(pane, mode, total, first, capacity, g, key, headY)
     pane.capacity = capacity
     pane.merged = pane.cols.merged == true
     pane.headName:SetText(TEXT_NAME_HEAD)
-    for _, id in ipairs(pane.cells) do pane["head" .. id]:SetText(HeadText(pane, mode, id)) end
+    for _, id in ipairs(pane.cells) do
+        local text = HeadText(pane, mode, id)
+        pane.heads[id] = text
+        pane["head" .. id]:SetText(text)
+    end
     local titles = TitleWidths(pane, g)
     first = math.max(0, math.min(first, total - capacity))
     local shown = math.min(total - first, capacity)
@@ -633,14 +639,24 @@ local function ValueOf(source, kind)
     return source.totalAmount
 end
 
-local function PaintValue(fs, value, suffix)
-    if value == nil then
+local function Written(row, id, text)
+    row.written[id] = DM.Plain(text, "string") and text or false
+end
+
+local function PaintValue(row, id, value, suffix)
+    local fs = row["col" .. id]
+    if type(value) == "nil" then
         fs:SetText("")
-    elseif suffix ~= "" then
-        fs:SetFormattedText("%s" .. suffix, Format(value))
-    else
-        fs:SetText(Format(value))
+        row.written[id] = ""
+        return
     end
+    local text = Format(value)
+    if suffix ~= "" then
+        fs:SetFormattedText("%s" .. suffix, text)
+    else
+        fs:SetText(text)
+    end
+    row.written[id] = DM.Plain(text, "string") and text .. suffix or false
 end
 
 local function ExtraOf(lookup, source)
@@ -656,24 +672,33 @@ local function PaintValues(row, source, cols, session, extras)
     local suffixA, suffixB = cols.a == "rate" and rate or "", cols.b == "rate" and rate or ""
     if cols.merged then
         local first, second = ValueOf(source, cols.a), ValueOf(source, cols.b)
-        if first ~= nil and second ~= nil then
-            row.colB:SetFormattedText("%s" .. suffixA .. " | %s" .. suffixB, Format(first), Format(second))
-        elseif first ~= nil then
-            PaintValue(row.colB, first, suffixA)
+        local hasFirst, hasSecond = type(first) ~= "nil", type(second) ~= "nil"
+        if hasFirst and hasSecond then
+            local one, two = Format(first), Format(second)
+            row.colB:SetFormattedText("%s" .. suffixA .. " | %s" .. suffixB, one, two)
+            row.written.B = DM.Plain(one, "string") and DM.Plain(two, "string")
+                and one .. suffixA .. " | " .. two .. suffixB or false
+        elseif hasFirst then
+            PaintValue(row, "B", first, suffixA)
         else
-            PaintValue(row.colB, second, suffixB)
+            PaintValue(row, "B", second, suffixB)
         end
     else
-        if cols.a then PaintValue(row.colA, ValueOf(source, cols.a), suffixA) end
-        if cols.b then PaintValue(row.colB, ValueOf(source, cols.b), suffixB) end
+        if cols.a then PaintValue(row, "A", ValueOf(source, cols.a), suffixA) end
+        if cols.b then PaintValue(row, "B", ValueOf(source, cols.b), suffixB) end
     end
     if cols.p then
         local percent = source.noPercent ~= true and DM.Percent(source.totalAmount, session.totalAmount)
-        row.colP:SetText(percent and DM.PercentText(percent) or "")
+        local text = percent and DM.PercentText(percent) or ""
+        row.colP:SetText(text)
+        row.written.P = text
     end
     for id, kind in pairs(cols.x) do
         local value = ExtraOf(extras and extras[kind], source)
-        row["col" .. id]:SetText(DM.Plain(value, "number") and Format(value) or "")
+        local text = ""
+        if DM.Plain(value, "number") then text = Format(value) end
+        row["col" .. id]:SetText(text)
+        Written(row, id, text)
     end
 end
 
@@ -734,7 +759,10 @@ local function PaintHeading(row, source, f)
     row.icon:Hide()
     row.name:SetText(source.label)
     row.name:SetTextColor(f.columnColor.r, f.columnColor.g, f.columnColor.b)
-    for _, id in ipairs(CELLS) do row["col" .. id]:SetText("") end
+    for _, id in ipairs(CELLS) do
+        row["col" .. id]:SetText("")
+        row.written[id] = ""
+    end
 end
 
 local function Truncate(text, letters)
@@ -759,6 +787,12 @@ local function Known(source)
         and (source.amountPerSecond == nil or DM.Plain(source.amountPerSecond, "number"))
 end
 
+local function MaxOf(source, session, byTotal)
+    if type(source.maxAmount) ~= "nil" then return source.maxAmount end
+    if byTotal and type(session.totalAmount) ~= "nil" then return session.totalAmount end
+    return session.maxAmount
+end
+
 local function FitColumns(pane, shown, plain)
     local g = pane.f.geo
     local ruler = pane.ruler
@@ -773,15 +807,19 @@ local function FitColumns(pane, shown, plain)
     local fit
     for _, cell in ipairs(pane.cells) do
         if (cell ~= "A" and cell ~= "B") or plain then
-            local widest = 0
+            local widest, known = 0, true
             for i = 1, shown do
-                local text = pane.rows[i]["col" .. cell]:GetText()
-                if text and text ~= "" then
+                local text = pane.rows[i].written[cell]
+                if text == false then
+                    known = false
+                    break
+                end
+                if text ~= nil and text ~= "" then
                     ruler:SetText(text)
                     widest = math.max(widest, ruler:GetStringWidth())
                 end
             end
-            if widest > 0 then
+            if known and widest > 0 then
                 fit = fit or {}
                 fit[cell] = math.ceil(widest) + FIT_PAD
             end
@@ -825,10 +863,11 @@ local function PaintPane(pane, session, first, shown, mode, unavailable, extras)
         if source.isHeader then
             PaintHeading(row, source, f)
         else
+            local labelled = source.isSpell == true or source.isTarget == true
             if not Known(source) then plain = false end
             local c = Look.BarColor(source, f.index)
             row:SetStatusBarColor(c.r, c.g, c.b, alpha)
-            row:SetMinMaxValues(0, source.maxAmount or (byTotal and session.totalAmount or session.maxAmount))
+            row:SetMinMaxValues(0, MaxOf(source, session, byTotal))
             row:SetValue(source.totalAmount)
             local e = own and source.isLocalPlayer == true and Look.EdgeColor(source) or c
             row.edge:SetColorTexture(e.r, e.g, e.b, 1)
@@ -836,12 +875,16 @@ local function PaintPane(pane, session, first, shown, mode, unavailable, extras)
             row.rank:SetFormattedText(RANK_TEXT, session.rank or index)
             row.icon:SetTexture(IconOf(source, classOnly))
             row.icon:SetShown(showIcons and source.noIcon ~= true)
-            row.name:SetText(source.label or NameOf(source, you, letters))
+            if labelled then
+                row.name:SetText(source.label)
+            else
+                row.name:SetText(NameOf(source, you, letters))
+            end
             local tint = f.nameColor
-            if classNames and not source.label then tint = ClassColor(source.classFilename) end
+            if classNames and not labelled then tint = ClassColor(source.classFilename) end
             row.name:SetTextColor(tint.r, tint.g, tint.b)
             tint = f.valueColor
-            if classValues and not source.label then tint = ClassColor(source.classFilename) end
+            if classValues and not labelled then tint = ClassColor(source.classFilename) end
             for _, id in ipairs(pane.cells) do row["col" .. id]:SetTextColor(tint.r, tint.g, tint.b) end
             PaintValues(row, source, pane.cols, session, extras)
         end
