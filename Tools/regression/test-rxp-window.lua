@@ -1267,14 +1267,14 @@ do
     Check(Window(bare) ~= nil and Window(bare).shown, "frames without a background, a border or a title: nothing raises")
 end
 
--- the icons of ours are drawn as a texture in their group's color, as it is now
+-- the icons of ours are drawn as a texture in the window's accent, as it is now
 do
     local account = { rxpWindow = true }
     local w = Start(account)
     local f = Window(w)
     local ns = w.ns
     local T = ns.THEME
-    T.accentSoft = { r = 0.1, g = 0.8, b = 0.4 }
+    T.accent = { r = 0.1, g = 0.8, b = 0.4 }
     local function Rows()
         local out = {}
         for _, o in ipairs(w.frames) do
@@ -1302,18 +1302,18 @@ do
     local talk, buy, vendor = Row("Talk to |cff00ff00Duokna|r"), Row("Buy [Refreshing Spring Water] from her"), Row("Vendor Trash")
     Check(talk.glyph.shown and talk.glyph.texture == ns.RXPIconPath("line", "goto") and talk.icon.text == "",
         "an icon of ours: its texture, and no text")
-    Check(Is(talk.glyph.vertex, 0.1, 0.8, 0.4), "in its group's color: goto's is the travel color")
+    Check(Is(talk.glyph.vertex, 0.1, 0.8, 0.4), "in the accent")
     Check(talk.glyph.width == 22 and talk.glyph.height == 22, "as big as the row's icon is: the title's, 18 and the bonus twice")
     Check(talk.glyph.alpha == 1, "whole when the row is not done")
-    local r, g, b = ns.RXPIconColor("other")
+    local r, g, b = ns.RXPIconColor()
     Check(buy.glyph.texture == ns.RXPIconPath("filled", "vendor") and Is(buy.glyph.vertex, r, g, b),
-        "in the other style and group as well")
+        "in the other style as well")
     Check(vendor.glyph.shown == false and vendor.icon.text == "|Tv|t", "and a row with RestedXP's own is as it was")
 
-    ns.SetRXPIconColor("travel", 1, 0, 0)
+    ns.SetRXPWindowColor("accent", 1, 0, 0)
     Flush(w)
-    Check(Is(Row("Talk to |cff00ff00Duokna|r").glyph.vertex, 1, 0, 0), "a color picked is drawn as it is")
-    ns.ResetRXPIconColors()
+    Check(Is(Row("Talk to |cff00ff00Duokna|r").glyph.vertex, 1, 0, 0), "the window's Accent Color picked is drawn as it is")
+    ns.SetRXPWindowColor("accent", nil)
     Flush(w)
     Check(Is(Row("Talk to |cff00ff00Duokna|r").glyph.vertex, 0.1, 0.8, 0.4), "and put back")
 

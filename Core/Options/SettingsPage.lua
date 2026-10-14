@@ -490,38 +490,15 @@ local function WindowColorCell(color)
 end
 
 local function IconStyleRow()
-    return { type = "dropdown", text = "RestedXP Icons",
+    return { type = "dropdown", text = "Step Icons",
         values = { [""] = "RestedXP's own", line = "Line", filled = "Filled" },
         order = { "", "line", "filled" },
-        tooltip = "Naowh's own step icons in place of RestedXP's, after a /reload.",
+        tooltip = "Naowh's own step icons in the accent color in place of RestedXP's, after a /reload.",
         getValue = ns.RXPIconStyle,
         setValue = function(v)
             ns.SetRXPIconStyle(v)
             RxpChanged()
         end }
-end
-
-local function IconColorRows(W, parent, y)
-    local cells = {}
-    for _, color in ipairs(ns.RXPIconColors()) do
-        local name = color.name
-        cells[#cells + 1] = { type = "colorpicker", text = color.label, hasAlpha = false, tooltip = color.tip,
-            getValue = function() return ns.RXPIconColor(name) end,
-            setValue = function(r, g, b)
-                ns.SetRXPIconColor(name, r, g, b)
-                rxpPending = true
-            end }
-    end
-    cells[#cells + 1] = { type = "button", text = "Icon Colors", buttonText = "Reset",
-        tooltip = "Puts the icons' colors back to the theme's.",
-        onClick = function()
-            ns.ResetRXPIconColors()
-            RxpChanged()
-        end }
-    for i = 1, #cells, 2 do
-        local _, h = W:DualRow(parent, y, cells[i], cells[i + 1] or Empty()); y = y - h
-    end
-    return y
 end
 
 local function RxpWindowStyleRows(W, parent, y)
@@ -603,7 +580,7 @@ local function RxpWindowRows(W, parent, y)
           tooltip = "How big the whole window is, its text with it.",
           getValue = ns.RXPWindowScale,
           setValue = function(v) ns.SetRXPWindowScale(v) end },
-        Empty()
+        IconStyleRow()
     ); y = y - h
     y = RxpArrowRows(W, parent, y)
     y = RxpWindowStyleRows(W, parent, y)
@@ -614,13 +591,10 @@ end
 local function RestedXPSection(W, parent, y)
     if not (ns.RXPThemesAvailable and ns.RXPThemesAvailable()) then return y end
     local themesOn = ns.RXPThemesEnabled()
-    local _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
-    _, h = W:DualRow(parent, y, IconStyleRow(), Empty()); y = y - h
-    if ns.RXPIconStyle() ~= "" then y = IconColorRows(W, parent, y) end
     local themesSwitch = RxpSwitch("RestedXP Theme (V1)",
         "Adds the Naowh themes to RestedXP's theme list, in place of the Naowh window.",
         ns.RXPThemesEnabled, ns.SetRXPThemes)
-    _, h = W:SwitchFold(parent, "RestedXP Theme (V1)", y, {
+    local _, h = W:SwitchFold(parent, "RestedXP Theme (V1)", y, {
         get = themesSwitch.getValue, set = themesSwitch.setValue, tooltip = themesSwitch.tooltip, rows = themesOn })
     y = y - h
     if themesOn then

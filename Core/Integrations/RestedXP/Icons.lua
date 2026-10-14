@@ -10,8 +10,7 @@ local ESCAPE = "|T%s%s\\%s%s:0:0:0:0:%d:%d:0:%d:0:%d:%d:%d:%d|t"
 local TEXELS = 64
 local CHANNEL_MAX, ROUND = 255, 0.5
 local NONE = ""
-local OTHER = "other"
-local COLORS_KEY = "rxpIconColors"
+local ACCENT = "accent"
 local STYLES = { line = true, filled = true }
 local ART_PATTERN = ART:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
 local LOOK_PATTERN = "|T" .. ART_PATTERN .. "(%a+)\\(%a+)%.tga"
@@ -21,22 +20,6 @@ local INLINE = {
     ["interface/cursor/crosshair/interact.blp"] = "interact",
 }
 local INLINE_PATTERN = "|T([^|:]+):%d+|t"
-
-local COLORS = {
-    { name = "quest", label = "Quest Icon Color", token = "accent",
-      glyphs = { "accept", "daily", "turnin", "dailyturnin", "complete", "abandon", "gossip", "interact" },
-      tip = "The quest and gossip icons." },
-    { name = "travel", label = "Travel Icon Color", token = "accentSoft",
-      glyphs = { "goto", "fly", "fp", "home", "deathskip", "marker", "arrow", "clicknext" },
-      tip = "The go to, flight and home icons." },
-    { name = OTHER, label = "Other Icon Color", token = "accent", glyphs = {}, tip = "The rest of the icons." },
-}
-
-local COLOR_BY_NAME, GROUP_OF = {}, {}
-for _, color in ipairs(COLORS) do
-    COLOR_BY_NAME[color.name] = color
-    for _, glyph in ipairs(color.glyphs) do GROUP_OF[glyph] = color.name end
-end
 
 local GLYPHS = {
     accept = "accept", acceptmultiple = "accept",
@@ -70,6 +53,7 @@ local GLYPHS = {
 }
 
 function ns.RXPIconStyle()
+    if type(ns.RXPWindowEnabled) == "function" and not ns.RXPWindowEnabled() then return NONE end
     local style = ns.AccountSettings().rxpIconStyle
     return STYLES[style] and style or NONE
 end
@@ -86,8 +70,6 @@ function ns.RXPIconPath(style, glyph)
     return ART .. style .. "\\" .. glyph .. EXTENSION
 end
 
-function ns.RXPIconColors() return COLORS end
-
 local function Rgb(color)
     if type(color) == "table" and type(color.r) == "number" and type(color.g) == "number"
             and type(color.b) == "number" then
@@ -95,45 +77,21 @@ local function Rgb(color)
     end
 end
 
-function ns.RXPIconColor(name)
-    local color = COLOR_BY_NAME[name] or COLOR_BY_NAME[OTHER]
-    local r, g, b = Rgb(Dig(ns.AccountSettings(), COLORS_KEY, color.name))
-    if r then return r, g, b end
-    r, g, b = Rgb(ns.THEME[color.token])
+function ns.RXPIconColor()
+    if type(ns.RXPWindowColor) == "function" then
+        local ok, r, g, b = pcall(ns.RXPWindowColor, ACCENT)
+        if ok and type(r) == "number" and type(g) == "number" and type(b) == "number" then return r, g, b end
+    end
+    local r, g, b = Rgb(ns.THEME.accent)
     if r then return r, g, b end
     return 1, 1, 1
-end
-
-local function Redraw()
-    if type(ns.RXPWindowRefresh) == "function" then ns.RXPWindowRefresh() end
-end
-
-function ns.SetRXPIconColor(name, r, g, b)
-    if not COLOR_BY_NAME[name] then return end
-    local all = ns.AccountSettings()[COLORS_KEY]
-    if type(all) ~= "table" then
-        all = {}
-        ns.AccountSettings()[COLORS_KEY] = all
-    end
-    if type(r) == "number" and type(g) == "number" and type(b) == "number" then
-        all[name] = { r = r, g = g, b = b }
-    else
-        all[name] = nil
-    end
-    if next(all) == nil then ns.AccountSettings()[COLORS_KEY] = nil end
-    Redraw()
-end
-
-function ns.ResetRXPIconColors()
-    ns.AccountSettings()[COLORS_KEY] = nil
-    Redraw()
 end
 
 function ns.RXPIconLook(text)
     if type(text) ~= "string" then return end
     local style, glyph = text:match(LOOK_PATTERN)
     if not (STYLES[style] and glyph) then return end
-    return ns.RXPIconPath(style, glyph), ns.RXPIconColor(GROUP_OF[glyph])
+    return ns.RXPIconPath(style, glyph), ns.RXPIconColor()
 end
 
 local function Channel(value)
@@ -141,7 +99,7 @@ local function Channel(value)
 end
 
 local function Escape(style, glyph)
-    local r, g, b = ns.RXPIconColor(GROUP_OF[glyph])
+    local r, g, b = ns.RXPIconColor()
     return ESCAPE:format(ART, style, glyph, EXTENSION, TEXELS, TEXELS, TEXELS, TEXELS, Channel(r), Channel(g),
         Channel(b))
 end

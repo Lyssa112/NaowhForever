@@ -113,12 +113,12 @@ do
         "another addon loading changes nothing")
     Boot(w, "RXPGuides")
     local icons = w.env.RXP.icons
-    Check(icons.accept == Expected("line", "accept", 128, 64, 255), "accept: Naowh's, in the quest color")
+    Check(icons.accept == Expected("line", "accept", 128, 64, 255), "accept: Naowh's, in the accent")
     Check(icons.turnin == Expected("line", "turnin", 128, 64, 255), "turnin")
-    Check(icons.vendor == Expected("line", "vendor", 128, 64, 255), "vendor: in the color of the rest, the accent too")
-    local goto = Expected("line", "goto", 0, 255, 128)
+    Check(icons.vendor == Expected("line", "vendor", 128, 64, 255), "vendor: in the accent too")
+    local goto = Expected("line", "goto", 128, 64, 255)
     Check(icons["goto"] == goto and icons.groundgoto == goto and icons.flygoto == goto and icons.explore == goto,
-        "the icons RestedXP made from goto are goto's too, in the travel color")
+        "the icons RestedXP made from goto are goto's too, in the same color")
     Check(icons.acceptmultiple == icons.accept, "and acceptmultiple is accept's")
     Check(icons.custom == "|TInterface/Anywhere/Else:0|t" and icons.scenario == 12345,
         "a key that is not ours, and one that is not text, are left alone")
@@ -185,60 +185,62 @@ do
     Check(w.ns.RXPIconStyle() == "", "a saved value that is not a style is RestedXP's own")
 end
 
--- the colors: a theme token each to start, a color of their own picked, and the window told
+-- the style is the window's: with it off there is none, and it comes back as the window does
+do
+    local account = { rxpIconStyle = "line" }
+    local w = World(account)
+    Check(w.ns.RXPIconStyle() == "line", "with no window module to ask: the style as it is kept")
+    w.ns.RXPWindowEnabled = function() return false end
+    Check(w.ns.RXPIconStyle() == "" and account.rxpIconStyle == "line",
+        "the window not wished for: RestedXP's own, and the style kept")
+    w.ns.RXPWindowEnabled = function() return true end
+    Check(w.ns.RXPIconStyle() == "line", "and wished for: the style is back")
+    w.env.RXP = { icons = Icons() }
+    w.ns.RXPWindowEnabled = function() return false end
+    Boot(w, "NaowhForever")
+    Check(next(w.watcher.events) == nil and w.env.RXP.icons.accept:find("GossipFrame", 1, true),
+        "the window off at load: nothing is listened for and RestedXP's icons stay")
+end
+
+-- the color: the window's accent, the theme's to start, and what the Naowh window asks of a line of text
 do
     local account = {}
     local w = World(account)
     local T = w.ns.THEME
     T.accent = { r = 0.5, g = 0.25, b = 1 }
-    T.accentSoft = { r = 0, g = 1, b = 0.5 }
-    T.fg = { r = 0.2, g = 0.4, b = 0.6 }
-    local function Is(name, r, g, b)
-        local cr, cg, cb = w.ns.RXPIconColor(name)
+    local function Is(r, g, b)
+        local cr, cg, cb = w.ns.RXPIconColor()
         return math.abs(cr - r) < 1e-9 and math.abs(cg - g) < 1e-9 and math.abs(cb - b) < 1e-9
     end
-    Check(#w.ns.RXPIconColors() == 3, "three colors: the quests', the travel's and the rest's")
-    Check(Is("quest", 0.5, 0.25, 1) and Is("travel", 0, 1, 0.5) and Is("other", 0.5, 0.25, 1),
-        "each is a token of the theme to start: the accent, the soft accent and the accent")
+    Check(Is(0.5, 0.25, 1), "the theme's accent to start")
     T.accent = { r = 0.9, g = 0.1, b = 0.1 }
-    Check(Is("quest", 0.9, 0.1, 0.1), "and follows the theme")
-    Check(Is("nothing", 0.9, 0.1, 0.1) and Is("other", 0.9, 0.1, 0.1), "a color that is not one is the rest's")
-    local redraws = 0
-    w.ns.RXPWindowRefresh = function() redraws = redraws + 1 end
-    w.ns.SetRXPIconColor("travel", 1, 0.5, 0)
-    Check(Is("travel", 1, 0.5, 0) and account.rxpIconColors.travel.g == 0.5 and redraws == 1,
-        "a color picked is kept, and the window is told")
-    Check(Is("quest", 0.9, 0.1, 0.1) and account.rxpIconColors.quest == nil, "the others are as they were")
-    w.ns.SetRXPIconColor("bogus", 1, 1, 1)
-    Check(account.rxpIconColors.bogus == nil and redraws == 1, "a name that is not a color is not kept")
-    w.ns.SetRXPIconColor("travel", "red", 1, 1)
-    Check(account.rxpIconColors == nil and Is("travel", 0, 1, 0.5) and redraws == 2,
-        "what is not a color puts it back, and the table goes with the last one")
-    w.ns.SetRXPIconColor("quest", 0, 0, 0)
-    w.ns.SetRXPIconColor("other", 1, 1, 1)
-    w.ns.ResetRXPIconColors()
-    Check(account.rxpIconColors == nil and Is("quest", 0.9, 0.1, 0.1) and redraws == 5, "reset puts every color back")
-    w.ns.RXPWindowRefresh = nil
-    w.ns.SetRXPIconColor("quest", 0, 1, 0)
-    Check(Is("quest", 0, 1, 0), "no window: nothing raised")
+    Check(Is(0.9, 0.1, 0.1), "and it follows the theme")
+    local asked
+    w.ns.RXPWindowColor = function(name)
+        asked = name
+        return 0, 1, 0, 1
+    end
+    Check(Is(0, 1, 0) and asked == "accent", "with the window there: its Accent Color")
+    w.ns.RXPWindowColor = function() error("window") end
+    Check(Is(0.9, 0.1, 0.1), "one that raises: the theme's")
+    w.ns.RXPWindowColor = function() return "red" end
+    Check(Is(0.9, 0.1, 0.1), "and one that gives no color")
+    w.ns.RXPWindowColor = function() return 1, 0, 0, 1 end
 
-    -- what the Naowh window asks of a line of text
-    w.ns.SetRXPIconColor("quest", 1, 0, 0)
     local text = ("|T%saccept.tga:0|t"):format(ART .. "filled\\")
     local path, r, g, b = w.ns.RXPIconLook(text)
     Check(path == ART .. "filled\\accept.tga" and r == 1 and g == 0 and b == 0,
-        "an icon of ours: its file, and its group's color as it is now")
-    w.ns.SetRXPIconColor("quest", 0, 0, 1)
+        "an icon of ours: its file, and the color as it is now")
+    w.ns.RXPWindowColor = function() return 0, 0, 1, 1 end
     local _, _, _, blue = w.ns.RXPIconLook(text)
     Check(blue == 1, "and as it is changed")
     Check(w.ns.RXPIconLook("|TInterface/GossipFrame/AvailableQuestIcon:0|t") == nil
         and w.ns.RXPIconLook("") == nil and w.ns.RXPIconLook(nil) == nil and w.ns.RXPIconLook(12) == nil,
         "RestedXP's own, and what is not text, are not ours")
     Check(w.ns.RXPIconLook(("|T%srainbow\\accept.tga:0|t"):format(ART)) == nil, "a style that is not one is not ours")
-    local _, tr, tg = w.ns.RXPIconLook(("|T%sline\\goto.tga:0|t"):format(ART))
-    Check(tr == 0 and tg == 1, "a glyph is in its group: goto in the travel color")
-    local _, orr, org = w.ns.RXPIconLook(("|T%sline\\clock.tga:0|t"):format(ART))
-    Check(math.abs(orr - 0.9) < 1e-9 and math.abs(org - 0.1) < 1e-9, "and one in none is in the rest's")
+    local _, tr, tg, tb = w.ns.RXPIconLook(("|T%sline\\goto.tga:0|t"):format(ART))
+    local _, cr, cg, cb = w.ns.RXPIconLook(("|T%sline\\clock.tga:0|t"):format(ART))
+    Check(tr == 0 and tg == 0 and tb == 1 and cr == 0 and cg == 0 and cb == 1, "every glyph has it: travel's and the rest's too")
 end
 
 -- the icons inside a guide's text: the two RestedXP puts in most of its lines

@@ -232,11 +232,15 @@ Core/Integrations/RestedXP/
   the line style and solid in the filled one, the detail is stroked and cut out. The escape that draws
   them carries the theme's accent as its vertex color (`|T...:r:g:b|t`), read as RestedXP loads, so it
   follows a theme change after a /reload. Their size is `0`, the height of the text, as RestedXP's own.
-- The icons' colors are three groups (quests, travel, the rest), each a theme token to start (accent, soft
-  accent, accent: so that no icon reads as unthemed) and a color of its own when picked (`rxpIconColors`, sparse). The escape bakes the color
-  in, so RestedXP's own windows take a change at the next /reload; the Naowh window does not use the
-  escape: it reads the path out of the row's text (`RXPIconLook`) and draws a texture, so a color picked,
-  or a theme token, is live there, and a done row is dimmed.
+- The icons have no colors of their own: they are in the window's Accent Color (`RXPWindowColor("accent")`,
+  the theme's accent to start, the theme's alone when the window is not there), so that no icon reads as
+  unthemed and one color covers the level range, the step count, the bars and the icons. The escape bakes
+  the color in, so RestedXP's own windows take a change at the next /reload; the Naowh window does not use
+  the escape: it reads the path out of the row's text (`RXPIconLook`) and draws a texture, so a color
+  picked, or a theme token, is live there, and a done row is dimmed.
+- The style is the window's own setting (Step Icons, in the window's (V2) fold, beside its scale) and is
+  only in force while the window is wished for (`RXPIconStyle` is RestedXP's own otherwise, the choice
+  kept), so the table is left alone for a player who does not use the window.
 - Two icons are not in `RXP.icons` but inside the guides' text, in most of its lines: the grey speech bubble
   (`chatbubble_64grey`, on every Talk to) and the interact cursor. They are baked into the text RestedXP
   parses, so the table cannot reach them and rewriting 27 thousand lines of guide text would not be ours to

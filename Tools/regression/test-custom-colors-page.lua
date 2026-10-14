@@ -364,8 +364,8 @@ do
     local a = {}
     local e = Page(a, true)
     local toggle, beside = Toggle(e)
-    Check(table.concat(e.headers, ",") == "COLORS,RESTEDXP,RestedXP Theme (V1),RestedXP Naowh Window (V2),RESTEDXP ARROW",
-        "RestedXP Guides installed: the shared one, V1's fold, V2's, and the arrow's own section while neither is on")
+    Check(table.concat(e.headers, ",") == "COLORS,RestedXP Theme (V1),RestedXP Naowh Window (V2),RESTEDXP ARROW",
+        "RestedXP Guides installed: V1's fold, V2's, and the arrow's own section while neither is on")
     Check(toggle and toggle.type == "toggle", "the toggle is there with RestedXP Guides installed")
     Check(toggle.getValue() == false and a.rxpThemes == nil, "off by default")
     Check(toggle.tooltip == "Adds the Naowh themes to RestedXP's theme list, in place of the Naowh window.",
@@ -570,13 +570,13 @@ do
 
     local plain = #Page({ themePreset = "custom" }).rows
     local custom = Page({ themePreset = "custom" }, true)
-    Check(Toggle(custom) and #custom.rows == plain + 4, "with Custom and everything off, RestedXP adds four rows: the icons', the theme's, the arrow's and the window's")
+    Check(Toggle(custom) and #custom.rows == plain + 3, "with Custom and everything off, RestedXP adds three rows: the theme's, the arrow's and the window's")
     Check(custom.rows[#custom.rows][1].text == "Style RestedXP's Arrow", "and the arrow's own is the last, above the Reload button")
     local onCustom = Page({ themePreset = "custom", rxpThemes = true }, true)
-    Check(#onCustom.rows == plain + 10, "with the themes on, RestedXP adds ten rows: the icons, the switch, the theme, the font and text, the arrow's switch, its style, its text, what it says, its font and the window")
+    Check(#onCustom.rows == plain + 9, "with the themes on, RestedXP adds nine rows: the switch, the theme, the font and text, the arrow's switch, its style, its text, what it says, its font and the window")
     Check(onCustom.rows[#onCustom.rows][1].text == "RestedXP Naowh Window (V2)", "and the window row is the last, above the Reload button")
     local onImage = Page({ themePreset = "custom", rxpThemes = true, rxpArrow = "image" }, true)
-    Check(#onImage.rows == plain + 11, "with Naowh arrow picked, one more: the glow and size")
+    Check(#onImage.rows == plain + 10, "with Naowh arrow picked, one more: the glow and size")
     local objective, size = Pair(onImage, "Arrow Shows Objective")
     Check(objective and objective.type == "toggle" and objective.getValue() == false and onImage.account.rxpArrowObjective == nil,
         "an Arrow Shows Objective toggle, off by default")
@@ -847,17 +847,17 @@ do
 end
 
 do
-    -- the icons: a style of their own, kept only when one is picked, and a reload to apply it
+    -- the icons: a style in the window's fold, kept only when one is picked, and a reload to apply it
     local function IconCell(page)
         for _, row in ipairs(page.rows) do
             for _, cell in ipairs(row) do
-                if cell.text == "RestedXP Icons" then return cell end
+                if cell.text == "Step Icons" then return cell end
             end
         end
     end
-    local s = Page({}, true)
+    local s = Page({ rxpWindow = true }, true)
     local cell = IconCell(s)
-    Check(cell and cell.type == "dropdown", "RestedXP Icons is a dropdown")
+    Check(cell and cell.type == "dropdown", "Step Icons is a dropdown")
     Check(cell.getValue() == "" and cell.values[""] == "RestedXP's own" and cell.values.line == "Line"
         and cell.values.filled == "Filled", "RestedXP's own to start, then the two styles")
     Check(cell.order[1] == "" and cell.order[2] == "line" and cell.order[3] == "filled", "in that order")
@@ -869,36 +869,29 @@ do
     Check(s.account.rxpIconStyle == nil and cell.getValue() == "", "RestedXP's own is not stored")
     cell.setValue("rainbow")
     Check(s.account.rxpIconStyle == nil, "and a style that is not one is not kept")
-    Check(IconCell(Page({}, false)) == nil and IconCell(Page({})) == nil, "no icons row without RestedXP Guides")
-end
-
-do
-    -- the icons' colors: only with a style picked, a swatch for each group and a button to put them back
-    local function Cells(page)
-        local out = {}
+    Check(cell.tooltip == "Naowh's own step icons in the accent color in place of RestedXP's, after a /reload.",
+        "its tooltip is one short sentence")
+    local function Position(page, name)
+        local at = 0
         for _, row in ipairs(page.rows) do
-            for _, cell in ipairs(row) do out[cell.text] = cell end
+            for _, cell2 in ipairs(row) do
+                at = at + 1
+                if cell2.text == name then return at end
+            end
         end
-        return out
     end
-    local none = Cells(Page({}, true))
-    Check(none["Quest Icon Color"] == nil and none["Icon Colors"] == nil, "RestedXP's own icons: no colors to pick")
-    local s = Page({ rxpIconStyle = "line" }, true)
-    local cells = Cells(s)
-    for _, name in ipairs({ "Quest Icon Color", "Travel Icon Color", "Other Icon Color" }) do
-        local cell = cells[name]
-        Check(cell and cell.type == "colorpicker" and cell.hasAlpha == false, name .. ": a swatch")
-        local r, g, b = cell.getValue()
-        Check(type(r) == "number" and type(g) == "number" and type(b) == "number", name .. ": it reads a color")
+    local scale = Position(s, "Naowh Window Scale")
+    Check(scale and scale == Position(s, "Step Icons") - 1, "it is beside the window's scale")
+    Check(IconCell(Page({}, true)) == nil and IconCell(Page({ rxpThemes = true }, true)) == nil,
+        "and not there with the window off, whatever else is on")
+    Check(IconCell(Page({ rxpWindow = true }, false)) == nil and IconCell(Page({ rxpWindow = true })) == nil,
+        "nor without RestedXP Guides")
+    local all = {}
+    for _, row in ipairs(s.rows) do
+        for _, c in ipairs(row) do all[c.text] = c end
     end
-    cells["Travel Icon Color"].setValue(0.25, 0.5, 0.75)
-    Check(s.account.rxpIconColors.travel.g == 0.5 and select(2, cells["Travel Icon Color"].getValue()) == 0.5,
-        "a color picked is kept")
-    local reset = cells["Icon Colors"]
-    Check(reset and reset.type == "button" and reset.buttonText == "Reset", "a button puts them back")
-    local refreshed = s.refreshes
-    reset.onClick()
-    Check(s.account.rxpIconColors == nil and s.refreshes == refreshed + 1, "it clears them and draws the page again")
+    Check(all["Quest Icon Color"] == nil and all["Travel Icon Color"] == nil and all["Other Icon Color"] == nil
+        and all["Icon Colors"] == nil, "and no colors of its own: the icons follow the Accent Color")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")
