@@ -96,9 +96,9 @@ local function Page(account, rxp, up)
     end
     function env.W:EndFeature() end
     function env.W:DualRow(_, _, left, right)
-        -- The Skin row is checked on its own below; the Theme rows keep their places.
+        -- The Skin row carries the Theme dropdown; the rows after it keep their places.
         if left.text == "Skin" then
-            e.skin = left
+            e.skin, e.theme = left, right
             return nil, 0
         end
         e.rows[#e.rows + 1] = { left, right }
@@ -113,14 +113,13 @@ local function Page(account, rxp, up)
     function e.build()
         e.rows, e.notes, e.headers = {}, {}, {}
         chunk({}, 0)
-        e.theme = e.rows[1][1]
     end
     e.build()
     return e
 end
 local function Texts(e)
     local out = {}
-    for i = 3, #e.rows do
+    for i = 2, #e.rows do
         for _, cfg in ipairs(e.rows[i]) do if cfg.text ~= "" then out[#out + 1] = cfg.text end end
     end
     return out
@@ -143,27 +142,31 @@ do
     for _, word in ipairs({ "Theme presets", "windows and HUD frames", "Custom", "Naowh (default)", "/reload" }) do
         Check(t.tooltip:find(word, 1, true), "tooltip mentions " .. word)
     end
-    Check(e.rows[1][2].type == "palette" and #e.rows[1][2].colors() == 6, "a six-chip preview beside the Theme dropdown")
+    local chips = t.palette()
+    Check(#chips == 3, "a three-chip preview beside the Theme dropdown")
+    local all = e.ns.ThemePalette("")
+    local function Same(x, y) return x.r == y.r and x.g == y.g and x.b == y.b end
+    Check(Same(chips[1], all[1]) and Same(chips[2], all[4]) and Same(chips[3], all[6]), "the first, middle and last colors")
     Check(not t.tooltip:find("Reset", 1, true), "no reset any more")
 end
 
 -- Swatches show for Custom and for nothing else.
 do
-    Check(#Page({}).rows == 1, "no swatches for the default theme")
+    Check(#Page({}).rows == 0, "no swatches for the default theme")
     for _, key in ipairs(Page({}).ns.THEME_PRESET_ORDER) do
         local e = Page({ themePreset = key })
-        Check(#e.rows == 1 and e.theme.getValue() == key, "no swatches for " .. key)
+        Check(#e.rows == 0 and e.theme.getValue() == key, "no swatches for " .. key)
     end
     for _, bad in ipairs({ "bogus", "order", 5 }) do
         local e = Page({ themePreset = bad })
-        Check(#e.rows == 1 and e.theme.getValue() == "", "an invalid preset reads as the default, no swatches")
+        Check(#e.rows == 0 and e.theme.getValue() == "", "an invalid preset reads as the default, no swatches")
     end
     local e = Page({ themePreset = "custom" })
-    Check(#e.rows == 5, "Custom shows the Start From row and three swatch rows")
-    Check(e.rows[2][1].text == "Start From" and e.rows[2][1].type == "dropdown", "the Start From dropdown")
+    Check(#e.rows == 4, "Custom shows the Start From row and three swatch rows")
+    Check(e.rows[1][1].text == "Start From" and e.rows[1][1].type == "dropdown", "the Start From dropdown")
     Check(table.concat(Texts(e), ",") == "Background,Panels,Borders & Lines,Text,Secondary Text,Accent",
         "the six swatches, in order")
-    for i = 3, 5 do
+    for i = 2, 4 do
         for _, cfg in ipairs(e.rows[i]) do
             if cfg.text ~= "" then Check(cfg.type == "colorpicker" and cfg.hasAlpha == false, cfg.text .. " is a swatch") end
         end
@@ -178,22 +181,24 @@ do
     e.theme.setValue("midnight")
     Check(a.themePreset == "midnight" and e.refreshes == 1 and #e.confirms == 0, "a preset is stored and the page redraws")
     e.build()
-    Check(#e.notes == 1 and e.notes[1] == HINT and #e.rows == 1, "the hint shows, still no swatches")
+    Check(#e.notes == 1 and e.notes[1] == HINT and #e.rows == 0, "the hint shows, still no swatches")
     e.theme.setValue("")
     e.build()
     Check(a.themePreset == nil and #e.notes == 1, "the default is stored as nothing, and the hint stays")
 end
 
--- Skin: the default or Classic+, stored for a reload; Classic+ has its own colors, so the
--- Theme dropdown is greyed out under it.
+-- Skin: the default or Forever, stored for a reload; Forever has its own colors, so the Theme
+-- dropdown is greyed out under it, and the help is one sentence.
 do
     local a = {}
     local e = Page(a)
     local k = e.skin
-    Check(k and k.type == "dropdown" and k.order[1] == "" and k.values.classic == "Classic+", "a Skin dropdown, default first")
+    Check(k and k.type == "dropdown" and #k.order == 2 and k.order[1] == "" and k.order[2] == "forever"
+        and k.values.forever == "Forever" and k.values.classic == nil, "a Skin dropdown: Naowh first, then Forever")
+    Check(#k.tooltip < 100 and not k.tooltip:find("%. ") and not k.tooltip:find("|n", 1, true), "its help is one short sentence")
     Check(k.getValue() == "" and not e.theme.disabled(), "nothing saved: the default, and Theme can be picked")
-    k.setValue("classic")
-    Check(a.skin == "classic" and e.refreshes == 1, "Classic+ is stored and the page redraws")
+    k.setValue("forever")
+    Check(a.skin == "forever" and e.refreshes == 1, "Forever is stored and the page redraws")
     e.build()
     Check(#e.notes == 1 and e.notes[1] == HINT and e.theme.disabled(), "the hint shows, and Theme is greyed out")
     e.skin.setValue("")
@@ -207,8 +212,8 @@ do
     e.theme.setValue("custom")
     Check(a.themePreset == "custom" and a.themeColors.bg.r == 0x12 / 255, "Custom is prefilled from the selected preset")
     e.build()
-    Check(#e.rows == 5 and #e.notes == 1, "the swatches appear once Custom is selected")
-    local bg = e.rows[3][1]
+    Check(#e.rows == 4 and #e.notes == 1, "the swatches appear once Custom is selected")
+    local bg = e.rows[2][1]
     local r = bg.getValue()
     Check(r == 0x12 / 255, "the swatch shows the prefilled color")
 end
@@ -217,7 +222,7 @@ end
 do
     local a = { themePreset = "custom", themeColors = { bg = { r = 0.1, g = 0.1, b = 0.1 } } }
     local e = Page(a)
-    local swatch = e.rows[3][1]
+    local swatch = e.rows[2][1]
     Check(#e.notes == 0, "no hint before a swatch changes")
     for i = 1, 50 do swatch.setValue(i / 50, 0, 0) end
     Check(e.refreshes == 1, "only the first tick redraws the page")
@@ -231,7 +236,7 @@ end
 do
     local a = { themePreset = "custom", themeColors = { bg = { r = 1, g = 0, b = 0 } } }
     local e = Page(a)
-    local start = e.rows[2][1]
+    local start = e.rows[1][1]
     Check(start.order[1] == "" and start.values[""] == "Choose a theme...", "the placeholder comes first")
     Check(start.order[2] == "default" and start.values.default == "Naowh (default)", "the default is offered")
     Check(#start.order == #e.ns.THEME_PRESET_ORDER + 2 and start.values.custom == nil, "every preset, and not Custom itself")
@@ -256,16 +261,16 @@ end
 
 -- The preview follows the selection.
 do
-    local function Chips(account) return Page(account).rows[1][2].colors() end
+    local function Chips(account) return Page(account).theme.palette() end
     local function Hex(c)
         return ("%02x%02x%02x"):format(math.floor(c.r * 255 + 0.5), math.floor(c.g * 255 + 0.5), math.floor(c.b * 255 + 0.5))
     end
     local default, midnight = Chips({}), Chips({ themePreset = "midnight" })
-    Check(Hex(default[1]) == "0e0f11" and Hex(default[6]) == "0091ed", "default: the shipped background and accent")
-    Check(Hex(midnight[1]) == "0b1020" and Hex(midnight[4]) == "eef2ff" and Hex(midnight[6]) == "5b8cff",
+    Check(Hex(default[1]) == "0e0f11" and Hex(default[3]) == "0091ed", "default: the shipped background and accent")
+    Check(Hex(midnight[1]) == "0b1020" and Hex(midnight[2]) == "eef2ff" and Hex(midnight[3]) == "5b8cff",
         "a preset: its own background, text and accent")
     local custom = Chips({ themePreset = "custom", themeColors = { bg = { r = 1, g = 0, b = 0 } } })
-    Check(Hex(custom[1]) == "ff0000" and Hex(custom[2]) == "1a1c1f", "custom: the saved pick, the shipped color for the rest")
+    Check(Hex(custom[1]) == "ff0000" and Hex(custom[2]) == Hex(default[2]), "custom: the saved pick, the shipped color for the rest")
     local invalid = Chips({ themePreset = "bogus" })
     Check(Hex(invalid[1]) == "0e0f11", "an invalid preset previews the default")
 end
@@ -276,7 +281,7 @@ do
     local widgetConstants = assert(widgets:match("\n(local MEDIA = .-\n)\nlocal UI = {}\n"), "Widgets constants")
     local atEnd = assert(widgets:match("\n(local function AtRowEnd%(.-\nend\n)"), "AtRowEnd")
     local from = assert(widgets:find("local function PaletteChip(", 1, true))
-    local upTo = assert(widgets:find("local function ColorPickerControl(", from, true))
+    local upTo = assert(widgets:find("local function DropdownControl(", from, true))
     local code = widgetConstants .. atEnd .. widgets:sub(from, upTo - 1)
         .. "local cfg, rgn = ...\nreturn PaletteControl(rgn, cfg)\n"
     local paletteChunk = assert(loadstring(code))
@@ -596,7 +601,7 @@ end
 do
     -- the window's look: a row for each thing it can be changed in, from its own list
     local styled = {}
-    local s = Page({ rxpWindow = true, themePreset = "custom" }, true)
+    local s = Page({ rxpWindow = true, rxpWindowTheme = "custom" }, true)
     Check(table.concat(s.headers, ","):find("WINDOW LOOK", 1, true) ~= nil, "a WINDOW LOOK section with it on")
     Check(table.concat(Page({}, true).headers, ","):find("WINDOW LOOK", 1, true) == nil, "and none with it off")
     local cells = {}
@@ -642,7 +647,7 @@ do
 end
 
 do
-    -- the theme picker is in the window's fold as well, and the colors are the window's own only with Custom
+    -- the window has a theme of its own in its fold, and its colors are its own only with Custom
     local function All(page, text)
         local out = {}
         for _, row in ipairs(page.rows) do
@@ -653,30 +658,40 @@ do
         return out
     end
     local s = Page({ rxpWindow = true }, true)
-    local pickers = All(s, "Theme")
-    Check(#pickers == 2 and pickers[2].type == "dropdown" and pickers[2].getValue == pickers[1].getValue,
-        "the addon's theme picker is there once more, in the window's fold, and is the same setting")
-    Check(pickers[2].tooltip == "The addon's theme, whose colors are the window's; Custom lets you pick them.",
-        "with a short tooltip of its own")
-    Check(#All(s, "Title Color") == 0 and #All(s, "Accent Color") == 0 and #All(s, "Window Color") == 0,
+    local pickers = All(s, "Window Theme")
+    Check(#pickers == 1 and pickers[1].type == "dropdown" and s.theme.text == "Theme" and #All(s, "Theme") == 0,
+        "a picker of its own, and the addon's is the one beside the Skin")
+    Check(pickers[1].getValue ~= s.theme.getValue and pickers[1].getValue() == "",
+        "it is not the addon's setting, and is the addon's theme to start")
+    Check(pickers[1].values[""] == "Same as the Addon" and pickers[1].values.midnight == "Midnight"
+        and pickers[1].values.custom == "Custom" and pickers[1].order[1] == ""
+        and pickers[1].order[#pickers[1].order] == "custom", "the addon's, every preset and Custom last")
+    Check(pickers[1].tooltip == "The window's colors alone, whatever the addon's theme is; Custom lets you pick them.",
+        "with a short tooltip")
+    Check(#All(s, "Title Color") == 0 and #All(s, "Accent Color") == 0 and #All(s, "Arrow Color") == 0,
         "a theme picked: no colors to pick")
-    Check(#All(Page({ rxpWindow = true, themePreset = "midnight" }, true), "Title Color") == 0,
-        "and a theme of the addon's is the same")
-    local custom = Page({ rxpWindow = true, themePreset = "custom" }, true)
-    Check(#All(custom, "Title Color") == 1 and #All(custom, "Accent Color") == 1 and #All(custom, "Window Color") == 1,
-        "Custom: the colors, each once")
+    Check(#All(Page({ rxpWindow = true, rxpWindowTheme = "midnight" }, true), "Title Color") == 0,
+        "and a theme of the presets is the same")
+    Check(#All(Page({ rxpWindow = true, themePreset = "custom" }, true), "Title Color") == 0,
+        "the addon's theme being Custom is not the window's")
+    local custom = Page({ rxpWindow = true, rxpWindowTheme = "custom" }, true)
+    Check(#All(custom, "Title Color") == 1 and #All(custom, "Accent Color") == 1 and #All(custom, "Window Color") == 1
+        and #All(custom, "Arrow Color") == 1, "Custom: the colors, each once, the arrow's with them")
+    local arrow = All(custom, "Arrow Color")[1]
+    Check(arrow.type == "colorpicker" and arrow.tooltip == "RestedXP's waypoint arrow.", "the arrow's is a swatch")
     Check(#All(Page({ rxpWindow = true }, true), "Naowh Window Width") == 1, "the sliders are there either way")
     local pick = Page({ rxpWindow = true }, true)
-    local picker = All(pick, "Theme")[2]
+    local picker = All(pick, "Window Theme")[1]
+    local refreshed = pick.refreshes
     picker.setValue("custom")
-    Check(pick.account.themePreset == "custom", "the picker sets the addon's theme")
+    Check(pick.account.rxpWindowTheme == "custom" and pick.account.themePreset == nil,
+        "the picker sets the window's theme and leaves the addon's alone")
+    Check(pick.refreshes == refreshed + 1, "and the page is drawn again")
     pick.build()
-    Check(#All(pick, "Title Color") == 1, "and the colors are there once it is Custom")
-    local noted = false
-    for _, note in ipairs(pick.notes) do
-        if note == "Reload UI to apply your color changes." then noted = true end
-    end
-    Check(noted, "with the note that a reload applies it")
+    Check(#All(pick, "Title Color") == 1, "the colors are there once it is Custom")
+    Check(#pick.notes == 0, "and no reload is asked for: it is at once")
+    picker.setValue("")
+    Check(pick.account.rxpWindowTheme == nil, "the addon's is not stored")
 end
 
 do
@@ -841,7 +856,7 @@ do
     Check(window["Naowh Window Width"] == "RestedXP Naowh Window (V2)" and window["Set Up New Characters"]
         == "RestedXP Naowh Window (V2)" and window["Title Color"] == nil and window["Window Look"] ~= nil,
         "V2's rows, the set up and the look, under its title, and no colors with a theme")
-    Check(Terms({ rxpWindow = true, themePreset = "custom" })["Title Color"] == "WINDOW LOOK",
+    Check(Terms({ rxpWindow = true, rxpWindowTheme = "custom" })["Title Color"] == "WINDOW LOOK",
         "and the colors with Custom, in the look's group")
     local none = Terms({})
     Check(none["RestedXP Theme (V1)"] ~= nil and none["Naowh Window Width"] == nil and none["Style RestedXP's Arrow"] ~= nil,

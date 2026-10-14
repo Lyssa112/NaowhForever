@@ -13,7 +13,7 @@ local SCALE_VALUES = { [200] = "200%", [190] = "190%", [180] = "180%", [170] = "
     [80] = "80%", [70] = "70%", [60] = "60%", [50] = "50%" }
 local SCALE_ORDER = { 200, 190, 180, 170, 160, 150, 140, 130, 120, 110, 100, 90, 80, 70, 60, 50 }
 local CUSTOM = "custom"
-local SKIN_CLASSIC = "classic"
+local SKIN_FOREVER = "forever"
 local DEFAULT_START = "default"
 local AUTO = "auto"
 local MINIMAP_NAME = "NaowhForever"
@@ -31,14 +31,14 @@ local TEXT_COLORS_RELOAD = ns.L("Reload UI to apply your color changes.")
 local TEXT_RXP_RELOAD = ns.L("Reload UI to apply your RestedXP changes.")
 local TEXT_RXP_PICK_RELOAD = "Reload UI to pick a theme."
 local TEXT_RXP_WINDOW_NEEDS = "Turn on RestedXP's Beta Features and V2 interface."
-local TEXT_SKIN_TIP = ns.L("Classic+ dresses the addon's windows like the game's own, in gold and bronze. "
-    .. "It has its own colors and uses the game's fonts unless you pick an Addon Font. Saved "
-    .. "for this computer.|n|nTakes effect after a /reload.")
-local TEXT_CLASSIC_PLUS = "Classic+"
-local SKINS = { [""] = TEXT_NAOWH_DEFAULT, [SKIN_CLASSIC] = TEXT_CLASSIC_PLUS }
-local SKIN_ORDER = { "", SKIN_CLASSIC }
+local TEXT_WINDOW_THEME_SAME = "Same as the Addon"
+local TEXT_SKIN_TIP = ns.L("Dresses the addon's windows as Naowh's own or WoW Forever's, after a reload.")
+local TEXT_FOREVER = "Forever"
+local SKINS = { [""] = TEXT_NAOWH_DEFAULT, [SKIN_FOREVER] = TEXT_FOREVER }
+local SKIN_ORDER = { "", SKIN_FOREVER }
 local TEXT_MINIMAP_TIP = ns.L("A minimap button that opens %s. /nf%s does the same, "
     .. "and the Top Bar can carry it too. Saved for this computer.")
+local TEXT_FEATURE_TIP = ns.L("A minimap button that opens %s. Saved for this computer.")
 local TEXT_TURNED_OFF = ns.L("%s is turned off, so its settings are hidden. Turn it on under Modules below.")
 local NONE = {}
 local TEXT_ON_ITS_OWN, TEXT_ITS_SETTINGS = ns.L("%s on its own"), ns.L("%s's settings")
@@ -72,7 +72,7 @@ local function ModuleRow(mod)
     return { type = "toggle", text = O.DisplayName(mod), module = mod,
         tooltip = mod.needs and NeedsTip(mod) or mod.subtitle,
         getValue = function()
-            if not Loaded(mod) then return C_AddOns.GetAddOnEnableState(mod.addon) > 0 end
+            if not Loaded(mod) then return C_AddOns.GetAddOnEnableState(mod.addon, UnitGUID("player")) > 0 end
             return ModuleOn(mod)
         end,
         setValue = function(v) SetModuleOn(mod, v) end }
@@ -124,6 +124,13 @@ local function ModuleButtonRow(mod)
         setValue = function(v) SetModuleButton(mod, v) end }
 end
 
+local function FeatureButtonRow(feature)
+    return { type = "toggle", text = feature.name,
+        tooltip = TEXT_FEATURE_TIP:format(ns.L(feature.name)),
+        getValue = function() return ns.MinimapFeatureOn(feature) end,
+        setValue = function(v) ns.SetMinimapFeature(feature, v) end }
+end
+
 local function MinimapShown()
     local mm = ns.AccountSettings().minimap
     return not (type(mm) == "table" and mm.hide)
@@ -156,6 +163,7 @@ local function MinimapSection(W, parent, y)
     for _, mod in ipairs(MODULES) do
         if mod.command and Loaded(mod) then rows[#rows + 1] = ModuleButtonRow(mod) end
     end
+    for _, feature in ipairs(ns.MinimapFeatures) do rows[#rows + 1] = FeatureButtonRow(feature) end
     return FoldedRows(W, parent, y, "MINIMAP ICONS", rows)
 end
 
@@ -305,8 +313,8 @@ local function CustomRows(W, parent, y)
     return y
 end
 
-local function ClassicSkin()
-    return ns.AccountSettings().skin == SKIN_CLASSIC
+local function SkinColors()
+    return ns.AccountSettings().skin == SKIN_FOREVER
 end
 
 local function SkinRow()
@@ -318,25 +326,27 @@ local function SkinRow()
         end }
 end
 
-local function ThemePicker(tooltip)
-    local themes, themeOrder = ThemeChoices()
-    return { type = "dropdown", text = "Theme", values = themes, order = themeOrder, tooltip = tooltip,
-          getValue = ns.ThemePresetKey,
-          disabled = ClassicSkin,
-          setValue = function(v)
-              ns.SetThemePreset(v)
-              ColorsChanged()
-          end },
-        { type = "palette", text = "", colors = function() return ns.ThemePalette(ns.ThemePresetKey()) end }
+local function ThemeRow(themes, themeOrder)
+    return { type = "dropdown", text = "Theme", values = themes, order = themeOrder,
+        tooltip = "Theme presets for the addon's windows and HUD frames, plus a Custom "
+        .. "option for your own colors. If text gets hard to read, pick Naowh (default). "
+        .. "Saved for this computer.|n|nTakes effect after a /reload.",
+        getValue = ns.ThemePresetKey,
+        disabled = SkinColors,
+        palette = function()
+            local colors = ns.ThemePalette(ns.ThemePresetKey())
+            return { colors[1], colors[math.floor(#colors / 2) + 1], colors[#colors] }
+        end,
+        setValue = function(v)
+            ns.SetThemePreset(v)
+            ColorsChanged()
+        end }
 end
 
 local function ColorsSection(W, parent, y)
     local _, h = W:SectionHeader(parent, "COLORS", y); y = y - h
-    _, h = W:DualRow(parent, y, SkinRow(), Empty()); y = y - h
-    _, h = W:DualRow(parent, y, ThemePicker("Theme presets for the addon's windows and HUD frames, plus a Custom "
-          .. "option for your own colors. If text gets hard to read, pick Naowh (default). "
-          .. "Saved for this computer.|n|nTakes effect after a /reload.")); y = y - h
-    if ns.ThemePresetKey() == CUSTOM and not ClassicSkin() then y = CustomRows(W, parent, y) end
+    _, h = W:DualRow(parent, y, SkinRow(), ThemeRow(ThemeChoices())); y = y - h
+    if ns.ThemePresetKey() == CUSTOM and not SkinColors() then y = CustomRows(W, parent, y) end
     if colorsPending then
         _, h = W:Note(parent, TEXT_COLORS_RELOAD, y); y = y - h
     end
@@ -501,13 +511,26 @@ local function IconStyleRow()
         end }
 end
 
+local function WindowThemeRow()
+    local values, order = { [""] = TEXT_WINDOW_THEME_SAME }, { "" }
+    for _, key in ipairs(ns.THEME_PRESET_ORDER) do
+        values[key] = ns.THEME_PRESETS[key].name
+        order[#order + 1] = key
+    end
+    values[CUSTOM] = TEXT_CUSTOM
+    order[#order + 1] = CUSTOM
+    return { type = "dropdown", text = "Window Theme", values = values, order = order,
+        tooltip = "The window's colors alone, whatever the addon's theme is; Custom lets you pick them.",
+        getValue = ns.RXPWindowThemeKey,
+        setValue = function(v)
+            ns.SetRXPWindowTheme(v)
+            UI:RefreshPage(true)
+        end }
+end
+
 local function RxpWindowStyleRows(W, parent, y)
     local _, h = W:GroupHeader(parent, "WINDOW LOOK", y); y = y - h
-    _, h = W:DualRow(parent, y, ThemePicker("The addon's theme, whose colors are the window's; Custom lets you pick them."))
-    y = y - h
-    if colorsPending then
-        _, h = W:Note(parent, TEXT_COLORS_RELOAD, y); y = y - h
-    end
+    _, h = W:DualRow(parent, y, WindowThemeRow(), Empty()); y = y - h
     local cells = {}
     for _, group in ipairs({ "Text", "Look", "Progress" }) do
         for _, option in ipairs(ns.RXPWindowOptions()) do

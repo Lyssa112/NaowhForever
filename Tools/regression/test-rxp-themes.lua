@@ -239,13 +239,14 @@ do
         "while the fixed themes are what they were")
 
     for _, account in ipairs({
-        { rxpThemes = true, skin = "classic", themePreset = "crimson" },
-        { rxpThemes = true, skin = "classic" },
-        { rxpThemes = true, skin = "classic", themePreset = "custom", themeColors = { accent = { r = 0, g = 1, b = 0 } } } }) do
+        { rxpThemes = true, skin = "forever", themePreset = "crimson" },
+        { rxpThemes = true, skin = "forever" },
+        { rxpThemes = true, skin = "forever", themePreset = "custom", themeColors = { accent = { r = 0, g = 1, b = 0 } } },
+        { rxpThemes = true, skin = "classic", themePreset = "crimson" } }) do
         theme, list = Current(account)
-        Check(Hex(theme.background) == "17110b" and Hex(theme.bottomFrameBG) == "17110b" and Hex(theme.mapPins) == "ffd100"
-            and Hex(theme.dividerColor) == "5e4a1c" and Hex(theme.chromeColor) == "a89a7c" and Hex(theme.textColor) == "ece3cc",
-            "with the Classic+ skin on: Classic+'s colors, whatever theme was picked")
+        Check(Hex(theme.background) == "1b1916" and Hex(theme.bottomFrameBG) == "1b1916" and Hex(theme.mapPins) == "ffd100"
+            and Hex(theme.dividerColor) == "6e5126" and Hex(theme.chromeColor) == "9a8f7a" and Hex(theme.textColor) == "e8dab4",
+            "with the Forever skin on (or the Classic+ it replaced): Forever's colors, whatever theme was picked")
         Check(theme.tooltip == "|cffffd100" and Same(theme.bottomFrameHighlight, { 1, 0xd1 / 255, 0, 0.5 }),
             "and its Accent in the tooltip and the highlight")
         Check(Hex(list["NaowhForever:crimson"].mapPins) == "ef4b56" and Hex(list["NaowhForever:default"].mapPins) == "0091ed",
@@ -741,6 +742,28 @@ do
     imageEnv.hooked[1][3](drawn)
     tint = drawn.tints[#drawn.tints]
     Check(drawn.texture.path == OURS and #drawn.sets == 3 and Hex(tint) == "5b8cff", "back to one of ours: the image and Midnight's Accent")
+
+    -- the window on with its theme Custom: the arrow is in the color the player picked for it
+    local own = imageEnv.NaowhForever
+    own.RXPWindowEnabled = function() return true end
+    own.RXPWindowOwnColors = function() return true end
+    own.RXPWindowColor = function(name) return name == "arrow" and 1 or 0, 0, 0.5, 1 end
+    own.RXPPaintArrow()
+    Check(Same(drawn.tints[#drawn.tints], { 1, 0, 0.5, 1 }), "the window on, its theme Custom: the arrow's own color")
+    own.RXPWindowOwnColors = function() return false end
+    own.RXPPaintArrow()
+    Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "a theme of the window's: the theme's own color")
+    own.RXPWindowOwnColors = function() return true end
+    own.RXPWindowEnabled = function() return false end
+    own.RXPPaintArrow()
+    Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "the window off: the theme's own color")
+    own.RXPWindowOwnColors = function() return true end
+    own.RXPWindowEnabled = function() return true end
+    own.RXPWindowColor = function() return "red" end
+    own.RXPPaintArrow()
+    Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "a color that is none: the theme's own color")
+    own.RXPWindowEnabled, own.RXPWindowOwnColors, own.RXPWindowColor = nil, nil, nil
+    own.RXPPaintArrow()
 
     local styles = imageEnv.NaowhForever
     styles.SetRXPArrowStyle("layer")

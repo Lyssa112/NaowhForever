@@ -600,13 +600,21 @@ function ns.SetRXPArrowObjective(on)
     if type(arrow) == "table" then arrow.distance = nil end
 end
 
+-- With the window on and its theme Custom, the arrow is in the color the player picked for it.
+local function OwnArrowColor()
+    if type(ns.RXPWindowEnabled) ~= "function" or not ns.RXPWindowEnabled() then return end
+    if type(ns.RXPWindowOwnColors) ~= "function" or not ns.RXPWindowOwnColors() then return end
+    local r, g, b = ns.RXPWindowColor("arrow")
+    if type(r) == "number" and type(g) == "number" and type(b) == "number" then return { r, g, b, 1 } end
+end
+
 local function DrawArrow()
     local arrow = _G.RXPG_ARROW
     local texture = Dig(arrow, "texture")
     if type(texture) ~= "table" then return end
     local on = ns.RXPArrowEnabled()
     local theme = ActiveTheme()
-    local color = theme and theme.mapPins or Rgba(ns.THEME.accent, 1)
+    local color = OwnArrowColor() or (theme and theme.mapPins) or Rgba(ns.THEME.accent, 1)
     local style = on and ns.RXPArrowStyle() or "off"
     if style == "layer" then
         ShowLayer(arrow, color)
@@ -623,6 +631,10 @@ end
 
 function PaintArrow()
     Quiet("PaintArrow", DrawArrow)
+end
+
+function ns.RXPPaintArrow()
+    PaintArrow()
 end
 
 local function OnRxpUpdate()
