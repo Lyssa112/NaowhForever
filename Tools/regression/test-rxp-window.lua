@@ -1878,4 +1878,37 @@ do
     Check(rows[3].points[1][4] == 7 + 12 + 23, "the column it is set in by is the icon's, and its gap")
 end
 
+-- a step that lists items under a line has no count bars: what is counted there is not what is bought
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local f = Window(w)
+    local ns = w.ns
+    local BAGS = "BAG_UPDATE_DELAYED"
+    local function Meters()
+        local count = 0
+        for _, o in ipairs(w.frames) do
+            if o.meter and Seen(o) and o.meter.shown then count = count + 1 end
+        end
+        return count
+    end
+    local function Draw()
+        w.rxp.v2:UpdateGuideWindow()
+        Flush(w)
+    end
+    w.buy.id, w.buy.qty = 159, 5
+    w.items[159] = 2
+    w.talk.frame.text:SetText("Strider Meat: 5/5")
+    Draw()
+    Check(Meters() == 2 and f.events[BAGS] == true, "a counted line and a buy have their bars to start")
+    w.vendor.frame.icon:SetText("")
+    w.vendor.frame.text:SetText("|T135641:0|t (Darkshore Grouper)")
+    Draw()
+    Check(Meters() == 0, "with an item listed under a line in the step, none has")
+    Check(f.events[BAGS] == nil, "and the bags are not listened to for it")
+    w.vendor.frame.text:SetText("Vendor Trash")
+    Draw()
+    Check(Meters() == 2 and f.events[BAGS] == true, "without it they are back")
+end
+
 print("PASS rxp window: " .. cases .. " checks")

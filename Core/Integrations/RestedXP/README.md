@@ -249,3 +249,7 @@ Core/Integrations/RestedXP/
   column like a marker is, and the line is set in as far as the column on top of the sub task indent, so
   the items listed under a "Buy the following:" sit under its text and not at its marker. A marker (the
   speech bubble, the interact cursor, ours) is set in as a sub task is, and the first line never is.
+- A step that lists items under a line (a row whose line begins with an item's icon) has no count bars:
+  what RestedXP counts under a "Buy the following:" is not what is bought, and its tracking there marked
+  items done that were not in the bags. The bars of such a step are not drawn and the bags are not
+  listened to for it.
