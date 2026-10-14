@@ -299,8 +299,11 @@ do
             if o.text:find("36/66", 1, true) then progress = o end
         end
     end
-    Check(heading and heading.text:find("|cffffd100" .. "1-6", 1, true) and not heading.text:find("^1%-6"),
-        "the place, then its level range in gold")
+    local accent = w.ns.THEME.accent
+    local accentHex = ("%02x%02x%02x"):format(math.floor(accent.r * 255 + 0.5), math.floor(accent.g * 255 + 0.5),
+        math.floor(accent.b * 255 + 0.5))
+    Check(heading and heading.text:find("|cff" .. accentHex .. "1-6", 1, true) and not heading.text:find("^1%-6"),
+        "the place, then its level range in the theme's accent")
     Check(progress and progress.text:find("36/66", 1, true) and progress.text:find("55%%"),
         "the step and the percent of the guide")
     local labels, rowTexts, lines = {}, {}, {}
@@ -624,12 +627,6 @@ do
         "the first starts at the start of the box, the others are set in")
     Check(rows[1].width == 380 - 20 - 14 and rows[2].width == 380 - 20 - 14 - 12,
         "and are that much narrower")
-    ns.SetRXPWindowOption("rxpWindowIndent", 20)
-    Flush(w)
-    Check(rows[2].points[1][4] == 7 + 20 and account.rxpWindowIndent == 20, "how far is a setting")
-    ns.SetRXPWindowOption("rxpWindowIndent", 0)
-    Flush(w)
-    Check(rows[2].points[1][4] == 7 and rows[2].width == rows[1].width, "none sets none in")
 end
 
 -- what is missing or fails is left out, quietly
@@ -717,13 +714,13 @@ do
     local T = ns.THEME
     local r, g, b, a = ns.RXPWindowColor("title")
     Check(r == T.fg.r and g == T.fg.g and b == T.fg.b and a == 1, "the title is the theme's text color")
-    r, g, b, a = ns.RXPWindowColor("range")
-    Check(r == 1 and math.abs(g - 0.82) < 1e-9 and b == 0 and a == 1, "the level range is gold")
-    r, g, b, a = ns.RXPWindowColor("list")
-    Check(r == T.muted.r and a == 0.9, "the list is the theme's muted, a little see-through")
+    r, g, b, a = ns.RXPWindowColor("accent")
+    Check(r == T.accent.r and g == T.accent.g and b == T.accent.b and a == 1, "the accent is the theme's accent")
+    r, g, b, a = ns.RXPWindowColor("muted")
+    Check(r == T.muted.r and a == 0.9, "the muted text is the theme's muted, a little see-through")
     r, g, b, a = ns.RXPWindowColor("panel")
     Check(r == T.panel.r and a == 0.92, "the panel is the theme's panel color")
-    Check(#ns.RXPWindowColors() >= 10, "the colors it lists")
+    Check(#ns.RXPWindowColors() == 8, "the eight colors it lists, each for several things")
     ns.SetRXPWindowColor("title", 0.1, 0.2, 0.3, 0.4)
     r, g, b, a = ns.RXPWindowColor("title")
     Check(r == 0.1 and g == 0.2 and b == 0.3 and a == 0.4 and account.rxpWindowColors.title.a == 0.4,
@@ -738,7 +735,7 @@ do
     Check(ns.RXPWindowColor("text") == T.fg.r, "a color saved wrongly is the theme's")
     account.rxpWindowColors = nil
     ns.SetRXPWindowOption("rxpWindowPanel", true)
-    ns.SetRXPWindowColor("fill", 1, 0, 0, 1)
+    ns.SetRXPWindowColor("accent", 1, 0, 0, 1)
     ns.ResetRXPWindowStyle()
     Check(account.rxpWindowPanel == nil and account.rxpWindowColors == nil, "reset puts the look back")
     account.rxpWindowWidth, account.rxpWindowSteps, account.rxpWindowScale = 400, 3, 120
@@ -785,7 +782,6 @@ do
     Flush(w)
     Check(f.bar.shown == false and f.rule.shown == false, "or nothing")
     w.ns.SetRXPWindowOption("rxpWindowLine", "bar")
-    w.ns.SetRXPWindowOption("rxpWindowBarHeight", 9)
     w.ns.SetRXPWindowOption("rxpWindowBarTexture", "Flat Name")
     Flush(w)
     Check(f.bar.barTexture == "Textures\\Flat Name", "another texture picked is the bar's")
@@ -793,11 +789,11 @@ do
     Flush(w)
     Check(f.bar.barTexture == w.ns.MEDIA .. "NaowhGradient.tga", "and none is the Naowh Gradient again")
     w.ns.SetRXPWindowOption("rxpWindowBarTexture", "Flat Name")
-    w.ns.SetRXPWindowColor("fill", 1, 0, 0, 0.5)
+    w.ns.SetRXPWindowColor("accent", 1, 0, 0, 0.5)
     w.ns.SetRXPWindowColor("line", 0, 0, 1, 1)
     Flush(w)
-    Check(f.bar.height == 9 and f.bar.barTexture == "Textures\\Flat Name" and f.bar.barColor[1] == 1
-        and f.bar.barColor[4] == 0.5 and f.bar.track.solid[3] == 1, "the height, the texture and the colors are its own")
+    Check(f.bar.height == 5 and f.bar.barTexture == "Textures\\Flat Name" and f.bar.barColor[1] == 1
+        and f.bar.barColor[4] == 0.5 and f.bar.track.solid[3] == 1, "the height is fixed, the texture and the colors are its own")
     w.rows[1].complete = true
     w.rxp.GetGuideProgress = function() return 66, "id" end
     w.rxp.v2:UpdateGuideWindow()
@@ -807,9 +803,6 @@ do
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
     Check(f.bar.value == 0, "and none an empty one")
-    w.ns.SetRXPWindowOption("rxpWindowProgressText", false)
-    Flush(w)
-    Check(f.progress.text == "", "the progress text can be left out")
 end
 
 -- the look: panel, borders, menu, spacing and the colors of every text
@@ -822,7 +815,7 @@ do
     ns.SetRXPWindowOption("rxpWindowPanel", true)
     ns.SetRXPWindowColor("panel", 0.1, 0.2, 0.3, 0.4)
     ns.SetRXPWindowOption("rxpWindowBorder", true)
-    ns.SetRXPWindowColor("edge", 0.9, 0.8, 0.7, 0.6)
+    ns.SetRXPWindowColor("border", 0.9, 0.8, 0.7, 0.6)
     Flush(w)
     Check(f.back.shown == true and f.back.solid[1] == 0.1 and f.back.solid[4] == 0.4, "a panel behind the window, in its color")
     Check(f.borderObject._frame.shown == true and f.borderObject.color[1] == 0.9 and f.borderObject.color[4] == 0.6,
@@ -831,14 +824,15 @@ do
     for _, o in ipairs(w.frames) do
         if o.label and o.logo then box = o end
     end
-    Check(box.borderObject._frame.shown == true and box.borderObject.color[1] == T.line.r, "the step's box has its own border")
+    Check(box.borderObject._frame.shown == true and box.borderObject.color[1] == 0.9 and box.borderObject.color[4] == 0.6,
+        "the step's box has its border, in the same color")
     Check(math.abs(box.back.solid[4] - 0.55) < 1e-9, "the box is a little see-through to start")
     ns.SetRXPWindowOption("rxpWindowBoxBorder", false)
     ns.SetRXPWindowColor("box", 0.3, 0.3, 0.3, 0.3)
-    ns.SetRXPWindowColor("boxEdge", 1, 1, 0, 1)
+    ns.SetRXPWindowColor("border", 1, 1, 0, 1)
     Flush(w)
-    Check(box.borderObject._frame.shown == false and box.back.solid[1] == 0.3 and box.borderObject.color[1] == 1,
-        "which can be turned off, and has its colors")
+    Check(box.borderObject._frame.shown == false and box.back.solid[1] == 0.3 and box.borderObject.color[1] == 1
+        and f.borderObject.color[1] == 1, "which can be turned off, and has its colors, the window's border the same")
     Check(math.abs(box.back.solid[4] - 0.55) < 1e-9 and select(4, ns.RXPWindowColor("box")) == 1,
         "the opacity of the box is not part of its color")
     ns.SetRXPWindowOption("rxpWindowBoxOpacity", 100)
@@ -860,10 +854,9 @@ do
 
     -- every text has its color
     ns.SetRXPWindowColor("title", 1, 0, 0, 1)
-    ns.SetRXPWindowColor("label", 0, 1, 0, 1)
+    ns.SetRXPWindowColor("accent", 0, 1, 0, 1)
     ns.SetRXPWindowColor("text", 0, 0, 1, 1)
-    ns.SetRXPWindowColor("done", 1, 1, 0, 1)
-    ns.SetRXPWindowColor("list", 0, 1, 1, 1)
+    ns.SetRXPWindowColor("muted", 0, 1, 1, 1)
     Flush(w)
     Check(f.title.color[1] == 1 and f.title.color[2] == 0, "the title's color")
     Check(box.label.color[2] == 1 and box.label.color[1] == 0, "the step label's")
@@ -874,8 +867,10 @@ do
         if o.text and o.text:find("^37  ") then listText = o end
     end
     Check(rowText and rowText.color[3] == 1, "a row's")
-    Check(doneText and doneText.color[1] == 1 and doneText.color[2] == 1 and doneText.color[3] == 0, "a done row's")
-    Check(listText and listText.color[2] == 1 and listText.color[3] == 1, "and a line in the list")
+    Check(doneText and doneText.color[1] == 0 and doneText.color[2] == 1 and doneText.color[3] == 1,
+        "a done row's, the muted color")
+    Check(listText and listText.color[1] == 0 and listText.color[2] == 1 and listText.color[3] == 1,
+        "and a line in the list, the same")
 end
 
 -- the text: its face, its size and how it is kept readable
@@ -905,14 +900,14 @@ do
     ns.SetRXPWindowOption("rxpWindowTitleSize", 20)
     ns.SetRXPWindowOption("rxpWindowTextSize", 15)
     ns.SetRXPWindowOption("rxpWindowListSize", 9)
-    ns.SetRXPWindowOption("rxpWindowFirstGrow", 0)
     Flush(w)
     for _, size in ipairs({ { "rxpWindowTitleSize", 20 }, { "rxpWindowTextSize", 15 }, { "rxpWindowListSize", 9 } }) do
         local group = Texts(size[1])
         Check(#group > 0, size[1] .. " has texts")
         for _, o in ipairs(group) do
-            Check(o.font == "Fonts\\Fira.ttf" and o.fontSize == size[2] and o.fontFlags == "OUTLINE" and o.shadowX == 0,
-                size[1] .. ": its face, size and outline")
+            local bonus = size[1] == "rxpWindowTextSize" and o.fontSize == size[2] + 2
+            Check(o.font == "Fonts\\Fira.ttf" and (o.fontSize == size[2] or bonus) and o.fontFlags == "OUTLINE"
+                and o.shadowX == 0, size[1] .. ": its face, size (a first line's with its bonus) and outline")
         end
     end
     ns.SetRXPWindowOption("rxpWindowOutline", "thick")
@@ -1113,13 +1108,11 @@ do
     local w = Begin(account, Both)
     local ns = w.ns
     target, items = w.rxp.targeting.activeTargetFrame, w.rxp.activeItemFrame
-    Check(ns.RXPWindowOption("rxpWindowSatellites") == true and account.rxpWindowSatellites == nil,
-        "styling the two windows is on with the window, and the default is not stored")
     local function Look(frame, name)
         local r, g, b = ns.RXPWindowColor("box")
         local opacity = ns.RXPWindowOption("rxpWindowBoxOpacity") / 100
-        local er, eg, eb, ea = ns.RXPWindowColor("boxEdge")
-        local label = { ns.RXPWindowColor("label") }
+        local er, eg, eb, ea = ns.RXPWindowColor("border")
+        local label = { ns.RXPWindowColor("accent") }
         Check(Is(Fill(frame), r, g, b, opacity), name .. ": the background is the active step's color and opacity")
         Check(Fill(frame.title) and Is(Fill(frame.title), r, g, b, opacity), name .. ": and so is its title's")
         for i, edge in ipairs(frame.rxpBorder.textures) do
@@ -1147,7 +1140,7 @@ do
     -- what is set for the window is what they follow
     ns.SetRXPWindowOption("rxpWindowBoxOpacity", 80)
     ns.SetRXPWindowColor("box", 1, 0, 0)
-    ns.SetRXPWindowColor("boxEdge", 0, 1, 0, 0.5)
+    ns.SetRXPWindowColor("border", 0, 1, 0, 0.5)
     ns.SetRXPWindowOption("rxpWindowOutline", "outline")
     ns.SetRXPWindowOption("rxpWindowFont", "Fancy")
     Flush(w)
@@ -1200,16 +1193,17 @@ do
     ns.SetRXPWindowOption("rxpWindowBoxBorder", false)
     Flush(w)
     Check(items.rxpBorder.shown == false and items.title.rxpBorder.shown == false, "the border is hidden to begin with")
-    ns.SetRXPWindowOption("rxpWindowSatellites", false)
+    ns.SetRXPWindow(false)
     Flush(w)
     Check(items.rxpBorder.shown == true and items.title.rxpBorder.shown == true and target.title.rxpBorder.shown == true,
         "a border the window hid is shown again with RestedXP's own look")
-    ns.SetRXPWindowOption("rxpWindowSatellites", true)
+    ns.SetRXPWindow(true)
     ns.SetRXPWindowOption("rxpWindowBoxBorder", true)
     Flush(w)
+    Check(Is(Fill(items), 1, 0, 0, 0.8), "the window on again: the look is back")
 
-    -- the option off, and RestedXP paints its own again, then not hooked into any more
-    ns.SetRXPWindowOption("rxpWindowSatellites", false)
+    -- the window turned off: they are RestedXP's again, and RestedXP paints its own, then not hooked into any more
+    ns.SetRXPWindow(false)
     Flush(w)
     Check(target.paints >= 3 and Is(Fill(target), 0.1, 0.2, 0.3, 0.9) and target.rxpBorder.textures[1].texture == RXP_EDGE
         and target.rxpBorder.textures[1].solid == nil and target.title.text.font == RXP_FONT
@@ -1218,14 +1212,6 @@ do
     items:UpdateVisuals()
     Check(items.paints == paints + 1 and Is(Fill(items), 0.1, 0.2, 0.3, 0.9) and items.title.text.font == RXP_FONT,
         "and what RestedXP paints is left as it is")
-    Check(account.rxpWindowSatellites == false, "left out: kept")
-    ns.SetRXPWindowOption("rxpWindowSatellites", true)
-    Flush(w)
-    Check(Is(Fill(items), 1, 0, 0, 0.8) and account.rxpWindowSatellites == nil, "turned on again: the look is back")
-
-    -- the window turned off: they are RestedXP's again
-    ns.SetRXPWindow(false)
-    Flush(w)
     Check(Is(Fill(items), 0.1, 0.2, 0.3, 0.9) and Is(Fill(target.title), 0.1, 0.2, 0.3, 0.9)
         and items.title.text.font == RXP_FONT and items.rxpBorder.textures[2].texture == RXP_EDGE,
         "the window turned off: RestedXP's own look is back")
@@ -1320,12 +1306,8 @@ do
     w.vendor.tag, w.vendor.id, w.vendor.qty = "vendor", 5, 9
     w.buy.qty = 5
     w.items[159] = 1
-    ns.SetRXPWindowOption("rxpWindowCountBar", false)
     Flush(w)
-    Check(Meters() == 0 and f.events[BAGS] == nil, "turned off: no bars, and no bags")
-    ns.SetRXPWindowOption("rxpWindowCountBar", true)
-    Flush(w)
-    Check(Meters() == 1 and Row(BUY).meter.shown, "turned on: the buy only, and not a row that is not a buy with an id")
+    Check(Meters() == 1 and Row(BUY).meter.shown, "the buy only, and not a row that is not a buy with an id")
     Check(f.events[BAGS] == true, "and the bags are listened to again")
 
     w.itemsRaise = true
@@ -1371,16 +1353,6 @@ do
         if o.icon and o.text and o.bar and o.parent == boxes[1] and not firstRow then firstRow = o end
     end
     Check(firstRow.points[1][5] == -7 - 24 - 5, "the rows start below it")
-    ns.SetRXPWindowOption("rxpWindowLogoSize", 40)
-    Flush(w)
-    Check(logo.width == 40 and firstRow.points[1][5] == -7 - 40 - 5 and account.rxpWindowLogoSize == 40,
-        "its size is a setting, and the rows make room for it")
-    ns.SetRXPWindowOption("rxpWindowLogoSize", 24)
-    ns.SetRXPWindowOption("rxpWindowLogo", false)
-    Flush(w)
-    Check(firstRow.points[1][5] == -7 - 13 - 5, "and without it the rows start below the label")
-    ns.SetRXPWindowOption("rxpWindowLogo", true)
-    Flush(w)
 
     -- with a second active step, only the first has it
     local second = { active = true, index = 37, title = "Step 37", elements = { w.buy } }
@@ -1390,18 +1362,16 @@ do
     Flush(w)
     boxes = Boxes()
     Check(#boxes == 2 and boxes[1].logo.shown and boxes[2].logo.shown == false, "with two steps, it is the first one's")
+    local second_row
+    for _, o in ipairs(w.frames) do
+        if o.icon and o.text and o.bar and o.parent == boxes[2] and not second_row then second_row = o end
+    end
+    Check(second_row.points[1][5] == -7 - 13 - 5, "and the rows of the other start below the label")
     w.rxp.RXPFrame.activeSteps = steps
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
     boxes = Boxes()
     Check(#boxes == 1 and boxes[1].logo.shown, "and back with one")
-
-    ns.SetRXPWindowOption("rxpWindowLogo", false)
-    Flush(w)
-    Check(boxes[1].logo.shown == false and account.rxpWindowLogo == false, "it can be left out, and that is kept")
-    ns.SetRXPWindowOption("rxpWindowLogo", true)
-    Flush(w)
-    Check(boxes[1].logo.shown and account.rxpWindowLogo == nil, "and back: the default is not kept")
 end
 
 -- the icon at the start of a row has a size of its own, and the text is set against it
@@ -1410,29 +1380,26 @@ do
     local w = Start(account)
     local ns = w.ns
     local function First()
+        local seen = 0
         for _, o in ipairs(w.frames) do
-            if o.icon and o.text and o.bar and Seen(o) then return o end
+            if o.icon and o.text and o.bar and Seen(o) then
+                seen = seen + 1
+                if seen == 2 then return o end
+            end
         end
     end
-    ns.SetRXPWindowOption("rxpWindowFirstGrow", 0)
     Flush(w)
     local row = First()
     Check(row.icon.fontSize == 18, "18 to start, bigger than the text")
     Check(row.text.points[1][4] == 2 + 5 + 18 + 5 and row.text.points[1][5] == -2,
         "the text starts after it, and is dropped to the middle of it")
     Check(row.height >= 18, "and the row is as tall as it")
-    ns.SetRXPWindowOption("rxpWindowIconSize", 28)
+    Check(row.text.width == row.width - 2 - 5 - 23, "and has that much less room")
+    ns.SetRXPWindowOption("rxpWindowTextSize", 24)
     Flush(w)
     row = First()
-    Check(row.icon.fontSize == 28 and row.text.points[1][4] == 2 + 5 + 28 + 5 and row.text.points[1][5] == -7
-        and account.rxpWindowIconSize == 28, "its size is a setting: the text moves with it")
-    Check(row.text.width == row.width - 2 - 5 - 33, "and has that much less room")
-    ns.SetRXPWindowOption("rxpWindowIconSize", 10)
-    Flush(w)
-    row = First()
-    Check(row.text.points[1][4] == 2 + 5 + 10 + 5 and row.text.points[1][5] == 0, "smaller than the text: not dropped")
-    ns.SetRXPWindowOption("rxpWindowIconSize", 18)
-    Check(account.rxpWindowIconSize == nil, "the default is not kept")
+    Check(row.icon.fontSize == 18 and row.text.points[1][4] == 2 + 5 + 18 + 5 and row.text.points[1][5] == 0,
+        "the icon keeps its size when the text is bigger than it: not dropped")
 end
 
 -- the first line of a step is bigger than its sub tasks by a little
@@ -1451,16 +1418,6 @@ do
     Check(#rows == 3 and rows[1].text.fontSize == 15 and rows[2].text.fontSize == 13 and rows[3].text.fontSize == 13,
         "the first is two bigger than the text of its sub tasks to start")
     Check(rows[1].icon.fontSize == 22 and rows[2].icon.fontSize == 18, "and its icon is bigger: the bonus twice")
-    ns.SetRXPWindowOption("rxpWindowFirstGrow", 5)
-    Flush(w)
-    rows = Rows()
-    Check(rows[1].text.fontSize == 18 and rows[2].text.fontSize == 13 and account.rxpWindowFirstGrow == 5,
-        "by as much as is set, kept")
-    ns.SetRXPWindowOption("rxpWindowFirstGrow", 0)
-    Flush(w)
-    rows = Rows()
-    Check(rows[1].text.fontSize == 13 and rows[2].text.fontSize == 13, "none: all alike")
-    ns.SetRXPWindowOption("rxpWindowFirstGrow", 2)
     ns.SetRXPWindowOption("rxpWindowTextSize", 16)
     Flush(w)
     rows = Rows()
@@ -1500,10 +1457,6 @@ do
     Check(rows[1].icon.fontSize == 22 and rows[2].icon.fontSize == 18 and rows[3].icon.fontSize == 18,
         "and its icon is bigger: the bonus twice over")
     Check(rows[1].text.points[1][4] == 2 + 5 + 22 + 5 and rows[1].height >= 22, "the text and the row make room for it")
-    ns.SetRXPWindowOption("rxpWindowFirstGrow", 0)
-    Flush(w)
-    rows = Rows()
-    Check(rows[1].icon.fontSize == 18 and rows[1].bar.shown == false, "with no bonus the icon is as big as the others'")
     local steps = w.rxp.RXPFrame.activeSteps
     w.rxp.RXPFrame.activeSteps = { { active = true, index = 37, title = "Step 37", elements = { w.buy } }, steps[1] }
     w.rxp.v2:UpdateGuideWindow()

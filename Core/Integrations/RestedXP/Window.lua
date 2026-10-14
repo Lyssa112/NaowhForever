@@ -15,13 +15,12 @@ local PAD, BOX_PAD, FOLD_W, PROGRESS_W = 10, 7, 16, 120
 local HEAD_PAD, LIST_PAD = 10, 6
 local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
 local BAR_W, ICON_GAP, GRIP_SIZE = 2, 5, 16
-local FIRST_ICON_GROW = 2
+local FIRST_GROW, FIRST_ICON_GROW, LOGO_SIZE, BAR_HEIGHT, INDENT, ICON_SIZE = 2, 2, 24, 5, 12, 18
 local PANEL_ALPHA, EDGE_ALPHA, RULE_ALPHA, MUTED_ALPHA = 0.92, 0.8, 0.5, 0.9
 local BOX_OPACITY = 55
 local COUNT_PATTERN, COUNT_MIN, COUNT_GAP = "(%d+)%s*/%s*(%d+)", 2, 2
 local BAG_EVENT = "BAG_UPDATE_DELAYED"
 local SHADOW, SHADOW_ALPHA = 1, 0.9
-local GOLD = { r = 1, g = 0.82, b = 0 }
 local TEXT_FOLD, TEXT_UNFOLD, TEXT_DOT = "-", "+", " \194\183 "
 local LOGO = "Interface\\AddOns\\RXPGuides\\Textures\\rxp_logo-64"
 local GRADIENT = ns.MEDIA .. "NaowhGradient.tga"
@@ -57,22 +56,10 @@ local OPTIONS = {
       max = 28, tip = "The guide's name and its progress." },
     { key = "rxpWindowTextSize", group = "Text", kind = "number", label = "Step Text Size", default = 13, min = 8,
       max = 24, tip = "The active step." },
-    { key = "rxpWindowFirstGrow", group = "Text", kind = "number", label = "First Line Bonus", default = 2, min = 0,
-      max = 8, tip = "How much bigger the first line of a step is than its sub tasks." },
     { key = "rxpWindowListSize", group = "Text", kind = "number", label = "List Text Size", default = 12, min = 8,
       max = 24, tip = "The steps after the active one." },
-    { key = "rxpWindowIconSize", group = "Text", kind = "number", label = "Icon Size", default = 18, min = 10,
-      max = 32, tip = "The icon at the start of a row." },
-    { key = "rxpWindowProgressText", group = "Look", kind = "toggle", label = "Show Progress Text", default = true,
-      tip = "The step and the percent of the guide, beside its name." },
     { key = "rxpWindowLine", group = "Look", kind = "choice", label = "Under the Title", default = "bar",
       values = LINES, order = { "bar", "rule", "none" }, tip = "A progress bar of the guide, a line, or nothing." },
-    { key = "rxpWindowLogo", group = "Look", kind = "toggle", label = "Show RestedXP Logo", default = true,
-      tip = "RestedXP's logo in the corner of the current step." },
-    { key = "rxpWindowLogoSize", group = "Look", kind = "number", label = "RestedXP Logo Size", default = 24,
-      min = 12, max = 48, tip = "How big RestedXP's logo is." },
-    { key = "rxpWindowIndent", group = "Look", kind = "number", label = "Row Indent", default = 12, min = 0,
-      max = 32, tip = "How far the rows after the first are set in." },
     { key = "rxpWindowGrip", group = "Look", kind = "toggle", label = "Show Resize Grip", default = true,
       tip = "The corner that is dragged to change the window's width and how many steps are listed." },
     { key = "rxpWindowSkip", group = "Look", kind = "choice", label = "Skipping Steps", default = "shift",
@@ -90,38 +77,26 @@ local OPTIONS = {
       tip = "A border round the active step." },
     { key = "rxpWindowBoxOpacity", group = "Look", kind = "number", label = "Step Box Opacity",
       default = BOX_OPACITY, min = 0, max = PERCENT, tip = "How solid the background of the active step is." },
-    { key = "rxpWindowSatellites", group = "Look", kind = "toggle", label = "Style Targets and Items",
-      default = true, tip = "RestedXP's Active Targets and Active Items windows take the look of the active step." },
     { key = "rxpWindowSpacing", group = "Look", kind = "number", label = "Spacing", default = 5, min = 0, max = 12,
       tip = "The room between the rows." },
-    { key = "rxpWindowBarHeight", group = "Progress", kind = "number", label = "Bar Height", default = 5, min = 2,
-      max = 16, tip = "How thick the progress bars are." },
     { key = "rxpWindowBarTexture", group = "Progress", kind = "texture", label = "Bar Texture",
       defaultLabel = TEXT_GRADIENT, tip = "The texture of the progress bars, the Naowh Gradient to start." },
-    { key = "rxpWindowCountBar", group = "Progress", kind = "toggle", label = "Item Count Bars", default = true,
-      tip = "A bar under a row that counts, as in Buy 5 or 3/8 Boar Meat." },
 }
 
--- A color is a theme token and an opacity, or a color of its own; a picked one is kept whole.
+-- A color is a theme token and an opacity; a picked one is kept whole. Each is for several things.
 local COLORS = {
-    { name = "title", label = "Title Color", token = "fg", tip = "The guide's name." },
-    { name = "range", label = "Level Range Color", rgb = GOLD, tip = "The level range in the guide's name." },
-    { name = "progress", label = "Progress Color", token = "accent", tip = "The step count at the right." },
-    { name = "percent", label = "Percent Color", token = "fg", tip = "The percent at the right." },
-    { name = "label", label = "Step Label Color", token = "accent", tip = "STEP and its number." },
+    { name = "title", label = "Title Color", token = "fg", tip = "The guide's name and its percent." },
+    { name = "accent", label = "Accent Color", token = "accent",
+      tip = "The level range, the step count, STEP and its number, and the filled part of the bars." },
     { name = "text", label = "Step Text Color", token = "fg", tip = "The rows of the active step." },
-    { name = "done", label = "Done Text Color", token = "muted", tip = "A row that is done." },
-    { name = "list", label = "List Text Color", token = "muted", alpha = MUTED_ALPHA,
-      tip = "The steps after the active one." },
+    { name = "muted", label = "Muted Text Color", token = "muted", alpha = MUTED_ALPHA,
+      tip = "A row that is done and the steps after the active one." },
     { name = "line", label = "Line Color", token = "fg", alpha = RULE_ALPHA, tip = "The line and the bars' track." },
-    { name = "fill", label = "Bar Color", token = "accent", tip = "The filled part of the bars." },
     { name = "box", label = "Step Box Color", token = "bg", opaque = true,
       tip = "Behind the active step; its opacity is its own setting." },
-    { name = "boxEdge", label = "Step Box Border Color", token = "line", alpha = EDGE_ALPHA,
-      tip = "Round the active step." },
+    { name = "border", label = "Border Color", token = "line", alpha = EDGE_ALPHA,
+      tip = "Round the active step and round the whole window." },
     { name = "panel", label = "Window Color", token = "panel", alpha = PANEL_ALPHA, tip = "Behind the whole window." },
-    { name = "edge", label = "Window Border Color", token = "line", alpha = EDGE_ALPHA,
-      tip = "Round the whole window." },
 }
 
 local OPTION_BY_KEY, COLOR_BY_NAME = {}, {}
@@ -233,7 +208,7 @@ function ns.RXPWindowColor(name)
             and type(saved.b) == "number" then
         return saved.r, saved.g, saved.b, type(saved.a) == "number" and saved.a or 1
     end
-    local base = color.rgb or ns.THEME[color.token]
+    local base = ns.THEME[color.token]
     return base.r, base.g, base.b, color.alpha or 1
 end
 
@@ -299,7 +274,7 @@ local function Heading(rxp, guide)
     local title = guide.title or guide.subgroup or name
     if type(title) ~= "string" then return "" end
     local place, range = SplitRange(title)
-    return range and (place .. " " .. Tint("range", range)) or place
+    return range and (place .. " " .. Tint("accent", range)) or place
 end
 
 local function ItemCount(id)
@@ -500,7 +475,7 @@ local function Faced(fs, size)
 end
 
 local function Face(fs, sizeKey)
-    Faced(fs, ns.RXPWindowOption(sizeKey))
+    Faced(fs, type(sizeKey) == "number" and sizeKey or ns.RXPWindowOption(sizeKey))
 end
 
 local function Text(parent, sizeKey, justify)
@@ -532,7 +507,7 @@ local function SkinBox(part)
     end
     local border = Dig(part, "rxpBorder")
     if type(border) ~= "table" then return end
-    local r, g, b, a = ns.RXPWindowColor("boxEdge")
+    local r, g, b, a = ns.RXPWindowColor("border")
     for _, texture in ipairs(type(border.textures) == "table" and border.textures or {}) do
         if Has(texture, "SetColorTexture") then texture:SetColorTexture(r, g, b, a) end
     end
@@ -549,7 +524,7 @@ local function SkinTitle(title)
     if not (Has(text, "SetFont") and Has(text, "GetFont") and Has(text, "GetStringWidth")) then return end
     local _, size = text:GetFont()
     Faced(text, type(size) == "number" and size or BOX_TITLE_TEXT)
-    Coloured(text, "label")
+    Coloured(text, "accent")
     if Has(title, "SetSize") then title:SetSize(text:GetStringWidth() + BOX_TITLE_ROOM, BOX_TITLE_HEIGHT) end
 end
 
@@ -559,7 +534,7 @@ local function SkinFrame(frame)
 end
 
 local function SkinWanted()
-    return active and ns.RXPWindowOption("rxpWindowSatellites")
+    return active
 end
 
 local function SkinFrames()
@@ -733,13 +708,13 @@ end
 
 local function PaintBar(bar, fraction)
     bar:SetStatusBarTexture(TexturePath())
-    local r, g, b, a = ns.RXPWindowColor("fill")
+    local r, g, b, a = ns.RXPWindowColor("accent")
     bar:SetStatusBarColor(r, g, b, a)
     r, g, b, a = ns.RXPWindowColor("line")
     bar.track:SetColorTexture(r, g, b, a)
     bar:SetMinMaxValues(0, 1)
     bar:SetValue(fraction)
-    bar:SetHeight(ns.RXPWindowOption("rxpWindowBarHeight"))
+    bar:SetHeight(BAR_HEIGHT)
 end
 
 local function Build()
@@ -825,7 +800,7 @@ local function MakeRow()
     row:SetScript("OnEnter", function(self) Tip(self.box or self, TEXT_SKIP, true) end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
-    row.icon = Text(row, "rxpWindowIconSize")
+    row.icon = Text(row, ICON_SIZE)
     row.meter = MakeBar(row)
     row.text = Text(row, "rxpWindowTextSize")
     row.text:SetWordWrap(true)
@@ -907,12 +882,11 @@ local function DrawRow(box, row, x, y, width, first)
     item:SetPoint("TOPLEFT", box, "TOPLEFT", x, y)
     item:SetWidth(width)
     local gap = Spacing()
-    local iconSize = ns.RXPWindowOption("rxpWindowIconSize")
+    local iconSize = ICON_SIZE
     local textSize = ns.RXPWindowOption("rxpWindowTextSize")
     if first then
-        local grow = ns.RXPWindowOption("rxpWindowFirstGrow")
-        textSize = textSize + grow
-        iconSize = iconSize + grow * FIRST_ICON_GROW
+        textSize = textSize + FIRST_GROW
+        iconSize = iconSize + FIRST_GROW * FIRST_ICON_GROW
     end
     local iconW = iconSize + ICON_GAP
     local drop = math.max(0, math.floor((iconSize - textSize) / 2))
@@ -922,7 +896,7 @@ local function DrawRow(box, row, x, y, width, first)
     item.bar:SetPoint("BOTTOMLEFT", item, "BOTTOMLEFT", 0, 0)
     item.bar:SetWidth(BAR_W)
     item.bar:SetShown(not first)
-    local a = row.done and "done" or "label"
+    local a = row.done and "muted" or "accent"
     item.bar:SetColorTexture(ns.RXPWindowColor(a))
     item.icon:ClearAllPoints()
     item.icon:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap, 0)
@@ -931,18 +905,18 @@ local function DrawRow(box, row, x, y, width, first)
     item.text:ClearAllPoints()
     item.text:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + iconW, -drop)
     item.text:SetWidth(textWidth)
-    Coloured(item.text, row.done and "done" or "text")
+    Coloured(item.text, row.done and "muted" or "text")
     Faced(item.text, textSize)
     item.text:SetText(row.text)
     local height = math.max(drop + math.max(item.text:GetStringHeight(), textSize), iconSize)
-    if row.need and row.need >= COUNT_MIN and ns.RXPWindowOption("rxpWindowCountBar") then
+    if row.need and row.need >= COUNT_MIN then
         local fraction = row.done and 1 or math.min(1, math.max(0, (row.have or 0) / row.need))
         item.meter:ClearAllPoints()
         item.meter:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + iconW, -(height + COUNT_GAP))
         item.meter:SetWidth(textWidth)
         PaintBar(item.meter, fraction)
         item.meter:Show()
-        height = height + COUNT_GAP + ns.RXPWindowOption("rxpWindowBarHeight")
+        height = height + COUNT_GAP + BAR_HEIGHT
         if row.bags then wantsBags = true end
     else
         item.meter:Hide()
@@ -962,28 +936,26 @@ local function DrawBox(step, y, inner, current)
     box:SetWidth(inner)
     local boxR, boxG, boxB = ns.RXPWindowColor("box")
     box.back:SetColorTexture(boxR, boxG, boxB, ns.RXPWindowOption("rxpWindowBoxOpacity") / PERCENT)
-    local r, g, b, a = ns.RXPWindowColor("boxEdge")
+    local r, g, b, a = ns.RXPWindowColor("border")
     box.edge:SetColor(r, g, b, a)
     box.edge._frame:SetShown(ns.RXPWindowOption("rxpWindowBoxBorder"))
     box.label:ClearAllPoints()
     box.label:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, -BOX_PAD)
-    Coloured(box.label, "label")
+    Coloured(box.label, "accent")
     box.label:SetText(step.label:upper())
     local head = size
-    if current and ns.RXPWindowOption("rxpWindowLogo") then
-        local logo = ns.RXPWindowOption("rxpWindowLogoSize")
+    if current then
         box.logo:ClearAllPoints()
         box.logo:SetPoint("TOPRIGHT", box, "TOPRIGHT", -BOX_PAD, -BOX_PAD)
-        box.logo:SetSize(logo, logo)
+        box.logo:SetSize(LOGO_SIZE, LOGO_SIZE)
         box.logo:Show()
-        head = math.max(size, logo)
+        head = math.max(size, LOGO_SIZE)
     else
         box.logo:Hide()
     end
     local by = -BOX_PAD - head - gap
-    local indent = ns.RXPWindowOption("rxpWindowIndent")
     for i, row in ipairs(step.rows) do
-        local set = i > 1 and indent or 0
+        local set = i > 1 and INDENT or 0
         by = by - DrawRow(box, row, BOX_PAD + set, by, inner - BOX_PAD * 2 - set, i == 1) - gap
     end
     box:SetHeight(-by + BOX_PAD - gap)
@@ -1003,9 +975,9 @@ local function DrawHeader(model, folded, width, headH)
     window.title:SetText(model.heading)
     window.progress:ClearAllPoints()
     window.progress:SetPoint("TOPRIGHT", window, "TOPRIGHT", -PAD, -PAD)
-    if model.step and ns.RXPWindowOption("rxpWindowProgressText") then
-        window.progress:SetText(Tint("progress", ("%d/%d"):format(model.step, model.total)) .. TEXT_DOT
-            .. Tint("percent", ("%d%%"):format(model.percent)))
+    if model.step then
+        window.progress:SetText(Tint("accent", ("%d/%d"):format(model.step, model.total)) .. TEXT_DOT
+            .. Tint("title", ("%d%%"):format(model.percent)))
     else
         window.progress:SetText("")
     end
@@ -1025,7 +997,7 @@ local function DrawLine(model, y)
         window.bar:SetPoint("TOPRIGHT", window, "TOPRIGHT", -PAD, y)
         PaintBar(window.bar, model.fraction or 0)
         window.bar:Show()
-        return y - ns.RXPWindowOption("rxpWindowBarHeight") - gap
+        return y - BAR_HEIGHT - gap
     elseif line == "rule" then
         window.rule:ClearAllPoints()
         window.rule:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
@@ -1060,7 +1032,7 @@ function Draw()
     if not sizing then window:SetWidth(width) end
     window.back:SetColorTexture(ns.RXPWindowColor("panel"))
     window.back:SetShown(ns.RXPWindowOption("rxpWindowPanel"))
-    window.edge:SetColor(ns.RXPWindowColor("edge"))
+    window.edge:SetColor(ns.RXPWindowColor("border"))
     window.edge._frame:SetShown(ns.RXPWindowOption("rxpWindowBorder"))
     DrawHeader(model, folded, width, headH)
     local y = DrawLine(model, -PAD - headH)
@@ -1070,7 +1042,7 @@ function Draw()
             item:ClearAllPoints()
             item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
             item:SetWidth(inner)
-            Coloured(item, "list")
+            Coloured(item, "muted")
             item:SetText(TEXT_PICK)
             local hit = Acquire("hit")
             hit:ClearAllPoints()
@@ -1088,7 +1060,7 @@ function Draw()
             item:ClearAllPoints()
             item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
             item:SetWidth(inner)
-            Coloured(item, "list")
+            Coloured(item, "muted")
             item:SetText(("%d  %s"):format(entry.index, entry.text))
             local hit = Acquire("hit")
             hit:ClearAllPoints()

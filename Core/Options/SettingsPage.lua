@@ -489,7 +489,7 @@ local function WindowColorCell(color)
 end
 
 local function RxpWindowStyleRows(W, parent, y)
-    local _, h = W:SectionHeader(parent, "WINDOW LOOK", y); y = y - h
+    local _, h = W:GroupHeader(parent, "WINDOW LOOK", y); y = y - h
     local cells = {}
     for _, group in ipairs({ "Text", "Look", "Progress" }) do
         for _, option in ipairs(ns.RXPWindowOptions()) do
@@ -528,18 +528,19 @@ local function SetUpRows(W, parent, y)
 end
 
 local function RxpWindowRows(W, parent, y)
-    local _, h = W:SectionHeader(parent, "RESTEDXP NAOWH WINDOW (V2)", y); y = y - h
-    _, h = W:DualRow(parent, y,
-        { type = "toggle", text = "RestedXP Naowh Window (V2)",
-          tooltip = "RestedXP's guide and active steps in one Naowh window, in place of its own and of the theme.",
-          getValue = ns.RXPWindowEnabled,
-          setValue = function(v)
-              ns.SetRXPWindow(v)
-              UI:RefreshPage(true)
-          end },
-        ns.RXPWindowReady() and Empty() or { type = "label", text = TEXT_RXP_WINDOW_NEEDS }
-    ); y = y - h
-    if not ns.RXPWindowEnabled() then return y end
+    local on = ns.RXPWindowEnabled()
+    local _, h = W:SwitchFold(parent, "RestedXP Naowh Window (V2)", y, {
+        get = ns.RXPWindowEnabled,
+        set = function(v)
+            ns.SetRXPWindow(v)
+            UI:RefreshPage(true)
+        end,
+        tooltip = "RestedXP's guide and active steps in one Naowh window, in place of its own and of the theme.",
+        rows = on }); y = y - h
+    if not on then return y end
+    if not ns.RXPWindowReady() then
+        _, h = W:DualRow(parent, y, { type = "label", text = TEXT_RXP_WINDOW_NEEDS }, Empty()); y = y - h
+    end
     local widthMin, widthMax, widthStep = ns.RXPWindowWidthRange()
     local stepsMin, stepsMax, stepsStep = ns.RXPWindowStepsRange()
     local scaleMin, scaleMax, scaleStep = ns.RXPWindowScaleRange()
@@ -560,26 +561,28 @@ local function RxpWindowRows(W, parent, y)
           setValue = function(v) ns.SetRXPWindowScale(v) end },
         Empty()
     ); y = y - h
+    y = SetUpRows(W, parent, y)
     y = RxpArrowRows(W, parent, y)
-    return RxpWindowStyleRows(W, parent, y)
+    y = RxpWindowStyleRows(W, parent, y)
+    W:EndFeature(parent)
+    return y
 end
 
 local function RestedXPSection(W, parent, y)
     if not (ns.RXPThemesAvailable and ns.RXPThemesAvailable()) then return y end
-    local _, h
-    if ns.RXPThemesEnabled() or ns.RXPWindowEnabled() then
-        _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
-        y = SetUpRows(W, parent, y)
-    end
-    _, h = W:SectionHeader(parent, "RESTEDXP THEME (V1)", y); y = y - h
+    local themesOn = ns.RXPThemesEnabled()
     local themesSwitch = RxpSwitch("RestedXP Theme (V1)",
         "Adds the Naowh themes to RestedXP's theme list, in place of the Naowh window.",
         ns.RXPThemesEnabled, ns.SetRXPThemes)
-    _, h = W:DualRow(parent, y, themesSwitch, RxpThemeChoice()); y = y - h
-    if ns.RXPThemesEnabled() then
+    local _, h = W:SwitchFold(parent, "RestedXP Theme (V1)", y, {
+        get = themesSwitch.getValue, set = themesSwitch.setValue, tooltip = themesSwitch.tooltip, rows = themesOn })
+    y = y - h
+    if themesOn then
+        _, h = W:DualRow(parent, y, RxpThemeChoice(), Empty()); y = y - h
         y = RxpThemeRows(W, parent, y)
         y = RxpArrowRows(W, parent, y)
     end
+    W:EndFeature(parent)
     y = RxpWindowRows(W, parent, y)
     if not (ns.RXPThemesEnabled() or ns.RXPWindowEnabled()) then
         _, h = W:SectionHeader(parent, "RESTEDXP ARROW", y); y = y - h

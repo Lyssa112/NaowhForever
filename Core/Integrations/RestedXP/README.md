@@ -121,7 +121,7 @@ Core/Integrations/RestedXP/
   the outline and the three sizes change at once.
 - The progress bar is a `StatusBar`: the guide's under the title (the step over the number of steps, so
   36 of 66) and one in the active step (the rows done over its rows). Its texture is a SharedMedia
-  statusbar picked in the page and flat to start, its track is the Line color and its fill the Bar color.
+  statusbar picked in the page and flat to start, its track is the Line color and its fill the Accent color. Its height is fixed (`BAR_HEIGHT`).
 - The window is resized from its corner (`StartSizing`). Its height is what it draws, so the height does
   not set a height: it sets how many steps are listed. Draw keeps the height the window has without the
   list (`chrome`) and the height of a line, and letting go of the grip turns the width and
@@ -140,10 +140,10 @@ Core/Integrations/RestedXP/
   so a texture of SharedMedia is only needed when another is wanted).
 - RestedXP's logo (`Textures/rxp_logo-64`, the one its own window and quest log use) is drawn from
   RestedXP's files in the top right corner of the current step's box (the first, when there are more),
-  untinted, at a size of its own (24 to start); Show RestedXP Logo turns it off. It is a texture of the
+  untinted, at a fixed size (`LOGO_SIZE`). It is a texture of the
   box, so it is above the box's background, and the rows start below it, or below the label when it is
   smaller. The window hides RestedXP's own and so would otherwise show nothing of it anywhere.
-- The rows after the first of a step are set in (Row Indent, 12 to start), and narrower by as much, so a
+- The rows after the first of a step are set in (`INDENT`, fixed), and narrower by as much, so a
   Buy under a Talk to reads as a part of it.
 - A click skips or goes to a step and never ticks an objective: a sub task completes itself as RestedXP
   sees it done, and skipping one by hand is not offered. On the whole of an active step (its rows and the
@@ -170,13 +170,13 @@ Core/Integrations/RestedXP/
   their title's text takes the window's face and color, kept at RestedXP's size so nothing is laid out
   again. Each is hooked once (`watched`); a frame RestedXP makes later is taken at the next draw. The
   border follows the background, so a background RestedXP hides keeps its border hidden. Turned off
-  (the window, or Style Targets and Items), RestedXP's own `UpdateVisuals` paints them again, and the
+  (the window), RestedXP's own `UpdateVisuals` paints them again, and the
   border is shown where the background is, as the title's is not set by it.
-- The icon at the start of a row has a size of its own (Icon Size, 18 to start, over the text's 13): the
+- The icon at the start of a row has a fixed size of its own (`ICON_SIZE`, 18, over the text's 13): the
   icon's font string is faced at it, so RestedXP's own icons (`|T...:0|t`, as tall as the text they are in)
   grow with it, and the column and the row are as big. The text is dropped to the middle of an icon that
   is taller than it, and not when it is smaller.
-- The first line of a step is bigger than its sub tasks (First Line Bonus, 2 over the text size to start).
+- The first line of a step is bigger than its sub tasks (`FIRST_GROW`, 2 over the text size).
   `Refaced` sets every row's text to the text size at the start of a draw, and `DrawRow` sets the first
   row's again with the bonus, so a pooled row that was the first and is not is back at the text size at
   the next draw. The title has no bar at its side (the sub tasks keep theirs, which say open or done), and
@@ -184,14 +184,15 @@ Core/Integrations/RestedXP/
   and the row follow the icon's size of that row.
 - RestedXP keeps its settings by profile, which is a character's own unless the player shares one, so a
   character it has not met has its defaults: the V2 interface off, which the window needs, and its own
-  theme. Set Up New Characters (off to start, shown once themes or the window are wished for) sets, the
+  theme. Set Up New Characters (off to start, in the window's (V2) fold) sets, the
   first login of a character, `enableBetaFeatures`, `enableV2Interface` and the Naowh current theme in its
   profile for what is wished for, and asks for a reload as the interface is read when RestedXP loads; what
   the player changes after is theirs, as the characters done are kept (`rxpSetUp`, by GUID). The button
   does it for the character played, seen or not.
 - The theme (RestedXP Theme (V1)), the arrow (Style RestedXP's Arrow) and the window (RestedXP Naowh
-  Window (V2)) are each a switch, and the theme and the window a section of their own, and none reads
-  another's rows. The arrow's options are in the section of whichever of the two is on (once), and in a
+  Window (V2)) are each a switch, and the theme and the window each a fold with its switch on its title
+  (`W:SwitchFold`: open to start, kept as it is left, no chevron while there is nothing under it), and none
+  reads another's rows. The arrow's options are in the fold of whichever of the two is on (once), and in a
   section of their own, RESTEDXP ARROW, while neither is. The theme and the window are
   never both on: turning one on turns the other off (`SetRXPThemes`, `SetRXPWindow`), and a saved pair is
   read as the window's (`RXPThemesEnabled` is false while the window is wished for). The arrow is its own

@@ -47,7 +47,7 @@ local GLIDE_RATE = 14
 local GLIDE_DONE = 0.5
 local TIP = { w = 240, pad = 8, size = 10, spacing = 3, gap = 4, cursorX = 16, cursorY = -12, alpha = 0.98 }
 local TOGGLE = { w = 40, h = 20, knobShare = 0.7, insetShare = 0.15, minInset = 2 }
-local FEATURE = { textSize = 16, textX = 30, arrow = 14, arrowX = 4, hitRoom = 120, hitRaise = 3 }
+local FEATURE = { textSize = 16, textX = 30, arrow = 14, arrowX = 4, hitRoom = 120, hitRaise = 3, switchGap = 12 }
 local NOTE = { size = 12, inset = 20, top = 12, room = 24, fallbackW = 960 }
 local SCROLL = { slimW = 6, slimGap = 6, trackAlpha = 0.6, thumbAlpha = 0.8, minThumb = 24, sync = 0.5 }
 local SHARE_DEPTH = 4
@@ -927,6 +927,7 @@ function W:SectionHeader(parent, text, yOffset)
     local lbl = ns.Font(f, LABEL_SIZE, nil, T.fg, true)
     lbl:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, HEADER_TEXT_Y)
     lbl:SetText(ns.L(text))
+    f._label = lbl
     local sep = ns.Solid(f, "ARTWORK", T.line, 1)
     sep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
     sep:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
@@ -972,6 +973,56 @@ function W:FoldHeader(parent, text, yOffset, forceOpen)
     local open = forceOpen or openFolds[text]
     f.arrow:SetRotation(open and CHEVRON_DOWN or 0)
     parent._nsuiCollapsed = not open or nil
+    return f, h
+end
+
+local closedFolds = {}
+
+local function OnSwitchFoldClick(hit)
+    closedFolds[hit._id] = not closedFolds[hit._id] or nil
+    UI:RefreshPage(true)
+end
+
+-- A header that folds what follows it, with its own switch beside the title. cfg: get and set for the switch,
+-- tooltip for its words, rows for whether anything follows it to fold (open to start, kept as it is left).
+function W:SwitchFold(parent, text, yOffset, cfg)
+    local f, h = W:SectionHeader(parent, text, yOffset)
+    f._get, f._set = cfg.get, cfg.set
+    if not f.switch then
+        f.arrow = f:CreateTexture(nil, "ARTWORK")
+        f.arrow:SetTexture(CHEVRON)
+        f.arrow:SetSize(FEATURE.arrow, FEATURE.arrow)
+        f.arrow:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -FEATURE.arrowX, HEADER_TEXT_Y)
+        f.arrow:SetVertexColor(T.muted.r, T.muted.g, T.muted.b, 1)
+        f.hit = CreateFrame("Button", nil, f)
+        f.hit:SetAllPoints()
+        f.hit:SetScript("OnClick", OnSwitchFoldClick)
+        f.hit:SetScript("OnEnter", function() f.arrow:SetVertexColor(T.fg.r, T.fg.g, T.fg.b, 1) end)
+        f.hit:SetScript("OnLeave", function() f.arrow:SetVertexColor(T.muted.r, T.muted.g, T.muted.b, 1) end)
+        f.switch = UI.BuildToggleControl(f, f.hit:GetFrameLevel() + FEATURE.hitRaise,
+            function() return f._get() end, function(v) f._set(v) end)
+        f.switch:SetPoint("LEFT", f._label, "RIGHT", FEATURE.switchGap, 0)
+    end
+    f.hit._id = text
+    f.switch._refreshValue()
+    if cfg.tooltip then ns.Tooltip(f.switch, ns.L(text), ns.L(cfg.tooltip)) end
+    local open = cfg.rows and not closedFolds[text]
+    f.arrow:SetShown(cfg.rows == true)
+    f.hit:SetShown(cfg.rows == true)
+    f.arrow:SetRotation(open and CHEVRON_DOWN or 0)
+    parent._nsuiCollapsed = (cfg.rows and closedFolds[text]) and true or nil
+    return f, h
+end
+
+-- A title inside a fold: shown with the rows under it, and gone with them when the fold is shut.
+function W:GroupHeader(parent, text, yOffset)
+    local shut = parent._nsuiCollapsed
+    local f, h = W:SectionHeader(parent, text, yOffset)
+    parent._nsuiCollapsed = shut
+    if shut then
+        f:Hide()
+        return f, 0
+    end
     return f, h
 end
 
