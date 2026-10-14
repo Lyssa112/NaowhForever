@@ -909,6 +909,7 @@ function W:SectionHeader(parent, text, yOffset, inset)
         pill:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, ns.Shared.Style.FOREVER_PILL_PAD)
         pill:SetPoint("TOPRIGHT", f, "BOTTOMRIGHT", 0, HEADER_H - HEADER_TEXT_Y)
         pill.text:SetText(text)
+        f._pill = pill
         lbl:Hide()
         sep:Hide()
     end
@@ -968,7 +969,7 @@ function W:SwitchFold(parent, text, yOffset, cfg)
         f.hit:SetScript("OnLeave", function() f.arrow:SetVertexColor(T.muted.r, T.muted.g, T.muted.b, 1) end)
         f.switch = UI.BuildToggleControl(f, f.hit:GetFrameLevel() + FEATURE.hitRaise,
             function() return f._get() end, function(v) f._set(v) end)
-        f.switch:SetPoint("LEFT", f._label, "RIGHT", FEATURE.switchGap, 0)
+        f.switch:SetPoint("LEFT", f._pill and f._pill.text or f._label, "RIGHT", FEATURE.switchGap, 0)
     end
     f.hit._id = text
     f.switch._refreshValue()
