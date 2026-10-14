@@ -15,6 +15,7 @@ local PAD, BOX_PAD, FOLD_W, PROGRESS_W = 10, 7, 16, 120
 local HEAD_PAD, LIST_PAD = 10, 6
 local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
 local BAR_W, ICON_GAP, MENU_SIZE, GRIP_SIZE = 2, 5, 22, 16
+local FIRST_ICON_GROW = 2
 local PANEL_ALPHA, EDGE_ALPHA, RULE_ALPHA, MUTED_ALPHA = 0.92, 0.8, 0.5, 0.9
 local BOX_OPACITY = 55
 local COUNT_PATTERN, COUNT_MIN, COUNT_GAP = "(%d+)%s*/%s*(%d+)", 2, 2
@@ -863,7 +864,11 @@ local function DrawRow(box, row, x, y, width, first)
     local gap = Spacing()
     local iconSize = ns.RXPWindowOption("rxpWindowIconSize")
     local textSize = ns.RXPWindowOption("rxpWindowTextSize")
-    if first then textSize = textSize + ns.RXPWindowOption("rxpWindowFirstGrow") end
+    if first then
+        local grow = ns.RXPWindowOption("rxpWindowFirstGrow")
+        textSize = textSize + grow
+        iconSize = iconSize + grow * FIRST_ICON_GROW
+    end
     local iconW = iconSize + ICON_GAP
     local drop = math.max(0, math.floor((iconSize - textSize) / 2))
     local textWidth = width - BAR_W - gap - iconW
@@ -871,10 +876,12 @@ local function DrawRow(box, row, x, y, width, first)
     item.bar:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
     item.bar:SetPoint("BOTTOMLEFT", item, "BOTTOMLEFT", 0, 0)
     item.bar:SetWidth(BAR_W)
+    item.bar:SetShown(not first)
     local a = row.done and "done" or "label"
     item.bar:SetColorTexture(ns.RXPWindowColor(a))
     item.icon:ClearAllPoints()
     item.icon:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap, 0)
+    Faced(item.icon, iconSize)
     item.icon:SetText(row.icon)
     item.text:ClearAllPoints()
     item.text:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + iconW, -drop)

@@ -172,4 +172,6 @@ Core/Integrations/RestedXP/
 - The first line of a step is bigger than its sub tasks (First Line Bonus, 2 over the text size to start).
   `Refaced` sets every row's text to the text size at the start of a draw, and `DrawRow` sets the first
   row's again with the bonus, so a pooled row that was the first and is not is back at the text size at
-  the next draw. The bonus is part of the size the icon is set against.
+  the next draw. The title has no bar at its side (the sub tasks keep theirs, which say open or done), and
+  its icon is bigger by the bonus twice, as its text is bigger by it once; the column, the drop of the text
+  and the row follow the icon's size of that row.

@@ -1371,15 +1371,17 @@ do
             if o.icon and o.text and o.bar and Seen(o) then return o end
         end
     end
+    ns.SetRXPWindowOption("rxpWindowFirstGrow", 0)
+    Flush(w)
     local row = First()
     Check(row.icon.fontSize == 18, "18 to start, bigger than the text")
-    Check(row.text.points[1][4] == 2 + 5 + 18 + 5 and row.text.points[1][5] == -1,
+    Check(row.text.points[1][4] == 2 + 5 + 18 + 5 and row.text.points[1][5] == -2,
         "the text starts after it, and is dropped to the middle of it")
     Check(row.height >= 18, "and the row is as tall as it")
     ns.SetRXPWindowOption("rxpWindowIconSize", 28)
     Flush(w)
     row = First()
-    Check(row.icon.fontSize == 28 and row.text.points[1][4] == 2 + 5 + 28 + 5 and row.text.points[1][5] == -6
+    Check(row.icon.fontSize == 28 and row.text.points[1][4] == 2 + 5 + 28 + 5 and row.text.points[1][5] == -7
         and account.rxpWindowIconSize == 28, "its size is a setting: the text moves with it")
     Check(row.text.width == row.width - 2 - 5 - 33, "and has that much less room")
     ns.SetRXPWindowOption("rxpWindowIconSize", 10)
@@ -1405,7 +1407,7 @@ do
     local rows = Rows()
     Check(#rows == 3 and rows[1].text.fontSize == 15 and rows[2].text.fontSize == 13 and rows[3].text.fontSize == 13,
         "the first is two bigger than the text of its sub tasks to start")
-    Check(rows[1].icon.fontSize == 18 and rows[2].icon.fontSize == 18, "and the icons are alike")
+    Check(rows[1].icon.fontSize == 22 and rows[2].icon.fontSize == 18, "and its icon is bigger: the bonus twice")
     ns.SetRXPWindowOption("rxpWindowFirstGrow", 5)
     Flush(w)
     rows = Rows()
@@ -1435,6 +1437,43 @@ do
     rows = Rows()
     Check(#rows == 3 and rows[1].text.fontSize == 18 and rows[2].text.fontSize == 16 and rows[3].text.fontSize == 16,
         "and back to one step: the others are the text's size again")
+end
+
+-- the title of a step has no bar at its side, and its icon is bigger
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local function Rows()
+        local out = {}
+        for _, o in ipairs(w.frames) do
+            if o.icon and o.text and o.bar and Seen(o) then out[#out + 1] = o end
+        end
+        return out
+    end
+    local rows = Rows()
+    Check(#rows == 3 and rows[1].bar.shown == false and rows[2].bar.shown == true and rows[3].bar.shown == true,
+        "the first line has no bar at its side, the sub tasks have theirs")
+    Check(rows[1].icon.fontSize == 22 and rows[2].icon.fontSize == 18 and rows[3].icon.fontSize == 18,
+        "and its icon is bigger: the bonus twice over")
+    Check(rows[1].text.points[1][4] == 2 + 5 + 22 + 5 and rows[1].height >= 22, "the text and the row make room for it")
+    ns.SetRXPWindowOption("rxpWindowFirstGrow", 0)
+    Flush(w)
+    rows = Rows()
+    Check(rows[1].icon.fontSize == 18 and rows[1].bar.shown == false, "with no bonus the icon is as big as the others'")
+    local steps = w.rxp.RXPFrame.activeSteps
+    w.rxp.RXPFrame.activeSteps = { { active = true, index = 37, title = "Step 37", elements = { w.buy } }, steps[1] }
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    rows = Rows()
+    Check(#rows == 4 and rows[1].bar.shown == false and rows[2].bar.shown == false and rows[3].bar.shown == true
+        and rows[4].bar.shown == true, "each step's first line has none")
+    w.rxp.RXPFrame.activeSteps = steps
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    rows = Rows()
+    Check(#rows == 3 and rows[1].bar.shown == false and rows[2].bar.shown == true and rows[3].bar.shown == true,
+        "and a row that was a first and is not has its bar again")
 end
 
 print("PASS rxp window: " .. cases .. " checks")
