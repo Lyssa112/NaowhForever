@@ -1239,9 +1239,21 @@ do
     end
 
     -- RestedXP's frame: what its UpdateVisuals paints is its own, each time it is called
+    local function Placeholder(w, id)
+        local button = Object(w.everything)
+        local texture = Object(w.everything)
+        texture.id = id
+        function texture:GetTexture() return self.id end
+        function texture:SetTexture(value) self.id = value end
+        button.placeholder = texture
+        return button
+    end
+
     local function Satellite(w, title)
         local f = Box(w)
         f.paints = 0
+        f.buttons = { Placeholder(w, 2056011), Placeholder(w, 135274), Placeholder(w, 135999) }
+        function f:GetChildren() return unpack(self.buttons) end
         f.title = Box(w)
         local text = Object(w.everything)
         text:SetText(title)
@@ -1281,6 +1293,7 @@ do
 
     local function Both(w, rxp)
         rxp.targeting = { activeTargetFrame = Satellite(w, "Active Targets") }
+        function rxp.targeting:UpdateTargetFrame() self.updates = (self.updates or 0) + 1 end
         function rxp.targeting:RenderTargetFrameBackground()
             self.activeTargetFrame.rxpBackground.textures[1]:SetVertexColor(0.1, 0.2, 0.3, 0.9)
             self.renders = (self.renders or 0) + 1
@@ -1312,7 +1325,7 @@ do
         local r, g, b = ns.RXPWindowColor("box")
         local opacity = ns.RXPWindowOption("rxpWindowBoxOpacity") / 100
         local er, eg, eb, ea = ns.RXPWindowColor("border")
-        local label = { ns.RXPWindowColor("accent") }
+        local label = { ns.RXPWindowColor("title") }
         Check(Is(Fill(frame), r, g, b, opacity), name .. ": the background is the active step's color and opacity")
         Check(Fill(frame.title) and Is(Fill(frame.title), r, g, b, opacity), name .. ": and so is its title's")
         for i, edge in ipairs(frame.rxpBorder.textures) do
@@ -1323,7 +1336,7 @@ do
         Check(text.font == "Fonts\\Naowh.ttf" and text.fontSize == 9 and text.fontFlags == "" and text.shadowX == 1,
             name .. ": the title is in the window's face and RestedXP's size, with the window's shadow")
         Check(text.color and math.abs(text.color[1] - label[1]) < 1e-6 and math.abs(text.color[3] - label[3]) < 1e-6,
-            name .. ": and in the step label's color")
+            name .. ": and in the title's color, not the accent")
         Check(frame.title.width == 90 and frame.title.height == 19,
             name .. ": the title is as wide as its text in the window's face, and RestedXP's height")
     end
@@ -1417,6 +1430,29 @@ do
         "the window turned off: RestedXP's own look is back")
     target:UpdateVisuals()
     Check(Is(Fill(target), 0.1, 0.2, 0.3, 0.9), "and stays")
+
+    -- the placeholders of the target buttons are the new icons, with the window on and a style picked
+    local buttons = target.buttons
+    ns.RXPIconTexture = function(glyph) return "Ours\\" .. glyph end
+    ns.SetRXPWindow(true)
+    Flush(w)
+    Check(buttons[1].placeholder.id == "Ours\\gossip" and buttons[2].placeholder.id == "Ours\\combat",
+        "RestedXP's chat bubble and sword placeholders are ours")
+    Check(buttons[3].placeholder.id == 135999, "and any other picture is left as it is")
+    buttons[1].placeholder:SetTexture(2056011)
+    w.rxp.targeting:UpdateTargetFrame()
+    Check(buttons[1].placeholder.id == "Ours\\gossip", "RestedXP putting its placeholder back is put right again")
+    ns.RXPIconTexture = function() return nil end
+    buttons[2].placeholder:SetTexture(135274)
+    target:UpdateVisuals()
+    Check(buttons[2].placeholder.id == 135274, "no style picked: RestedXP's own placeholder stays")
+    ns.RXPIconTexture = function(glyph) return "Ours\\" .. glyph end
+    target:UpdateVisuals()
+    ns.SetRXPWindow(false)
+    Flush(w)
+    Check(buttons[1].placeholder.id == 2056011 and buttons[2].placeholder.id == 135274,
+        "the window off: RestedXP's placeholders are back")
+    ns.RXPIconTexture = nil
 
     -- pieces that are not there raise nothing
     local bare = Begin({ rxpWindow = true }, function(world, rxp)

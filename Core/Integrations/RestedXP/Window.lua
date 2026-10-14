@@ -47,6 +47,8 @@ local CUSTOM = "custom"
 local FOLLOW = ""
 local FOREVER = "forever"
 local ACCENT = "accent"
+local TARGET_PLACEHOLDER, MOB_PLACEHOLDER = 2056011, 135274
+local PLACEHOLDER_GLYPHS = { [TARGET_PLACEHOLDER] = "gossip", [MOB_PLACEHOLDER] = "combat" }
 
 -- Everything the window can be changed in, in the order a page lists it. A saved value is only kept when it
 -- is not the default, as in the other settings of this integration.
@@ -117,6 +119,8 @@ local sizing, sizingModel
 local pool, used = { box = {}, row = {}, line = {}, hit = {} }, { box = 0, row = 0, line = 0, hit = 0 }
 local silenced = setmetatable({}, { __mode = "k" })
 local watched = setmetatable({}, { __mode = "k" })
+local placeholders = setmetatable({}, { __mode = "k" })
+local targetingHooked = {}
 local faced = {}
 local Draw
 
@@ -596,13 +600,37 @@ local function SkinTitle(title)
     if not (Has(text, "SetFont") and Has(text, "GetFont") and Has(text, "GetStringWidth")) then return end
     local _, size = text:GetFont()
     Faced(text, type(size) == "number" and size or BOX_TITLE_TEXT)
-    Coloured(text, "accent")
+    Coloured(text, "title")
     if Has(title, "SetSize") then title:SetSize(text:GetStringWidth() + BOX_TITLE_ROOM, BOX_TITLE_HEIGHT) end
+end
+
+local function SkinPlaceholders(frame)
+    if type(ns.RXPIconTexture) ~= "function" or not Has(frame, "GetChildren") then return end
+    for _, button in ipairs({ frame:GetChildren() }) do
+        local texture = Dig(button, "placeholder")
+        if Has(texture, "GetTexture") and Has(texture, "SetTexture") then
+            local id = texture:GetTexture()
+            local glyph = PLACEHOLDER_GLYPHS[id]
+            local path = glyph and ns.RXPIconTexture(glyph)
+            if path then
+                placeholders[texture] = id
+                texture:SetTexture(path)
+            end
+        end
+    end
+end
+
+local function RestorePlaceholders()
+    for texture, id in pairs(placeholders) do
+        placeholders[texture] = nil
+        if Has(texture, "SetTexture") then texture:SetTexture(id) end
+    end
 end
 
 local function SkinFrame(frame)
     SkinBox(frame)
     if type(frame.title) == "table" then SkinTitle(frame.title) end
+    SkinPlaceholders(frame)
 end
 
 local function SkinWanted()
@@ -628,11 +656,18 @@ local function SkinHooks(frames)
         end
     end
     local targeting = Dig(_G.RXP, "targeting")
-    if not watched[targeting] and Has(targeting, "RenderTargetFrameBackground") then
-        watched[targeting] = true
+    if not targetingHooked.background and Has(targeting, "RenderTargetFrameBackground") then
+        targetingHooked.background = true
         hooksecurefunc(targeting, "RenderTargetFrameBackground", Guarded("WindowSkin", function()
             local target = Dig(_G.RXP, "targeting", "activeTargetFrame")
             if SkinWanted() and type(target) == "table" then SkinBox(target) end
+        end))
+    end
+    if not targetingHooked.update and Has(targeting, "UpdateTargetFrame") then
+        targetingHooked.update = true
+        hooksecurefunc(targeting, "UpdateTargetFrame", Guarded("WindowSkin", function()
+            local target = Dig(_G.RXP, "targeting", "activeTargetFrame")
+            if SkinWanted() and type(target) == "table" then SkinPlaceholders(target) end
         end))
     end
 end
@@ -654,6 +689,7 @@ local function Skin()
         for _, frame in ipairs(frames) do Quiet("WindowSkin", SkinFrame, frame) end
     elseif skinned then
         skinned = false
+        RestorePlaceholders()
         for _, frame in ipairs(frames) do SkinRestore(frame) end
     end
 end

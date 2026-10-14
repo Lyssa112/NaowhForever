@@ -173,7 +173,12 @@ Core/Integrations/RestedXP/
   again. Each is hooked once (`watched`); a frame RestedXP makes later is taken at the next draw. The
   border follows the background, so a background RestedXP hides keeps its border hidden. Turned off
   (the window), RestedXP's own `UpdateVisuals` paints them again, and the
-  border is shown where the background is, as the title's is not set by it.
+  border is shown where the background is, as the title's is not set by it. The title is in the window's Title
+  Color, as the guide's name is, and not in the accent. The buttons of the targets that have no portrait yet
+  show a placeholder (the chat bubble for a friendly one, the sword for an enemy: file IDs 2056011 and 135274
+  that RestedXP sets again at each `UpdateTargetFrame`), and with a step icon style picked those are the
+  gossip and combat glyphs (`RXPIconTexture`), put right after each update and given back when the window
+  goes off; a portrait is never touched.
 - The icon at the start of a row has a fixed size of its own (`ICON_SIZE`, 18, over the text's 13): the
   icon's font string is faced at it, so RestedXP's own icons (`|T...:0|t`, as tall as the text they are in)
   grow with it, and the column and the row are as big. The text is dropped to the middle of an icon that
