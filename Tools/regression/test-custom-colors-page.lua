@@ -394,7 +394,7 @@ do
     Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == RXP_HINT, "it reads back, and the RestedXP reload hint shows")
     Check(not Hidden(e), "and the choices are shown")
 
-    Check(Layout(e) == "Add Themes to RestedXP|Reload UI to pick a theme., RestedXP Arrow|, Show Arrow Text|, Arrow Shows Objective|Arrow Text Size, Use Addon Font|Use Theme Text Color, Naowh Guide Window|" .. NEEDS,
+    Check(Layout(e) == "Add Themes to RestedXP|Reload UI to pick a theme., RestedXP Arrow|, Show Arrow Text|, Arrow Shows Objective|Arrow Text Size, Use Addon Font|Use Theme Text Color, Set Up New Characters|This Character, Naowh Guide Window|" .. NEEDS,
         "with the themes just turned on: a note beside the toggle in place of the theme, then the arrow choice, the arrow text, what it says, the font and text color, and the window")
     local _, waiting = Pair(e, "Add Themes to RestedXP")
     Check(waiting.type == "label" and waiting.getValue == nil, "RestedXP has not started with the themes yet: a note, not a dropdown")
@@ -402,7 +402,7 @@ do
     -- RestedXP up with the themes in its list: the dropdown, which is RestedXP's own setting
     local up = RxpStub("RXP Blue")
     local u = Page({ rxpThemes = true }, true, up)
-    Check(Layout(u) == "Add Themes to RestedXP|RestedXP Theme, RestedXP Arrow|, Show Arrow Text|, Arrow Shows Objective|Arrow Text Size, Use Addon Font|Use Theme Text Color, Naowh Guide Window|" .. NEEDS,
+    Check(Layout(u) == "Add Themes to RestedXP|RestedXP Theme, RestedXP Arrow|, Show Arrow Text|, Arrow Shows Objective|Arrow Text Size, Use Addon Font|Use Theme Text Color, Set Up New Characters|This Character, Naowh Guide Window|" .. NEEDS,
         "with RestedXP started: the toggle with the theme beside it, the arrow choice, the arrow text, what it says, and the font and text color")
     local switch, picker = Pair(u, "Add Themes to RestedXP")
     Check(switch and picker.type == "dropdown" and picker.text == "RestedXP Theme", "the theme is a dropdown beside the toggle")
@@ -451,7 +451,7 @@ do
         "with the layer as the arrow style, the choices for Naowh's arrow are not shown")
     local imaged = Page({ rxpThemes = true, rxpArrow = "image" }, true, RxpStub("RXP Blue"))
     Check(Layout(imaged) == "Add Themes to RestedXP|RestedXP Theme, RestedXP Arrow|Naowh Arrow Shape, Naowh Arrow Glow|Naowh Arrow Size, "
-        .. "Show Arrow Text|Naowh Arrow Text Gap, Arrow Shows Objective|Arrow Text Size, Use Addon Font|Use Theme Text Color, Naowh Guide Window|" .. NEEDS,
+        .. "Show Arrow Text|Naowh Arrow Text Gap, Arrow Shows Objective|Arrow Text Size, Use Addon Font|Use Theme Text Color, Set Up New Characters|This Character, Naowh Guide Window|" .. NEEDS,
         "with Naowh arrow picked: the arrow and its shape, its glow and size, the arrow text and its gap, what it says, then the font and text color")
     local _, shape = Pair(imaged, "RestedXP Arrow")
     local glow, size = Pair(imaged, "Naowh Arrow Glow")
@@ -547,10 +547,10 @@ do
     Check(Toggle(custom) and #custom.rows == plain + 2, "with Custom and the themes off, RestedXP adds the toggle row and the window's")
     Check(custom.rows[#custom.rows][1].text == "Naowh Guide Window", "and the window's is the last, above the Reload button")
     local onCustom = Page({ themePreset = "custom", rxpThemes = true }, true)
-    Check(#onCustom.rows == plain + 6, "with the themes on, RestedXP adds six rows: the toggle and theme, the arrow, the arrow text, what it says, the font and text, and the window")
+    Check(#onCustom.rows == plain + 7, "with the themes on, RestedXP adds seven rows: the toggle and theme, the arrow, the arrow text, what it says, the font and text, the set up and the window")
     Check(onCustom.rows[#onCustom.rows][1].text == "Naowh Guide Window", "and the window row is the last, above the Reload button")
     local onImage = Page({ themePreset = "custom", rxpThemes = true, rxpArrow = "image" }, true)
-    Check(#onImage.rows == plain + 7, "with Naowh arrow picked, one more: the glow and size")
+    Check(#onImage.rows == plain + 8, "with Naowh arrow picked, one more: the glow and size")
     local objective, size = Pair(onImage, "Arrow Shows Objective")
     Check(objective and objective.type == "toggle" and objective.getValue() == false and onImage.account.rxpArrowObjective == nil,
         "an Arrow Shows Objective toggle, off by default")
@@ -613,6 +613,38 @@ do
     reset.onClick()
     Check(s.account.rxpWindowColors == nil and s.account.rxpWindowTitleSize == nil
         and s.account.rxpWindowOutline == nil and s.refreshes == refreshed + 1, "it clears them and redraws the page")
+end
+
+do
+    -- setting a character up: only when themes or the window are wished for, off to start, and a button for the one played
+    local function Cells(page)
+        local out = {}
+        for _, row in ipairs(page.rows) do
+            for _, cell in ipairs(row) do out[cell.text] = cell end
+        end
+        return out
+    end
+    local none = Cells(Page({}, true))
+    Check(none["Set Up New Characters"] == nil and none["This Character"] == nil,
+        "nothing wished for: no row of it")
+    local s = Page({ rxpThemes = true }, true)
+    local cells = Cells(s)
+    local toggle, button = cells["Set Up New Characters"], cells["This Character"]
+    Check(toggle and toggle.type == "toggle" and toggle.getValue() == false, "with themes wished for: a switch, off to start")
+    Check(button and button.type == "button" and button.buttonText == "Set Up", "and a button for the character played")
+    toggle.setValue(true)
+    Check(s.account.rxpSetup == true and toggle.getValue() == true, "turned on, it is kept")
+    toggle.setValue(false)
+    Check(s.account.rxpSetup == nil, "and the default is not")
+    local w = Page({ rxpWindow = true }, true)
+    Check(Cells(w)["Set Up New Characters"] ~= nil, "the window wished for is enough")
+    local refreshed = s.refreshes
+    s.ns.RXPSetUpCharacter = function() return "reload" end
+    button.onClick()
+    Check(s.refreshes == refreshed + 1, "the button draws the page again with its reload note")
+    s.ns.RXPSetUpCharacter = function() return nil end
+    button.onClick()
+    Check(s.refreshes == refreshed + 2, "and when nothing needed a reload")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")

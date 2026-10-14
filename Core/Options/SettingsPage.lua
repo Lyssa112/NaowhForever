@@ -491,6 +491,21 @@ local function RxpWindowStyleRows(W, parent, y)
     return y - h
 end
 
+local function SetUpRows(W, parent, y)
+    local _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Set Up New Characters",
+          tooltip = "Turns on RestedXP's new interface and the Naowh theme for a character that has not been set up.",
+          getValue = ns.RXPSetUpEnabled,
+          setValue = function(v) ns.SetRXPSetUp(v) end },
+        { type = "button", text = "This Character", buttonText = "Set Up",
+          tooltip = "Turns them on for the character you are playing now.",
+          onClick = function()
+              if ns.RXPSetUpCharacter() == "reload" then RxpChanged() else UI:RefreshPage(true) end
+          end }
+    )
+    return y - h
+end
+
 local function RxpWindowRows(W, parent, y)
     local _, h = W:DualRow(parent, y,
         { type = "toggle", text = "Naowh Guide Window",
@@ -533,6 +548,7 @@ local function RestedXPSection(W, parent, y)
         ns.RXPThemesEnabled, ns.SetRXPThemes)
     _, h = W:DualRow(parent, y, themesSwitch, RxpThemeChoice()); y = y - h
     if ns.RXPThemesEnabled() then y = RxpThemeRows(W, parent, y) end
+    if ns.RXPThemesEnabled() or ns.RXPWindowEnabled() then y = SetUpRows(W, parent, y) end
     y = RxpWindowRows(W, parent, y)
     if rxpPending then
         _, h = W:Note(parent, TEXT_RXP_RELOAD, y); y = y - h

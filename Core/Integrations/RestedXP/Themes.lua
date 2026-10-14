@@ -10,6 +10,7 @@ local CURRENT_KEY, CURRENT_NAME = "current", ns.L("Naowh (current)")
 local RXP_DEFAULT = "Default"
 local TEXT_RXP_DEFAULT = ns.L("RestedXP (default)")
 local TEXT_CURRENT = ns.L("Current Theme")
+local TEXT_SETUP = ns.L("Naowh turned on RestedXP's new interface for this character. Reload UI to use it.")
 
 local RXP_TEXTURES = "Interface/AddOns/RXPGuides/Textures/"
 local TEXTURES = RXP_TEXTURES .. "DarkMode/"
@@ -64,6 +65,16 @@ function ns.RXPThemesEnabled()
     local on = ns.AccountSettings().rxpThemes
     if on == nil then return F.rxpThemes end
     return on == true
+end
+
+function ns.RXPSetUpEnabled()
+    local on = ns.AccountSettings().rxpSetup
+    if on == nil then return F.rxpSetup end
+    return on == true
+end
+
+function ns.SetRXPSetUp(on)
+    ns.AccountSettings().rxpSetup = on and true or nil
 end
 
 function ns.SetRXPThemes(on)
@@ -754,6 +765,37 @@ local function WindowWanted()
     return type(ns.RXPWindowEnabled) == "function" and ns.RXPWindowEnabled()
 end
 
+-- RestedXP keeps its settings by profile, and a character it has not met has the defaults: its V2
+-- interface off and its own theme. What the player turned on for the account is set for the character
+-- once, and RestedXP's interface is read when it loads, so that waits for a reload.
+local function SetUp(force)
+    local rxp = _G.RXP
+    local profile = Dig(rxp, "settings", "profile")
+    local guid = UnitGUID("player")
+    if type(profile) ~= "table" or type(guid) ~= "string" then return end
+    local account = ns.AccountSettings()
+    if type(account.rxpSetUp) ~= "table" then account.rxpSetUp = {} end
+    if account.rxpSetUp[guid] and not force then return end
+    account.rxpSetUp[guid] = true
+    local restart
+    if WindowWanted() and not (profile.enableBetaFeatures and profile.enableV2Interface) then
+        profile.enableBetaFeatures, profile.enableV2Interface = true, true
+        restart = true
+    end
+    local current = NAME_PREFIX .. CURRENT_KEY
+    local changed = not Ours(profile.activeTheme) and type(Dig(rxp, "themes", current)) == "table"
+    if changed then
+        profile.activeTheme = current
+        if not restart then Reload() end
+    end
+    if restart then ns.ConfirmReload(TEXT_SETUP) end
+    return restart and "reload" or (changed and "theme") or nil
+end
+
+function ns.RXPSetUpCharacter()
+    return SetUp(true)
+end
+
 local function OnBootEvent(self, event, name)
     if event == "ADDON_LOADED" then
         if name ~= ns.MODULE_KEY then return end
@@ -767,6 +809,7 @@ local function OnBootEvent(self, event, name)
         Reload()
     else
         self:UnregisterAllEvents()
+        if ns.RXPSetUpEnabled() then Quiet("SetUp", SetUp) end
         if ns.RXPThemesEnabled() then
             if late then Quiet("Resume", Resume) end
             Quiet("HookArrow", HookArrow)

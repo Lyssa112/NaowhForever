@@ -182,3 +182,10 @@ Core/Integrations/RestedXP/
   the next draw. The title has no bar at its side (the sub tasks keep theirs, which say open or done), and
   its icon is bigger by the bonus twice, as its text is bigger by it once; the column, the drop of the text
   and the row follow the icon's size of that row.
+- RestedXP keeps its settings by profile, which is a character's own unless the player shares one, so a
+  character it has not met has its defaults: the V2 interface off, which the window needs, and its own
+  theme. Set Up New Characters (off to start, shown once themes or the window are wished for) sets, the
+  first login of a character, `enableBetaFeatures`, `enableV2Interface` and the Naowh current theme in its
+  profile for what is wished for, and asks for a reload as the interface is read when RestedXP loads; what
+  the player changes after is theirs, as the characters done are kept (`rxpSetUp`, by GUID). The button
+  does it for the character played, seen or not.

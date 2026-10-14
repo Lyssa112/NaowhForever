@@ -1887,4 +1887,117 @@ do
         "each part is hooked once")
 end
 
+-- a character RestedXP has not met: what is turned on for the account is set for it once, and only if wished
+do
+    local function Rxp(profile)
+        local rxp = { activeTheme = { name = "RXP Blue" }, themes = { ["RXP Blue"] = { name = "RXP Blue" } },
+            registered = {}, reloads = {}, settings = { profile = profile } }
+        function rxp:RegisterTheme(theme) self.themes[theme.name] = theme end
+        function rxp:ReloadTheme()
+            self.reloads[#self.reloads + 1] = self.settings.profile.activeTheme
+            self.activeTheme = self.themes[self.settings.profile.activeTheme]
+        end
+        return rxp
+    end
+    local function Run(account, profile, guid, window, starting)
+        local env, ns, frames, boot = Load(account, true)
+        local rxp = Rxp(profile)
+        if not starting then env.RXP = rxp end
+        env.UnitGUID = function() return guid end
+        local confirms = {}
+        ns.ConfirmReload = function(text) confirms[#confirms + 1] = text end
+        ns.RXPWindowEnabled = function() return window == true end
+        Fire(frames, "NaowhForever")
+        if starting then
+            env.RXP = rxp
+            for name, theme in pairs(env.RXPGuides_Themes or {}) do rxp.themes[name] = theme end
+        end
+        if profile and rxp.themes[profile.activeTheme] then rxp.activeTheme = rxp.themes[profile.activeTheme] end
+        Login(boot)
+        return rxp, ns, confirms, env
+    end
+    local CURRENT = "NaowhForever:current"
+
+    -- not wished for: nothing is touched, as the other settings are
+    local profile = { activeTheme = "RXP Blue" }
+    local rxp, _, confirms = Run({ rxpThemes = true }, profile, "Player-1", true)
+    Check(profile.activeTheme == "RXP Blue" and profile.enableV2Interface == nil and #confirms == 0 and #rxp.reloads == 0,
+        "not turned on: the character's settings are left as they are")
+
+    -- wished for, on a character it has not seen: the interface and the theme, and a reload to use the interface
+    profile = { activeTheme = "RXP Blue" }
+    local account = { rxpThemes = true, rxpSetup = true }
+    local env, ns
+    rxp, ns, confirms, env = Run(account, profile, "Player-1", true)
+    Check(profile.enableBetaFeatures == true and profile.enableV2Interface == true and profile.activeTheme == CURRENT,
+        "turned on: the interface and the Naowh theme are set for it")
+    Check(#confirms == 1, "a reload is asked for, to use the interface")
+    Check(account.rxpSetUp["Player-1"] == true, "and it is kept that it was done")
+
+    -- seen: what the player changes after is theirs
+    profile.activeTheme, profile.enableV2Interface = "RXP Blue", false
+    rxp, ns, confirms = Run(account, profile, "Player-1", true)
+    Check(profile.activeTheme == "RXP Blue" and profile.enableV2Interface == false and #confirms == 0,
+        "the same character again: nothing is set again")
+
+    -- another character
+    local other = { activeTheme = "RXP Blue" }
+    rxp, ns, confirms = Run(account, other, "Player-2", true)
+    Check(other.enableV2Interface == true and other.activeTheme == CURRENT and #confirms == 1, "another one is set up")
+
+    -- the theme alone: no interface to wait for, so the theme is reloaded
+    local themed = { activeTheme = "RXP Blue" }
+    rxp, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, themed, "Player-3", false)
+    Check(themed.activeTheme == CURRENT and themed.enableV2Interface == nil and #confirms == 0
+        and #rxp.reloads == 1 and rxp.reloads[1] == CURRENT, "the window not wished for: the theme only, and live")
+
+    -- RestedXP loading after us, which imports the themes itself: the theme is reloaded by the set up
+    local later = { activeTheme = "RXP Blue" }
+    rxp, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, later, "Player-3b", false, true)
+    Check(later.activeTheme == CURRENT and #rxp.reloads == 1 and rxp.reloads[1] == CURRENT,
+        "RestedXP not up when we loaded: the theme is reloaded onto the new one")
+
+    -- the interface alone
+    local windowed = { activeTheme = "RXP Blue" }
+    rxp, ns, confirms = Run({ rxpSetup = true }, windowed, "Player-4", true)
+    Check(windowed.activeTheme == "RXP Blue" and windowed.enableV2Interface == true and #confirms == 1,
+        "the themes not wished for: the interface only")
+
+    -- already as it should be
+    local done = { activeTheme = CURRENT, enableBetaFeatures = true, enableV2Interface = true }
+    rxp, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, done, "Player-5", true)
+    Check(#confirms == 0 and #rxp.reloads == 0, "a character that is as it should be: nothing is asked")
+
+    -- nothing wished for at all
+    local none = { activeTheme = "RXP Blue" }
+    rxp, ns, confirms = Run({ rxpSetup = true }, none, "Player-6", false)
+    Check(none.activeTheme == "RXP Blue" and none.enableV2Interface == nil and #confirms == 0,
+        "set up on, with no theme and no window wished for: nothing to set")
+
+    -- a theme of RestedXP's own choosing is not ours to keep, but the player's own pick of ours is
+    local picked = { activeTheme = "NaowhForever:crimson" }
+    rxp, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, picked, "Player-7", false)
+    Check(picked.activeTheme == "NaowhForever:crimson", "a theme of ours already picked is not changed")
+
+    -- by hand, with it off and the character seen
+    local manual = { activeTheme = "RXP Blue" }
+    account = { rxpThemes = true, rxpWindow = true, rxpSetUp = { ["Player-8"] = true } }
+    rxp, ns, confirms = Run(account, manual, "Player-8", true)
+    Check(manual.enableV2Interface == nil and manual.activeTheme == "RXP Blue", "off and seen: login sets nothing")
+    local result = ns.RXPSetUpCharacter()
+    Check(result == "reload" and manual.enableV2Interface == true and manual.activeTheme == CURRENT and #confirms == 1,
+        "the button sets it, wished for or not, seen or not")
+
+    -- what is missing raises nothing
+    rxp, ns, confirms, env = Run({ rxpThemes = true, rxpSetup = true }, nil, "Player-9", true)
+    Check(#confirms == 0 and ns.RXPFailures.SetUp == nil, "no profile: nothing")
+    rxp, ns, confirms, env = Run({ rxpThemes = true, rxpSetup = true }, { activeTheme = "RXP Blue" }, nil, true)
+    Check(#confirms == 0, "no character to say who it is: nothing")
+    ns.RXPSetUpEnabled()
+    ns.SetRXPSetUp(true)
+    Check(ns.RXPSetUpEnabled() == true, "the setting is kept")
+    ns.SetRXPSetUp(false)
+    Check(ns.AccountSettings().rxpSetup == nil and ns.RXPSetUpEnabled() == false, "and the default is not")
+end
+
 print("PASS rxp themes: " .. cases .. " checks")
