@@ -38,6 +38,13 @@ local function Object(everything)
     function o:SetScript(name, fn) self.scripts[name] = fn end
     function o:SetTextColor(r, g, b) self.color = { r, g, b } end
     function o:SetColorTexture(r, g, b, a) self.solid = { r, g, b, a } end
+    function o:RegisterEvent(event)
+        self.events = self.events or {}
+        self.events[event] = true
+    end
+    function o:UnregisterEvent(event)
+        if self.events then self.events[event] = nil end
+    end
     function o:SetFont(path, size, flags) self.font, self.fontSize, self.fontFlags = path, size, flags end
     function o:SetShown(on) self.shown = on and true or false end
     function o:SetShadowOffset(x, y) self.shadowX, self.shadowY = x, y end
@@ -92,6 +99,11 @@ local function World(account, opts)
     env.C_AddOns = { DoesAddOnExist = function(name) return opts.installed ~= false and name == "RXPGuides" end }
     env.C_Timer = { After = function(_, fn) w.timers[#w.timers + 1] = fn end }
     env.SetItemRef = function(link) w.links[#w.links + 1] = link end
+    w.items = {}
+    env.GetItemCount = function(id)
+        if w.itemsRaise then error("items") end
+        return w.items[id] or 0
+    end
     env.NaowhForeverDB = { account = account, profiles = {}, charActive = {} }
     env.CreateFrame = function(_, name, parent)
         local f = Object(w.everything)
@@ -1085,6 +1097,106 @@ do
     bare.rxp.SetStep()
     Flush(bare)
     Check(Window(bare) ~= nil and Window(bare).shown, "frames without a background, a border or a title: nothing raises")
+end
+
+-- a row that counts has a bar of its own: the items in the bags for a buy, the numbers in a counted line
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local f = Window(w)
+    local ns = w.ns
+    local BAGS = "BAG_UPDATE_DELAYED"
+    local function Row(text)
+        for _, o in ipairs(w.frames) do
+            if o.meter and o.text and o.text.text == text and Seen(o) then return o end
+        end
+    end
+    local function Meters()
+        local count = 0
+        for _, o in ipairs(w.frames) do
+            if o.meter and Seen(o) and o.meter.shown then count = count + 1 end
+        end
+        return count
+    end
+    local BUY = "Buy [Refreshing Spring Water] from her"
+    local TALK = "Talk to |cff00ff00Duokna|r"
+    Check(Meters() == 0 and (f.events == nil or f.events[BAGS] == nil), "nothing counts to start: no bar, and no event")
+
+    w.buy.id, w.buy.qty = 159, 5
+    w.items[159] = 2
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    local buy = Row(BUY)
+    Check(buy.meter.shown and math.abs(buy.meter.value - 0.4) < 1e-9, "buy five with two in the bags: two fifths")
+    Check(buy.meter.width == buy.width - 2 - 5 - 18 and buy.height == 13 + 2 + 5,
+        "under the text as wide as it, and the row is as tall as both")
+    Check(f.events and f.events[BAGS] == true, "and the bags are listened to")
+
+    w.items[159] = 4
+    f.scripts.OnEvent(f, BAGS)
+    Flush(w)
+    Check(math.abs(Row(BUY).meter.value - 0.8) < 1e-9, "a bag update draws it again: four fifths")
+    w.items[159] = 9
+    f.scripts.OnEvent(f, BAGS)
+    Flush(w)
+    Check(Row(BUY).meter.value == 1, "more than needed is a full bar")
+
+    w.buy.qty = 1
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(Meters() == 0 and f.events[BAGS] == nil, "one of something is not a count: no bar, and the bags are let go")
+
+    w.talk.frame.text:SetText("|cff00ff00Boar Meat|r: |cffffd1003/8|r")
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    local talk = Row("|cff00ff00Boar Meat|r: |cffffd1003/8|r")
+    Check(talk and talk.meter.shown and math.abs(talk.meter.value - 3 / 8) < 1e-9, "a line that counts: three of eight")
+    Check(f.events[BAGS] == nil, "and needs no bags: RestedXP changes its text")
+    w.talk.frame.button.GetChecked = function() return true end
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(talk.meter.value == 1, "a row that is done is a full bar")
+    w.talk.frame.button.GetChecked = function() return false end
+    w.talk.frame.text:SetText("Kill 12/10 Boars")
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(Row("Kill 12/10 Boars").meter.value == 1, "past its count is full")
+    w.talk.frame.text:SetText("Talk to 1/1 Duokna")
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(Meters() == 0, "1/1 is not a count")
+
+    w.buy.id, w.buy.qty = "Refreshing Spring Water", 5
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(Meters() == 0, "a buy that is of an item by name has nothing to count in the bags")
+    w.buy.id = 159
+
+    w.talk.frame.text:SetText("Talk to |cff00ff00Duokna|r")
+    w.vendor.tag, w.vendor.id, w.vendor.qty = "vendor", 5, 9
+    w.buy.qty = 5
+    w.items[159] = 1
+    ns.SetRXPWindowOption("rxpWindowCountBar", false)
+    Flush(w)
+    Check(Meters() == 0 and f.events[BAGS] == nil, "turned off: no bars, and no bags")
+    ns.SetRXPWindowOption("rxpWindowCountBar", true)
+    Flush(w)
+    Check(Meters() == 1 and Row(BUY).meter.shown, "turned on: the buy only, and not a row that is not a buy with an id")
+    Check(f.events[BAGS] == true, "and the bags are listened to again")
+
+    w.itemsRaise = true
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(Meters() == 0 and type(ns.RXPFailures.WindowCount) == "string" and f.shown,
+        "bags that raise: no bar, kept by name, and the window is drawn")
+    w.itemsRaise = false
+
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(Meters() == 1 and f.events[BAGS] == true, "and back when they do not")
+    ns.SetRXPWindow(false)
+    Flush(w)
+    Check(f.events[BAGS] == nil, "the window turned off: the bags are let go")
 end
 
 print("PASS rxp window: " .. cases .. " checks")

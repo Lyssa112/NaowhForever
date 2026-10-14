@@ -17,6 +17,8 @@ local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
 local BAR_W, ICON_W, MENU_SIZE, GRIP_SIZE = 2, 18, 22, 16
 local PANEL_ALPHA, EDGE_ALPHA, RULE_ALPHA, MUTED_ALPHA = 0.92, 0.8, 0.5, 0.9
 local BOX_OPACITY = 55
+local COUNT_PATTERN, COUNT_MIN, COUNT_GAP = "(%d+)%s*/%s*(%d+)", 2, 2
+local BAG_EVENT = "BAG_UPDATE_DELAYED"
 local SHADOW, SHADOW_ALPHA = 1, 0.9
 local GOLD = { r = 1, g = 0.82, b = 0 }
 local TEXT_FOLD, TEXT_UNFOLD, TEXT_DOT = "-", "+", " \194\183 "
@@ -78,6 +80,8 @@ local OPTIONS = {
       defaultLabel = TEXT_GRADIENT, tip = "The texture of the progress bars, the Naowh Gradient to start." },
     { key = "rxpWindowStepBar", group = "Progress", kind = "toggle", label = "Step Objectives Bar", default = false,
       tip = "A bar under the active step of the objectives done." },
+    { key = "rxpWindowCountBar", group = "Progress", kind = "toggle", label = "Item Count Bars", default = true,
+      tip = "A bar under a row that counts, as in Buy 5 or 3/8 Boar Meat." },
 }
 
 -- A color is a theme token and an opacity, or a color of its own; a picked one is kept whole.
@@ -106,7 +110,7 @@ local OPTION_BY_KEY, COLOR_BY_NAME = {}, {}
 for _, option in ipairs(OPTIONS) do OPTION_BY_KEY[option.key] = option end
 for _, color in ipairs(COLORS) do COLOR_BY_NAME[color.name] = color end
 
-local window, active, started, pending, skinned
+local window, active, started, pending, skinned, wantsBags
 local sizing, sizingModel
 local pool, used = { box = {}, row = {}, line = {} }, { box = 0, row = 0, line = 0 }
 local silenced = setmetatable({}, { __mode = "k" })
@@ -280,6 +284,25 @@ local function Heading(rxp, guide)
     return range and (place .. " " .. Tint("range", range)) or place
 end
 
+local function ItemCount(id)
+    local item = _G.C_Item
+    local count = Has(item, "GetItemCount") and item.GetItemCount or _G.GetItemCount
+    if type(count) ~= "function" then return nil end
+    local have = Run("WindowCount", count, id)
+    return type(have) == "number" and have or nil
+end
+
+local function Counted(element, shown)
+    local tag = element.tag
+    if type(tag) == "string" and tag:find("^buy") and type(element.id) == "number"
+            and type(element.qty) == "number" then
+        local have = ItemCount(element.id)
+        if have then return have, element.qty, true end
+    end
+    local have, need = Plain(shown):match(COUNT_PATTERN)
+    return tonumber(have), tonumber(need), false
+end
+
 local function Row(rxp, element)
     local frame = element.frame
     local text = Dig(frame, "text")
@@ -294,7 +317,9 @@ local function Row(rxp, element)
     if type(glyph) ~= "string" then glyph = element.icon or Dig(rxp, "icons", element.tag) or "" end
     local button = Dig(frame, "button")
     local done = Has(button, "GetChecked") and button:GetChecked() or element.completed or element.skip
-    return { text = shown, icon = glyph, done = done and true or false, button = button, source = text }
+    local have, need, bags = Counted(element, shown)
+    return { text = shown, icon = glyph, done = done and true or false, button = button, source = text,
+        have = have, need = need, bags = bags }
 end
 
 local function ActiveSteps(rxp)
@@ -652,6 +677,7 @@ local function Build()
     f:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" then Menu() end
     end)
+    f:SetScript("OnEvent", function() Refresh() end)
     f.back = ns.Solid(f, "BACKGROUND", T.panel, 1)
     f.back:SetAllPoints()
     f.edge = ns.Border(f, T.line, EDGE_ALPHA)
@@ -723,6 +749,7 @@ local function MakeRow()
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
     row.icon = Text(row, "rxpWindowTextSize")
+    row.meter = MakeBar(row)
     row.text = Text(row, "rxpWindowTextSize")
     row.text:SetWordWrap(true)
     Draggable(row)
@@ -792,6 +819,18 @@ local function DrawRow(box, row, x, y, width)
     Coloured(item.text, row.done and "done" or "text")
     item.text:SetText(row.text)
     local height = math.max(item.text:GetStringHeight(), ns.RXPWindowOption("rxpWindowTextSize"))
+    if row.need and row.need >= COUNT_MIN and ns.RXPWindowOption("rxpWindowCountBar") then
+        local fraction = row.done and 1 or math.min(1, math.max(0, (row.have or 0) / row.need))
+        item.meter:ClearAllPoints()
+        item.meter:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + ICON_W, -(height + COUNT_GAP))
+        item.meter:SetWidth(textWidth)
+        PaintBar(item.meter, fraction)
+        item.meter:Show()
+        height = height + COUNT_GAP + ns.RXPWindowOption("rxpWindowBarHeight")
+        if row.bags then wantsBags = true end
+    else
+        item.meter:Hide()
+    end
     item:SetHeight(height)
     Watch(row.source)
     return height
@@ -883,6 +922,7 @@ end
 
 function Draw()
     if not active then return end
+    wantsBags = false
     if not sizing then Quiet("WindowSkin", Skin) end
     window = window or Build()
     if not sizing then Take() end
@@ -929,6 +969,7 @@ function Draw()
         y = y - gap - MENU_SIZE
     end
     if not sizing then window:SetHeight(-y + PAD) end
+    if wantsBags then window:RegisterEvent(BAG_EVENT) else window:UnregisterEvent(BAG_EVENT) end
     window.lineHeight = listH
     window.chrome = -y + PAD - used.line * listH
     local locked = ns.RXPWindowOption("rxpWindowLock")
@@ -951,7 +992,10 @@ local function Apply()
         Quiet("WindowDraw", Draw)
     else
         Release()
-        if window then window:Hide() end
+        if window then
+            window:Hide()
+            window:UnregisterEvent(BAG_EVENT)
+        end
         Quiet("WindowSkin", Skin)
     end
 end

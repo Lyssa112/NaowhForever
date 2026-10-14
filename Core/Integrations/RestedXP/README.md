@@ -135,6 +135,12 @@ Core/Integrations/RestedXP/
   is under the title, and is off to start so the guide's is the only bar; the box's own opacity is a setting (`rxpWindowBoxOpacity`) and not a part of its
   color. The bars are in the Naowh Gradient to start (`GRADIENT`, which is `ns.MEDIA`'s, so a texture of
   SharedMedia is only needed when another is wanted).
+- A row that counts has a bar under its text: a buy by the items in the bags against `qty` (RestedXP shows
+  no counter for it, so `GetItemCount(id)` is read, and the window listens to `BAG_UPDATE_DELAYED` only
+  while such a row is drawn), and any other row by the `3/8` in its text, which RestedXP rewrites as the
+  count changes and so redraws the window. A count of one is a tick box and not a bar, a row that is done
+  is full, and a count past its total is full. Only `buy` tags are counted from the bags, as another tag's
+  `id` or `qty` can mean something else.
 - The Active Targets and Active Items windows (`RXPTargetFrame`, `RXPItemFrame`) take the look of the
   active step's box: the colors of their v2 background and border textures are set in place after
   `UpdateVisuals` (and after the targets' `RenderTargetFrameBackground`, which settings call alone), and
