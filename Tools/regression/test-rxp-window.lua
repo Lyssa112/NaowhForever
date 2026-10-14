@@ -1608,7 +1608,6 @@ end
 do
     local account = { rxpWindow = true, rxpWindowTheme = "custom" }
     local w = Start(account)
-    local f = Window(w)
     local ns = w.ns
     local T = ns.THEME
     T.accent = { r = 0.1, g = 0.8, b = 0.4 }
@@ -1947,7 +1946,6 @@ do
     local account = { rxpWindow = true }
     local w = Start(account)
     local rxp = w.rxp
-    local ns = w.ns
     local went = {}
     rxp.SetStep = function(n) went[#went + 1] = n end
     rxp.updateSteps = false

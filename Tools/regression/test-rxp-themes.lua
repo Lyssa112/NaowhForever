@@ -27,7 +27,7 @@ local function Shown(t)
 end
 -- What a FontString answers that the arrow's text is asked: its font, text and width.
 local function Fontish(t)
-    t.font = t.font or { "Fonts\RXP.TTF", 9, "OUTLINE" }
+    t.font = t.font or { "Fonts\\RXP.TTF", 9, "OUTLINE" }
     function t:GetFont() return unpack(self.font) end
     function t:SetFont(path, size, flags) self.font = { path, size, flags } end
     function t:SetText(text) self.shown = text end
