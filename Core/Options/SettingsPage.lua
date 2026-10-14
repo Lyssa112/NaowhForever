@@ -318,15 +318,9 @@ local function SkinRow()
         end }
 end
 
-local function ColorsSection(W, parent, y)
-    local _, h = W:SectionHeader(parent, "COLORS", y); y = y - h
-    _, h = W:DualRow(parent, y, SkinRow(), Empty()); y = y - h
+local function ThemePicker(tooltip)
     local themes, themeOrder = ThemeChoices()
-    _, h = W:DualRow(parent, y,
-        { type = "dropdown", text = "Theme", values = themes, order = themeOrder,
-          tooltip = "Theme presets for the addon's windows and HUD frames, plus a Custom "
-          .. "option for your own colors. If text gets hard to read, pick Naowh (default). "
-          .. "Saved for this computer.|n|nTakes effect after a /reload.",
+    return { type = "dropdown", text = "Theme", values = themes, order = themeOrder, tooltip = tooltip,
           getValue = ns.ThemePresetKey,
           disabled = ClassicSkin,
           setValue = function(v)
@@ -334,7 +328,14 @@ local function ColorsSection(W, parent, y)
               ColorsChanged()
           end },
         { type = "palette", text = "", colors = function() return ns.ThemePalette(ns.ThemePresetKey()) end }
-    ); y = y - h
+end
+
+local function ColorsSection(W, parent, y)
+    local _, h = W:SectionHeader(parent, "COLORS", y); y = y - h
+    _, h = W:DualRow(parent, y, SkinRow(), Empty()); y = y - h
+    _, h = W:DualRow(parent, y, ThemePicker("Theme presets for the addon's windows and HUD frames, plus a Custom "
+          .. "option for your own colors. If text gets hard to read, pick Naowh (default). "
+          .. "Saved for this computer.|n|nTakes effect after a /reload.")); y = y - h
     if ns.ThemePresetKey() == CUSTOM and not ClassicSkin() then y = CustomRows(W, parent, y) end
     if colorsPending then
         _, h = W:Note(parent, TEXT_COLORS_RELOAD, y); y = y - h
@@ -490,13 +491,20 @@ end
 
 local function RxpWindowStyleRows(W, parent, y)
     local _, h = W:GroupHeader(parent, "WINDOW LOOK", y); y = y - h
+    _, h = W:DualRow(parent, y, ThemePicker("The addon's theme, whose colors are the window's; Custom lets you pick them."))
+    y = y - h
+    if colorsPending then
+        _, h = W:Note(parent, TEXT_COLORS_RELOAD, y); y = y - h
+    end
     local cells = {}
     for _, group in ipairs({ "Text", "Look", "Progress" }) do
         for _, option in ipairs(ns.RXPWindowOptions()) do
             if option.group == group then cells[#cells + 1] = WindowOptionCell(option) end
         end
     end
-    for _, color in ipairs(ns.RXPWindowColors()) do cells[#cells + 1] = WindowColorCell(color) end
+    if ns.RXPWindowOwnColors() then
+        for _, color in ipairs(ns.RXPWindowColors()) do cells[#cells + 1] = WindowColorCell(color) end
+    end
     for i = 1, #cells, 2 do
         _, h = W:DualRow(parent, y, cells[i], cells[i + 1] or Empty()); y = y - h
     end

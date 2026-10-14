@@ -94,6 +94,9 @@ local function World(account, opts)
     env.UIParent = Object(w.everything)
     env.GameTooltip = Object(w.everything)
     function env.GameTooltip:GetOwner() return self.owner end
+    function env.GameTooltip:SetText(text, r, g, b)
+        self.text, self.titleColor = text, { r, g, b }
+    end
     function env.GameTooltip:SetOwner(owner)
         self.owner = owner
         self.lines = {}
@@ -608,6 +611,13 @@ do
     w.shift = false
     hits[3].scripts.OnEnter(hits[3])
     Check(hits[3].shade.shown == true, "lit under the mouse")
+    local accent = w.ns.THEME.accent
+    local solid = hits[3].shade.solid
+    Check(solid and solid[1] == accent.r and solid[2] == accent.g and solid[3] == accent.b and solid[4] == 0.25,
+        "in the accent, a little see-through, not the text's color")
+    local title = w.env.GameTooltip.titleColor
+    Check(title and title[1] == accent.r and title[2] == accent.g and title[3] == accent.b,
+        "and its tooltip's title is in the accent, not the game's gold")
     rxp.v2:UpdateGuideWindow()
     Flush(w)
     Check(hits[3].shade.shown == false, "and not when it is drawn again")
@@ -712,7 +722,7 @@ end
 
 -- the colors: the theme's, until one is picked
 do
-    local account = { rxpWindow = true }
+    local account = { rxpWindow = true, themePreset = "custom" }
     local w = Start(account)
     local ns = w.ns
     local T = ns.THEME
@@ -735,6 +745,16 @@ do
     Check(account.rxpWindowColors == nil and ns.RXPWindowColor("title") == T.fg.r, "and none puts the theme's back")
     ns.SetRXPWindowColor("nothing", 1, 1, 1, 1)
     Check(account.rxpWindowColors == nil, "a color that is not one of them is not kept")
+    ns.SetRXPWindowColor("title", 0.1, 0.2, 0.3, 1)
+    Check(ns.RXPWindowOwnColors() == true and ns.RXPWindowColor("title") == 0.1, "Custom: a color picked is the window's")
+    account.themePreset = "midnight"
+    Check(ns.RXPWindowOwnColors() == false and ns.RXPWindowColor("title") == T.fg.r
+        and account.rxpWindowColors.title.r == 0.1, "a theme: the theme's color, and the one picked is kept")
+    account.themePreset = nil
+    Check(ns.RXPWindowColor("title") == T.fg.r, "the addon's own theme the same")
+    account.themePreset = "custom"
+    Check(ns.RXPWindowColor("title") == 0.1, "and Custom again: the one picked is back")
+    ns.SetRXPWindowColor("title", nil)
     account.rxpWindowColors = { text = { r = "x" } }
     Check(ns.RXPWindowColor("text") == T.fg.r, "a color saved wrongly is the theme's")
     account.rxpWindowColors = nil
@@ -750,7 +770,7 @@ end
 
 -- the bars
 do
-    local account = { rxpWindow = true }
+    local account = { rxpWindow = true, themePreset = "custom" }
     local w = Start(account)
     local f = Window(w)
     local T = w.ns.THEME
@@ -811,7 +831,7 @@ end
 
 -- the look: panel, borders, menu, spacing and the colors of every text
 do
-    local account = { rxpWindow = true }
+    local account = { rxpWindow = true, themePreset = "custom" }
     local w = Start(account)
     local ns = w.ns
     local f = Window(w)
@@ -1108,7 +1128,7 @@ do
     Check(Is(Fill(target), 0.1, 0.2, 0.3, 0.9) and items.paints == 1, "and are painted that way again")
 
     -- the window on: both take its look, and keep it when RestedXP paints them again
-    local account = { rxpWindow = true }
+    local account = { rxpWindow = true, themePreset = "custom" }
     local w = Begin(account, Both)
     local ns = w.ns
     target, items = w.rxp.targeting.activeTargetFrame, w.rxp.activeItemFrame
@@ -1613,6 +1633,9 @@ do
     w.rxp.v2.ShowGuideSelectionMenu = list
     pick.scripts.OnEnter(pick)
     Check(w.env.GameTooltip.text == "Pick a guide" and pick.shade.shown, "and says so")
+    local lit = w.ns.THEME.accent
+    Check(w.env.GameTooltip.titleColor[1] == lit.r and w.env.GameTooltip.titleColor[2] == lit.g,
+        "in the accent, as the others' are")
     ns.SetRXPWindowOption("rxpWindowSkip", "off")
     pick.scripts.OnLeave(pick)
     pick.scripts.OnEnter(pick)

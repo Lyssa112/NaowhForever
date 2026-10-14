@@ -16,7 +16,7 @@ local HEAD_PAD, LIST_PAD = 10, 6
 local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
 local BAR_W, ICON_GAP, GRIP_SIZE = 2, 5, 16
 local FIRST_GROW, FIRST_ICON_GROW, LOGO_SIZE, BAR_HEIGHT, INDENT, ICON_SIZE = 2, 2, 24, 5, 12, 18
-local PANEL_ALPHA, EDGE_ALPHA, RULE_ALPHA, MUTED_ALPHA = 0.92, 0.8, 0.5, 0.9
+local PANEL_ALPHA, EDGE_ALPHA, RULE_ALPHA, MUTED_ALPHA, HOVER_ALPHA = 0.92, 0.8, 0.5, 0.9, 0.25
 local BOX_OPACITY = 55
 local COUNT_PATTERN, COUNT_MIN, COUNT_GAP = "(%d+)%s*/%s*(%d+)", 2, 2
 local BAG_EVENT = "BAG_UPDATE_DELAYED"
@@ -39,6 +39,8 @@ local TIP_DIM = 0.7
 local HOME = { "LEFT", "LEFT", 0, 35 }
 local DRAG_BUTTON, TIP_ANCHOR = "LeftButton", "ANCHOR_TOP"
 local COLORS_KEY = "rxpWindowColors"
+local CUSTOM = "custom"
+local ACCENT = "accent"
 
 -- Everything the window can be changed in, in the order a page lists it. A saved value is only kept when it
 -- is not the default, as in the other settings of this integration.
@@ -200,10 +202,15 @@ function ns.SetRXPWindowOption(key, value)
     Refresh()
 end
 
+-- The colors are the theme's, and the player's own only when the theme is Custom: a theme is a look as a whole.
+function ns.RXPWindowOwnColors()
+    return type(ns.ThemePresetKey) == "function" and ns.ThemePresetKey() == CUSTOM
+end
+
 function ns.RXPWindowColor(name)
     local color = COLOR_BY_NAME[name]
     if not color then return 1, 1, 1, 1 end
-    local saved = Dig(Settings(), COLORS_KEY, name)
+    local saved = ns.RXPWindowOwnColors() and Dig(Settings(), COLORS_KEY, name)
     if type(saved) == "table" and type(saved.r) == "number" and type(saved.g) == "number"
             and type(saved.b) == "number" then
         return saved.r, saved.g, saved.b, type(saved.a) == "number" and saved.a or 1
@@ -645,12 +652,13 @@ local function Tip(owner, text, menu, plain)
     if not ns.RXPWindowOption("rxpWindowTips") or GameTooltip:IsForbidden() then return end
     local mode = ns.RXPWindowOption("rxpWindowSkip")
     GameTooltip:SetOwner(owner, TIP_ANCHOR)
+    local r, g, b = ns.RXPWindowColor(ACCENT)
     if plain then
-        GameTooltip:SetText(text)
+        GameTooltip:SetText(text, r, g, b)
     elseif mode == "off" then
-        GameTooltip:SetText(TEXT_MENU)
+        GameTooltip:SetText(TEXT_MENU, r, g, b)
     else
-        GameTooltip:SetText(text)
+        GameTooltip:SetText(text, r, g, b)
         if mode == "shift" then GameTooltip:AddLine(TEXT_SHIFT, TIP_DIM, TIP_DIM, TIP_DIM) end
         if menu then GameTooltip:AddLine(TEXT_MENU, TIP_DIM, TIP_DIM, TIP_DIM) end
     end
@@ -835,7 +843,8 @@ local function MakeHit()
     end)
     hit:SetScript("OnEnter", function(self)
         if not self.menu and ns.RXPWindowOption("rxpWindowSkip") == "off" then return end
-        self.shade:SetColorTexture(ns.RXPWindowColor("line"))
+        local r, g, b = ns.RXPWindowColor(ACCENT)
+        self.shade:SetColorTexture(r, g, b, HOVER_ALPHA)
         self.shade:Show()
         if self.menu then
             Tip(self, TEXT_PICK, false, true)

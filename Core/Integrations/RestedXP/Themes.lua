@@ -804,6 +804,29 @@ local function WindowWanted()
     return type(ns.RXPWindowEnabled) == "function" and ns.RXPWindowEnabled()
 end
 
+local ARROW_FRAME, SCREEN, MIDDLE, EDGE = "arrowFrame", "UIParent", "CENTER", "TOP"
+
+local function InRestedXPsPlace(places)
+    if type(places) ~= "table" then return true end
+    if #places ~= 1 then return false end
+    local p = places[1]
+    return type(p) == "table" and p[1] == EDGE and p[2] == SCREEN and p[3] == EDGE and (p[4] or 0) == 0
+        and (p[5] or 0) == 0
+end
+
+-- RestedXP puts its arrow at the top of the screen, and keeps where it is by profile. One that is still there
+-- goes to the middle, in the profile (read at load) and where it is now (written back when the game closes).
+local function CenterArrow(rxp, profile)
+    if type(profile.framePositions) ~= "table" then profile.framePositions = {} end
+    if not InRestedXPsPlace(profile.framePositions[ARROW_FRAME]) then return end
+    profile.framePositions[ARROW_FRAME] = { { MIDDLE, SCREEN, MIDDLE, 0, 0 } }
+    local frame = Dig(rxp, ARROW_FRAME)
+    if Has(frame, "ClearAllPoints") and Has(frame, "SetPoint") then
+        frame:ClearAllPoints()
+        frame:SetPoint(MIDDLE, SCREEN, MIDDLE, 0, 0)
+    end
+end
+
 -- RestedXP keeps its settings by profile, and a character it has not met has the defaults: its V2
 -- interface off and its own theme. What the player turned on for the account is set for the character
 -- once, and RestedXP's interface is read when it loads, so that waits for a reload.
@@ -816,6 +839,7 @@ local function SetUp(force)
     if type(account.rxpSetUp) ~= "table" then account.rxpSetUp = {} end
     if account.rxpSetUp[guid] and not force then return end
     account.rxpSetUp[guid] = true
+    CenterArrow(rxp, profile)
     local restart
     if WindowWanted() and not (profile.enableBetaFeatures and profile.enableV2Interface) then
         profile.enableBetaFeatures, profile.enableV2Interface = true, true

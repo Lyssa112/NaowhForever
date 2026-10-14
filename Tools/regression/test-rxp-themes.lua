@@ -1916,7 +1916,9 @@ end
 do
     local function Rxp(profile)
         local rxp = { activeTheme = { name = "RXP Blue" }, themes = { ["RXP Blue"] = { name = "RXP Blue" } },
-            registered = {}, reloads = {}, settings = { profile = profile } }
+            registered = {}, reloads = {}, settings = { profile = profile }, arrowFrame = { points = {} } }
+        function rxp.arrowFrame:ClearAllPoints() self.points = {} end
+        function rxp.arrowFrame:SetPoint(...) self.points[#self.points + 1] = { ... } end
         function rxp:RegisterTheme(theme) self.themes[theme.name] = theme end
         function rxp:ReloadTheme()
             self.reloads[#self.reloads + 1] = self.settings.profile.activeTheme
@@ -1987,6 +1989,35 @@ do
     rxp, ns, confirms = Run({ rxpSetup = true }, windowed, "Player-4", true)
     Check(windowed.activeTheme == "RXP Blue" and windowed.enableV2Interface == true and #confirms == 1,
         "the themes not wished for: the interface only")
+
+    -- the arrow: RestedXP puts it at the top of the screen, and a character set up has it in the middle
+    local middle = { activeTheme = "RXP Blue", framePositions = { arrowFrame = { { "TOP", "UIParent", "TOP", 0, 0 } } } }
+    rxp = Run({ rxpThemes = true, rxpSetup = true }, middle, "Player-A1", true)
+    local places = middle.framePositions.arrowFrame
+    Check(#places == 1 and places[1][1] == "CENTER" and places[1][2] == "UIParent" and places[1][3] == "CENTER"
+        and places[1][4] == 0 and places[1][5] == 0, "an arrow where RestedXP puts it is in the middle, in the profile")
+    local at = rxp.arrowFrame.points
+    Check(#at == 1 and at[1][1] == "CENTER" and at[1][3] == "CENTER", "and where it is now, so that it is not put back")
+    local own = { activeTheme = "RXP Blue", framePositions = { arrowFrame = { { "LEFT", "UIParent", "LEFT", 40, -10 } } } }
+    rxp = Run({ rxpThemes = true, rxpSetup = true }, own, "Player-A2", true)
+    Check(own.framePositions.arrowFrame[1][1] == "LEFT" and own.framePositions.arrowFrame[1][4] == 40
+        and #rxp.arrowFrame.points == 0, "an arrow the player has put somewhere is not moved")
+    local bottom = { activeTheme = "RXP Blue", framePositions = { arrowFrame = { { "BOTTOM", "UIParent", "BOTTOM", 0, 0 } } } }
+    rxp = Run({ rxpThemes = true, rxpSetup = true }, bottom, "Player-A2b", true)
+    Check(bottom.framePositions.arrowFrame[1][1] == "BOTTOM" and #rxp.arrowFrame.points == 0,
+        "one the player put at the bottom is not RestedXP's place either")
+    local fresh = { activeTheme = "RXP Blue" }
+    rxp = Run({ rxpThemes = true, rxpSetup = true }, fresh, "Player-A3", true)
+    Check(fresh.framePositions and fresh.framePositions.arrowFrame[1][1] == "CENTER",
+        "a profile with no places yet has it in the middle")
+    local seen = { activeTheme = "RXP Blue", framePositions = { arrowFrame = { { "TOP", "UIParent", "TOP", 0, 0 } } } }
+    rxp = Run({ rxpThemes = true, rxpSetup = true, rxpSetUp = { ["Player-A4"] = true } }, seen, "Player-A4", true)
+    Check(seen.framePositions.arrowFrame[1][1] == "TOP" and #rxp.arrowFrame.points == 0,
+        "a character already set up: the arrow is left where it is")
+    local by_hand = { activeTheme = "RXP Blue", framePositions = { arrowFrame = { { "TOP", "UIParent", "TOP", 0, 0 } } } }
+    local _, handNs = Run({ rxpSetUp = { ["Player-A5"] = true } }, by_hand, "Player-A5", true)
+    handNs.RXPSetUpCharacter()
+    Check(by_hand.framePositions.arrowFrame[1][1] == "CENTER", "the button sets it up again, the arrow with it")
 
     -- already as it should be
     local done = { activeTheme = CURRENT, enableBetaFeatures = true, enableV2Interface = true }

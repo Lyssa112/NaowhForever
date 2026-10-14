@@ -188,7 +188,15 @@ Core/Integrations/RestedXP/
   first login of a character, `enableBetaFeatures`, `enableV2Interface` and the Naowh current theme in its
   profile for what is wished for, and asks for a reload as the interface is read when RestedXP loads; what
   the player changes after is theirs, as the characters done are kept (`rxpSetUp`, by GUID). The button
-  does it for the character played, seen or not.
+  does it for the character played, seen or not. RestedXP puts its waypoint arrow at the top of the screen
+  (`framePositions.arrowFrame`, by profile), and a character that is set up has an arrow that is still
+  there in the middle: in the profile, which is read at load, and on the frame, so that the position
+  RestedXP saves when the game closes is not the old one. One the player moved is left where it is.
+- The window's colors are the theme's, and the player's own only while the addon's theme is Custom
+  (`RXPWindowOwnColors`): a theme is a look as a whole. The window's fold has the addon's Theme picker
+  (the same setting as the one under COLORS) and shows the eight colors only for Custom; what was picked is
+  kept for when it is Custom again. A step of the list lit by the mouse and the title of the tooltips are in
+  the accent, a little see-through for the first, and not the text's color or the game's gold.
 - The theme (RestedXP Theme (V1)), the arrow (Style RestedXP's Arrow) and the window (RestedXP Naowh
   Window (V2)) are each a switch, and the theme and the window each a fold with its switch on its title
   (`W:SwitchFold`: open to start, kept as it is left, no chevron while there is nothing under it), and none
