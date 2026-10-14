@@ -135,6 +135,11 @@ Core/Integrations/RestedXP/
   is under the title, and is off to start so the guide's is the only bar; the box's own opacity is a setting (`rxpWindowBoxOpacity`) and not a part of its
   color. The bars are in the Naowh Gradient to start (`GRADIENT`, which is `ns.MEDIA`'s, so a texture of
   SharedMedia is only needed when another is wanted).
+- RestedXP's logo (`Textures/rxp_logo-64`, the one its own window and quest log use) is drawn from
+  RestedXP's files in the top right corner of the current step's box (the first, when there are more),
+  untinted and a little taller than the step's text; Show RestedXP Logo turns it off. It is a texture of
+  the box, so it is above the box's background, and the rows start below it. The window hides RestedXP's
+  own and so would otherwise show nothing of it anywhere.
 - A row that counts has a bar under its text: a buy by the items in the bags against `qty` (RestedXP shows
   no counter for it, so `GetItemCount(id)` is read, and the window listens to `BAG_UPDATE_DELAYED` only
   while such a row is drawn), and any other row by the `3/8` in its text, which RestedXP rewrites as the

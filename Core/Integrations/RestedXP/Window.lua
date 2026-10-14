@@ -23,6 +23,8 @@ local SHADOW, SHADOW_ALPHA = 1, 0.9
 local GOLD = { r = 1, g = 0.82, b = 0 }
 local TEXT_FOLD, TEXT_UNFOLD, TEXT_DOT = "-", "+", " \194\183 "
 local MENU_ICON = "Interface\\ChatFrame\\UI-ChatIcon-Chat-Up"
+local LOGO = "Interface\\AddOns\\RXPGuides\\Textures\\rxp_logo-64"
+local LOGO_GROW = 4
 local GRADIENT = ns.MEDIA .. "NaowhGradient.tga"
 local TEXT_GRADIENT = "Naowh Gradient"
 local GRIP_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
@@ -56,6 +58,8 @@ local OPTIONS = {
       tip = "The step and the percent of the guide, beside its name." },
     { key = "rxpWindowLine", group = "Look", kind = "choice", label = "Under the Title", default = "bar",
       values = LINES, order = { "bar", "rule", "none" }, tip = "A progress bar of the guide, a line, or nothing." },
+    { key = "rxpWindowLogo", group = "Look", kind = "toggle", label = "Show RestedXP Logo", default = true,
+      tip = "RestedXP's logo in the corner of the current step." },
     { key = "rxpWindowMenu", group = "Look", kind = "toggle", label = "Show Menu Button", default = true,
       tip = "The button that opens RestedXP's menu." },
     { key = "rxpWindowGrip", group = "Look", kind = "toggle", label = "Show Resize Grip", default = true,
@@ -713,6 +717,8 @@ local function MakeBox()
     box.back:SetAllPoints()
     box.edge = ns.Border(box, T.line, EDGE_ALPHA)
     box.label = Text(box, "rxpWindowTextSize")
+    box.logo = box:CreateTexture(nil, "OVERLAY")
+    box.logo:SetTexture(LOGO)
     box.bar = MakeBar(window)
     return box
 end
@@ -836,7 +842,7 @@ local function DrawRow(box, row, x, y, width)
     return height
 end
 
-local function DrawBox(step, y, inner)
+local function DrawBox(step, y, inner, current)
     local box = Acquire("box")
     local gap = Spacing()
     local size = ns.RXPWindowOption("rxpWindowTextSize")
@@ -852,6 +858,15 @@ local function DrawBox(step, y, inner)
     box.label:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, -BOX_PAD)
     Coloured(box.label, "label")
     box.label:SetText(step.label:upper())
+    if current and ns.RXPWindowOption("rxpWindowLogo") then
+        local logo = size + LOGO_GROW
+        box.logo:ClearAllPoints()
+        box.logo:SetPoint("TOPRIGHT", box, "TOPRIGHT", -BOX_PAD, -BOX_PAD)
+        box.logo:SetSize(logo, logo)
+        box.logo:Show()
+    else
+        box.logo:Hide()
+    end
     local by = -BOX_PAD - size - gap
     for _, row in ipairs(step.rows) do
         by = by - DrawRow(box, row, BOX_PAD, by, inner - BOX_PAD * 2) - gap
@@ -947,7 +962,7 @@ function Draw()
     DrawHeader(model, folded, width, headH)
     local y = DrawLine(model, -PAD - headH)
     if not folded then
-        for _, step in ipairs(model.steps) do y = DrawBox(step, y, inner) end
+        for i, step in ipairs(model.steps) do y = DrawBox(step, y, inner, i == 1) end
         for i = 1, sizing and sizing.steps or #model.upcoming do
             local entry = model.upcoming[i]
             if not entry then break end

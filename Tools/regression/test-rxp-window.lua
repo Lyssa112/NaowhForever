@@ -38,6 +38,7 @@ local function Object(everything)
     function o:SetScript(name, fn) self.scripts[name] = fn end
     function o:SetTextColor(r, g, b) self.color = { r, g, b } end
     function o:SetColorTexture(r, g, b, a) self.solid = { r, g, b, a } end
+    function o:SetTexture(path) self.texture = path end
     function o:RegisterEvent(event)
         self.events = self.events or {}
         self.events[event] = true
@@ -1197,6 +1198,56 @@ do
     ns.SetRXPWindow(false)
     Flush(w)
     Check(f.events[BAGS] == nil, "the window turned off: the bags are let go")
+end
+
+-- RestedXP's logo in the corner of the current step's box
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local f = Window(w)
+    local ns = w.ns
+    local LOGO = "Interface\\AddOns\\RXPGuides\\Textures\\rxp_logo-64"
+    local function Boxes()
+        local out = {}
+        for _, o in ipairs(w.frames) do
+            if o.label and o.logo and Seen(o) then out[#out + 1] = o end
+        end
+        return out
+    end
+    local boxes = Boxes()
+    Check(#boxes == 1 and boxes[1].logo.shown and boxes[1].logo.texture == LOGO,
+        "RestedXP's logo, from RestedXP's own files, is in the current step's box")
+    local logo = boxes[1].logo
+    Check(logo.points[1][1] == "TOPRIGHT" and logo.points[1][2] == boxes[1] and logo.points[1][3] == "TOPRIGHT"
+        and logo.points[1][4] == -7 and logo.points[1][5] == -7, "in its top right corner")
+    Check(logo.width == 17 and logo.height == 17, "a little taller than the step's text")
+    Check(f.title.points[1][4] == 31 and f.title.width == 380 - 10 - 31 - 120,
+        "and the guide's name has all its room")
+    ns.SetRXPWindowOption("rxpWindowTextSize", 20)
+    Flush(w)
+    Check(logo.width == 24, "it follows the size of the text")
+    ns.SetRXPWindowOption("rxpWindowTextSize", 13)
+
+    -- with a second active step, only the first has it
+    local second = { active = true, index = 37, title = "Step 37", elements = { w.buy } }
+    local steps = w.rxp.RXPFrame.activeSteps
+    w.rxp.RXPFrame.activeSteps = { steps[1], second }
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    boxes = Boxes()
+    Check(#boxes == 2 and boxes[1].logo.shown and boxes[2].logo.shown == false, "with two steps, it is the first one's")
+    w.rxp.RXPFrame.activeSteps = steps
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    boxes = Boxes()
+    Check(#boxes == 1 and boxes[1].logo.shown, "and back with one")
+
+    ns.SetRXPWindowOption("rxpWindowLogo", false)
+    Flush(w)
+    Check(boxes[1].logo.shown == false and account.rxpWindowLogo == false, "it can be left out, and that is kept")
+    ns.SetRXPWindowOption("rxpWindowLogo", true)
+    Flush(w)
+    Check(boxes[1].logo.shown and account.rxpWindowLogo == nil, "and back: the default is not kept")
 end
 
 print("PASS rxp window: " .. cases .. " checks")
