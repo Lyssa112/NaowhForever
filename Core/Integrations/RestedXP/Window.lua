@@ -42,6 +42,7 @@ local COLORS_KEY = "rxpWindowColors"
 local THEME_KEY = "rxpWindowTheme"
 local CUSTOM = "custom"
 local FOLLOW = ""
+local FOREVER = "forever"
 local ACCENT = "accent"
 
 -- Everything the window can be changed in, in the order a page lists it. A saved value is only kept when it
@@ -215,14 +216,19 @@ local function IsPreset(key)
     return type(key) == "string" and type(ns.THEME_PRESETS) == "table" and ns.THEME_PRESETS[key] ~= nil
 end
 
+-- The Forever skin's gold and bronze, and its face, for the window alone, without the addon's skin.
+local function IsTheme(key)
+    return key == CUSTOM or key == FOREVER or IsPreset(key)
+end
+
 function ns.RXPWindowThemeKey()
     local key = Settings()[THEME_KEY]
-    if key == CUSTOM or IsPreset(key) then return key end
+    if IsTheme(key) then return key end
     return FOLLOW
 end
 
 function ns.SetRXPWindowTheme(key)
-    Settings()[THEME_KEY] = (key == CUSTOM or IsPreset(key)) and key or nil
+    Settings()[THEME_KEY] = IsTheme(key) and key or nil
     Refresh()
     RepaintArrow()
 end
@@ -241,7 +247,8 @@ function ns.RXPWindowColor(name)
         return saved.r, saved.g, saved.b, type(saved.a) == "number" and saved.a or 1
     end
     local key = ns.RXPWindowThemeKey()
-    local preset = IsPreset(key) and ns.THEME_PRESETS[key][color.token]
+    local source = (key == FOREVER and ns.FOREVER_SKIN) or (IsPreset(key) and ns.THEME_PRESETS[key]) or nil
+    local preset = type(source) == "table" and source[color.token]
     local base = type(preset) == "table" and preset or ns.THEME[color.token]
     return base.r, base.g, base.b, color.alpha or 1
 end
@@ -506,7 +513,7 @@ end
 local function FacePath()
     local name = ns.RXPWindowOption("rxpWindowFont")
     local custom = name ~= "" and type(ns.UI) == "table" and ns.UI.FontPath and ns.UI.FontPath(name)
-    return custom or ns.AddonFontPath()
+    return custom or ns.AddonFontPath(ns.RXPWindowThemeKey() == FOREVER or nil)
 end
 
 -- A text: its face, size, outline and shadow are the window's own, set again each time it is drawn.

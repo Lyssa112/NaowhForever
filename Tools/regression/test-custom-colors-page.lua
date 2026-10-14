@@ -660,14 +660,17 @@ do
     Check(pickers[1].getValue ~= s.theme.getValue and pickers[1].getValue() == "",
         "it is not the addon's setting, and is the addon's theme to start")
     Check(pickers[1].values[""] == "Same as the Addon" and pickers[1].values.midnight == "Midnight"
-        and pickers[1].values.custom == "Custom" and pickers[1].order[1] == ""
-        and pickers[1].order[#pickers[1].order] == "custom", "the addon's, every preset and Custom last")
+        and pickers[1].values.forever == "Forever" and pickers[1].values.custom == "Custom" and pickers[1].order[1] == ""
+        and pickers[1].order[#pickers[1].order] == "custom" and pickers[1].order[#pickers[1].order - 1] == "forever",
+        "the addon's, every preset, the Forever skin and Custom last")
     Check(pickers[1].tooltip == "The window's colors alone, whatever the addon's theme is; Custom lets you pick them.",
         "with a short tooltip")
     Check(#All(s, "Title Color") == 0 and #All(s, "Accent Color") == 0 and #All(s, "Arrow Color") == 0,
         "a theme picked: no colors to pick")
     Check(#All(Page({ rxpWindow = true, rxpWindowTheme = "midnight" }, true), "Title Color") == 0,
         "and a theme of the presets is the same")
+    Check(#All(Page({ rxpWindow = true, rxpWindowTheme = "forever" }, true), "Title Color") == 0,
+        "and so is the Forever skin's")
     Check(#All(Page({ rxpWindow = true, themePreset = "custom" }, true), "Title Color") == 0,
         "the addon's theme being Custom is not the window's")
     local custom = Page({ rxpWindow = true, rxpWindowTheme = "custom" }, true)
