@@ -202,6 +202,22 @@ do
         "the window off at load: nothing is listened for and RestedXP's icons stay")
 end
 
+-- a glyph's file, for what RestedXP draws itself (the placeholders of its target buttons)
+do
+    local w = World({ rxpIconStyle = "filled" })
+    Check(w.ns.RXPIconTexture("gossip") == ART .. "filled\\gossip.tga" and w.ns.RXPIconTexture("combat") == ART .. "filled\\combat.tga",
+        "a glyph of ours: its file in the style picked")
+    Check(w.ns.RXPIconTexture("nothing") == nil and w.ns.RXPIconTexture(5) == nil and w.ns.RXPIconTexture(nil) == nil,
+        "one that is not ours, or not text: none")
+    w.ns.SetRXPIconStyle("line")
+    Check(w.ns.RXPIconTexture("gossip") == ART .. "line\\gossip.tga", "and in the other style")
+    w.ns.SetRXPIconStyle(nil)
+    Check(w.ns.RXPIconTexture("gossip") == nil, "no style: none, and RestedXP's own is left")
+    w.ns.RXPWindowEnabled = function() return false end
+    w.ns.SetRXPIconStyle("line")
+    Check(w.ns.RXPIconTexture("gossip") == nil, "and with the window not wished for")
+end
+
 -- the color: the window's accent, the theme's to start, and what the Naowh window asks of a line of text
 do
     local account = {}

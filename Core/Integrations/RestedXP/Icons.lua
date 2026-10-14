@@ -52,6 +52,9 @@ local GLYPHS = {
     deathskip = "deathskip",
 }
 
+local GLYPH_NAMES = {}
+for _, glyph in pairs(GLYPHS) do GLYPH_NAMES[glyph] = true end
+
 function ns.RXPIconStyle()
     if type(ns.RXPWindowEnabled) == "function" and not ns.RXPWindowEnabled() then return NONE end
     local style = ns.AccountSettings().rxpIconStyle
@@ -85,6 +88,12 @@ function ns.RXPIconColor()
     local r, g, b = Rgb(ns.THEME.accent)
     if r then return r, g, b end
     return 1, 1, 1
+end
+
+function ns.RXPIconTexture(glyph)
+    local style = ns.RXPIconStyle()
+    if style == NONE or not GLYPH_NAMES[glyph] then return nil end
+    return ns.RXPIconPath(style, glyph)
 end
 
 function ns.RXPIconLook(text)

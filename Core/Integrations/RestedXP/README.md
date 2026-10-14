@@ -258,6 +258,9 @@ Core/Integrations/RestedXP/
 - The style is the window's own setting (Step Icons, in the window's (V2) fold, beside its scale) and is
   only in force while the window is wished for (`RXPIconStyle` is RestedXP's own otherwise, the choice
   kept), so the table is left alone for a player who does not use the window.
+- The two placeholders RestedXP shows on its target buttons until a unit has a portrait are not in
+  `RXP.icons` either (file IDs, not escapes): the Naowh window takes them (see the Active Targets bullet) and
+  `RXPIconTexture(glyph)` gives it a glyph's file in the style picked, or nothing without one.
 - Two icons are not in `RXP.icons` but inside the guides' text, in most of its lines: the grey speech bubble
   (`chatbubble_64grey`, on every Talk to) and the interact cursor. They are baked into the text RestedXP
   parses, so the table cannot reach them and rewriting 27 thousand lines of guide text would not be ours to
