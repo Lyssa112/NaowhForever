@@ -116,8 +116,9 @@ do
     Check(icons.accept == Expected("line", "accept", 128, 64, 255), "accept: Naowh's, in the accent")
     Check(icons.turnin == Expected("line", "turnin", 128, 64, 255), "turnin")
     Check(icons.vendor == Expected("line", "vendor", 128, 64, 255), "vendor: in the accent too")
-    local goto = Expected("line", "goto", 128, 64, 255)
-    Check(icons["goto"] == goto and icons.groundgoto == goto and icons.flygoto == goto and icons.explore == goto,
+    local gotoIcon = Expected("line", "goto", 128, 64, 255)
+    Check(icons["goto"] == gotoIcon and icons.groundgoto == gotoIcon and icons.flygoto == gotoIcon
+        and icons.explore == gotoIcon,
         "the icons RestedXP made from goto are goto's too, in the same color")
     Check(icons.acceptmultiple == icons.accept, "and acceptmultiple is accept's")
     Check(icons.custom == "|TInterface/Anywhere/Else:0|t" and icons.scenario == 12345,
