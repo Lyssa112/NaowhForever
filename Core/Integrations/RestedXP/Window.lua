@@ -749,11 +749,8 @@ local function MakeBox()
     local box = CreateFrame("Button", nil, window)
     box:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     box:SetScript("OnClick", function(_, button)
-        if button == "RightButton" then return Menu() end
-        if MaySkip() then SkipStep() end
+        if button == "RightButton" then Menu() end
     end)
-    box:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP) end)
-    box:SetScript("OnLeave", function() GameTooltip:Hide() end)
     Draggable(box)
     box.back = ns.Solid(box, "BACKGROUND", T.bg, 1)
     box.back:SetAllPoints()
@@ -784,11 +781,13 @@ local function MakeRow()
     row:SetScript("OnHyperlinkEnter", LinkEnter)
     row:SetScript("OnHyperlinkLeave", LinkLeave)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    row:SetScript("OnClick", function(_, button)
+    row:SetScript("OnClick", function(self, button)
         if button == "RightButton" then return Menu() end
-        if MaySkip() then SkipStep() end
+        if self.first and MaySkip() then SkipStep() end
     end)
-    row:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP) end)
+    row:SetScript("OnEnter", function(self)
+        if self.first then Tip(self, TEXT_SKIP) end
+    end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
     row.icon = Text(row, "rxpWindowIconSize")
@@ -863,6 +862,7 @@ end
 local function DrawRow(box, row, x, y, width, first)
     local item = Acquire("row")
     item:SetParent(box)
+    item.first = first and true or false
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", box, "TOPLEFT", x, y)
     item:SetWidth(width)
