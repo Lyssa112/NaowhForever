@@ -648,7 +648,8 @@ do
     w.rxp.currentGuide = { empty = true, steps = {} }
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
-    Check(Window(w).shown == false, "no guide: nothing to show")
+    Check(Window(w).shown == true and Window(w).title.text:find("No guide selected", 1, true) ~= nil
+        and w.guide.frame.alpha ~= 0, "no guide: the window says so, and RestedXP's is left to pick one")
     w = Start({ rxpWindow = true })
     w.rxp.RXPFrame.activeSteps = nil
     w.rxp.v2:UpdateGuideWindow()
@@ -1618,22 +1619,55 @@ do
         "the window turned on: the theme is off and the arrow is still on")
 end
 
--- with no guide to show (a character that has not picked one) RestedXP's windows are not taken
+-- with no guide (a character that has not picked one) RestedXP's windows are not taken, and ours says so
 do
     local account = { rxpWindow = true }
     local w = Start(account)
     local f = Window(w)
+    local ns = w.ns
     Check(f.shown and w.guide.frame.alpha == 0 and w.guide.frame.mouse == false, "with a guide: RestedXP's window is taken")
     local guide = w.rxp.currentGuide
     w.rxp.currentGuide = nil
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
-    Check(f.shown == false and w.guide.frame.alpha ~= 0 and w.guide.frame.mouse ~= false,
-        "no guide: ours is not shown, and RestedXP's own is given back to the player to pick one")
+    Check(f.shown and f.title.text:find("No guide selected", 1, true), "no guide: the window says so")
+    Check(w.guide.frame.alpha ~= 0 and w.guide.frame.mouse ~= false,
+        "and RestedXP's own is given back to the player to pick one")
+    local pick
+    for _, o in ipairs(w.frames) do
+        if o.shade and o.menu == true and Seen(o) then pick = o end
+    end
+    local lineText
+    for _, o in ipairs(w.everything) do
+        if o.text == "Pick a guide" and Seen(o) then lineText = o end
+    end
+    Check(pick ~= nil and lineText ~= nil, "with a line, and a button over it, to pick one")
+    local menus = w.menus
+    pick.scripts.OnClick(pick, "LeftButton")
+    Check(w.menus == menus + 1, "which opens RestedXP's menu, with no shift: there is nothing to skip")
+    pick.scripts.OnEnter(pick)
+    Check(w.env.GameTooltip.text == "Pick a guide" and pick.shade.shown, "and says so")
+    ns.SetRXPWindowOption("rxpWindowSkip", "off")
+    pick.scripts.OnLeave(pick)
+    pick.scripts.OnEnter(pick)
+    Check(pick.shade.shown == true, "also with skipping off")
+    ns.SetRXPWindowOption("rxpWindowSkip", "shift")
     w.rxp.currentGuide = guide
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
-    Check(f.shown and w.guide.frame.alpha == 0 and w.guide.frame.mouse == false, "and taken again when there is one")
+    Check(f.shown and w.guide.frame.alpha == 0 and w.guide.frame.mouse == false and f.title.text:find("Durotar", 1, true),
+        "and with a guide again it is the guide's, and RestedXP's is taken again")
+    local lines = 0
+    for _, o in ipairs(w.everything) do
+        if o.text == "Pick a guide" and Seen(o) then lines = lines + 1 end
+    end
+    Check(lines == 0 and pick.menu == false, "and the line to pick one is gone")
+    local rxp = w.env.RXP
+    w.env.RXP = nil
+    rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(f.shown == false, "RestedXP gone altogether: nothing to say, the window is not shown")
+    w.env.RXP = rxp
 end
 
 print("PASS rxp window: " .. cases .. " checks")

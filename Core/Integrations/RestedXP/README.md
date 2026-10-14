@@ -202,3 +202,7 @@ Core/Integrations/RestedXP/
   show: a character that has not picked one has RestedXP's own window to pick it with, and it is given
   back as soon as the guide goes away. The hook that keeps them dark follows what is silenced and not
   whether the window is on, as giving them back sets their alpha through it.
+- With RestedXP there and no guide (a new character, in RestedXP's V2 interface, shows nothing of its own
+  until one is picked), the window is shown as that: "No guide selected" and a line, Pick a guide, which
+  opens RestedXP's menu with a plain click (there is nothing to skip, so it takes no shift). RestedXP's own
+  windows are given back meanwhile and taken once there is a guide.

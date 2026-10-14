@@ -35,6 +35,7 @@ local TEXT_SKIP = "Skip step"
 local TEXT_SHIFT = "Shift-click"
 local TEXT_MENU = "Right-click: menu"
 local TEXT_GO = "Go to step %d"
+local TEXT_NO_GUIDE, TEXT_PICK = "No guide selected", "Pick a guide"
 local TIP_DIM = 0.7
 local HOME = { "LEFT", "LEFT", 0, 35 }
 local DRAG_BUTTON, TIP_ANCHOR = "LeftButton", "ANCHOR_TOP"
@@ -377,6 +378,15 @@ end
 
 -- What RestedXP is showing, as plain data: the heading, the progress, the active steps with their rows,
 -- and the steps that follow. Nil without a guide.
+-- RestedXP is there and has no guide: what a character that has not picked one has
+local function NoGuide()
+    local rxp = _G.RXP
+    if type(rxp) ~= "table" then return nil end
+    local guide = rxp.currentGuide
+    if type(guide) == "table" and not guide.empty and type(guide.steps) == "table" then return nil end
+    return { heading = TEXT_NO_GUIDE, steps = {}, upcoming = {}, empty = true }
+end
+
 local function Read(steps)
     local rxp = _G.RXP
     local guide = Dig(rxp, "currentGuide")
@@ -646,11 +656,13 @@ local function MaySkip()
     return mode == "click" or (mode == "shift" and IsShiftKeyDown())
 end
 
-local function Tip(owner, text, menu)
+local function Tip(owner, text, menu, plain)
     if not ns.RXPWindowOption("rxpWindowTips") or GameTooltip:IsForbidden() then return end
     local mode = ns.RXPWindowOption("rxpWindowSkip")
     GameTooltip:SetOwner(owner, TIP_ANCHOR)
-    if mode == "off" then
+    if plain then
+        GameTooltip:SetText(text)
+    elseif mode == "off" then
         GameTooltip:SetText(TEXT_MENU)
     else
         GameTooltip:SetText(text)
@@ -833,13 +845,18 @@ local function MakeHit()
     hit.shade = hit:CreateTexture(nil, "BACKGROUND")
     hit.shade:SetAllPoints()
     hit:SetScript("OnClick", function(self)
+        if self.menu then return Menu() end
         if MaySkip() then GoTo(self.index) end
     end)
     hit:SetScript("OnEnter", function(self)
-        if ns.RXPWindowOption("rxpWindowSkip") == "off" then return end
+        if not self.menu and ns.RXPWindowOption("rxpWindowSkip") == "off" then return end
         self.shade:SetColorTexture(ns.RXPWindowColor("line"))
         self.shade:Show()
-        Tip(self, TEXT_GO:format(self.index or 0))
+        if self.menu then
+            Tip(self, TEXT_PICK, false, true)
+        else
+            Tip(self, TEXT_GO:format(self.index or 0))
+        end
     end)
     hit:SetScript("OnLeave", function(self)
         self.shade:Hide()
@@ -1025,13 +1042,13 @@ function Draw()
     wantsBags = false
     if not sizing then Quiet("WindowSkin", Skin) end
     window = window or Build()
-    local model = sizing and sizingModel or Read()
+    local model = sizing and sizingModel or Read() or NoGuide()
     if not model then
         Release()
         window:Hide()
         return
     end
-    if not sizing then Take() end
+    if model.empty then Release() elseif not sizing then Take() end
     Reset()
     Refaced()
     local width = sizing and sizing.width or ns.RXPWindowWidth()
@@ -1048,6 +1065,21 @@ function Draw()
     DrawHeader(model, folded, width, headH)
     local y = DrawLine(model, -PAD - headH)
     if not folded then
+        if model.empty then
+            local item = Acquire("line")
+            item:ClearAllPoints()
+            item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
+            item:SetWidth(inner)
+            Coloured(item, "list")
+            item:SetText(TEXT_PICK)
+            local hit = Acquire("hit")
+            hit:ClearAllPoints()
+            hit:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
+            hit:SetSize(inner, listH)
+            hit.index, hit.menu = nil, true
+            hit.shade:Hide()
+            y = y - listH
+        end
         for i, step in ipairs(model.steps) do y = DrawBox(step, y, inner, i == 1) end
         for i = 1, sizing and sizing.steps or #model.upcoming do
             local entry = model.upcoming[i]
@@ -1062,7 +1094,7 @@ function Draw()
             hit:ClearAllPoints()
             hit:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
             hit:SetSize(inner, listH)
-            hit.index = entry.index
+            hit.index, hit.menu = entry.index, false
             hit.shade:Hide()
             y = y - listH
         end
