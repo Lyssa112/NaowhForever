@@ -585,7 +585,7 @@ do
     Check(f.bar.shown == true and f.rule.shown == false, "under the title: the guide's progress bar to start")
     Check(math.abs(f.bar.value - 36 / 66) < 1e-9 and f.bar.range[1] == 0 and f.bar.range[2] == 1,
         "full as far as the guide is, steps 36 of 66")
-    Check(f.bar.height == 5 and f.bar.barTexture == "Interface\\Buttons\\WHITE8X8", "5 thick, flat")
+    Check(f.bar.height == 5 and f.bar.barTexture == w.ns.MEDIA .. "NaowhGradient.tga", "5 thick, in the Naowh Gradient")
     Check(f.bar.barColor[1] == T.accent.r and f.bar.barColor[4] == 1, "in the accent")
     Check(f.bar.track.solid[1] == T.fg.r and f.bar.track.solid[4] == 0.5, "over a track of the line's color")
     local box
@@ -594,6 +594,19 @@ do
     end
     Check(box and box.bar.shown == true and math.abs(box.bar.value - 1 / 3) < 1e-9,
         "the active step has a bar of its objectives done: one of three")
+    Check(box.bar.parent == f and box.bar.points[1][2] == f and box.bar.points[2][2] == f,
+        "it is a divider of the window and not in the step's box")
+    Check(math.abs(box.bar.points[1][5] - (box.points[1][5] - box.height - 5)) < 1e-9
+        and box.bar.points[1][4] == box.points[1][4], "under the box, as wide as it, a gap below it")
+    local activeSteps = w.rxp.RXPFrame.activeSteps
+    w.rxp.RXPFrame.activeSteps = {}
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(box.shown == false and box.bar.shown == false, "with no active step the divider goes with its box")
+    w.rxp.RXPFrame.activeSteps = activeSteps
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(box.bar.shown == true, "and comes back with it")
     w.ns.SetRXPWindowOption("rxpWindowStepBar", false)
     Flush(w)
     Check(box.bar.shown == false, "off: not drawn")
@@ -606,6 +619,12 @@ do
     Check(f.bar.shown == false and f.rule.shown == false, "or nothing")
     w.ns.SetRXPWindowOption("rxpWindowLine", "bar")
     w.ns.SetRXPWindowOption("rxpWindowBarHeight", 9)
+    w.ns.SetRXPWindowOption("rxpWindowBarTexture", "Flat Name")
+    Flush(w)
+    Check(f.bar.barTexture == "Textures\\Flat Name", "another texture picked is the bar's")
+    w.ns.SetRXPWindowOption("rxpWindowBarTexture", "")
+    Flush(w)
+    Check(f.bar.barTexture == w.ns.MEDIA .. "NaowhGradient.tga", "and none is the Naowh Gradient again")
     w.ns.SetRXPWindowOption("rxpWindowBarTexture", "Flat Name")
     w.ns.SetRXPWindowColor("fill", 1, 0, 0, 0.5)
     w.ns.SetRXPWindowColor("line", 0, 0, 1, 1)
@@ -653,12 +672,24 @@ do
         if o.label and o.bar then box = o end
     end
     Check(box.borderObject._frame.shown == true and box.borderObject.color[1] == T.line.r, "the step's box has its own border")
+    Check(math.abs(box.back.solid[4] - 0.55) < 1e-9, "the box is a little see-through to start")
     ns.SetRXPWindowOption("rxpWindowBoxBorder", false)
     ns.SetRXPWindowColor("box", 0.3, 0.3, 0.3, 0.3)
     ns.SetRXPWindowColor("boxEdge", 1, 1, 0, 1)
     Flush(w)
     Check(box.borderObject._frame.shown == false and box.back.solid[1] == 0.3 and box.borderObject.color[1] == 1,
         "which can be turned off, and has its colors")
+    Check(math.abs(box.back.solid[4] - 0.55) < 1e-9 and select(4, ns.RXPWindowColor("box")) == 1,
+        "the opacity of the box is not part of its color")
+    ns.SetRXPWindowOption("rxpWindowBoxOpacity", 100)
+    Flush(w)
+    Check(box.back.solid[4] == 1, "its opacity: solid")
+    ns.SetRXPWindowOption("rxpWindowBoxOpacity", 0)
+    Flush(w)
+    Check(box.back.solid[4] == 0, "and none")
+    ns.SetRXPWindowOption("rxpWindowBoxOpacity", 30)
+    Flush(w)
+    Check(math.abs(box.back.solid[4] - 0.3) < 1e-9, "and in between")
     ns.SetRXPWindowOption("rxpWindowMenu", false)
     Flush(w)
     Check(f.menu.shown == false, "the menu button can be left out")
@@ -726,6 +757,12 @@ do
                 size[1] .. ": its face, size and outline")
         end
     end
+    ns.SetRXPWindowOption("rxpWindowOutline", "thick")
+    Flush(w)
+    for _, o in ipairs(Texts()) do
+        Check(o.fontFlags == "THICKOUTLINE" and o.shadowX == 0, "a thick outline, with no shadow")
+        break
+    end
     ns.SetRXPWindowOption("rxpWindowOutline", "none")
     Flush(w)
     Check(Texts("rxpWindowListSize")[1].fontFlags == "" and Texts("rxpWindowListSize")[1].shadowX == 0,
@@ -759,6 +796,27 @@ do
         and f.resizeBounds[4] == base + 12 * line, "its smallest has no steps listed and its biggest all of them")
     f.grip.scripts.OnMouseDown(f.grip)
     Check(f.sizing == "BOTTOMRIGHT", "the grip starts the sizing from its corner")
+
+    -- while it is dragged the window follows, with nothing kept until the grip is let go
+    local snapshots = w.rxp.v2.snapshots
+    f.width, f.height = 450, base + 2 * line
+    f.scripts.OnSizeChanged(f, 450, base + 2 * line)
+    Check(Lines() == 2 and account.rxpWindowSteps == nil and account.rxpWindowWidth == nil,
+        "dragged to two lines: two are listed, and nothing is kept yet")
+    local box
+    for _, o in ipairs(w.frames) do
+        if o.label and o.bar then box = o end
+    end
+    Check(box.width == 450 - 20 and f.title.width == 450 - 20 - 16 - 5 - 120,
+        "and everything is laid out to the width it has now")
+    f.scripts.OnSizeChanged(f, 520, base + 5 * line)
+    Check(Lines() == 5 and box.width == 520 - 20, "bigger again: five lines, and wider")
+    f.scripts.OnSizeChanged(f, 100, 3)
+    Check(Lines() == 0 and box.width == 260 - 20, "smaller than it can be: none, and the narrowest")
+    f.scripts.OnSizeChanged(f, 900, base + 40 * line)
+    Check(Lines() == 12 and box.width == 640 - 20, "bigger than it can be: all of them, and the widest")
+    Check(f.width == 450 and f.height == base + 2 * line, "the size is the dragged one's: the window does not set its own meanwhile")
+    Check(w.rxp.v2.snapshots == snapshots, "and what it lists is not read again: it was, once, when the grip was pressed")
     f.width, f.height = 500, base + 3 * line + line / 2
     f.points = { { "TOPLEFT", w.env.UIParent, "TOPLEFT", 40, -60 } }
     f.grip.scripts.OnMouseUp(f.grip)
@@ -798,6 +856,230 @@ do
     ns.SetRXPWindowOption("rxpWindowGrip", true)
     Flush(w)
     Check(f.grip.shown == false and f.resizable == false, "folded: there is no list to size, and no grip")
+end
+
+-- RestedXP's Active Targets and Active Items windows take the look of the active step
+do
+    local RXP_EDGE = "Textures\\RXPEdge"
+    local RXP_FONT = "Fonts\\RXP.ttf"
+
+    local function Box(w)
+        local part = Object(w.everything)
+        local fill = Object(w.everything)
+        function fill:SetVertexColor(r, g, b, a)
+            self.vertex, self.sets = { r, g, b, a }, (self.sets or 0) + 1
+        end
+        part.rxpBackground = Object(w.everything)
+        part.rxpBackground.textures = { fill }
+        part.rxpBorder = Object(w.everything)
+        part.rxpBorder.textures = {}
+        for i = 1, 4 do
+            local edge = Object(w.everything)
+            function edge:SetTexture(path) self.texture, self.solid = path, nil end
+            function edge:SetVertexColor(r, g, b, a) self.vertex = { r, g, b, a } end
+            part.rxpBorder.textures[i] = edge
+        end
+        return part
+    end
+
+    -- RestedXP's frame: what its UpdateVisuals paints is its own, each time it is called
+    local function Satellite(w, title)
+        local f = Box(w)
+        f.paints = 0
+        f.title = Box(w)
+        local text = Object(w.everything)
+        text:SetText(title)
+        text:SetFont(RXP_FONT, 9, "")
+        function text:GetFont() return self.font, self.fontSize, self.fontFlags end
+        function text:GetStringWidth() return self.font == RXP_FONT and 60 or 80 end
+        f.title.text = text
+        local function Paint(part)
+            part.rxpBackground.textures[1]:SetVertexColor(0.1, 0.2, 0.3, 0.9)
+            for _, edge in ipairs(part.rxpBorder.textures) do
+                edge:SetTexture(RXP_EDGE)
+                edge:SetVertexColor(0.7, 0.6, 0.5, 1)
+            end
+        end
+        function f:UpdateVisuals()
+            self.paints = self.paints + 1
+            Paint(self)
+            Paint(self.title)
+            self.title.text:SetFont(RXP_FONT, 9, "")
+            self.title.text:SetTextColor(0.9, 0.9, 0.9)
+            self.title:SetSize(70, 19)
+        end
+        f:UpdateVisuals()
+        return f
+    end
+
+    local function Begin(account, make)
+        local w = World(account)
+        local rxp = Rxp(w)
+        make(w, rxp)
+        for _, f in ipairs(w.frames) do w.boot = f end
+        w.boot.scripts.OnEvent(w.boot, "ADDON_LOADED", "NaowhForever")
+        w.boot.scripts.OnEvent(w.boot, "PLAYER_LOGIN")
+        Flush(w)
+        return w
+    end
+
+    local function Both(w, rxp)
+        rxp.targeting = { activeTargetFrame = Satellite(w, "Active Targets") }
+        function rxp.targeting:RenderTargetFrameBackground()
+            self.activeTargetFrame.rxpBackground.textures[1]:SetVertexColor(0.1, 0.2, 0.3, 0.9)
+            self.renders = (self.renders or 0) + 1
+        end
+        rxp.activeItemFrame = Satellite(w, "Active Items")
+    end
+
+    local function Fill(part) return part.rxpBackground.textures[1].vertex end
+
+    local function Is(color, r, g, b, a)
+        return color and math.abs(color[1] - r) < 1e-6 and math.abs(color[2] - g) < 1e-6
+            and math.abs(color[3] - b) < 1e-6 and math.abs(color[4] - a) < 1e-6
+    end
+
+    -- the window off: they are as RestedXP paints them, and are not hooked
+    local off = Begin({}, Both)
+    local target, items = off.rxp.targeting.activeTargetFrame, off.rxp.activeItemFrame
+    Check(Is(Fill(target), 0.1, 0.2, 0.3, 0.9) and target.rxpBorder.textures[1].texture == RXP_EDGE
+        and target.title.text.font == RXP_FONT, "the window is off: RestedXP's windows are left as RestedXP paints them")
+    target:UpdateVisuals()
+    Check(Is(Fill(target), 0.1, 0.2, 0.3, 0.9) and items.paints == 1, "and are painted that way again")
+
+    -- the window on: both take its look, and keep it when RestedXP paints them again
+    local account = { rxpWindow = true }
+    local w = Begin(account, Both)
+    local ns = w.ns
+    target, items = w.rxp.targeting.activeTargetFrame, w.rxp.activeItemFrame
+    Check(ns.RXPWindowOption("rxpWindowSatellites") == true and account.rxpWindowSatellites == nil,
+        "styling the two windows is on with the window, and the default is not stored")
+    local function Look(frame, name)
+        local r, g, b = ns.RXPWindowColor("box")
+        local opacity = ns.RXPWindowOption("rxpWindowBoxOpacity") / 100
+        local er, eg, eb, ea = ns.RXPWindowColor("boxEdge")
+        local label = { ns.RXPWindowColor("label") }
+        Check(Is(Fill(frame), r, g, b, opacity), name .. ": the background is the active step's color and opacity")
+        Check(Fill(frame.title) and Is(Fill(frame.title), r, g, b, opacity), name .. ": and so is its title's")
+        for i, edge in ipairs(frame.rxpBorder.textures) do
+            Check(Is(edge.solid, er, eg, eb, ea), name .. ": border " .. i .. " is the active step's border color")
+        end
+        Check(frame.rxpBorder.shown == true and frame.title.rxpBorder.shown == true, name .. ": the border is shown")
+        local text = frame.title.text
+        Check(text.font == "Fonts\\Naowh.ttf" and text.fontSize == 9 and text.fontFlags == "" and text.shadowX == 1,
+            name .. ": the title is in the window's face and RestedXP's size, with the window's shadow")
+        Check(text.color and math.abs(text.color[1] - label[1]) < 1e-6 and math.abs(text.color[3] - label[3]) < 1e-6,
+            name .. ": and in the step label's color")
+        Check(frame.title.width == 90 and frame.title.height == 19,
+            name .. ": the title is as wide as its text in the window's face, and RestedXP's height")
+    end
+    Look(target, "targets")
+    Look(items, "items")
+
+    target:UpdateVisuals()
+    Look(target, "targets painted again")
+    w.rxp.targeting:RenderTargetFrameBackground()
+    local r, g, b = ns.RXPWindowColor("box")
+    Check(Is(Fill(target), r, g, b, 0.55) and w.rxp.targeting.renders == 1,
+        "RestedXP rendering the background of the targets again does not undo it")
+
+    -- what is set for the window is what they follow
+    ns.SetRXPWindowOption("rxpWindowBoxOpacity", 80)
+    ns.SetRXPWindowColor("box", 1, 0, 0)
+    ns.SetRXPWindowColor("boxEdge", 0, 1, 0, 0.5)
+    ns.SetRXPWindowOption("rxpWindowOutline", "outline")
+    ns.SetRXPWindowOption("rxpWindowFont", "Fancy")
+    Flush(w)
+    Check(Is(Fill(target), 1, 0, 0, 0.8) and Is(Fill(items.title), 1, 0, 0, 0.8), "a color and an opacity set for the box")
+    Check(Is(target.rxpBorder.textures[3].solid, 0, 1, 0, 0.5), "a border color set for the box")
+    Check(items.title.text.font == "Fonts\\Fancy.ttf" and items.title.text.fontFlags == "OUTLINE"
+        and items.title.text.shadowX == 0, "a face and an outline set for the window")
+    ns.SetRXPWindowOption("rxpWindowBoxBorder", false)
+    Flush(w)
+    Check(target.rxpBorder.shown == false and items.title.rxpBorder.shown == false, "no border: none is shown")
+    ns.SetRXPWindowOption("rxpWindowBoxBorder", true)
+    Flush(w)
+    Check(target.rxpBorder.shown == true, "and shown again")
+
+    -- hooked once, however often it is drawn
+    for _ = 1, 3 do
+        ns.SetRXPWindowOption("rxpWindowSpacing", 6)
+        Flush(w)
+    end
+    local fill = target.rxpBackground.textures[1]
+    fill.sets = 0
+    target:UpdateVisuals()
+    Check(fill.sets == 2, "RestedXP paints it once and the window once, however often the window was drawn")
+    ns.SetRXPWindowOption("rxpWindowSpacing", 5)
+    Flush(w)
+
+    -- RestedXP hides the background of a window: the border is not shown without it
+    target.rxpBackground:Hide()
+    target.rxpBorder:Hide()
+    target:UpdateVisuals()
+    Check(target.rxpBorder.shown == false and Is(Fill(target), 1, 0, 0, 0.8),
+        "a background RestedXP hides keeps its border hidden")
+    target.rxpBackground:Show()
+    target.rxpBorder:Show()
+
+    -- a frame RestedXP makes later is taken at the next draw
+    local late = Begin({ rxpWindow = true }, function(world, rxp)
+        rxp.targeting = { activeTargetFrame = Satellite(world, "Active Targets") }
+    end)
+    local lr, lg, lb = late.ns.RXPWindowColor("box")
+    Check(late.rxp.activeItemFrame == nil and Is(Fill(late.rxp.targeting.activeTargetFrame), lr, lg, lb, 0.55),
+        "one of the two is not there yet, and the other has the look")
+    late.rxp.activeItemFrame = Satellite(late, "Active Items")
+    Check(Is(Fill(late.rxp.activeItemFrame), 0.1, 0.2, 0.3, 0.9), "it is painted as RestedXP paints it")
+    late.rxp.SetStep()
+    Flush(late)
+    Check(Is(Fill(late.rxp.activeItemFrame), lr, lg, lb, 0.55), "and has the look of the window at the next draw")
+
+    -- a border the window hid is shown again when RestedXP's own look is
+    ns.SetRXPWindowOption("rxpWindowBoxBorder", false)
+    Flush(w)
+    Check(items.rxpBorder.shown == false and items.title.rxpBorder.shown == false, "the border is hidden to begin with")
+    ns.SetRXPWindowOption("rxpWindowSatellites", false)
+    Flush(w)
+    Check(items.rxpBorder.shown == true and items.title.rxpBorder.shown == true and target.title.rxpBorder.shown == true,
+        "a border the window hid is shown again with RestedXP's own look")
+    ns.SetRXPWindowOption("rxpWindowSatellites", true)
+    ns.SetRXPWindowOption("rxpWindowBoxBorder", true)
+    Flush(w)
+
+    -- the option off, and RestedXP paints its own again, then not hooked into any more
+    ns.SetRXPWindowOption("rxpWindowSatellites", false)
+    Flush(w)
+    Check(target.paints >= 3 and Is(Fill(target), 0.1, 0.2, 0.3, 0.9) and target.rxpBorder.textures[1].texture == RXP_EDGE
+        and target.rxpBorder.textures[1].solid == nil and target.title.text.font == RXP_FONT
+        and target.rxpBorder.shown == true, "turned off: RestedXP's own look is back, border and all")
+    local paints = items.paints
+    items:UpdateVisuals()
+    Check(items.paints == paints + 1 and Is(Fill(items), 0.1, 0.2, 0.3, 0.9) and items.title.text.font == RXP_FONT,
+        "and what RestedXP paints is left as it is")
+    Check(account.rxpWindowSatellites == false, "left out: kept")
+    ns.SetRXPWindowOption("rxpWindowSatellites", true)
+    Flush(w)
+    Check(Is(Fill(items), 1, 0, 0, 0.8) and account.rxpWindowSatellites == nil, "turned on again: the look is back")
+
+    -- the window turned off: they are RestedXP's again
+    ns.SetRXPWindow(false)
+    Flush(w)
+    Check(Is(Fill(items), 0.1, 0.2, 0.3, 0.9) and Is(Fill(target.title), 0.1, 0.2, 0.3, 0.9)
+        and items.title.text.font == RXP_FONT and items.rxpBorder.textures[2].texture == RXP_EDGE,
+        "the window turned off: RestedXP's own look is back")
+    target:UpdateVisuals()
+    Check(Is(Fill(target), 0.1, 0.2, 0.3, 0.9), "and stays")
+
+    -- pieces that are not there raise nothing
+    local bare = Begin({ rxpWindow = true }, function(world, rxp)
+        rxp.targeting = { activeTargetFrame = Object(world.everything) }
+        rxp.activeItemFrame = { UpdateVisuals = function() end, title = {} }
+    end)
+    bare.rxp.activeItemFrame:UpdateVisuals()
+    bare.rxp.SetStep()
+    Flush(bare)
+    Check(Window(bare) ~= nil and Window(bare).shown, "frames without a background, a border or a title: nothing raises")
 end
 
 print("PASS rxp window: " .. cases .. " checks")

@@ -6,20 +6,23 @@ local Has, Dig, Quiet, Guarded = Safe.Has, Safe.Dig, Safe.Quiet, Safe.Guarded
 
 local WINDOW_NAME = "NaowhRXPWindow"
 local STRATA = "MEDIUM"
-local WIDTH_MIN, WIDTH_MAX, WIDTH_STEP, DEFAULT_WIDTH = 260, 640, 10, 380
+local WIDTH_MIN, WIDTH_MAX, WIDTH_STEP, DEFAULT_WIDTH = 260, 640, 1, 380
 local SCALE_MIN, SCALE_MAX, SCALE_STEP, DEFAULT_SCALE = 60, 200, 5, 100
 local STEPS_MIN, STEPS_MAX, DEFAULT_STEPS = 0, 12, 6
 local ACTIVE_SHOWN = 3
 local PERCENT, ROUND, CHANNEL_MAX = 100, 0.5, 255
 local PAD, BOX_PAD, FOLD_W, PROGRESS_W = 10, 7, 16, 120
 local HEAD_PAD, LIST_PAD = 10, 6
+local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
 local BAR_W, ICON_W, MENU_SIZE, GRIP_SIZE = 2, 18, 22, 16
-local PANEL_ALPHA, EDGE_ALPHA, BOX_ALPHA, RULE_ALPHA, MUTED_ALPHA = 0.92, 0.8, 0.55, 0.5, 0.9
+local PANEL_ALPHA, EDGE_ALPHA, RULE_ALPHA, MUTED_ALPHA = 0.92, 0.8, 0.5, 0.9
+local BOX_OPACITY = 55
 local SHADOW, SHADOW_ALPHA = 1, 0.9
 local GOLD = { r = 1, g = 0.82, b = 0 }
 local TEXT_FOLD, TEXT_UNFOLD, TEXT_DOT = "-", "+", " \194\183 "
 local MENU_ICON = "Interface\\ChatFrame\\UI-ChatIcon-Chat-Up"
-local FLAT = "Interface\\Buttons\\WHITE8X8"
+local GRADIENT = ns.MEDIA .. "NaowhGradient.tga"
+local TEXT_GRADIENT = "Naowh Gradient"
 local GRIP_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
 local GRIP_DOWN = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down"
 local GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight"
@@ -32,13 +35,15 @@ local COLORS_KEY = "rxpWindowColors"
 
 -- Everything the window can be changed in, in the order a page lists it. A saved value is only kept when it
 -- is not the default, as in the other settings of this integration.
-local OUTLINES = { shadow = "Shadow", outline = "Outline", none = "None" }
+local OUTLINES = { shadow = "Shadow", outline = "Outline", thick = "Thick Outline", none = "None" }
+local OUTLINE_FLAGS = { outline = "OUTLINE", thick = "THICKOUTLINE" }
 local LINES = { bar = "Progress Bar", rule = "Line", none = "Nothing" }
 local OPTIONS = {
     { key = "rxpWindowFont", group = "Text", kind = "font", label = "Window Font",
       tip = "The face of every text in the window." },
     { key = "rxpWindowOutline", group = "Text", kind = "choice", label = "Text Outline", default = "shadow",
-      values = OUTLINES, order = { "shadow", "outline", "none" }, tip = "How the text is kept readable." },
+      values = OUTLINES, order = { "shadow", "outline", "thick", "none" },
+      tip = "How the text is kept readable over the world." },
     { key = "rxpWindowTitleSize", group = "Text", kind = "number", label = "Title Size", default = 16, min = 10,
       max = 28, tip = "The guide's name and its progress." },
     { key = "rxpWindowTextSize", group = "Text", kind = "number", label = "Step Text Size", default = 13, min = 8,
@@ -61,14 +66,18 @@ local OPTIONS = {
       tip = "A border round the whole window." },
     { key = "rxpWindowBoxBorder", group = "Look", kind = "toggle", label = "Step Box Border", default = true,
       tip = "A border round the active step." },
+    { key = "rxpWindowBoxOpacity", group = "Look", kind = "number", label = "Step Box Opacity",
+      default = BOX_OPACITY, min = 0, max = PERCENT, tip = "How solid the background of the active step is." },
+    { key = "rxpWindowSatellites", group = "Look", kind = "toggle", label = "Style Targets and Items",
+      default = true, tip = "RestedXP's Active Targets and Active Items windows take the look of the active step." },
     { key = "rxpWindowSpacing", group = "Look", kind = "number", label = "Spacing", default = 5, min = 0, max = 12,
       tip = "The room between the rows." },
     { key = "rxpWindowBarHeight", group = "Progress", kind = "number", label = "Bar Height", default = 5, min = 2,
       max = 16, tip = "How thick the progress bars are." },
     { key = "rxpWindowBarTexture", group = "Progress", kind = "texture", label = "Bar Texture",
-      tip = "The texture of the progress bars, flat to start." },
+      defaultLabel = TEXT_GRADIENT, tip = "The texture of the progress bars, the Naowh Gradient to start." },
     { key = "rxpWindowStepBar", group = "Progress", kind = "toggle", label = "Step Objectives Bar", default = true,
-      tip = "A bar in the active step of the objectives done." },
+      tip = "A bar under the active step of the objectives done." },
 }
 
 -- A color is a theme token and an opacity, or a color of its own; a picked one is kept whole.
@@ -84,7 +93,8 @@ local COLORS = {
       tip = "The steps after the active one." },
     { name = "line", label = "Line Color", token = "fg", alpha = RULE_ALPHA, tip = "The line and the bars' track." },
     { name = "fill", label = "Bar Color", token = "accent", tip = "The filled part of the bars." },
-    { name = "box", label = "Step Box Color", token = "bg", alpha = BOX_ALPHA, tip = "Behind the active step." },
+    { name = "box", label = "Step Box Color", token = "bg", opaque = true,
+      tip = "Behind the active step; its opacity is its own setting." },
     { name = "boxEdge", label = "Step Box Border Color", token = "line", alpha = EDGE_ALPHA,
       tip = "Round the active step." },
     { name = "panel", label = "Window Color", token = "panel", alpha = PANEL_ALPHA, tip = "Behind the whole window." },
@@ -96,7 +106,8 @@ local OPTION_BY_KEY, COLOR_BY_NAME = {}, {}
 for _, option in ipairs(OPTIONS) do OPTION_BY_KEY[option.key] = option end
 for _, color in ipairs(COLORS) do COLOR_BY_NAME[color.name] = color end
 
-local window, active, started, pending
+local window, active, started, pending, skinned
+local sizing, sizingModel
 local pool, used = { box = {}, row = {}, line = {} }, { box = 0, row = 0, line = 0 }
 local silenced = setmetatable({}, { __mode = "k" })
 local watched = setmetatable({}, { __mode = "k" })
@@ -212,7 +223,8 @@ function ns.SetRXPWindowColor(name, r, g, b, a)
         Settings()[COLORS_KEY] = all
     end
     if type(r) == "number" and type(g) == "number" and type(b) == "number" then
-        all[name] = { r = r, g = g, b = b, a = type(a) == "number" and a or 1 }
+        local solid = COLOR_BY_NAME[name].opaque or type(a) ~= "number"
+        all[name] = { r = r, g = g, b = b, a = solid and 1 or a }
     else
         all[name] = nil
     end
@@ -323,7 +335,7 @@ end
 
 -- What RestedXP is showing, as plain data: the heading, the progress, the active steps with their rows,
 -- and the steps that follow. Nil without a guide.
-local function Read()
+local function Read(steps)
     local rxp = _G.RXP
     local guide = Dig(rxp, "currentGuide")
     if type(guide) ~= "table" or guide.empty or type(guide.steps) ~= "table" then return nil end
@@ -348,7 +360,7 @@ local function Read()
         model.steps[#model.steps + 1] = { label = StepLabel(rxp, activeStep), rows = rows, done = done }
         if type(activeStep.index) == "number" and activeStep.index > after then after = activeStep.index end
     end
-    model.upcoming = Upcoming(rxp, after, ns.RXPWindowSteps())
+    model.upcoming = Upcoming(rxp, after, steps or ns.RXPWindowSteps())
     return model
 end
 
@@ -424,15 +436,19 @@ local function FacePath()
 end
 
 -- A text: its face, size, outline and shadow are the window's own, set again each time it is drawn.
-local function Face(fs, sizeKey)
+local function Faced(fs, size)
     local outline = ns.RXPWindowOption("rxpWindowOutline")
-    fs:SetFont(FacePath(), ns.RXPWindowOption(sizeKey), outline == "outline" and "OUTLINE" or "")
+    fs:SetFont(FacePath(), size, OUTLINE_FLAGS[outline] or "")
     if outline == "shadow" then
         fs:SetShadowOffset(SHADOW, -SHADOW)
         fs:SetShadowColor(0, 0, 0, SHADOW_ALPHA)
     else
         fs:SetShadowOffset(0, 0)
     end
+end
+
+local function Face(fs, sizeKey)
+    Faced(fs, ns.RXPWindowOption(sizeKey))
 end
 
 local function Text(parent, sizeKey, justify)
@@ -454,6 +470,95 @@ local function Coloured(fs, name)
     fs:SetTextColor(r, g, b, a)
 end
 
+-- RestedXP's Active Targets and Active Items windows in the look of the active step: the colors of their v2
+-- background and border are set in place, and the text of their title takes the window's face.
+local function SkinBox(part)
+    local fill = Dig(part, "rxpBackground", "textures", 1)
+    if Has(fill, "SetVertexColor") then
+        local r, g, b = ns.RXPWindowColor("box")
+        fill:SetVertexColor(r, g, b, ns.RXPWindowOption("rxpWindowBoxOpacity") / PERCENT)
+    end
+    local border = Dig(part, "rxpBorder")
+    if type(border) ~= "table" then return end
+    local r, g, b, a = ns.RXPWindowColor("boxEdge")
+    for _, texture in ipairs(type(border.textures) == "table" and border.textures or {}) do
+        if Has(texture, "SetColorTexture") then texture:SetColorTexture(r, g, b, a) end
+    end
+    local back = part.rxpBackground
+    local shown = not Has(back, "IsShown") or back:IsShown()
+    if Has(border, "SetShown") then
+        border:SetShown(ns.RXPWindowOption("rxpWindowBoxBorder") and shown and true or false)
+    end
+end
+
+local function SkinTitle(title)
+    SkinBox(title)
+    local text = title.text
+    if not (Has(text, "SetFont") and Has(text, "GetFont") and Has(text, "GetStringWidth")) then return end
+    local _, size = text:GetFont()
+    Faced(text, type(size) == "number" and size or BOX_TITLE_TEXT)
+    Coloured(text, "label")
+    if Has(title, "SetSize") then title:SetSize(text:GetStringWidth() + BOX_TITLE_ROOM, BOX_TITLE_HEIGHT) end
+end
+
+local function SkinFrame(frame)
+    SkinBox(frame)
+    if type(frame.title) == "table" then SkinTitle(frame.title) end
+end
+
+local function SkinWanted()
+    return active and ns.RXPWindowOption("rxpWindowSatellites")
+end
+
+local function SkinFrames()
+    local rxp = _G.RXP
+    local frames = {}
+    local target, items = Dig(rxp, "targeting", "activeTargetFrame"), Dig(rxp, "activeItemFrame")
+    if type(target) == "table" then table.insert(frames, target) end
+    if type(items) == "table" then table.insert(frames, items) end
+    return frames
+end
+
+local function SkinHooks(frames)
+    for _, frame in ipairs(frames) do
+        if not watched[frame] and Has(frame, "UpdateVisuals") then
+            watched[frame] = true
+            hooksecurefunc(frame, "UpdateVisuals", Guarded("WindowSkin", function(self)
+                if SkinWanted() then SkinFrame(self) end
+            end))
+        end
+    end
+    local targeting = Dig(_G.RXP, "targeting")
+    if not watched[targeting] and Has(targeting, "RenderTargetFrameBackground") then
+        watched[targeting] = true
+        hooksecurefunc(targeting, "RenderTargetFrameBackground", Guarded("WindowSkin", function()
+            local target = Dig(_G.RXP, "targeting", "activeTargetFrame")
+            if SkinWanted() and type(target) == "table" then SkinBox(target) end
+        end))
+    end
+end
+
+-- RestedXP paints its own look again, and shows the border where it shows the background
+local function SkinRestore(frame)
+    if Has(frame, "UpdateVisuals") then Quiet("WindowSkin", frame.UpdateVisuals, frame) end
+    for _, part in ipairs({ frame, frame.title }) do
+        local border, back = Dig(part, "rxpBorder"), Dig(part, "rxpBackground")
+        if Has(border, "SetShown") then border:SetShown(not Has(back, "IsShown") or back:IsShown()) end
+    end
+end
+
+local function Skin()
+    local frames = SkinFrames()
+    if SkinWanted() then
+        skinned = true
+        SkinHooks(frames)
+        for _, frame in ipairs(frames) do Quiet("WindowSkin", SkinFrame, frame) end
+    elseif skinned then
+        skinned = false
+        for _, frame in ipairs(frames) do SkinRestore(frame) end
+    end
+end
+
 local function Draggable(frame)
     frame:RegisterForDrag(DRAG_BUTTON)
     frame:SetScript("OnDragStart", function()
@@ -467,6 +572,16 @@ end
 
 -- Dragging the corner sets the window's width, and how many steps are listed from how tall it was made: the
 -- height the window has without any, and the height of a line, are what Draw last drew.
+local function LiveSize(width, height)
+    if not (sizing and sizingModel and window) then return end
+    sizing.width = math.min(WIDTH_MAX, math.max(WIDTH_MIN, width))
+    local base, line = window.chrome, window.lineHeight
+    if type(base) == "number" and type(line) == "number" and line > 0 then
+        sizing.steps = math.floor((height - base) / line)
+    end
+    Quiet("WindowDraw", Draw)
+end
+
 local function Resized()
     if not window then return end
     local width, height = window:GetWidth(), window:GetHeight()
@@ -487,9 +602,14 @@ local function MakeGrip(parent)
     grip:SetPushedTexture(GRIP_DOWN)
     grip:SetHighlightTexture(GRIP_HIGHLIGHT)
     grip:SetScript("OnMouseDown", function()
-        if not ns.RXPWindowOption("rxpWindowLock") then window:StartSizing(GRIP_CORNER) end
+        if ns.RXPWindowOption("rxpWindowLock") then return end
+        -- read once, with every step it could list: each size it is dragged through draws from this
+        sizingModel = Read(STEPS_MAX)
+        sizing = { width = window:GetWidth(), steps = ns.RXPWindowSteps() }
+        window:StartSizing(GRIP_CORNER)
     end)
     grip:SetScript("OnMouseUp", function()
+        sizing, sizingModel = nil, nil
         window:StopMovingOrSizing()
         Resized()
     end)
@@ -498,8 +618,8 @@ end
 
 local function TexturePath()
     local name = ns.RXPWindowOption("rxpWindowBarTexture")
-    local custom = name ~= "" and type(ns.UI) == "table" and ns.UI.TexturePath and ns.UI.TexturePath(name, FLAT)
-    return custom or FLAT
+    local custom = name ~= "" and type(ns.UI) == "table" and ns.UI.TexturePath and ns.UI.TexturePath(name, GRADIENT)
+    return custom or GRADIENT
 end
 
 local function MakeBar(parent)
@@ -554,6 +674,7 @@ local function Build()
     f.menu:SetNormalTexture(MENU_ICON)
     f.menu:SetHighlightTexture(MENU_ICON)
     f.menu:SetScript("OnClick", Menu)
+    f:SetScript("OnSizeChanged", function(_, width, height) LiveSize(width, height) end)
     f.grip = MakeGrip(f)
     Place(f)
     return f
@@ -566,7 +687,7 @@ local function MakeBox()
     box.back:SetAllPoints()
     box.edge = ns.Border(box, T.line, EDGE_ALPHA)
     box.label = Text(box, "rxpWindowTextSize")
-    box.bar = MakeBar(box)
+    box.bar = MakeBar(window)
     return box
 end
 
@@ -629,7 +750,10 @@ end
 
 local function Reset()
     for kind, list in pairs(pool) do
-        for i = 1, #list do list[i]:Hide() end
+        for i = 1, #list do
+            list[i]:Hide()
+            if kind == "box" then list[i].bar:Hide() end
+        end
         used[kind] = 0
     end
 end
@@ -680,7 +804,8 @@ local function DrawBox(step, y, inner)
     box:ClearAllPoints()
     box:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
     box:SetWidth(inner)
-    box.back:SetColorTexture(ns.RXPWindowColor("box"))
+    local boxR, boxG, boxB = ns.RXPWindowColor("box")
+    box.back:SetColorTexture(boxR, boxG, boxB, ns.RXPWindowOption("rxpWindowBoxOpacity") / PERCENT)
     local r, g, b, a = ns.RXPWindowColor("boxEdge")
     box.edge:SetColor(r, g, b, a)
     box.edge._frame:SetShown(ns.RXPWindowOption("rxpWindowBoxBorder"))
@@ -689,21 +814,24 @@ local function DrawBox(step, y, inner)
     Coloured(box.label, "label")
     box.label:SetText(step.label:upper())
     local by = -BOX_PAD - size - gap
-    if ns.RXPWindowOption("rxpWindowStepBar") and #step.rows > 0 then
-        box.bar:ClearAllPoints()
-        box.bar:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, by)
-        box.bar:SetPoint("TOPRIGHT", box, "TOPRIGHT", -BOX_PAD, by)
-        PaintBar(box.bar, step.done / #step.rows)
-        box.bar:Show()
-        by = by - ns.RXPWindowOption("rxpWindowBarHeight") - gap
-    else
-        box.bar:Hide()
-    end
     for _, row in ipairs(step.rows) do
         by = by - DrawRow(box, row, BOX_PAD, by, inner - BOX_PAD * 2) - gap
     end
     box:SetHeight(-by + BOX_PAD - gap)
-    return y + by - BOX_PAD
+    local bottom = y + by - BOX_PAD
+    -- the objectives done are a divider under the box, as the guide's is under the title
+    if ns.RXPWindowOption("rxpWindowStepBar") and #step.rows > 0 then
+        local top = bottom
+        box.bar:ClearAllPoints()
+        box.bar:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, top)
+        box.bar:SetPoint("TOPRIGHT", window, "TOPRIGHT", -PAD, top)
+        PaintBar(box.bar, step.done / #step.rows)
+        box.bar:Show()
+        bottom = top - ns.RXPWindowOption("rxpWindowBarHeight") - gap
+    else
+        box.bar:Hide()
+    end
+    return bottom
 end
 
 local function DrawHeader(model, folded, width, headH)
@@ -755,22 +883,23 @@ end
 
 function Draw()
     if not active then return end
+    if not sizing then Quiet("WindowSkin", Skin) end
     window = window or Build()
-    Take()
-    local model = Read()
+    if not sizing then Take() end
+    local model = sizing and sizingModel or Read()
     if not model then
         window:Hide()
         return
     end
     Reset()
     Refaced()
-    local width = ns.RXPWindowWidth()
+    local width = sizing and sizing.width or ns.RXPWindowWidth()
     local inner = width - PAD * 2
     local folded = Settings().rxpWindowCollapsed == true
     local headH = ns.RXPWindowOption("rxpWindowTitleSize") + HEAD_PAD
     local gap = Spacing()
     local listH = ns.RXPWindowOption("rxpWindowListSize") + LIST_PAD
-    window:SetWidth(width)
+    if not sizing then window:SetWidth(width) end
     window.back:SetColorTexture(ns.RXPWindowColor("panel"))
     window.back:SetShown(ns.RXPWindowOption("rxpWindowPanel"))
     window.edge:SetColor(ns.RXPWindowColor("edge"))
@@ -779,7 +908,9 @@ function Draw()
     local y = DrawLine(model, -PAD - headH)
     if not folded then
         for _, step in ipairs(model.steps) do y = DrawBox(step, y, inner) end
-        for _, entry in ipairs(model.upcoming) do
+        for i = 1, sizing and sizing.steps or #model.upcoming do
+            local entry = model.upcoming[i]
+            if not entry then break end
             local item = Acquire("line")
             item:ClearAllPoints()
             item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
@@ -797,7 +928,7 @@ function Draw()
         window.menu:Show()
         y = y - gap - MENU_SIZE
     end
-    window:SetHeight(-y + PAD)
+    if not sizing then window:SetHeight(-y + PAD) end
     window.lineHeight = listH
     window.chrome = -y + PAD - used.line * listH
     local locked = ns.RXPWindowOption("rxpWindowLock")
@@ -821,6 +952,7 @@ local function Apply()
     else
         Release()
         if window then window:Hide() end
+        Quiet("WindowSkin", Skin)
     end
 end
 

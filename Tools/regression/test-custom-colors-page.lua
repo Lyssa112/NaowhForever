@@ -368,7 +368,7 @@ do
     Check(a.rxpWindow == true, "on is stored")
     e.build()
     local width, steps = Pair(e, "Naowh Window Width")
-    Check(width and width.type == "slider" and width.min == 260 and width.max == 640 and width.step == 10
+    Check(width and width.type == "slider" and width.min == 260 and width.max == 640 and width.step == 1
         and steps and steps.text == "Upcoming Steps" and steps.min == 0 and steps.max == 12 and steps.step == 1,
         "on: the window's width and the steps listed after the active one")
     local scale = Pair(e, "Naowh Window Scale")
@@ -591,13 +591,13 @@ do
     end
     for _, color in ipairs(s.ns.RXPWindowColors()) do
         local cell = Cell(color.label)
-        Check(cell and cell.type == "colorpicker" and cell.hasAlpha == true, color.label .. ": its swatch")
+        Check(cell and cell.type == "colorpicker" and cell.hasAlpha == not color.opaque, color.label .. ": its swatch")
         local r, g, b, alpha = cell.getValue()
         Check(type(r) == "number" and type(g) == "number" and type(b) == "number" and type(alpha) == "number",
             color.label .. ": it reads a color")
         cell.setValue(0.25, 0.5, 0.75, 0.5)
-        Check(s.account.rxpWindowColors[color.name].g == 0.5 and select(4, cell.getValue()) == 0.5,
-            color.label .. ": and keeps one picked")
+        Check(s.account.rxpWindowColors[color.name].g == 0.5
+            and select(4, cell.getValue()) == (color.opaque and 1 or 0.5), color.label .. ": and keeps one picked")
     end
     local size = styled.rxpWindowTitleSize
     Check(size.min == 10 and size.max == 28 and size.step == 1 and size.getValue() == 16, "a size has its range and start")

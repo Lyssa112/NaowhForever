@@ -126,3 +126,20 @@ Core/Integrations/RestedXP/
   `(height - chrome) / line` into the width and steps settings and draws again at the size that fits.
   Its bounds are the smallest (no steps) and the tallest (all of them). Lock Window stops moving and
   sizing, and a folded window has nothing to size.
+- The window follows the drag as it happens (`OnSizeChanged` while the grip is held): what the list can
+  show is read once when the grip is pressed, with every step it could list, and each size drawn from
+  that, so nothing is read again per frame; the window does not set its own width or height while it is
+  dragged, as the drag does, and what is kept is set when the grip is let go. The width is kept to the
+  pixel.
+- The step objectives bar is a divider under the active step's box and not a part of it, as the guide's
+  is under the title; the box's own opacity is a setting (`rxpWindowBoxOpacity`) and not a part of its
+  color. The bars are in the Naowh Gradient to start (`GRADIENT`, which is `ns.MEDIA`'s, so a texture of
+  SharedMedia is only needed when another is wanted).
+- The Active Targets and Active Items windows (`RXPTargetFrame`, `RXPItemFrame`) take the look of the
+  active step's box: the colors of their v2 background and border textures are set in place after
+  `UpdateVisuals` (and after the targets' `RenderTargetFrameBackground`, which settings call alone), and
+  their title's text takes the window's face and color, kept at RestedXP's size so nothing is laid out
+  again. Each is hooked once (`watched`); a frame RestedXP makes later is taken at the next draw. The
+  border follows the background, so a background RestedXP hides keeps its border hidden. Turned off
+  (the window, or Style Targets and Items), RestedXP's own `UpdateVisuals` paints them again, and the
+  border is shown where the background is, as the title's is not set by it.

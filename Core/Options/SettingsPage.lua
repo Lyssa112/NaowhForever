@@ -31,7 +31,6 @@ local TEXT_COLORS_RELOAD = ns.L("Reload UI to apply your color changes.")
 local TEXT_RXP_RELOAD = ns.L("Reload UI to apply your RestedXP changes.")
 local TEXT_RXP_PICK_RELOAD = "Reload UI to pick a theme."
 local TEXT_RXP_WINDOW_NEEDS = "Turn on RestedXP's Beta Features and V2 interface."
-local TEXT_FLAT = "Flat"
 local TEXT_SKIN_TIP = ns.L("Classic+ dresses the addon's windows like the game's own, in gold and bronze. "
     .. "It has its own colors and uses the game's fonts unless you pick an Addon Font. Saved "
     .. "for this computer.|n|nTakes effect after a /reload.")
@@ -456,14 +455,14 @@ local function WindowOptionCell(option)
         return { type = "dropdown", text = option.label, values = values, order = order, tooltip = option.tip,
           getValue = Get, setValue = Set }
     end
-    local values, order = UI.TextureChoices(Get(), TEXT_FLAT)
+    local values, order = UI.TextureChoices(Get(), option.defaultLabel)
     return { type = "dropdown", text = option.label, values = values, order = order, tooltip = option.tip,
       getValue = Get, setValue = Set }
 end
 
 local function WindowColorCell(color)
     local name = color.name
-    return { type = "colorpicker", text = color.label, hasAlpha = true, tooltip = color.tip,
+    return { type = "colorpicker", text = color.label, hasAlpha = not color.opaque, tooltip = color.tip,
       getValue = function() return ns.RXPWindowColor(name) end,
       setValue = function(r, g, b, a) ns.SetRXPWindowColor(name, r, g, b, a) end }
 end
