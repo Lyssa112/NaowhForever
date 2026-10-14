@@ -744,26 +744,26 @@ do
     Check(drawn.texture.path == OURS and #drawn.sets == 3 and Hex(tint) == "5b8cff", "back to one of ours: the image and Midnight's Accent")
 
     -- the window on with its theme Custom: the arrow is in the color the player picked for it
-    local own = imageEnv.NaowhForever
-    own.RXPWindowEnabled = function() return true end
-    own.RXPWindowOwnColors = function() return true end
-    own.RXPWindowColor = function(name) return name == "arrow" and 1 or 0, 0, 0.5, 1 end
-    own.RXPPaintArrow()
+    local windowNs = imageEnv.NaowhForever
+    windowNs.RXPWindowEnabled = function() return true end
+    windowNs.RXPWindowOwnColors = function() return true end
+    windowNs.RXPWindowColor = function(name) return name == "arrow" and 1 or 0, 0, 0.5, 1 end
+    windowNs.RXPPaintArrow()
     Check(Same(drawn.tints[#drawn.tints], { 1, 0, 0.5, 1 }), "the window on, its theme Custom: the arrow's own color")
-    own.RXPWindowOwnColors = function() return false end
-    own.RXPPaintArrow()
+    windowNs.RXPWindowOwnColors = function() return false end
+    windowNs.RXPPaintArrow()
     Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "a theme of the window's: the theme's own color")
-    own.RXPWindowOwnColors = function() return true end
-    own.RXPWindowEnabled = function() return false end
-    own.RXPPaintArrow()
+    windowNs.RXPWindowOwnColors = function() return true end
+    windowNs.RXPWindowEnabled = function() return false end
+    windowNs.RXPPaintArrow()
     Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "the window off: the theme's own color")
-    own.RXPWindowOwnColors = function() return true end
-    own.RXPWindowEnabled = function() return true end
-    own.RXPWindowColor = function() return "red" end
-    own.RXPPaintArrow()
+    windowNs.RXPWindowOwnColors = function() return true end
+    windowNs.RXPWindowEnabled = function() return true end
+    windowNs.RXPWindowColor = function() return "red" end
+    windowNs.RXPPaintArrow()
     Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "a color that is none: the theme's own color")
-    own.RXPWindowEnabled, own.RXPWindowOwnColors, own.RXPWindowColor = nil, nil, nil
-    own.RXPPaintArrow()
+    windowNs.RXPWindowEnabled, windowNs.RXPWindowOwnColors, windowNs.RXPWindowColor = nil, nil, nil
+    windowNs.RXPPaintArrow()
 
     local styles = imageEnv.NaowhForever
     styles.SetRXPArrowStyle("layer")
@@ -1981,8 +1981,8 @@ do
     -- wished for, on a character it has not seen: the interface and the theme, and a reload to use the interface
     profile = { activeTheme = "RXP Blue" }
     local account = { rxpThemes = true, rxpSetup = true }
-    local env, ns
-    rxp, ns, confirms, env = Run(account, profile, "Player-1", true)
+    local ns
+    _, _, confirms = Run(account, profile, "Player-1", true)
     Check(profile.enableBetaFeatures == true and profile.enableV2Interface == true and profile.activeTheme == "RXP Blue",
         "turned on with the window: the interface is set for it, and the old theme is not, it being off")
     Check(#confirms == 1, "a reload is asked for, to use the interface")
@@ -1990,30 +1990,30 @@ do
 
     -- seen: what the player changes after is theirs
     profile.activeTheme, profile.enableV2Interface = "RXP Blue", false
-    rxp, ns, confirms = Run(account, profile, "Player-1", true)
+    _, _, confirms = Run(account, profile, "Player-1", true)
     Check(profile.activeTheme == "RXP Blue" and profile.enableV2Interface == false and #confirms == 0,
         "the same character again: nothing is set again")
 
     -- another character
     local other = { activeTheme = "RXP Blue" }
-    rxp, ns, confirms = Run(account, other, "Player-2", true)
+    _, _, confirms = Run(account, other, "Player-2", true)
     Check(other.enableV2Interface == true and other.activeTheme == "RXP Blue" and #confirms == 1, "another one is set up")
 
     -- the theme alone: no interface to wait for, so the theme is reloaded
     local themed = { activeTheme = "RXP Blue" }
-    rxp, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, themed, "Player-3", false)
+    rxp, _, confirms = Run({ rxpThemes = true, rxpSetup = true }, themed, "Player-3", false)
     Check(themed.activeTheme == CURRENT and themed.enableV2Interface == nil and #confirms == 0
         and #rxp.reloads == 1 and rxp.reloads[1] == CURRENT, "the window not wished for: the theme only, and live")
 
     -- RestedXP loading after us, which imports the themes itself: the theme is reloaded by the set up
     local later = { activeTheme = "RXP Blue" }
-    rxp, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, later, "Player-3b", false, true)
+    rxp = Run({ rxpThemes = true, rxpSetup = true }, later, "Player-3b", false, true)
     Check(later.activeTheme == CURRENT and #rxp.reloads == 1 and rxp.reloads[1] == CURRENT,
         "RestedXP not up when we loaded: the theme is reloaded onto the new one")
 
     -- the interface alone
     local windowed = { activeTheme = "RXP Blue" }
-    rxp, ns, confirms = Run({ rxpSetup = true }, windowed, "Player-4", true)
+    _, _, confirms = Run({ rxpSetup = true }, windowed, "Player-4", true)
     Check(windowed.activeTheme == "RXP Blue" and windowed.enableV2Interface == true and #confirms == 1,
         "the themes not wished for: the interface only")
 
@@ -2034,7 +2034,7 @@ do
     Check(bottom.framePositions.arrowFrame[1][1] == "BOTTOM" and #rxp.arrowFrame.points == 0,
         "one the player put at the bottom is not RestedXP's place either")
     local fresh = { activeTheme = "RXP Blue" }
-    rxp = Run({ rxpThemes = true, rxpSetup = true }, fresh, "Player-A3", true)
+    Run({ rxpThemes = true, rxpSetup = true }, fresh, "Player-A3", true)
     Check(fresh.framePositions and fresh.framePositions.arrowFrame[1][1] == "CENTER",
         "a profile with no places yet has it in the middle")
     local seen = { activeTheme = "RXP Blue", framePositions = { arrowFrame = { { "TOP", "UIParent", "TOP", 0, 0 } } } }
@@ -2048,33 +2048,33 @@ do
 
     -- already as it should be
     local done = { activeTheme = CURRENT, enableBetaFeatures = true, enableV2Interface = true }
-    rxp, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, done, "Player-5", true)
+    rxp, _, confirms = Run({ rxpThemes = true, rxpSetup = true }, done, "Player-5", true)
     Check(#confirms == 0 and #rxp.reloads == 0, "a character that is as it should be: nothing is asked")
 
     -- nothing wished for at all
     local none = { activeTheme = "RXP Blue" }
-    rxp, ns, confirms = Run({ rxpSetup = true }, none, "Player-6", false)
+    _, _, confirms = Run({ rxpSetup = true }, none, "Player-6", false)
     Check(none.activeTheme == "RXP Blue" and none.enableV2Interface == nil and #confirms == 0,
         "set up on, with no theme and no window wished for: nothing to set")
 
     -- a theme of RestedXP's own choosing is not ours to keep, but the player's own pick of ours is
     local picked = { activeTheme = "NaowhForever:crimson" }
-    rxp, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, picked, "Player-7", false)
+    Run({ rxpThemes = true, rxpSetup = true }, picked, "Player-7", false)
     Check(picked.activeTheme == "NaowhForever:crimson", "a theme of ours already picked is not changed")
 
     -- by hand, with it off and the character seen
     local manual = { activeTheme = "RXP Blue" }
     account = { rxpThemes = true, rxpWindow = true, rxpSetUp = { ["Player-8"] = true } }
-    rxp, ns, confirms = Run(account, manual, "Player-8", true)
+    _, ns, confirms = Run(account, manual, "Player-8", true)
     Check(manual.enableV2Interface == nil and manual.activeTheme == "RXP Blue", "off and seen: login sets nothing")
     local result = ns.RXPSetUpCharacter()
     Check(result == "reload" and manual.enableV2Interface == true and manual.activeTheme == "RXP Blue" and #confirms == 1,
         "the button sets it, wished for or not, seen or not")
 
     -- what is missing raises nothing
-    rxp, ns, confirms, env = Run({ rxpThemes = true, rxpSetup = true }, nil, "Player-9", true)
+    _, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, nil, "Player-9", true)
     Check(#confirms == 0 and ns.RXPFailures.SetUp == nil, "no profile: nothing")
-    rxp, ns, confirms, env = Run({ rxpThemes = true, rxpSetup = true }, { activeTheme = "RXP Blue" }, nil, true)
+    _, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, { activeTheme = "RXP Blue" }, nil, true)
     Check(#confirms == 0, "no character to say who it is: nothing")
     ns.RXPSetUpEnabled()
     ns.SetRXPSetUp(true)
@@ -2143,7 +2143,7 @@ do
     Check(ns.RXPArrowEnabled() == false and #env.hooked == 0, "and with neither on, it is off")
 
     -- the window on: the old theme is off, and the arrow is its own
-    env, ns = Boot({ rxpThemes = true, rxpWindow = true }, true)
+    ns = select(2, Boot({ rxpThemes = true, rxpWindow = true }, true))
     Check(ns.RXPThemesEnabled() == false, "the window on: the old theme is not used, whatever was saved")
     env, ns = Boot({ rxpArrowOn = true }, true)
     Check(ns.RXPArrowEnabled() == true and #env.hooked >= 1, "and the arrow is, if it is on")
@@ -2226,12 +2226,12 @@ do
 
     -- each of the two is the other's off
     local account = { rxpWindow = true }
-    env, ns = Load(account, true)
+    ns = select(2, Load(account, true))
     local turnedOff
     ns.RXPWindowEnabled = function() return account.rxpWindow == true end
-    ns.SetRXPWindow = function(on)
-        turnedOff = on == false
-        account.rxpWindow = on and true or nil
+    ns.SetRXPWindow = function(enabled)
+        turnedOff = enabled == false
+        account.rxpWindow = enabled and true or nil
     end
     ns.SetRXPThemes(true)
     Check(account.rxpThemes == true and turnedOff == true and account.rxpWindow == nil,
@@ -2242,7 +2242,7 @@ do
 
     -- the arrow's own font
     account = {}
-    env, ns = Load(account, true)
+    ns = select(2, Load(account, true))
     Check(ns.RXPArrowFontEnabled() == true and account.rxpArrowFont == nil, "its font is on by default")
     ns.SetRXPArrowFont(false)
     Check(ns.RXPArrowFontEnabled() == false and account.rxpArrowFont == false and ns.RXPFontEnabled() == true,

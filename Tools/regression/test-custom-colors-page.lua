@@ -65,9 +65,9 @@ local function RealCore(account, rxp, up)
     module("NaowhForever")
     for _, part in ipairs({ { settingsSource, "RXPWindowSettings" }, { modelSource, "RXPWindowModel" },
             { windowSource, "RXPWindow" } }) do
-        local chunk = assert(loadstring(part[1], part[2]))
-        setfenv(chunk, env)
-        chunk("NaowhForever")
+        local built = assert(loadstring(part[1], part[2]))
+        setfenv(built, env)
+        built("NaowhForever")
     end
     local icons = assert(loadstring(iconsSource, "RXPIcons"))
     setfenv(icons, env)
@@ -583,14 +583,14 @@ do
     Check(onCustom.rows[#onCustom.rows][1].text == "RestedXP Naowh Window (V2)", "and the window row is the last, above the Reload button")
     local onImage = Page({ themePreset = "custom", rxpThemes = true, rxpArrow = "image" }, true)
     Check(#onImage.rows == plain + 10, "with Naowh arrow picked, one more: the glow and size")
-    local objective, size = Pair(onImage, "Arrow Shows Objective")
+    local objective, textSize = Pair(onImage, "Arrow Shows Objective")
     Check(objective and objective.type == "toggle" and objective.getValue() == false and onImage.account.rxpArrowObjective == nil,
         "an Arrow Shows Objective toggle, off by default")
-    Check(size and size.type == "slider" and size.text == "Arrow Text Size" and size.min == 8 and size.max == 24
-        and size.step == 1 and size.getValue() == 13, "and the arrow text's size beside it, 13 to start")
-    size.setValue(18)
+    Check(textSize and textSize.type == "slider" and textSize.text == "Arrow Text Size" and textSize.min == 8 and textSize.max == 24
+        and textSize.step == 1 and textSize.getValue() == 13, "and the arrow text's size beside it, 13 to start")
+    textSize.setValue(18)
     Check(onImage.account.rxpArrowTextSize == 18, "a size is stored")
-    size.setValue(13)
+    textSize.setValue(13)
     Check(onImage.account.rxpArrowTextSize == nil, "and the default is not")
     objective.setValue(true)
     Check(onImage.account.rxpArrowObjective == true, "on is stored")
@@ -849,7 +849,7 @@ do
         env.W = {}
         setmetatable(env, { __index = _G })
         setfenv(driver, env)
-        driver(function(text, _, section) seen[text] = section end)
+        driver(function(text, _, title) seen[text] = title end)
         return seen
     end
     local theme = Terms({ rxpThemes = true })
