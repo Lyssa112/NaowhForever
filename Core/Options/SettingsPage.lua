@@ -528,10 +528,10 @@ local function SetUpRows(W, parent, y)
 end
 
 local function RxpWindowRows(W, parent, y)
-    local _, h = W:SectionHeader(parent, "NAOWH GUIDE WINDOW", y); y = y - h
+    local _, h = W:SectionHeader(parent, "RESTEDXP NAOWH WINDOW (V2)", y); y = y - h
     _, h = W:DualRow(parent, y,
-        { type = "toggle", text = "Naowh Guide Window",
-          tooltip = "RestedXP's guide and active steps in one Naowh window, in place of its own and of the old theme.",
+        { type = "toggle", text = "RestedXP Naowh Window (V2)",
+          tooltip = "RestedXP's guide and active steps in one Naowh window, in place of its own and of the theme.",
           getValue = ns.RXPWindowEnabled,
           setValue = function(v)
               ns.SetRXPWindow(v)
@@ -560,6 +560,7 @@ local function RxpWindowRows(W, parent, y)
           setValue = function(v) ns.SetRXPWindowScale(v) end },
         Empty()
     ); y = y - h
+    y = RxpArrowRows(W, parent, y)
     return RxpWindowStyleRows(W, parent, y)
 end
 
@@ -570,15 +571,20 @@ local function RestedXPSection(W, parent, y)
         _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
         y = SetUpRows(W, parent, y)
     end
-    _, h = W:SectionHeader(parent, "RESTEDXP THEME", y); y = y - h
-    local themesSwitch = RxpSwitch("Add Themes to RestedXP",
-        "Adds the Naowh themes to RestedXP's theme list, in place of the Naowh Guide Window.",
+    _, h = W:SectionHeader(parent, "RESTEDXP THEME (V1)", y); y = y - h
+    local themesSwitch = RxpSwitch("RestedXP Theme (V1)",
+        "Adds the Naowh themes to RestedXP's theme list, in place of the Naowh window.",
         ns.RXPThemesEnabled, ns.SetRXPThemes)
     _, h = W:DualRow(parent, y, themesSwitch, RxpThemeChoice()); y = y - h
-    if ns.RXPThemesEnabled() then y = RxpThemeRows(W, parent, y) end
-    _, h = W:SectionHeader(parent, "RESTEDXP ARROW", y); y = y - h
-    y = RxpArrowRows(W, parent, y)
+    if ns.RXPThemesEnabled() then
+        y = RxpThemeRows(W, parent, y)
+        y = RxpArrowRows(W, parent, y)
+    end
     y = RxpWindowRows(W, parent, y)
+    if not (ns.RXPThemesEnabled() or ns.RXPWindowEnabled()) then
+        _, h = W:SectionHeader(parent, "RESTEDXP ARROW", y); y = y - h
+        y = RxpArrowRows(W, parent, y)
+    end
     if rxpPending then
         _, h = W:Note(parent, TEXT_RXP_RELOAD, y); y = y - h
     end

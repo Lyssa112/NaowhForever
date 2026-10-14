@@ -317,7 +317,7 @@ end
 do
     local function Toggle(e)
         for _, row in ipairs(e.rows) do
-            if row[1].text == "Add Themes to RestedXP" then return row[1], row[2] end
+            if row[1].text == "RestedXP Theme (V1)" then return row[1], row[2] end
         end
     end
     local function Pair(page, name)
@@ -340,7 +340,7 @@ do
         for i = #page.rows, 1, -1 do
             local row = page.rows[i]
             table.insert(out, 1, (row[1].text or "") .. "|" .. (row[2] and row[2].text or ""))
-            if row[1].text == "Add Themes to RestedXP" then break end
+            if row[1].text == "RestedXP Theme (V1)" then break end
         end
         return table.concat(out, ", ")
     end
@@ -349,21 +349,21 @@ do
     local a = {}
     local e = Page(a, true)
     local toggle, beside = Toggle(e)
-    Check(table.concat(e.headers, ",") == "COLORS,RESTEDXP THEME,RESTEDXP ARROW,NAOWH GUIDE WINDOW",
-        "RestedXP Guides installed: a section for the old theme, one for the arrow and one for the window, even with them off")
+    Check(table.concat(e.headers, ",") == "COLORS,RESTEDXP THEME (V1),RESTEDXP NAOWH WINDOW (V2),RESTEDXP ARROW",
+        "RestedXP Guides installed: V1's section, V2's, and the arrow's own while neither is on")
     Check(toggle and toggle.type == "toggle", "the toggle is there with RestedXP Guides installed")
     Check(toggle.getValue() == false and a.rxpThemes == nil, "off by default")
-    Check(toggle.tooltip == "Adds the Naowh themes to RestedXP's theme list, in place of the Naowh Guide Window.",
+    Check(toggle.tooltip == "Adds the Naowh themes to RestedXP's theme list, in place of the Naowh window.",
         "its tooltip is one short sentence")
 
     Check(beside.type == "label" and beside.text == "", "nothing is beside the toggle")
     local NEEDS = "Turn on RestedXP's Beta Features and V2 interface."
-    Check(Layout(e) == "Add Themes to RestedXP|, Style RestedXP's Arrow|, Naowh Guide Window|" .. NEEDS,
-        "with them off: the toggle of each of the theme, the arrow and the window, and nothing else")
+    Check(Layout(e) == "RestedXP Theme (V1)|, RestedXP Naowh Window (V2)|" .. NEEDS .. ", Style RestedXP's Arrow|",
+        "with them off: the toggle of V1, of V2 with its note, and the arrow's own switch, and nothing else")
     Check(Hidden(e), "and none of the other RestedXP choices is shown")
-    local window, need = Pair(e, "Naowh Guide Window")
+    local window, need = Pair(e, "RestedXP Naowh Window (V2)")
     Check(window and window.type == "toggle" and window.getValue() == false and a.rxpWindow == nil,
-        "a Naowh Guide Window toggle, off by default")
+        "a RestedXP Naowh Window (V2) toggle, off by default")
     Check(need.type == "label" and need.text == NEEDS, "with a note beside it while RestedXP's V2 interface is off")
     Check(Pair(e, "Naowh Window Width") == nil, "and no width or steps while it is off")
     window.setValue(true)
@@ -386,7 +386,7 @@ do
     scale.setValue(100)
     Check(a.rxpWindowWidth == nil and a.rxpWindowSteps == nil and a.rxpWindowScale == nil,
         "and the defaults are not stored")
-    Pair(e, "Naowh Guide Window").setValue(false)
+    Pair(e, "RestedXP Naowh Window (V2)").setValue(false)
     Check(a.rxpWindow == nil, "off is not stored")
     Check(#e.notes == 0, "no hint before a change")
     local refreshed = e.refreshes
@@ -396,17 +396,17 @@ do
     Check(Toggle(e).getValue() == true and #e.notes == 1 and e.notes[1] == RXP_HINT, "it reads back, and the RestedXP reload hint shows")
     Check(not Hidden(e), "and the choices are shown")
 
-    Check(Layout(e) == "Add Themes to RestedXP|Reload UI to pick a theme., Use Addon Font|Use Theme Text Color, Style RestedXP's Arrow|, Naowh Guide Window|" .. NEEDS,
+    Check(Layout(e) == "RestedXP Theme (V1)|Reload UI to pick a theme., Use Addon Font|Use Theme Text Color, Style RestedXP's Arrow|, RestedXP Naowh Window (V2)|" .. NEEDS,
         "with the themes just turned on: a note beside the toggle in place of the theme, the font and text color, the arrow's switch as it was (off), and the window")
-    local _, waiting = Pair(e, "Add Themes to RestedXP")
+    local _, waiting = Pair(e, "RestedXP Theme (V1)")
     Check(waiting.type == "label" and waiting.getValue == nil, "RestedXP has not started with the themes yet: a note, not a dropdown")
 
     -- RestedXP up with the themes in its list: the dropdown, which is RestedXP's own setting
     local up = RxpStub("RXP Blue")
     local u = Page({ rxpThemes = true }, true, up)
-    Check(Layout(u) == "Add Themes to RestedXP|RestedXP Theme, Use Addon Font|Use Theme Text Color, Style RestedXP's Arrow|, RestedXP Arrow|, Show Arrow Text|, Arrow Shows Objective|Arrow Text Size, Arrow Addon Font|, Naowh Guide Window|" .. NEEDS,
+    Check(Layout(u) == "RestedXP Theme (V1)|RestedXP Theme, Use Addon Font|Use Theme Text Color, Style RestedXP's Arrow|, RestedXP Arrow|, Show Arrow Text|, Arrow Shows Objective|Arrow Text Size, Arrow Addon Font|, RestedXP Naowh Window (V2)|" .. NEEDS,
         "with RestedXP started: the toggle with the theme beside it, the font and text color, and the arrow's own rows")
-    local switch, picker = Pair(u, "Add Themes to RestedXP")
+    local switch, picker = Pair(u, "RestedXP Theme (V1)")
     Check(switch and picker.type == "dropdown" and picker.text == "RestedXP Theme", "the theme is a dropdown beside the toggle")
     Check(picker.getValue() == "" and u.account.rxpTheme == nil, "RestedXP's own while RestedXP is on its own, and nothing stored")
     local presets = u.ns.THEME_PRESET_ORDER
@@ -430,7 +430,7 @@ do
     -- RestedXP's live reload off: the theme shows after a reload, so the note does
     local quiet = RxpStub("RXP Blue", false)
     local q = Page({ rxpThemes = true }, true, quiet)
-    local _, quietPicker = Pair(q, "Add Themes to RestedXP")
+    local _, quietPicker = Pair(q, "RestedXP Theme (V1)")
     quietPicker.setValue("crimson")
     Check(quiet.settings.profile.activeTheme == "NaowhForever:crimson" and #quiet.reloads == 0 and q.refreshes == 1,
         "RestedXP's live reload off: the pick is set, RestedXP is not reloaded, and the page redraws")
@@ -454,9 +454,9 @@ do
     Check(Pair(e, "Naowh Arrow Shape") == nil and Pair(e, "Naowh Arrow Size") == nil,
         "with the layer as the arrow style, the choices for Naowh's arrow are not shown")
     local imaged = Page({ rxpThemes = true, rxpArrow = "image" }, true, RxpStub("RXP Blue"))
-    Check(Layout(imaged) == "Add Themes to RestedXP|RestedXP Theme, Use Addon Font|Use Theme Text Color, Style RestedXP's Arrow|, "
+    Check(Layout(imaged) == "RestedXP Theme (V1)|RestedXP Theme, Use Addon Font|Use Theme Text Color, Style RestedXP's Arrow|, "
         .. "RestedXP Arrow|Naowh Arrow Shape, Naowh Arrow Glow|Naowh Arrow Size, "
-        .. "Show Arrow Text|Naowh Arrow Text Gap, Arrow Shows Objective|Arrow Text Size, Arrow Addon Font|, Naowh Guide Window|" .. NEEDS,
+        .. "Show Arrow Text|Naowh Arrow Text Gap, Arrow Shows Objective|Arrow Text Size, Arrow Addon Font|, RestedXP Naowh Window (V2)|" .. NEEDS,
         "with Naowh arrow picked: the arrow and its shape, its glow and size, the arrow text and its gap, what it says, and its font")
     local _, shape = Pair(imaged, "RestedXP Arrow")
     local glow, size = Pair(imaged, "Naowh Arrow Glow")
@@ -503,7 +503,7 @@ do
     for _, page in ipairs({ u, imaged }) do
         local inSection
         for _, row in ipairs(page.rows) do
-            inSection = inSection or row[1].text == "Add Themes to RestedXP"
+            inSection = inSection or row[1].text == "RestedXP Theme (V1)"
             for _, cfg in ipairs(inSection and row or {}) do
                 if cfg.tooltip then
                     count = count + 1
@@ -555,10 +555,10 @@ do
     local plain = #Page({ themePreset = "custom" }).rows
     local custom = Page({ themePreset = "custom" }, true)
     Check(Toggle(custom) and #custom.rows == plain + 3, "with Custom and everything off, RestedXP adds three rows: the theme's, the arrow's and the window's")
-    Check(custom.rows[#custom.rows][1].text == "Naowh Guide Window", "and the window's is the last, above the Reload button")
+    Check(custom.rows[#custom.rows][1].text == "Style RestedXP's Arrow", "and the arrow's own is the last, above the Reload button")
     local onCustom = Page({ themePreset = "custom", rxpThemes = true }, true)
     Check(#onCustom.rows == plain + 9, "with the themes on, RestedXP adds nine rows: the toggle and theme, the font and text, the arrow's switch, its style, its text, what it says, its font, the set up and the window")
-    Check(onCustom.rows[#onCustom.rows][1].text == "Naowh Guide Window", "and the window row is the last, above the Reload button")
+    Check(onCustom.rows[#onCustom.rows][1].text == "RestedXP Naowh Window (V2)", "and the window row is the last, above the Reload button")
     local onImage = Page({ themePreset = "custom", rxpThemes = true, rxpArrow = "image" }, true)
     Check(#onImage.rows == plain + 10, "with Naowh arrow picked, one more: the glow and size")
     local objective, size = Pair(onImage, "Arrow Shows Objective")
@@ -691,12 +691,56 @@ do
 
     -- the window on: the theme's toggle reads off, and turning it on turns the window off
     local w = Page({ rxpThemes = true, rxpWindow = true }, true)
-    local themes = Cells(w)["Add Themes to RestedXP"]
+    local themes = Cells(w)["RestedXP Theme (V1)"]
     Check(themes.getValue() == false, "saved with both on, the window is used and the theme reads off")
     local before = w.account.rxpWindow
     Check(before == true, "the window is on")
     themes.setValue(true)
     Check(w.account.rxpThemes == true and w.account.rxpWindow == nil, "the theme turned on turns the window off")
+end
+
+do
+    -- the arrow's options are in V1 and in V2, and on their own when neither is on: once on the page
+    local function Count(page, name)
+        local count = 0
+        for _, row in ipairs(page.rows) do
+            for _, cell in ipairs(row) do
+                if cell.text == name then count = count + 1 end
+            end
+        end
+        return count
+    end
+    local function Has(page, header)
+        return ("," .. table.concat(page.headers, ",") .. ","):find("," .. header .. ",", 1, true) ~= nil
+    end
+    local neither = Page({}, true)
+    Check(Count(neither, "Style RestedXP's Arrow") == 1 and Has(neither, "RESTEDXP ARROW"),
+        "neither on: the arrow's options have a section of their own")
+    local v1 = Page({ rxpThemes = true, rxpArrowOn = true }, true)
+    Check(Count(v1, "Style RestedXP's Arrow") == 1 and Count(v1, "RestedXP Arrow") == 1 and not Has(v1, "RESTEDXP ARROW")
+        and Has(v1, "RESTEDXP THEME (V1)"), "V1 on: the arrow's options are in V1's section, once")
+    local v2 = Page({ rxpWindow = true, rxpArrowOn = true }, true)
+    Check(Count(v2, "Style RestedXP's Arrow") == 1 and Count(v2, "RestedXP Arrow") == 1 and not Has(v2, "RESTEDXP ARROW")
+        and Has(v2, "RESTEDXP NAOWH WINDOW (V2)") and Has(v2, "WINDOW LOOK"),
+        "V2 on: the arrow's options are in V2's section, once, before the window's look")
+    Check(Count(v2, "Use Addon Font") == 0 and Count(v1, "Naowh Window Width") == 0,
+        "and what is of the one is not in the other")
+    local function Position(page, name)
+        local at = 0
+        for _, row in ipairs(page.rows) do
+            for _, cell in ipairs(row) do
+                at = at + 1
+                if cell.text == name then return at end
+            end
+        end
+    end
+    local firstLook
+    for _, option in ipairs(v2.ns.RXPWindowOptions()) do
+        if option.group == "Text" and not firstLook then firstLook = option.label end
+    end
+    local sliders, arrow, look = Position(v2, "Naowh Window Scale"), Position(v2, "Style RestedXP's Arrow"), Position(v2, firstLook)
+    Check(sliders and arrow and look and sliders < arrow and arrow < look,
+        "V2: the window's sliders, then the arrow's options, then the window's look")
 end
 
 print("PASS custom colors page: " .. cases .. " checks")
