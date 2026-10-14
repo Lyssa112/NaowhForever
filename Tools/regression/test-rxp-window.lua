@@ -1493,6 +1493,14 @@ do
     Flush(w)
     Check(Row(BUY).meter.value == 1, "more than needed is a full bar")
 
+    w.buy.frame.button.GetChecked = function() return true end
+    w.items[159] = 0
+    f.scripts.OnEvent(f, BAGS)
+    Flush(w)
+    Check(Row(BUY).meter.value == 1, "a buy that is done is full whatever is left in the bags: they were used or sold")
+    w.buy.frame.button.GetChecked = function() return false end
+    w.items[159] = 9
+
     w.buy.qty = 1
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
@@ -1507,7 +1515,16 @@ do
     w.talk.frame.button.GetChecked = function() return true end
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
-    Check(talk.meter.value == 1, "a row that is done is a full bar")
+    Check(math.abs(talk.meter.value - 3 / 8) < 1e-9,
+        "a row RestedXP says is done keeps what its text counts: three of eight, not a full bar")
+    w.talk.frame.text:SetText("|cff00ff00Boar Meat|r: |cffffd1008/8|r")
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(Row("|cff00ff00Boar Meat|r: |cffffd1008/8|r").meter.value == 1, "and eight of eight is full")
+    w.talk.frame.text:SetText("|cff00ff00Boar Meat|r: |cffffd1000/8|r")
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(Row("|cff00ff00Boar Meat|r: |cffffd1000/8|r").meter.value == 0, "none of eight is an empty bar, done or not")
     w.talk.frame.button.GetChecked = function() return false end
     w.talk.frame.text:SetText("Kill 12/10 Boars")
     w.rxp.v2:UpdateGuideWindow()
