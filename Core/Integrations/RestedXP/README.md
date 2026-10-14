@@ -198,7 +198,10 @@ Core/Integrations/RestedXP/
   its fold and shown at once. It is the window's colors alone: the addon's theme (COLORS) is not read for
   a preset and not set by it, and the icons and the arrow follow the window's. The colors are the preset's
   and the player's own only while it is Custom (`RXPWindowOwnColors`): a theme is a look as a whole, so the
-  nine colors are shown only for Custom, and what was picked is kept for when it is Custom again. The
+  nine colors are shown only for Custom, and what was picked is kept for when it is Custom again. Forever is
+  the addon's Forever skin for the window alone: its gold and bronze (`ns.FOREVER_SKIN`) and its face, with the
+  addon left as it is (the skin itself, under COLORS, is read at load and takes the window with it when the
+  window's theme is the addon's). The
   waypoint arrow's color is one of them, used by the arrow (`OwnArrowColor`) only with the window on and
   Custom, and the arrow is painted again when it, the theme or the reset changes it. A step of the list lit
   by the mouse and the title of the tooltips are in the accent, a little see-through for the first, and not

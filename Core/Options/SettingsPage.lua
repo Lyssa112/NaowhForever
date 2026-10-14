@@ -517,6 +517,8 @@ local function WindowThemeRow()
         values[key] = ns.THEME_PRESETS[key].name
         order[#order + 1] = key
     end
+    values.forever = TEXT_FOREVER
+    order[#order + 1] = "forever"
     values[CUSTOM] = TEXT_CUSTOM
     order[#order + 1] = CUSTOM
     return { type = "dropdown", text = "Window Theme", values = values, order = order,

@@ -167,7 +167,7 @@ local function World(account, opts)
     ns.UI = { FontPath = function(name) return "Fonts\\" .. name .. ".ttf" end,
         TexturePath = function(name) return "Textures\\" .. name end }
     ns.Hairline = function() end
-    ns.AddonFontPath = function() return "Fonts\\Naowh.ttf" end
+    ns.AddonFontPath = function(classic) return classic and "Fonts\\Forever.ttf" or "Fonts\\Naowh.ttf" end
     for _, part in ipairs({ { themesSource, "Themes" }, { windowSource, "Window" } }) do
         local chunk = assert(loadstring(part[1], part[2]))
         setfenv(chunk, env)
@@ -773,6 +773,14 @@ do
     local box = { ns.RXPWindowColor("box") }
     Check(box[1] == midnight.bg.r and box[4] == 1, "the box has the preset's background, solid")
     Check(account.themePreset == nil and ns.ThemePresetKey() == "", "and the addon's own theme is not touched")
+    ns.SetRXPWindowTheme("forever")
+    local gold = ns.FOREVER_SKIN
+    Check(account.rxpWindowTheme == "forever" and ns.RXPWindowOwnColors() == false
+        and ns.RXPWindowColor("accent") == gold.accent.r and select(2, ns.RXPWindowColor("accent")) == gold.accent.g
+        and ns.RXPWindowColor("title") == gold.fg.r and ns.RXPWindowColor("box") == gold.bg.r,
+        "Forever: the skin's gold, its text and its brown, for the window alone")
+    Check(account.themePreset == nil and ns.Skin() == "" and ns.foreverSkin ~= true,
+        "and the addon is not in the skin: it is not set by it")
     ns.SetRXPWindowTheme(nil)
     Check(account.rxpWindowTheme == nil and ns.RXPWindowThemeKey() == "" and ns.RXPWindowColor("title") == T.fg.r,
         "the addon's own: the addon's colors, and nothing stored")
@@ -1006,6 +1014,16 @@ do
     ns.SetRXPWindowOption("rxpWindowFont", "")
     ns.SetRXPWindowOption("rxpWindowOutline", "shadow")
     Flush(w)
+    ns.SetRXPWindowTheme("forever")
+    Flush(w)
+    Check(f.title.font == "Fonts\\Forever.ttf", "the Forever window theme: the skin's face, with no font picked")
+    ns.SetRXPWindowOption("rxpWindowFont", "Fira")
+    Flush(w)
+    Check(f.title.font == "Fonts\\Fira.ttf", "a font picked is the window's still")
+    ns.SetRXPWindowOption("rxpWindowFont", "")
+    ns.SetRXPWindowTheme(nil)
+    Flush(w)
+    Check(f.title.font == "Fonts\\Naowh.ttf", "and the addon's own face again with the addon's theme")
     Check(Texts("rxpWindowTitleSize")[1].font == "Fonts\\Naowh.ttf" and Texts("rxpWindowTitleSize")[1].shadowX == 1,
         "back to the Addon Font and the shadow")
     Check(f.title.fontSize == 20, "the sizes stay")
