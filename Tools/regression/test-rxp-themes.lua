@@ -1418,6 +1418,7 @@ do
         end
         function arrow.text:Hide() end
         function arrow.text:Show() end
+        function arrow.text:SetWidth(width) self.width = width end
         function arrow.text:GetPoint() return "TOP", arrow, "BOTTOM", 0, -5 end
         function arrow.text:SetPoint() end
         function arrow:GetSize() return 32, 32 end
@@ -1465,9 +1466,11 @@ do
     ns.SetRXPArrowTextSize("big")
     Check(ns.RXPArrowTextSize() == 13 and arrow.text.font[2] == 13, "what is no number is the default")
 
+    Check(arrow.text.width == 0, "RestedXP's own text is as wide as it is")
     ns.SetRXPArrowObjective(true)
     Check(ns.AccountSettings().rxpArrowObjective == true and arrow.distance == nil,
         "objective on: stored, and RestedXP is made to say its text again")
+    Check(arrow.text.width == 240, "a line that long is wrapped at a width, not one long line across the screen")
     Check(Moved(1577) == "1577 yd\nTalk to Duokna", "the distance, then the objective, with no icon")
     Check(arrow.text.font[1] == ns.AddonFontPath() and arrow.text.font[2] == 13 and arrow.text.font[3] == "OUTLINE",
         "still in the Addon Font at that size")
@@ -1546,6 +1549,7 @@ do
     ns.SetRXPArrowText(true)
     ns.SetRXPArrowObjective(false)
     Check(ns.AccountSettings().rxpArrowObjective == nil and arrow.distance == nil, "off: not stored, RestedXP's text again")
+    Check(arrow.text.width == 0, "and its width is its own again")
     Check(Moved(10) == "Step 36\n(10yd)", "and the step is said again")
 
     -- on at login, and with one of RestedXP's themes

@@ -112,7 +112,9 @@ Core/Integrations/RestedXP/
   start, RestedXP's own is 9, Arrow Text Size), with the outline RestedXP gave it, so it is in the Addon
   Font at that size whichever theme is picked and whatever RestedXP sets next. A path the client
   hands back spelled differently would make the font chase itself, so a flag (`keeping`) holds the
-  hook while it sets one. With the switch off RestedXP's own font (`RXP.font`) is given back. The
+  hook while it sets one. With Arrow Shows Objective its text is also given a width (`TEXT_WIDTH`) so a long
+  objective wraps under the arrow and does not run across the screen; it is its own width again without it.
+  With the switch off RestedXP's own font (`RXP.font`) is given back. The
   window uses `ns.AddonFontPath`, which is read live, and not `ns.UIFontPath`, which keeps the first
   path it found.
 - What the window can be changed in is two lists in `Window.lua` (`OPTIONS` and `COLORS`), each with its
@@ -279,3 +281,7 @@ Core/Integrations/RestedXP/
 - The line of an item listed that way has no bar at its side: that bar says open or done, and
   RestedXP's tracking of such a line marked items done that were not in the bags. The counts under it
   (a line with a `5/5`, a buy) keep their bars.
+- A line of words that is not a task (`textOnly`, with no marker of its own: "Don't go out of your way to
+  loot all of them yet") has no bar and no icon: it has nothing to be open or done. RestedXP hides the icon of
+  such a line but its frame keeps the text of the element it showed last, so an icon is only read from a
+  frame that is shown (`IsShown() == false` is none); that is what put a question mark on it.

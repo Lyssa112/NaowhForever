@@ -371,14 +371,16 @@ local function Row(rxp, element)
     if type(ns.RXPIconText) == "function" then shown = ns.RXPIconText(shown) end
     local icon = Dig(frame, "icon")
     local glyph = Has(icon, "GetText") and icon:GetText()
+    if Has(icon, "IsShown") and icon:IsShown() == false then glyph = "" end
     if type(glyph) ~= "string" then glyph = element.icon or Dig(rxp, "icons", element.tag) or "" end
     local nested
     shown, glyph, nested = Lifted(shown, glyph)
+    local note = element.textOnly == true and glyph == ""
     local button = Dig(frame, "button")
     local done = Has(button, "GetChecked") and button:GetChecked() or element.completed or element.skip
     local have, need, bags = Counted(element, shown)
     return { text = shown, icon = glyph, done = done and true or false, button = button, source = text,
-        have = have, need = need, bags = bags, nested = nested }
+        have = have, need = need, bags = bags, nested = nested, note = note }
 end
 
 local function ActiveSteps(rxp)
@@ -1067,7 +1069,7 @@ local function DrawRow(box, row, x, y, width, first)
     item.bar:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
     item.bar:SetPoint("BOTTOMLEFT", item, "BOTTOMLEFT", 0, 0)
     item.bar:SetWidth(BAR_W)
-    item.bar:SetShown(not first and not row.nested)
+    item.bar:SetShown(not first and not row.nested and not row.note)
     local a = row.done and "muted" or "accent"
     item.bar:SetColorTexture(ns.RXPWindowColor(a))
     item.icon:ClearAllPoints()

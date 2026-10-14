@@ -36,6 +36,7 @@ local SIZE_MIN, SIZE_MAX, SIZE_STEP, DEFAULT_SIZE = 60, 200, 5, 90
 local GLOW_FILL = 0.76
 local GAP_MIN, GAP_MAX, DEFAULT_GAP = 0, 20, 4
 local TEXT_MIN, TEXT_MAX, DEFAULT_TEXT = 8, 24, 13
+local TEXT_WIDTH = 240
 local GAP_STEP = 1
 local PERCENT = 100
 local ARROW_DISTANCE = "%d yd"
@@ -485,6 +486,7 @@ local function PaintText(arrow, on)
         text:Show()
     end
     textHidden = hide
+    if Has(text, "SetWidth") then text:SetWidth(on and ns.RXPArrowObjective() and TEXT_WIDTH or 0) end
 end
 
 local objectiveHooked, composing
@@ -598,6 +600,7 @@ function ns.SetRXPArrowObjective(on)
     if on then Quiet("ArrowObjective", HookObjective) end
     local arrow = _G.RXPG_ARROW
     if type(arrow) == "table" then arrow.distance = nil end
+    PaintArrow()
 end
 
 -- With the window on and its theme Custom, the arrow is in the color the player picked for it.

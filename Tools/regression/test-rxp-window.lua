@@ -657,6 +657,54 @@ do
         "and are that much narrower")
 end
 
+-- a line of words that is not a task has no icon and no bar of its own
+do
+    local w = Start({ rxpWindow = true })
+    local ns = w.ns
+    local function Rows()
+        local out = {}
+        for _, o in ipairs(w.frames) do
+            if o.icon and o.text and o.bar and Seen(o) then out[#out + 1] = o end
+        end
+        return out
+    end
+    local function Line(text, icon, shown)
+        local frame = { text = Object(w.everything), icon = Object(w.everything), button = Object(w.everything) }
+        frame.text:SetText(text)
+        frame.icon:SetText(icon)
+        if shown == false then frame.icon:Hide() end
+        function frame.button:GetChecked() return true end
+        return frame
+    end
+    local elements = w.rxp.RXPFrame.activeSteps[1].elements
+    table.insert(elements, 2, { text = "x", textOnly = true, frame = Line("|cffffd100Do not go out of your way|r", "|Tstale|t", false) })
+    table.insert(elements, 3, { text = "x", textOnly = true,
+        frame = Line("|Tinterface/worldmap/chatbubble_64grey.blp:20|t Talk to Duokna", "", false) })
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    local rows = Rows()
+    Check(#rows == 5, "the step's five lines")
+    Check(rows[2].icon.text == "" and rows[2].bar.shown == false,
+        "a line that is only words: no icon, though its frame kept one from another use, and no bar")
+    Check(rows[3].bar.shown == true and rows[3].icon.text ~= "",
+        "a line that starts with a marker is a row like the others: the bubble and its bar")
+    Check(rows[4].bar.shown == true and rows[5].bar.shown == true, "and the objectives after it have theirs")
+    Check(rows[2].points[1][4] == 7 + 12 and rows[2].text.points[1][4] == rows[4].text.points[1][4],
+        "the words are set in as a row is, and start where the others' do")
+    elements[2].textOnly = false
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    rows = Rows()
+    Check(rows[2].bar.shown == true, "the same line as an objective has its bar")
+    elements[2].textOnly = true
+    elements[2].frame.icon:Show()
+    elements[2].frame.icon:SetText("|Tshown|t")
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    rows = Rows()
+    Check(rows[2].icon.text == "|Tshown|t", "an icon RestedXP shows is still shown")
+end
+
 -- what is missing or fails is left out, quietly
 do
     local w = Start({ rxpWindow = true }, { snapshotRaises = true })
