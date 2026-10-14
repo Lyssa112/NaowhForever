@@ -1,120 +1,44 @@
 -- Window.lua: RestedXP's guide in one Naowh window: its progress, the active step and the steps after it.
 local ns = _G.NaowhForever
-local F = ns.FEATURES.account
 local Safe = ns.RXPSafe
-local Has, Dig, Quiet, Guarded = Safe.Has, Safe.Dig, Safe.Quiet, Safe.Guarded
+local Has, Dig, Quiet, Guarded, Run = Safe.Has, Safe.Dig, Safe.Quiet, Safe.Guarded, Safe.Run
+
+local WIDTH_MIN, WIDTH_MAX = ns.RXPWindowWidthRange()
+local STEPS_MAX = select(2, ns.RXPWindowStepsRange())
 
 local WINDOW_NAME = "NaowhRXPWindow"
 local STRATA = "MEDIUM"
-local WIDTH_MIN, WIDTH_MAX, WIDTH_STEP, DEFAULT_WIDTH = 260, 640, 1, 380
-local SCALE_MIN, SCALE_MAX, SCALE_STEP, DEFAULT_SCALE = 60, 200, 5, 100
-local STEPS_MIN, STEPS_MAX, DEFAULT_STEPS = 0, 12, 6
-local ACTIVE_SHOWN = 3
-local PERCENT, ROUND, CHANNEL_MAX = 100, 0.5, 255
+local PERCENT = 100
 local PAD, BOX_PAD, FOLD_W, PROGRESS_W = 10, 7, 16, 120
 local HEAD_PAD, LIST_PAD = 10, 6
 local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
 local BAR_W, ICON_GAP, GRIP_SIZE = 2, 5, 16
 local FIRST_GROW, FIRST_ICON_GROW, LOGO_SIZE, BAR_HEIGHT, INDENT, ICON_SIZE = 2, 2, 24, 5, 12, 18
-local PANEL_ALPHA, EDGE_ALPHA, RULE_ALPHA, MUTED_ALPHA, HOVER_ALPHA = 0.92, 0.8, 0.5, 0.9, 0.25
-local BOX_OPACITY = 55
-local ICON_DONE_ALPHA = 0.5
-local COUNT_PATTERN, COUNT_MIN, COUNT_GAP = "(%d+)%s*/%s*(%d+)", 2, 2
-local LEAD_ICON, LEAD_PLAIN = "^%s*(|T[^|]*|t)%s*", "^|T([^|:]+):%d+|t$"
-local LEAD_PATH, CONTENT_ID, CONTENT_DIR = "^|T([^|:]+)", "^%d+$", "interface[/\\]icons[/\\]"
+local HOVER_ALPHA, ICON_DONE_ALPHA = 0.25, 0.5
+local COUNT_MIN, COUNT_GAP = 2, 2
 local BAG_EVENT = "BAG_UPDATE_DELAYED"
 local SHADOW, SHADOW_ALPHA = 1, 0.9
 local TEXT_FOLD, TEXT_UNFOLD, TEXT_DOT = "-", "+", " \194\183 "
 local LOGO = "Interface\\AddOns\\RXPGuides\\Textures\\rxp_logo-64"
 local GRADIENT = ns.MEDIA .. "NaowhGradient.tga"
-local TEXT_GRADIENT = "Naowh Gradient"
 local GRIP_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
 local GRIP_DOWN = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down"
 local GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight"
 local GRIP_CORNER = "BOTTOMRIGHT"
-local TEXT_STEP = "Step %d"
 local TEXT_SKIP = "Skip step"
 local TEXT_SHIFT = "Shift-click"
 local TEXT_MENU = "Right-click: menu"
 local TEXT_GO = "Go to step %d"
-local TEXT_NO_GUIDE, TEXT_PICK = "No guide selected", "Pick a guide"
+local TEXT_PICK = "Pick a guide"
 local TIP_DIM = 0.7
 local HOME = { "LEFT", "LEFT", 0, 35 }
 local DRAG_BUTTON, TIP_ANCHOR = "LeftButton", "ANCHOR_TOP"
-local COLORS_KEY = "rxpWindowColors"
-local THEME_KEY = "rxpWindowTheme"
-local CUSTOM = "custom"
-local FOLLOW = ""
-local FOREVER = "forever"
 local ACCENT = "accent"
 local TARGET_PLACEHOLDER, MOB_PLACEHOLDER = 2056011, 135274
 local PLACEHOLDER_GLYPHS = { [TARGET_PLACEHOLDER] = "gossip", [MOB_PLACEHOLDER] = "combat" }
-
--- Everything the window can be changed in, in the order a page lists it. A saved value is only kept when it
--- is not the default, as in the other settings of this integration.
-local OUTLINES = { shadow = "Shadow", outline = "Outline", thick = "Thick Outline", none = "None" }
-local SKIPS = { shift = "Shift-click", click = "Click", off = "Off" }
 local OUTLINE_FLAGS = { outline = "OUTLINE", thick = "THICKOUTLINE" }
-local LINES = { bar = "Progress Bar", rule = "Line", none = "Nothing" }
-local OPTIONS = {
-    { key = "rxpWindowFont", group = "Text", kind = "font", label = "Window Font",
-      tip = "The face of every text in the window." },
-    { key = "rxpWindowOutline", group = "Text", kind = "choice", label = "Text Outline", default = "shadow",
-      values = OUTLINES, order = { "shadow", "outline", "thick", "none" },
-      tip = "How the text is kept readable over the world." },
-    { key = "rxpWindowTitleSize", group = "Text", kind = "number", label = "Title Size", default = 16, min = 10,
-      max = 28, tip = "The guide's name and its progress." },
-    { key = "rxpWindowTextSize", group = "Text", kind = "number", label = "Step Text Size", default = 13, min = 8,
-      max = 24, tip = "The active step." },
-    { key = "rxpWindowListSize", group = "Text", kind = "number", label = "List Text Size", default = 12, min = 8,
-      max = 24, tip = "The steps after the active one." },
-    { key = "rxpWindowLine", group = "Look", kind = "choice", label = "Under the Title", default = "bar",
-      values = LINES, order = { "bar", "rule", "none" }, tip = "A progress bar of the guide, a line, or nothing." },
-    { key = "rxpWindowGrip", group = "Look", kind = "toggle", label = "Show Resize Grip", default = true,
-      tip = "The corner that is dragged to change the window's width and how many steps are listed." },
-    { key = "rxpWindowSkip", group = "Look", kind = "choice", label = "Skipping Steps", default = "shift",
-      values = SKIPS, order = { "shift", "click", "off" },
-      tip = "What it takes to click the active step to skip it, or a step of the list to go to it." },
-    { key = "rxpWindowTips", group = "Look", kind = "toggle", label = "Show Tooltips", default = true,
-      tip = "What a click on a step does, said when the mouse is over it." },
-    { key = "rxpWindowLock", group = "Look", kind = "toggle", label = "Lock Window", default = false,
-      tip = "The window cannot be moved or resized." },
-    { key = "rxpWindowPanel", group = "Look", kind = "toggle", label = "Window Background", default = false,
-      tip = "A panel behind the whole window." },
-    { key = "rxpWindowBorder", group = "Look", kind = "toggle", label = "Window Border", default = false,
-      tip = "A border round the whole window." },
-    { key = "rxpWindowBoxBorder", group = "Look", kind = "toggle", label = "Step Box Border", default = true,
-      tip = "A border round the active step." },
-    { key = "rxpWindowBoxOpacity", group = "Look", kind = "number", label = "Step Box Opacity",
-      default = BOX_OPACITY, min = 0, max = PERCENT, tip = "How solid the background of the active step is." },
-    { key = "rxpWindowSpacing", group = "Look", kind = "number", label = "Spacing", default = 5, min = 0, max = 12,
-      tip = "The room between the rows." },
-    { key = "rxpWindowBarTexture", group = "Progress", kind = "texture", label = "Bar Texture",
-      defaultLabel = TEXT_GRADIENT, tip = "The texture of the progress bars, the Naowh Gradient to start." },
-}
 
--- A color is a theme token and an opacity; a picked one is kept whole. Each is for several things.
-local COLORS = {
-    { name = "title", label = "Title Color", token = "fg", tip = "The guide's name and its percent." },
-    { name = "accent", label = "Accent Color", token = "accent",
-      tip = "The level range, the step count, STEP and its number, and the filled part of the bars." },
-    { name = "text", label = "Step Text Color", token = "fg", tip = "The rows of the active step." },
-    { name = "muted", label = "Muted Text Color", token = "muted", alpha = MUTED_ALPHA,
-      tip = "A row that is done and the steps after the active one." },
-    { name = "line", label = "Line Color", token = "fg", alpha = RULE_ALPHA, tip = "The line and the bars' track." },
-    { name = "box", label = "Step Box Color", token = "bg", opaque = true,
-      tip = "Behind the active step; its opacity is its own setting." },
-    { name = "border", label = "Border Color", token = "line", alpha = EDGE_ALPHA,
-      tip = "Round the active step and round the whole window." },
-    { name = "panel", label = "Window Color", token = "panel", alpha = PANEL_ALPHA, tip = "Behind the whole window." },
-    { name = "arrow", label = "Arrow Color", token = "accent", tip = "RestedXP's waypoint arrow." },
-}
-
-local OPTION_BY_KEY, COLOR_BY_NAME = {}, {}
-for _, option in ipairs(OPTIONS) do OPTION_BY_KEY[option.key] = option end
-for _, color in ipairs(COLORS) do COLOR_BY_NAME[color.name] = color end
-
-local window, active, started, pending, skinned, wantsBags
+local window, active, started, pending, styled, wantsBags
 local sizing, sizingModel
 local pool, used = { box = {}, row = {}, line = {}, hit = {} }, { box = 0, row = 0, line = 0, hit = 0 }
 local silenced = setmetatable({}, { __mode = "k" })
@@ -128,62 +52,6 @@ local function Settings()
     return ns.AccountSettings()
 end
 
-local function Snap(value, lo, hi, step)
-    return math.min(hi, math.max(lo, math.floor(value / step + ROUND) * step))
-end
-
-function ns.RXPWindowEnabled()
-    local on = ns.AccountSettings().rxpWindow
-    if on == nil then return F.rxpWindow end
-    return on == true
-end
-
-function ns.RXPWindowWidthRange() return WIDTH_MIN, WIDTH_MAX, WIDTH_STEP end
-
-function ns.RXPWindowStepsRange() return STEPS_MIN, STEPS_MAX, 1 end
-
-function ns.RXPWindowScaleRange() return SCALE_MIN, SCALE_MAX, SCALE_STEP end
-
-function ns.RXPWindowScale()
-    local scale = tonumber(Settings().rxpWindowScale)
-    return scale and Snap(scale, SCALE_MIN, SCALE_MAX, SCALE_STEP) or DEFAULT_SCALE
-end
-
-function ns.RXPWindowWidth()
-    local width = tonumber(Settings().rxpWindowWidth)
-    return width and Snap(width, WIDTH_MIN, WIDTH_MAX, WIDTH_STEP) or DEFAULT_WIDTH
-end
-
-function ns.RXPWindowSteps()
-    local steps = tonumber(Settings().rxpWindowSteps)
-    return steps and Snap(steps, STEPS_MIN, STEPS_MAX, 1) or DEFAULT_STEPS
-end
-
-function ns.RXPWindowReady()
-    local v2 = Dig(_G.RXP, "v2")
-    return Has(v2, "IsGuideWindowEnabled") and v2:IsGuideWindowEnabled() and true or false
-end
-
-function ns.RXPWindowOptions() return OPTIONS end
-
-function ns.RXPWindowColors() return COLORS end
-
-function ns.RXPWindowOption(key)
-    local option = OPTION_BY_KEY[key]
-    if not option then return nil end
-    local value = Settings()[key]
-    if option.kind == "number" then
-        local number = tonumber(value)
-        return number and Snap(number, option.min, option.max, 1) or option.default
-    elseif option.kind == "toggle" then
-        if value == nil then return option.default end
-        return value == true
-    elseif option.kind == "choice" then
-        return option.values[value] and value or option.default
-    end
-    return type(value) == "string" and value or ""
-end
-
 local function Refresh()
     if not active or pending then return end
     pending = true
@@ -193,271 +61,7 @@ local function Refresh()
     end)
 end
 
-function ns.RXPWindowRefresh() Refresh() end
-
-function ns.SetRXPWindowOption(key, value)
-    local option = OPTION_BY_KEY[key]
-    if not option then return end
-    local store
-    if option.kind == "number" then
-        local number = tonumber(value)
-        number = number and Snap(number, option.min, option.max, 1)
-        store = number ~= option.default and number or nil
-    elseif option.kind == "toggle" then
-        local on = value and true or false
-        if on ~= option.default then store = on end
-    elseif option.kind == "choice" then
-        store = option.values[value] and value ~= option.default and value or nil
-    else
-        store = type(value) == "string" and value ~= "" and value or nil
-    end
-    Settings()[key] = store
-    Refresh()
-end
-
--- The window has a theme of its own: the addon's to start, one of the presets, or Custom. It is the window's
--- colors only; the addon's theme is not read or changed by it, and a change shows at once.
-local function RepaintArrow()
-    if type(ns.RXPPaintArrow) == "function" then ns.RXPPaintArrow() end
-end
-
-local function IsPreset(key)
-    return type(key) == "string" and type(ns.THEME_PRESETS) == "table" and ns.THEME_PRESETS[key] ~= nil
-end
-
--- The Forever skin's gold and bronze, and its face, for the window alone, without the addon's skin.
-local function IsTheme(key)
-    return key == CUSTOM or key == FOREVER or IsPreset(key)
-end
-
-function ns.RXPWindowThemeKey()
-    local key = Settings()[THEME_KEY]
-    if IsTheme(key) then return key end
-    return FOLLOW
-end
-
-function ns.SetRXPWindowTheme(key)
-    Settings()[THEME_KEY] = IsTheme(key) and key or nil
-    Refresh()
-    RepaintArrow()
-end
-
--- The colors are the theme's, and the player's own only when the theme is Custom: a theme is a look as a whole.
-function ns.RXPWindowOwnColors()
-    return ns.RXPWindowThemeKey() == CUSTOM
-end
-
-function ns.RXPWindowColor(name)
-    local color = COLOR_BY_NAME[name]
-    if not color then return 1, 1, 1, 1 end
-    local saved = ns.RXPWindowOwnColors() and Dig(Settings(), COLORS_KEY, name)
-    if type(saved) == "table" and type(saved.r) == "number" and type(saved.g) == "number"
-            and type(saved.b) == "number" then
-        return saved.r, saved.g, saved.b, type(saved.a) == "number" and saved.a or 1
-    end
-    local key = ns.RXPWindowThemeKey()
-    local source = (key == FOREVER and ns.FOREVER_SKIN) or (IsPreset(key) and ns.THEME_PRESETS[key]) or nil
-    local preset = type(source) == "table" and source[color.token]
-    local base = type(preset) == "table" and preset or ns.THEME[color.token]
-    return base.r, base.g, base.b, color.alpha or 1
-end
-
-function ns.SetRXPWindowColor(name, r, g, b, a)
-    if not COLOR_BY_NAME[name] then return end
-    local all = Settings()[COLORS_KEY]
-    if type(all) ~= "table" then
-        all = {}
-        Settings()[COLORS_KEY] = all
-    end
-    if type(r) == "number" and type(g) == "number" and type(b) == "number" then
-        local solid = COLOR_BY_NAME[name].opaque or type(a) ~= "number"
-        all[name] = { r = r, g = g, b = b, a = solid and 1 or a }
-    else
-        all[name] = nil
-    end
-    if next(all) == nil then Settings()[COLORS_KEY] = nil end
-    Refresh()
-    RepaintArrow()
-end
-
-function ns.ResetRXPWindowStyle()
-    for _, option in ipairs(OPTIONS) do Settings()[option.key] = nil end
-    Settings()[COLORS_KEY] = nil
-    Settings()[THEME_KEY] = nil
-    Refresh()
-    RepaintArrow()
-end
-
-local function Run(name, fn, ...)
-    local ok, result = pcall(fn, ...)
-    if ok then return result end
-    ns.RXPFailures[name] = tostring(result)
-end
-
-local function SplitRange(text)
-    local range, place = text:match("^(%d+%-%d+)%s+(.+)$")
-    if range then return place, range end
-    place, range = text:match("^(.-)%s+(%d+%-%d+)$")
-    if place then return place, range end
-    return text
-end
-
-local function Hex(r, g, b)
-    return ("%02x%02x%02x"):format(math.floor(r * CHANNEL_MAX + ROUND), math.floor(g * CHANNEL_MAX + ROUND),
-        math.floor(b * CHANNEL_MAX + ROUND))
-end
-
-local function Tint(name, text)
-    local r, g, b = ns.RXPWindowColor(name)
-    return "|cff" .. Hex(r, g, b) .. text .. "|r"
-end
-
-local function Plain(text)
-    text = text:gsub("|c%x%x%x%x%x%x%x%x", "")
-    text = text:gsub("|r", "")
-    text = text:gsub("|T[^|]*|t", "")
-    text = text:gsub("|A[^|]*|a", "")
-    text = text:gsub("|H[^|]*|h", "")
-    text = text:gsub("|h", "")
-    return (text:gsub("^%s+", ""))
-end
-
-local function Heading(rxp, guide)
-    local name = Has(rxp, "GetGuideName") and Run("WindowGuideName", rxp.GetGuideName, guide) or guide.name
-    local title = guide.title or guide.subgroup or name
-    if type(title) ~= "string" then return "" end
-    local place, range = SplitRange(title)
-    return range and (place .. " " .. Tint("accent", range)) or place
-end
-
-local function ItemCount(id)
-    local item = _G.C_Item
-    local count = Has(item, "GetItemCount") and item.GetItemCount or _G.GetItemCount
-    if type(count) ~= "function" then return nil end
-    local have = Run("WindowCount", count, id)
-    return type(have) == "number" and have or nil
-end
-
-local function Counted(element, shown)
-    local tag = element.tag
-    if type(tag) == "string" and tag:find("^buy") and type(element.id) == "number"
-            and type(element.qty) == "number" then
-        local have = ItemCount(element.id)
-        if have then return have, element.qty, true end
-    end
-    local have, need = Plain(shown):match(COUNT_PATTERN)
-    return tonumber(have), tonumber(need), false
-end
-
-local function Lifted(shown, glyph)
-    if glyph ~= "" then return shown, glyph, false end
-    local lead = shown:match(LEAD_ICON)
-    if not lead then return shown, glyph, false end
-    local path = lead:match(LEAD_PLAIN)
-    local named = lead:match(LEAD_PATH) or ""
-    local content = named:match(CONTENT_ID) or named:lower():find(CONTENT_DIR)
-    return (shown:gsub(LEAD_ICON, "", 1)), path and ("|T" .. path .. ":0|t") or lead, content and true or false
-end
-
-local function Row(rxp, element)
-    local frame = element.frame
-    local text = Dig(frame, "text")
-    local shown = Has(text, "GetText") and text:GetText()
-    if type(shown) ~= "string" or shown == "" or shown == " " then
-        local raw = element.text ~= " " and element.text or element.tooltipText or element.rawtext
-        shown = type(raw) == "string" and raw or ""
-        if Has(rxp, "ReplaceNpcIds") then shown = Run("WindowNpc", rxp.ReplaceNpcIds, shown, element) or shown end
-    end
-    if type(ns.RXPIconText) == "function" then shown = ns.RXPIconText(shown) end
-    local icon = Dig(frame, "icon")
-    local glyph = Has(icon, "GetText") and icon:GetText()
-    if Has(icon, "IsShown") and icon:IsShown() == false then glyph = "" end
-    if type(glyph) ~= "string" then glyph = element.icon or Dig(rxp, "icons", element.tag) or "" end
-    local nested
-    shown, glyph, nested = Lifted(shown, glyph)
-    local note = element.textOnly == true and glyph == ""
-    local button = Dig(frame, "button")
-    local done = Has(button, "GetChecked") and button:GetChecked() or element.completed or element.skip
-    local have, need, bags = Counted(element, shown)
-    return { text = shown, icon = glyph, done = done and true or false, button = button, source = text,
-        have = have, need = need, bags = bags, nested = nested, note = note }
-end
-
-local function ActiveSteps(rxp)
-    local list = Dig(rxp, "RXPFrame", "activeSteps")
-    local out = {}
-    if type(list) ~= "table" then return out end
-    for _, step in ipairs(list) do
-        if type(step) == "table" and step.active and not step.hidewindow and not step.hidetip then
-            out[#out + 1] = step
-            if #out == ACTIVE_SHOWN then break end
-        end
-    end
-    return out
-end
-
-local function StepLabel(rxp, step)
-    if type(step.title) == "string" and step.title ~= "" then return step.title end
-    local get = Dig(rxp, "locale", "Get")
-    local format = type(get) == "function" and Run("WindowLocale", get, TEXT_STEP) or TEXT_STEP
-    return (type(format) == "string" and format or TEXT_STEP):format(tonumber(step.index) or 0)
-end
-
-local function Upcoming(rxp, after, count)
-    local out = {}
-    local v2 = Dig(rxp, "v2")
-    if count == 0 or not Has(v2, "BuildGuideStepsSnapshot") then return out end
-    local snapshot = Run("WindowSteps", v2.BuildGuideStepsSnapshot, v2, true)
-    if type(snapshot) ~= "table" or type(snapshot.rows) ~= "table" then return out end
-    for _, row in ipairs(snapshot.rows) do
-        if type(row) == "table" and type(row.index) == "number" and row.index > after and not row.hidden
-                and not row.complete and type(row.text) == "string" then
-            out[#out + 1] = { index = row.index, text = Plain(row.text:match("^[^\n]*")) }
-            if #out == count then break end
-        end
-    end
-    return out
-end
-
--- What RestedXP is showing, as plain data: the heading, the progress, the active steps with their rows,
--- and the steps that follow. Nil without a guide.
--- RestedXP is there and has no guide: what a character that has not picked one has
-local function NoGuide()
-    local rxp = _G.RXP
-    if type(rxp) ~= "table" then return nil end
-    local guide = rxp.currentGuide
-    if type(guide) == "table" and not guide.empty and type(guide.steps) == "table" then return nil end
-    return { heading = TEXT_NO_GUIDE, steps = {}, upcoming = {}, empty = true }
-end
-
-local function Read(steps)
-    local rxp = _G.RXP
-    local guide = Dig(rxp, "currentGuide")
-    if type(guide) ~= "table" or guide.empty or type(guide.steps) ~= "table" then return nil end
-    local model = { heading = Heading(rxp, guide), steps = {} }
-    local step = Has(rxp, "GetGuideProgress") and Run("WindowProgress", rxp.GetGuideProgress)
-    local total = #guide.steps
-    if type(step) == "number" and total > 0 then
-        model.step, model.total = step, total
-        model.fraction = math.min(1, math.max(0, step / total))
-        model.percent = math.floor(model.fraction * PERCENT + ROUND)
-    end
-    local after = step or 0
-    for _, activeStep in ipairs(ActiveSteps(rxp)) do
-        local rows = {}
-        for _, element in ipairs(activeStep.elements or {}) do
-            if type(element) == "table" and (element.text or element.rawtext or element.tooltipText) then
-                local row = Row(rxp, element)
-                row.step = activeStep
-                rows[#rows + 1] = row
-            end
-        end
-        model.steps[#model.steps + 1] = { label = StepLabel(rxp, activeStep), rows = rows, source = activeStep }
-        if type(activeStep.index) == "number" and activeStep.index > after then after = activeStep.index end
-    end
-    model.upcoming = Upcoming(rxp, after, steps or ns.RXPWindowSteps())
-    return model
-end
+ns.RXPWindowRefresh = Refresh
 
 local function Silence(frame, top)
     if type(frame) ~= "table" then return end
@@ -524,7 +128,6 @@ local function Menu()
     if Has(frame, "DropDownMenu") then Quiet("WindowMenu", frame.DropDownMenu) end
 end
 
--- RestedXP's list of guides, as its own welcome window opens it, or its menu when it has no such list
 local function PickGuide()
     local v2 = Dig(_G.RXP, "v2")
     if Has(v2, "ShowGuideSelectionMenu") then
@@ -537,10 +140,9 @@ end
 local function FacePath()
     local name = ns.RXPWindowOption("rxpWindowFont")
     local custom = name ~= "" and type(ns.UI) == "table" and ns.UI.FontPath and ns.UI.FontPath(name)
-    return custom or ns.AddonFontPath(ns.RXPWindowThemeKey() == FOREVER or nil)
+    return custom or ns.AddonFontPath(ns.RXPWindowForeverTheme() or nil)
 end
 
--- A text: its face, size, outline and shadow are the window's own, set again each time it is drawn.
 local function Faced(fs, size)
     local outline = ns.RXPWindowOption("rxpWindowOutline")
     fs:SetFont(FacePath(), size, OUTLINE_FLAGS[outline] or "")
@@ -575,8 +177,6 @@ local function Coloured(fs, name)
     fs:SetTextColor(r, g, b, a)
 end
 
--- RestedXP's Active Targets and Active Items windows in the look of the active step: the colors of their v2
--- background and border are set in place, and the text of their title takes the window's face.
 local function SkinBox(part)
     local fill = Dig(part, "rxpBackground", "textures", 1)
     if Has(fill, "SetVertexColor") then
@@ -635,10 +235,6 @@ local function SkinFrame(frame)
     SkinPlaceholders(frame)
 end
 
-local function SkinWanted()
-    return active
-end
-
 local function SkinFrames()
     local rxp = _G.RXP
     local frames = {}
@@ -653,7 +249,7 @@ local function SkinHooks(frames)
         if not watched[frame] and Has(frame, "UpdateVisuals") then
             watched[frame] = true
             hooksecurefunc(frame, "UpdateVisuals", Guarded("WindowSkin", function(self)
-                if SkinWanted() then SkinFrame(self) end
+                if active then SkinFrame(self) end
             end))
         end
     end
@@ -662,19 +258,18 @@ local function SkinHooks(frames)
         targetingHooked.background = true
         hooksecurefunc(targeting, "RenderTargetFrameBackground", Guarded("WindowSkin", function()
             local target = Dig(_G.RXP, "targeting", "activeTargetFrame")
-            if SkinWanted() and type(target) == "table" then SkinBox(target) end
+            if active and type(target) == "table" then SkinBox(target) end
         end))
     end
     if not targetingHooked.update and Has(targeting, "UpdateTargetFrame") then
         targetingHooked.update = true
         hooksecurefunc(targeting, "UpdateTargetFrame", Guarded("WindowSkin", function()
             local target = Dig(_G.RXP, "targeting", "activeTargetFrame")
-            if SkinWanted() and type(target) == "table" then SkinPlaceholders(target) end
+            if active and type(target) == "table" then SkinPlaceholders(target) end
         end))
     end
 end
 
--- RestedXP paints its own look again, and shows the border where it shows the background
 local function SkinRestore(frame)
     if Has(frame, "UpdateVisuals") then Quiet("WindowSkin", frame.UpdateVisuals, frame) end
     for _, part in ipairs({ frame, frame.title }) do
@@ -685,12 +280,12 @@ end
 
 local function Skin()
     local frames = SkinFrames()
-    if SkinWanted() then
-        skinned = true
+    if active then
+        styled = true
         SkinHooks(frames)
         for _, frame in ipairs(frames) do Quiet("WindowSkin", SkinFrame, frame) end
-    elseif skinned then
-        skinned = false
+    elseif styled then
+        styled = false
         RestorePlaceholders()
         for _, frame in ipairs(frames) do SkinRestore(frame) end
     end
@@ -712,8 +307,6 @@ local function GoTo(index)
     if type(index) == "number" and Has(rxp, "SetStep") then Quiet("WindowGo", rxp.SetStep, index) end
 end
 
--- a step that stays while the guide goes on (a trainer to see, say) is not the guide's progress: skipping
--- it is its objectives skipped, as RestedXP's checkboxes do, and RestedXP then lets it go
 local function SkipObjectives(rxp, step)
     for _, element in ipairs(step.elements or {}) do
         if type(element) == "table" and not element.optional and not element.skip then
@@ -741,6 +334,11 @@ local function MaySkip()
     return mode == "click" or (mode == "shift" and IsShiftKeyDown())
 end
 
+local function StepClick(self, button)
+    if button == "RightButton" then return Menu() end
+    if MaySkip() then SkipStep(self.step) end
+end
+
 local function Tip(owner, text, menu, plain)
     if not ns.RXPWindowOption("rxpWindowTips") or GameTooltip:IsForbidden() then return end
     local mode = ns.RXPWindowOption("rxpWindowSkip")
@@ -758,26 +356,26 @@ local function Tip(owner, text, menu, plain)
     GameTooltip:Show()
 end
 
--- Dragging the corner sets the window's width, and how many steps are listed from how tall it was made: the
--- height the window has without any, and the height of a line, are what Draw last drew.
+local function StepsFor(height)
+    local base, line = window.chrome, window.lineHeight
+    if type(height) == "number" and type(base) == "number" and type(line) == "number" and line > 0 then
+        return math.floor((height - base) / line)
+    end
+end
+
 local function LiveSize(width, height)
     if not (sizing and sizingModel and window) then return end
     sizing.width = math.min(WIDTH_MAX, math.max(WIDTH_MIN, width))
-    local base, line = window.chrome, window.lineHeight
-    if type(base) == "number" and type(line) == "number" and line > 0 then
-        sizing.steps = math.floor((height - base) / line)
-    end
+    sizing.steps = StepsFor(height) or sizing.steps
     Quiet("WindowDraw", Draw)
 end
 
 local function Resized()
     if not window then return end
-    local width, height = window:GetWidth(), window:GetHeight()
+    local width = window:GetWidth()
     if type(width) == "number" then ns.SetRXPWindowWidth(width) end
-    local base, line = window.chrome, window.lineHeight
-    if type(height) == "number" and type(base) == "number" and type(line) == "number" and line > 0 then
-        ns.SetRXPWindowSteps(math.floor((height - base) / line))
-    end
+    local steps = StepsFor(window:GetHeight())
+    if steps then ns.SetRXPWindowSteps(steps) end
     Save(window)
     Quiet("WindowDraw", Draw)
 end
@@ -791,8 +389,7 @@ local function MakeGrip(parent)
     grip:SetHighlightTexture(GRIP_HIGHLIGHT)
     grip:SetScript("OnMouseDown", function()
         if ns.RXPWindowOption("rxpWindowLock") then return end
-        -- read once, with every step it could list: each size it is dragged through draws from this
-        sizingModel = Read(STEPS_MAX)
+        sizingModel = ns.RXPWindowRead(STEPS_MAX)
         sizing = { width = window:GetWidth(), steps = ns.RXPWindowSteps() }
         window:StartSizing(GRIP_CORNER)
     end)
@@ -817,9 +414,7 @@ local function MakeBar(parent)
     return bar
 end
 
--- The window is in the Forever skin's art when its theme is Forever, or is the addon's and the addon is in the
--- skin: the bronze inset on the step box and the window, the skin's field and rim on the bars, its sign to fold.
-local function SkinParts()
+local function ForeverParts()
     local shared = type(ns.Shared) == "table" and ns.Shared or nil
     local parts = shared and shared.Parts
     if type(parts) == "table" and parts.ForeverInset and parts.ForeverBox and parts.ForeverAtlas then
@@ -827,18 +422,14 @@ local function SkinParts()
     end
 end
 
-local function Skinned()
-    if not SkinParts() then return false end
-    local key = ns.RXPWindowThemeKey()
-    return key == FOREVER or (key == FOLLOW and ns.foreverSkin == true)
+local function ForeverLook()
+    return ForeverParts() ~= nil and ns.RXPWindowInForever()
 end
 
--- A bronze inset behind a frame, drawn under what the frame holds.
-local function SkinInset(frame, on)
+local function PaintInset(frame, on)
     if on then
         if not frame.inset then
-            local parts = SkinParts()
-            frame.inset = parts.ForeverInset(frame)
+            frame.inset = ForeverParts().ForeverInset(frame)
             frame.inset:SetAllPoints(frame)
             local level = frame:GetFrameLevel()
             if type(level) == "number" then frame.inset:SetFrameLevel(math.max(0, level - 1)) end
@@ -851,13 +442,13 @@ end
 
 local function PaintBar(bar, fraction)
     bar:SetStatusBarTexture(TexturePath())
-    local r, g, b, a = ns.RXPWindowColor("accent")
+    local r, g, b, a = ns.RXPWindowColor(ACCENT)
     bar:SetStatusBarColor(r, g, b, a)
-    local parts, style = SkinParts()
-    local skinned = Skinned()
-    if skinned and not bar.rim then bar.rim = parts.ForeverBox(bar) end
-    if bar.rim then bar.rim._frame:SetShown(skinned) end
-    if skinned and style and style.FOREVER_FIELD_RGB then
+    local parts, style = ForeverParts()
+    local forever = ForeverLook()
+    if forever and not bar.rim then bar.rim = parts.ForeverBox(bar) end
+    if bar.rim then bar.rim._frame:SetShown(forever) end
+    if forever and style and style.FOREVER_FIELD_RGB then
         local field = style.FOREVER_FIELD_RGB
         bar.track:SetColorTexture(field.r, field.g, field.b, 1)
     else
@@ -884,7 +475,7 @@ local function Build()
     f:SetScript("OnEvent", function() Refresh() end)
     f.back = ns.Solid(f, "BACKGROUND", T.panel, 1)
     f.back:SetAllPoints()
-    f.edge = ns.Border(f, T.line, EDGE_ALPHA)
+    f.edge = ns.Border(f, T.line)
     f.fold = CreateFrame("Button", nil, f)
     f.fold.text = Text(f.fold, "rxpWindowTitleSize", "CENTER")
     f.fold.text:SetAllPoints()
@@ -911,16 +502,13 @@ local function MakeBox()
     local T = ns.THEME
     local box = CreateFrame("Button", nil, window)
     box:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    box:SetScript("OnClick", function(self, button)
-        if button == "RightButton" then return Menu() end
-        if MaySkip() then SkipStep(self.step) end
-    end)
+    box:SetScript("OnClick", StepClick)
     box:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP, true) end)
     box:SetScript("OnLeave", function() GameTooltip:Hide() end)
     Draggable(box)
     box.back = ns.Solid(box, "BACKGROUND", T.bg, 1)
     box.back:SetAllPoints()
-    box.edge = ns.Border(box, T.line, EDGE_ALPHA)
+    box.edge = ns.Border(box, T.line)
     box.label = Text(box, "rxpWindowTextSize")
     box.logo = box:CreateTexture(nil, "OVERLAY")
     box.logo:SetTexture(LOGO)
@@ -947,10 +535,7 @@ local function MakeRow()
     row:SetScript("OnHyperlinkEnter", LinkEnter)
     row:SetScript("OnHyperlinkLeave", LinkLeave)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    row:SetScript("OnClick", function(self, button)
-        if button == "RightButton" then return Menu() end
-        if MaySkip() then SkipStep(self.step) end
-    end)
+    row:SetScript("OnClick", StepClick)
     row:SetScript("OnEnter", function(self) Tip(self.box or self, TEXT_SKIP, true) end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
@@ -1047,6 +632,17 @@ local function DrawIcon(item, row, size)
     item.glyph:Show()
 end
 
+local function DrawMeter(item, row, x, y, width)
+    local counted = math.min(1, math.max(0, (row.have or 0) / row.need))
+    local fraction = row.bags and row.done and 1 or counted
+    item.meter:ClearAllPoints()
+    item.meter:SetPoint("TOPLEFT", item, "TOPLEFT", x, -y)
+    item.meter:SetWidth(width)
+    PaintBar(item.meter, fraction)
+    item.meter:Show()
+    if row.bags then wantsBags = true end
+end
+
 local function DrawRow(box, row, x, y, width, first)
     local item = Acquire("row")
     item:SetParent(box)
@@ -1070,8 +666,7 @@ local function DrawRow(box, row, x, y, width, first)
     item.bar:SetPoint("BOTTOMLEFT", item, "BOTTOMLEFT", 0, 0)
     item.bar:SetWidth(BAR_W)
     item.bar:SetShown(not first and not row.nested and not row.note)
-    local a = row.done and "muted" or "accent"
-    item.bar:SetColorTexture(ns.RXPWindowColor(a))
+    item.bar:SetColorTexture(ns.RXPWindowColor(row.done and "muted" or ACCENT))
     item.icon:ClearAllPoints()
     item.icon:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap, 0)
     Faced(item.icon, iconSize)
@@ -1084,15 +679,8 @@ local function DrawRow(box, row, x, y, width, first)
     item.text:SetText(row.text)
     local height = math.max(drop + math.max(item.text:GetStringHeight(), textSize), iconSize)
     if row.need and row.need >= COUNT_MIN then
-        local counted = math.min(1, math.max(0, (row.have or 0) / row.need))
-        local fraction = row.bags and row.done and 1 or counted
-        item.meter:ClearAllPoints()
-        item.meter:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + iconW, -(height + COUNT_GAP))
-        item.meter:SetWidth(textWidth)
-        PaintBar(item.meter, fraction)
-        item.meter:Show()
+        DrawMeter(item, row, BAR_W + gap + iconW, height + COUNT_GAP, textWidth)
         height = height + COUNT_GAP + BAR_HEIGHT
-        if row.bags then wantsBags = true end
     else
         item.meter:Hide()
     end
@@ -1112,17 +700,17 @@ local function DrawBox(step, y, inner, current)
     local boxR, boxG, boxB = ns.RXPWindowColor("box")
     local opacity = ns.RXPWindowOption("rxpWindowBoxOpacity") / PERCENT
     local bordered = ns.RXPWindowOption("rxpWindowBoxBorder")
-    local skinned = bordered and Skinned()
-    SkinInset(box, skinned)
-    if skinned then box.inset.fill:SetColorTexture(boxR, boxG, boxB, opacity) end
+    local inset = bordered and ForeverLook()
+    PaintInset(box, inset)
+    if inset then box.inset.fill:SetColorTexture(boxR, boxG, boxB, opacity) end
     box.back:SetColorTexture(boxR, boxG, boxB, opacity)
-    box.back:SetShown(not skinned)
+    box.back:SetShown(not inset)
     local r, g, b, a = ns.RXPWindowColor("border")
     box.edge:SetColor(r, g, b, a)
-    box.edge._frame:SetShown(bordered and not skinned)
+    box.edge._frame:SetShown(bordered and not inset)
     box.label:ClearAllPoints()
     box.label:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, -BOX_PAD)
-    Coloured(box.label, "accent")
+    Coloured(box.label, ACCENT)
     box.label:SetText(step.label:upper())
     local head = size
     if current then
@@ -1145,17 +733,22 @@ local function DrawBox(step, y, inner, current)
     return y + by - BOX_PAD
 end
 
+local function DrawFold(folded, headH)
+    local fold = window.fold
+    fold:SetSize(FOLD_W, headH)
+    fold:ClearAllPoints()
+    fold:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, -PAD)
+    fold.text:SetText(folded and TEXT_UNFOLD or TEXT_FOLD)
+    local parts, style = ForeverParts()
+    local name = style and ForeverLook() and (folded and style.FOREVER_PLUS_ATLAS or style.FOREVER_MINUS_ATLAS)
+    local sign = type(name) == "string" and parts.ForeverAtlas(fold.sign, name, true) == true
+    fold.sign:SetShown(sign)
+    fold.text:SetShown(not sign)
+    Coloured(fold.text, "line")
+end
+
 local function DrawHeader(model, folded, width, headH)
-    window.fold:SetSize(FOLD_W, headH)
-    window.fold:ClearAllPoints()
-    window.fold:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, -PAD)
-    window.fold.text:SetText(folded and TEXT_UNFOLD or TEXT_FOLD)
-    local parts, style = SkinParts()
-    local name = style and Skinned() and (folded and style.FOREVER_PLUS_ATLAS or style.FOREVER_MINUS_ATLAS)
-    local sign = type(name) == "string" and parts.ForeverAtlas(window.fold.sign, name, true) == true
-    window.fold.sign:SetShown(sign)
-    window.fold.text:SetShown(not sign)
-    Coloured(window.fold.text, "line")
+    DrawFold(folded, headH)
     window.title:ClearAllPoints()
     window.title:SetPoint("TOPLEFT", window, "TOPLEFT", PAD + FOLD_W + Spacing(), -PAD)
     window.title:SetWidth(width - PAD * 2 - FOLD_W - Spacing() - PROGRESS_W)
@@ -1164,16 +757,14 @@ local function DrawHeader(model, folded, width, headH)
     window.progress:ClearAllPoints()
     window.progress:SetPoint("TOPRIGHT", window, "TOPRIGHT", -PAD, -PAD)
     if model.step then
-        window.progress:SetText(Tint("accent", ("%d/%d"):format(model.step, model.total)) .. TEXT_DOT
-            .. Tint("title", ("%d%%"):format(model.percent)))
+        window.progress:SetText(ns.RXPWindowTint(ACCENT, ("%d/%d"):format(model.step, model.total)) .. TEXT_DOT
+            .. ns.RXPWindowTint("title", ("%d%%"):format(model.percent)))
     else
         window.progress:SetText("")
     end
     window.progress:SetTextColor(1, 1, 1, 1)
 end
 
--- The line under the title: a bar of how far the guide is, a plain line, or nothing. Returns where the rest
--- begins.
 local function DrawLine(model, y)
     local line = ns.RXPWindowOption("rxpWindowLine")
     local gap = Spacing()
@@ -1197,75 +788,48 @@ local function DrawLine(model, y)
     return y
 end
 
-function Draw()
-    if not active then return end
-    wantsBags = false
-    if not sizing then Quiet("WindowSkin", Skin) end
-    window = window or Build()
-    local model = sizing and sizingModel or Read() or NoGuide()
-    if not model then
-        Release()
-        window:Hide()
-        return
-    end
-    if not sizing then Take() end
-    Reset()
-    Refaced()
-    local width = sizing and sizing.width or ns.RXPWindowWidth()
-    local inner = width - PAD * 2
-    local folded = Settings().rxpWindowCollapsed == true
-    local headH = ns.RXPWindowOption("rxpWindowTitleSize") + HEAD_PAD
-    local gap = Spacing()
-    local listH = ns.RXPWindowOption("rxpWindowListSize") + LIST_PAD
-    if not sizing then window:SetWidth(width) end
+local function DrawPanel()
     local panelOn, borderOn = ns.RXPWindowOption("rxpWindowPanel"), ns.RXPWindowOption("rxpWindowBorder")
-    local skinned = borderOn and Skinned()
-    SkinInset(window, skinned)
-    if skinned then
-        local pr, pg, pb, pa = ns.RXPWindowColor("panel")
-        window.inset.fill:SetColorTexture(pr, pg, pb, panelOn and pa or 0)
+    local inset = borderOn and ForeverLook()
+    PaintInset(window, inset)
+    if inset then
+        local r, g, b, a = ns.RXPWindowColor("panel")
+        window.inset.fill:SetColorTexture(r, g, b, panelOn and a or 0)
     end
     window.back:SetColorTexture(ns.RXPWindowColor("panel"))
-    window.back:SetShown(panelOn and not skinned)
+    window.back:SetShown(panelOn and not inset)
     window.edge:SetColor(ns.RXPWindowColor("border"))
-    window.edge._frame:SetShown(borderOn and not skinned)
-    DrawHeader(model, folded, width, headH)
-    local y = DrawLine(model, -PAD - headH)
-    if not folded then
-        if model.empty then
-            local item = Acquire("line")
-            item:ClearAllPoints()
-            item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
-            item:SetWidth(inner)
-            Coloured(item, "muted")
-            item:SetText(TEXT_PICK)
-            local hit = Acquire("hit")
-            hit:ClearAllPoints()
-            hit:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
-            hit:SetSize(inner, listH)
-            hit.index, hit.menu = nil, true
-            hit.shade:Hide()
-            y = y - listH
-        end
-        for i, step in ipairs(model.steps) do y = DrawBox(step, y, inner, i == 1) end
-        for i = 1, sizing and sizing.steps or #model.upcoming do
-            local entry = model.upcoming[i]
-            if not entry then break end
-            local item = Acquire("line")
-            item:ClearAllPoints()
-            item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
-            item:SetWidth(inner)
-            Coloured(item, "muted")
-            item:SetText(("%d  %s"):format(entry.index, entry.text))
-            local hit = Acquire("hit")
-            hit:ClearAllPoints()
-            hit:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
-            hit:SetSize(inner, listH)
-            hit.index, hit.menu = entry.index, false
-            hit.shade:Hide()
-            y = y - listH
-        end
+    window.edge._frame:SetShown(borderOn and not inset)
+end
+
+local function ListLine(y, inner, listH, text, index, menu)
+    local item = Acquire("line")
+    item:ClearAllPoints()
+    item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
+    item:SetWidth(inner)
+    Coloured(item, "muted")
+    item:SetText(text)
+    local hit = Acquire("hit")
+    hit:ClearAllPoints()
+    hit:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
+    hit:SetSize(inner, listH)
+    hit.index, hit.menu = index, menu
+    hit.shade:Hide()
+    return y - listH
+end
+
+local function DrawList(model, y, inner, listH)
+    if model.empty then y = ListLine(y, inner, listH, TEXT_PICK, nil, true) end
+    for i, step in ipairs(model.steps) do y = DrawBox(step, y, inner, i == 1) end
+    for i = 1, sizing and sizing.steps or #model.upcoming do
+        local entry = model.upcoming[i]
+        if not entry then break end
+        y = ListLine(y, inner, listH, ("%d  %s"):format(entry.index, entry.text), entry.index, false)
     end
+    return y
+end
+
+local function DrawChrome(y, listH, folded)
     if not sizing then window:SetHeight(-y + PAD) end
     if wantsBags then window:RegisterEvent(BAG_EVENT) else window:UnregisterEvent(BAG_EVENT) end
     window.lineHeight = listH
@@ -1276,6 +840,32 @@ function Draw()
         window:SetResizeBounds(WIDTH_MIN, window.chrome, WIDTH_MAX, window.chrome + STEPS_MAX * listH)
     end
     window.grip:SetShown(ns.RXPWindowOption("rxpWindowGrip") and not folded and not locked)
+end
+
+function Draw()
+    if not active then return end
+    wantsBags = false
+    if not sizing then Quiet("WindowSkin", Skin) end
+    window = window or Build()
+    local model = sizing and sizingModel or ns.RXPWindowRead() or ns.RXPWindowNoGuide()
+    if not model then
+        Release()
+        window:Hide()
+        return
+    end
+    if not sizing then Take() end
+    Reset()
+    Refaced()
+    local width = sizing and sizing.width or ns.RXPWindowWidth()
+    local folded = Settings().rxpWindowCollapsed == true
+    local headH = ns.RXPWindowOption("rxpWindowTitleSize") + HEAD_PAD
+    local listH = ns.RXPWindowOption("rxpWindowListSize") + LIST_PAD
+    if not sizing then window:SetWidth(width) end
+    DrawPanel()
+    DrawHeader(model, folded, width, headH)
+    local y = DrawLine(model, -PAD - headH)
+    if not folded then y = DrawList(model, y, width - PAD * 2, listH) end
+    DrawChrome(y, listH, folded)
     window:Show()
 end
 
@@ -1302,6 +892,11 @@ local function Hook(owner, name)
     if Has(owner, name) then hooksecurefunc(owner, name, Guarded("WindowRefresh", Refresh)) end
 end
 
+function ns.RXPWindowReady()
+    local v2 = Dig(_G.RXP, "v2")
+    return Has(v2, "IsGuideWindowEnabled") and v2:IsGuideWindowEnabled() and true or false
+end
+
 function ns.RXPWindowStart()
     if not started then
         started = true
@@ -1324,18 +919,9 @@ function ns.SetRXPWindow(on)
     ns.RXPWindowStart()
 end
 
-function ns.SetRXPWindowWidth(width)
-    width = tonumber(width)
-    width = width and Snap(width, WIDTH_MIN, WIDTH_MAX, WIDTH_STEP)
-    Settings().rxpWindowWidth = width ~= DEFAULT_WIDTH and width or nil
-    Refresh()
-end
-
 function ns.SetRXPWindowScale(scale)
     local was = window and window:GetScale() or ns.RXPWindowScale() / PERCENT
-    scale = tonumber(scale)
-    scale = scale and Snap(scale, SCALE_MIN, SCALE_MAX, SCALE_STEP)
-    Settings().rxpWindowScale = scale ~= DEFAULT_SCALE and scale or nil
+    ns.RXPWindowStoreScale(scale)
     local now = ns.RXPWindowScale() / PERCENT
     local saved = Settings().rxpWindowPos
     if window then
@@ -1349,11 +935,4 @@ function ns.SetRXPWindowScale(scale)
     elseif type(saved) == "table" and type(saved[3]) == "number" and type(saved[4]) == "number" then
         saved[3], saved[4] = saved[3] * was / now, saved[4] * was / now
     end
-end
-
-function ns.SetRXPWindowSteps(steps)
-    steps = tonumber(steps)
-    steps = steps and Snap(steps, STEPS_MIN, STEPS_MAX, 1)
-    Settings().rxpWindowSteps = steps ~= DEFAULT_STEPS and steps or nil
-    Refresh()
 end

@@ -8,6 +8,8 @@ end
 local coreSource = Read("Core/Core.lua")
 local featuresSource = Read("Core/Features.lua")
 local themesSource = Read("Core/Integrations/RestedXP/Themes.lua")
+local settingsSource = Read("Core/Integrations/RestedXP/WindowSettings.lua")
+local modelSource = Read("Core/Integrations/RestedXP/WindowModel.lua")
 local windowSource = Read("Core/Integrations/RestedXP/Window.lua")
 local iconsSource = Read("Core/Integrations/RestedXP/Icons.lua")
 
@@ -168,7 +170,8 @@ local function World(account, opts)
         TexturePath = function(name) return "Textures\\" .. name end }
     ns.Hairline = function() end
     ns.AddonFontPath = function(classic) return classic and "Fonts\\Forever.ttf" or "Fonts\\Naowh.ttf" end
-    for _, part in ipairs({ { themesSource, "Themes" }, { windowSource, "Window" } }) do
+    for _, part in ipairs({ { themesSource, "Themes" }, { settingsSource, "WindowSettings" },
+            { modelSource, "WindowModel" }, { windowSource, "Window" } }) do
         local chunk = assert(loadstring(part[1], part[2]))
         setfenv(chunk, env)
         chunk("NaowhForever")

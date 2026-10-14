@@ -951,8 +951,6 @@ local function OnSwitchFoldClick(hit)
     UI:RefreshPage(true)
 end
 
--- A header that folds what follows it, with its own switch beside the title. cfg: get and set for the switch,
--- tooltip for its words, rows for whether anything follows it to fold (open to start, kept as it is left).
 function W:SwitchFold(parent, text, yOffset, cfg)
     local f, h = W:SectionHeader(parent, text, yOffset, FEATURE.foldInset)
     f._get, f._set = cfg.get, cfg.set
@@ -982,7 +980,6 @@ function W:SwitchFold(parent, text, yOffset, cfg)
     return f, h
 end
 
--- A title inside a fold: shown with the rows under it, and gone with them when the fold is shut.
 function W:GroupHeader(parent, text, yOffset)
     local shut = parent._nsuiCollapsed
     local f, h = W:SectionHeader(parent, text, yOffset)

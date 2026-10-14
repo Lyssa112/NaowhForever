@@ -146,7 +146,13 @@ local function Guarded(name, fn)
     return function(...) Quiet(name, fn, ...) end
 end
 
-ns.RXPSafe = { Has = Has, Dig = Dig, Quiet = Quiet, Guarded = Guarded }
+local function Run(name, fn, ...)
+    local ok, result = pcall(fn, ...)
+    if ok then return result end
+    ns.RXPFailures[name] = tostring(result)
+end
+
+ns.RXPSafe = { Has = Has, Dig = Dig, Quiet = Quiet, Guarded = Guarded, Run = Run }
 
 local function Visible(region)
     if Has(region, "IsVisible") then return region:IsVisible() == true end
@@ -498,8 +504,6 @@ local function Words(source)
     if type(raw) == "string" and raw ~= "" then return raw end
 end
 
--- The waypoint's own objective first: the line it was written under, then its own words, then the lines
--- of its step after it (a guide gives the place and then what to do there), then the ones before it.
 local function Source(element)
     local sources = { element }
     if type(element.parent) == "table" then table.insert(sources, 1, element.parent) end
@@ -603,7 +607,6 @@ function ns.SetRXPArrowObjective(on)
     PaintArrow()
 end
 
--- With the window on and its theme Custom, the arrow is in the color the player picked for it.
 local function OwnArrowColor()
     if type(ns.RXPWindowEnabled) ~= "function" or not ns.RXPWindowEnabled() then return end
     if type(ns.RXPWindowOwnColors) ~= "function" or not ns.RXPWindowOwnColors() then return end
@@ -829,8 +832,6 @@ local function InRestedXPsPlace(places)
         and (p[5] or 0) == 0
 end
 
--- RestedXP puts its arrow at the top of the screen, and keeps where it is by profile. One that is still there
--- goes to the middle, in the profile (read at load) and where it is now (written back when the game closes).
 local function CenterArrow(rxp, profile)
     if type(profile.framePositions) ~= "table" then profile.framePositions = {} end
     if not InRestedXPsPlace(profile.framePositions[ARROW_FRAME]) then return end
@@ -842,9 +843,6 @@ local function CenterArrow(rxp, profile)
     end
 end
 
--- RestedXP keeps its settings by profile, and a character it has not met has the defaults: its V2
--- interface off and its own theme. What the player turned on for the account is set for the character
--- once, and RestedXP's interface is read when it loads, so that waits for a reload.
 local function SetUp(force)
     local rxp = _G.RXP
     local profile = Dig(rxp, "settings", "profile")

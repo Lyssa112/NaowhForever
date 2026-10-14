@@ -14,7 +14,9 @@ in one Naowh window: the guide and its progress, the active step and the steps a
 Core/Integrations/RestedXP/
   RestedXP.xml                what loads
   Themes.lua     the themes, the settings behind the RESTEDXP card, and the hooks
-  Window.lua     the Naowh guide window, its settings and what it reads from RestedXP
+  WindowSettings.lua  what the window can be changed in: its options, colors and theme
+  WindowModel.lua     what RestedXP shows, read as plain data for the window to draw
+  Window.lua     the Naowh guide window: its frames, drawing, clicks and the look of the two small windows
   Icons.lua      Naowh's step icons, put in RestedXP's icon table as it loads
   Media/         the themes' arrow, frame and grip art (rxp_*.tga), drawn by Tools/media/make_media.py
   Media/Icons/   the step icons, line/ and filled/ (28 each), drawn by Tools/media/make_rxp_icons.py
@@ -117,7 +119,12 @@ Core/Integrations/RestedXP/
   With the switch off RestedXP's own font (`RXP.font`) is given back. The
   window uses `ns.AddonFontPath`, which is read live, and not `ns.UIFontPath`, which keeps the first
   path it found.
-- What the window can be changed in is two lists in `Window.lua` (`OPTIONS` and `COLORS`), each with its
+- The window is three files in load order, each one job: `WindowSettings.lua` (what can be changed, read
+  live by the others; it tells the window to draw again through `ns.RXPWindowRefresh`, which the window
+  defines), `WindowModel.lua` (reads RestedXP and returns tables; draws nothing) and `Window.lua` (frames).
+  What each reads of the others is a function on `ns`, never a file-level local. `Run`, which returns
+  what a call returned and keeps what raised, is shared through `ns.RXPSafe` with `Quiet` and `Guarded`.
+- What the window can be changed in is two lists in `WindowSettings.lua` (`OPTIONS` and `COLORS`), each with its
   kind, default, range and tip, and the settings page draws its rows from them (`WindowOptionCell`,
   `WindowColorCell`), so a new option is one entry. A value is kept only when it is not the default, and
   a color whole (r, g, b, a) or not at all, so the theme's stays the default and follows it. Every text
