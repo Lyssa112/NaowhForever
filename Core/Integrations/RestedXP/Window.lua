@@ -1117,6 +1117,10 @@ end
 
 function ns.SetRXPWindow(on)
     Settings().rxpWindow = on and true or nil
+    if on then
+        if type(ns.RXPArrowKept) == "function" then ns.RXPArrowKept() end
+        Settings().rxpThemes = nil
+    end
     ns.RXPWindowStart()
 end
 

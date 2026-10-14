@@ -215,6 +215,7 @@ ns.FEATURES = {
         rxpThemes = false,
         rxpWindow = false,
         rxpSetup = false,
+        rxpArrowOn = false,
     },
 }
 

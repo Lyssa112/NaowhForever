@@ -189,3 +189,12 @@ Core/Integrations/RestedXP/
   profile for what is wished for, and asks for a reload as the interface is read when RestedXP loads; what
   the player changes after is theirs, as the characters done are kept (`rxpSetUp`, by GUID). The button
   does it for the character played, seen or not.
+- The old theme (Add Themes to RestedXP), the arrow (Style RestedXP's Arrow) and the Naowh guide window are
+  each a switch and a section of their own, and none reads another's rows. The theme and the window are
+  never both on: turning one on turns the other off (`SetRXPThemes`, `SetRXPWindow`), and a saved pair is
+  read as the window's (`RXPThemesEnabled` is false while the window is wished for). The arrow is its own
+  module (`RXPArrowEnabled`): it is hooked at login when it is on, with the theme or the window or neither,
+  in the live Naowh accent when the active theme is not one of ours, and with a font of its own (Arrow
+  Addon Font, `rxpArrowFont`). An account from before follows the theme it had on until the arrow is
+  set once, and the theme or the window being switched sets it as it was, so that taking the theme away
+  does not take the arrow with it.

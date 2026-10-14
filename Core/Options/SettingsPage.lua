@@ -423,17 +423,38 @@ local function ArrowObjectiveRow()
 end
 
 local function RxpThemeRows(W, parent, y)
+    local _, h = W:DualRow(parent, y,
+        RxpSwitch("Use Addon Font", "RestedXP's text uses your Addon Font.", ns.RXPFontEnabled, ns.SetRXPFont),
+        RxpSwitch("Use Theme Text Color", "RestedXP's text uses the theme's Text color.",
+            ns.RXPTextColorEnabled, ns.SetRXPTextColor)
+    )
+    return y - h
+end
+
+local function RxpArrowRows(W, parent, y)
+    local on = ns.RXPArrowEnabled()
+    local _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Style RestedXP's Arrow",
+          tooltip = "The waypoint arrow in a look of its own, whatever theme or window is used.",
+          getValue = ns.RXPArrowEnabled,
+          setValue = function(v)
+              ns.SetRXPArrow(v)
+              UI:RefreshPage(true)
+          end },
+        Empty()
+    ); y = y - h
+    if not on then return y end
     local image = ns.RXPArrowStyle() == "image"
-    local _, h = W:DualRow(parent, y, ArrowStyleRow(image)); y = y - h
+    _, h = W:DualRow(parent, y, ArrowStyleRow(image)); y = y - h
     if image then
         _, h = W:DualRow(parent, y, ArrowLookRow()); y = y - h
     end
     _, h = W:DualRow(parent, y, ArrowTextRow(image)); y = y - h
     _, h = W:DualRow(parent, y, ArrowObjectiveRow()); y = y - h
     _, h = W:DualRow(parent, y,
-        RxpSwitch("Use Addon Font", "RestedXP's text uses your Addon Font.", ns.RXPFontEnabled, ns.SetRXPFont),
-        RxpSwitch("Use Theme Text Color", "RestedXP's text uses the theme's Text color.",
-            ns.RXPTextColorEnabled, ns.SetRXPTextColor)
+        RxpSwitch("Arrow Addon Font", "The text under the arrow uses your Addon Font.", ns.RXPArrowFontEnabled,
+            ns.SetRXPArrowFont),
+        Empty()
     )
     return y - h
 end
@@ -468,7 +489,7 @@ local function WindowColorCell(color)
 end
 
 local function RxpWindowStyleRows(W, parent, y)
-    local _, h = W:SectionHeader(parent, "GUIDE WINDOW", y); y = y - h
+    local _, h = W:SectionHeader(parent, "WINDOW LOOK", y); y = y - h
     local cells = {}
     for _, group in ipairs({ "Text", "Look", "Progress" }) do
         for _, option in ipairs(ns.RXPWindowOptions()) do
@@ -507,9 +528,10 @@ local function SetUpRows(W, parent, y)
 end
 
 local function RxpWindowRows(W, parent, y)
-    local _, h = W:DualRow(parent, y,
+    local _, h = W:SectionHeader(parent, "NAOWH GUIDE WINDOW", y); y = y - h
+    _, h = W:DualRow(parent, y,
         { type = "toggle", text = "Naowh Guide Window",
-          tooltip = "RestedXP's guide and active steps in one Naowh window, with RestedXP's own two hidden.",
+          tooltip = "RestedXP's guide and active steps in one Naowh window, in place of its own and of the old theme.",
           getValue = ns.RXPWindowEnabled,
           setValue = function(v)
               ns.SetRXPWindow(v)
@@ -543,12 +565,19 @@ end
 
 local function RestedXPSection(W, parent, y)
     if not (ns.RXPThemesAvailable and ns.RXPThemesAvailable()) then return y end
-    local _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
-    local themesSwitch = RxpSwitch("Add Themes to RestedXP", "Adds the Naowh themes to RestedXP's theme list.",
+    local _, h
+    if ns.RXPThemesEnabled() or ns.RXPWindowEnabled() then
+        _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
+        y = SetUpRows(W, parent, y)
+    end
+    _, h = W:SectionHeader(parent, "RESTEDXP THEME", y); y = y - h
+    local themesSwitch = RxpSwitch("Add Themes to RestedXP",
+        "Adds the Naowh themes to RestedXP's theme list, in place of the Naowh Guide Window.",
         ns.RXPThemesEnabled, ns.SetRXPThemes)
     _, h = W:DualRow(parent, y, themesSwitch, RxpThemeChoice()); y = y - h
     if ns.RXPThemesEnabled() then y = RxpThemeRows(W, parent, y) end
-    if ns.RXPThemesEnabled() or ns.RXPWindowEnabled() then y = SetUpRows(W, parent, y) end
+    _, h = W:SectionHeader(parent, "RESTEDXP ARROW", y); y = y - h
+    y = RxpArrowRows(W, parent, y)
     y = RxpWindowRows(W, parent, y)
     if rxpPending then
         _, h = W:Note(parent, TEXT_RXP_RELOAD, y); y = y - h

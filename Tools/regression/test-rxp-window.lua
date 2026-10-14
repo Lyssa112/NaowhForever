@@ -1594,4 +1594,28 @@ do
     Check(type(ns.RXPFailures.WindowComplete) == "string", "an objective that raises is kept by name and not raised")
 end
 
+-- the window and the old theme are never both on
+do
+    local account = { rxpThemes = true }
+    local w = Start(account)
+    local ns = w.ns
+    Check(ns.RXPThemesEnabled() == true and ns.RXPWindowEnabled() == false, "the theme on, the window off")
+    ns.SetRXPWindow(true)
+    Check(account.rxpWindow == true and account.rxpThemes == nil and ns.RXPThemesEnabled() == false,
+        "the window turned on turns the old theme off")
+    ns.SetRXPThemes(true)
+    Check(account.rxpThemes == true and account.rxpWindow == nil and ns.RXPWindowEnabled() == false
+        and ns.RXPThemesEnabled() == true, "and the theme turned on turns the window off")
+    account.rxpWindow, account.rxpThemes = true, true
+    Check(ns.RXPThemesEnabled() == false and ns.RXPWindowEnabled() == true, "saved both on: the window is used")
+
+    -- the arrow was the theme's to follow: it stays as it was when the window takes the theme's place
+    local kept = { rxpThemes = true }
+    local keptWorld = Start(kept)
+    Check(keptWorld.ns.RXPArrowEnabled() == true, "the arrow follows the theme that is on")
+    keptWorld.ns.SetRXPWindow(true)
+    Check(kept.rxpThemes == nil and kept.rxpArrowOn == true and keptWorld.ns.RXPArrowEnabled() == true,
+        "the window turned on: the theme is off and the arrow is still on")
+end
+
 print("PASS rxp window: " .. cases .. " checks")
