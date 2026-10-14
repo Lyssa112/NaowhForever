@@ -76,7 +76,7 @@ local OPTIONS = {
       max = 16, tip = "How thick the progress bars are." },
     { key = "rxpWindowBarTexture", group = "Progress", kind = "texture", label = "Bar Texture",
       defaultLabel = TEXT_GRADIENT, tip = "The texture of the progress bars, the Naowh Gradient to start." },
-    { key = "rxpWindowStepBar", group = "Progress", kind = "toggle", label = "Step Objectives Bar", default = true,
+    { key = "rxpWindowStepBar", group = "Progress", kind = "toggle", label = "Step Objectives Bar", default = false,
       tip = "A bar under the active step of the objectives done." },
 }
 

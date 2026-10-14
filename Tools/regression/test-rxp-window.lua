@@ -592,8 +592,13 @@ do
     for _, o in ipairs(w.frames) do
         if o.label and o.bar then box = o end
     end
+    Check(box and box.bar.shown == false and w.ns.RXPWindowOption("rxpWindowStepBar") == false,
+        "the active step's bar is off to start: the guide's is the only one")
+    w.ns.SetRXPWindowOption("rxpWindowStepBar", true)
+    Check(account.rxpWindowStepBar == true, "and kept when it is turned on")
+    Flush(w)
     Check(box and box.bar.shown == true and math.abs(box.bar.value - 1 / 3) < 1e-9,
-        "the active step has a bar of its objectives done: one of three")
+        "turned on, the active step has a bar of its objectives done: one of three")
     Check(box.bar.parent == f and box.bar.points[1][2] == f and box.bar.points[2][2] == f,
         "it is a divider of the window and not in the step's box")
     Check(math.abs(box.bar.points[1][5] - (box.points[1][5] - box.height - 5)) < 1e-9

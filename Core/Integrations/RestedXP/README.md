@@ -132,7 +132,7 @@ Core/Integrations/RestedXP/
   dragged, as the drag does, and what is kept is set when the grip is let go. The width is kept to the
   pixel.
 - The step objectives bar is a divider under the active step's box and not a part of it, as the guide's
-  is under the title; the box's own opacity is a setting (`rxpWindowBoxOpacity`) and not a part of its
+  is under the title, and is off to start so the guide's is the only bar; the box's own opacity is a setting (`rxpWindowBoxOpacity`) and not a part of its
   color. The bars are in the Naowh Gradient to start (`GRADIENT`, which is `ns.MEDIA`'s, so a texture of
   SharedMedia is only needed when another is wanted).
 - The Active Targets and Active Items windows (`RXPTargetFrame`, `RXPItemFrame`) take the look of the
