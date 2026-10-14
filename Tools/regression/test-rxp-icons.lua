@@ -1,0 +1,303 @@
+-- Naowh's step icons for RestedXP (Core/Integrations/RestedXP/Icons.lua), run against the real Core with
+-- RestedXP's icon table stood in for by a plain one. Run with Lua 5.1 from the repository root.
+local function Read(path)
+    local f = assert(io.open(path, "rb"))
+    local s = f:read("*a"); f:close()
+    return s
+end
+local coreSource = Read("Core/Core.lua")
+local featuresSource = Read("Core/Features.lua")
+local themesSource = Read("Core/Integrations/RestedXP/Themes.lua")
+local iconsSource = Read("Core/Integrations/RestedXP/Icons.lua")
+
+local cases = 0
+local function Check(ok, label) assert(ok, label); cases = cases + 1 end
+
+local ART = "Interface\\AddOns\\NaowhForever\\Core\\Integrations\\RestedXP\\Media\\Icons\\"
+
+local function Frame()
+    local f = { events = {}, scripts = {} }
+    setmetatable(f, { __index = function(_, key)
+        if type(key) == "string" and key:find("^%u") then return function() end end
+    end })
+    function f:RegisterEvent(event) self.events[event] = true end
+    function f:UnregisterEvent(event) self.events[event] = nil end
+    function f:UnregisterAllEvents() self.events = {} end
+    function f:SetScript(name, fn) self.scripts[name] = fn end
+    return f
+end
+
+-- The game with our addon loaded: opts.loaded is RestedXP being up already, opts.installed its being there at all.
+local function World(account, opts)
+    opts = opts or {}
+    local w = { frames = {} }
+    local env = {}
+    env._G = env
+    env.UIParent = Frame()
+    env.CreateFrame = function()
+        local f = Frame()
+        w.frames[#w.frames + 1] = f
+        return f
+    end
+    env.C_AddOns = {
+        DoesAddOnExist = function(name) return opts.installed ~= false and name == "RXPGuides" end,
+        IsAddOnLoaded = function(name) return opts.loaded == true and name == "RXPGuides" end,
+    }
+    env.C_Timer = { After = function() end }
+    env.hooksecurefunc = function() end
+    env.NaowhForeverDB = { account = account, profiles = {}, charActive = {} }
+    setmetatable(env, { __index = _G })
+    for _, part in ipairs({ { coreSource, "Core" }, { featuresSource, "Features" } }) do
+        local chunk = assert(loadstring(part[1], part[2]))
+        setfenv(chunk, env)
+        chunk("NaowhForever")
+    end
+    local ns = env.NaowhForever
+    for _, part in ipairs({ { themesSource, "Themes" }, { iconsSource, "Icons" } }) do
+        local chunk = assert(loadstring(part[1], part[2]))
+        setfenv(chunk, env)
+        chunk("NaowhForever")
+    end
+    w.env, w.ns = env, ns
+    w.watcher = w.frames[#w.frames]
+    return w
+end
+
+-- RestedXP's table as it is when its files have loaded
+local function Icons()
+    return {
+        accept = "|TInterface/GossipFrame/AvailableQuestIcon:0|t",
+        turnin = "|TInterface/GossipFrame/ActiveQuestIcon:0|t",
+        ["goto"] = "|TInterface/MINIMAP/POIICONS:0:0:0:0:128:128:63:72:0:4|t",
+        groundgoto = "|TInterface/MINIMAP/POIICONS:0:0:0:0:128:128:63:72:0:4|t",
+        flygoto = "|TInterface/MINIMAP/POIICONS:0:0:0:0:128:128:63:72:0:4|t",
+        explore = "|TInterface/MINIMAP/POIICONS:0:0:0:0:128:128:63:72:0:4|t",
+        acceptmultiple = "|TInterface/GossipFrame/AvailableQuestIcon:0|t",
+        vendor = "|TInterface/GossipFrame/BankerGossipIcon:0|t",
+        custom = "|TInterface/Anywhere/Else:0|t",
+        scenario = 12345,
+    }
+end
+
+local function Boot(w, name) w.watcher.scripts.OnEvent(w.watcher, "ADDON_LOADED", name) end
+
+local function Expected(style, glyph, r, g, b)
+    return ("|T%s%s\\%s.tga:0:0:0:0:64:64:0:64:0:64:%d:%d:%d|t"):format(ART, style, glyph, r, g, b)
+end
+
+-- off to start: nothing is listened for, and nothing is changed
+do
+    local w = World({})
+    w.env.RXP = { icons = Icons() }
+    Check(w.ns.RXPIconStyle() == "", "no style to start")
+    Check(next(w.watcher.events) == "ADDON_LOADED", "waiting for the addon to load")
+    Boot(w, "NaowhForever")
+    Check(next(w.watcher.events) == nil, "off: it listens for nothing")
+    Boot(w, "RXPGuides")
+    w.ns.RXPIconsApply()
+    Check(w.env.RXP.icons["goto"]:find("POIICONS", 1, true) and w.env.RXP.icons.accept:find("GossipFrame", 1, true),
+        "and RestedXP's icons are as they were")
+end
+
+-- a style, with RestedXP loading after: its icons are replaced as it loads, tinted with the accent
+do
+    local w = World({ rxpIconStyle = "line" })
+    w.ns.THEME.accent = { r = 0.5, g = 0.25, b = 1 }
+    w.ns.THEME.accentSoft = { r = 0, g = 1, b = 0.5 }
+    w.ns.THEME.fg = { r = 0.2, g = 0.4, b = 0.6 }
+    w.env.RXP = { icons = Icons() }
+    Boot(w, "NaowhForever")
+    Check(w.watcher.events.ADDON_LOADED == true, "a style: it waits for RestedXP to load")
+    Boot(w, "SomeOtherAddon")
+    Check(w.env.RXP.icons.accept:find("GossipFrame", 1, true) and w.watcher.events.ADDON_LOADED == true,
+        "another addon loading changes nothing")
+    Boot(w, "RXPGuides")
+    local icons = w.env.RXP.icons
+    Check(icons.accept == Expected("line", "accept", 128, 64, 255), "accept: Naowh's, in the quest color")
+    Check(icons.turnin == Expected("line", "turnin", 128, 64, 255), "turnin")
+    Check(icons.vendor == Expected("line", "vendor", 128, 64, 255), "vendor: in the color of the rest, the accent too")
+    local goto = Expected("line", "goto", 0, 255, 128)
+    Check(icons["goto"] == goto and icons.groundgoto == goto and icons.flygoto == goto and icons.explore == goto,
+        "the icons RestedXP made from goto are goto's too, in the travel color")
+    Check(icons.acceptmultiple == icons.accept, "and acceptmultiple is accept's")
+    Check(icons.custom == "|TInterface/Anywhere/Else:0|t" and icons.scenario == 12345,
+        "a key that is not ours, and one that is not text, are left alone")
+    Check(icons.fp == nil and icons.hs == nil, "a key RestedXP does not have is not added")
+    Check(next(w.watcher.events) == nil, "and it listens for nothing more")
+    local before = icons.accept
+    w.ns.RXPIconsApply()
+    Check(icons.accept == before, "applied again it is the same")
+    Check(w.ns.RXPFailures.Icons == nil, "and nothing failed")
+end
+
+-- RestedXP loaded before us, and the filled style: done at once
+do
+    local w = World({ rxpIconStyle = "filled" }, { loaded = true })
+    w.ns.THEME.accent = { r = 1, g = 1, b = 1 }
+    w.env.RXP = { icons = Icons() }
+    Boot(w, "NaowhForever")
+    Check(w.env.RXP.icons.accept == Expected("filled", "accept", 255, 255, 255), "RestedXP up already: done at once")
+    Check(next(w.watcher.events) == nil, "and it listens for nothing")
+end
+
+-- no RestedXP: nothing is listened for
+do
+    local w = World({ rxpIconStyle = "line" }, { installed = false })
+    Boot(w, "NaowhForever")
+    Check(next(w.watcher.events) == nil, "RestedXP not installed: it listens for nothing")
+end
+
+-- what is missing or wrong raises nothing
+do
+    local w = World({ rxpIconStyle = "line" })
+    Boot(w, "NaowhForever")
+    Boot(w, "RXPGuides")
+    Check(w.ns.RXPFailures.Icons == nil, "no RestedXP table: nothing raised, nothing failed")
+    w.env.RXP = { icons = "not a table" }
+    w.ns.RXPIconsApply()
+    Check(w.env.RXP.icons == "not a table", "a table that is not one is left alone")
+    local locked = setmetatable({}, { __index = function() return "|Tx:0|t" end,
+        __newindex = function() error("locked") end })
+    local raising = World({ rxpIconStyle = "line" })
+    raising.env.RXP = { icons = locked }
+    Boot(raising, "NaowhForever")
+    Boot(raising, "RXPGuides")
+    Check(type(raising.ns.RXPFailures.Icons) == "string" and raising.ns.RXPFailures.Icons:find("locked", 1, true),
+        "a table that raises: kept by name, and not raised")
+    w.ns.THEME.accent = nil
+    w.env.RXP = { icons = { accept = "|Tx:0|t" } }
+    w.ns.RXPIconsApply()
+    Check(w.env.RXP.icons.accept == Expected("line", "accept", 255, 255, 255), "no accent: white")
+end
+
+-- the setting: only a style is kept
+do
+    local account = {}
+    local w = World(account)
+    w.ns.SetRXPIconStyle("filled")
+    Check(account.rxpIconStyle == "filled" and w.ns.RXPIconStyle() == "filled", "a style is kept")
+    w.ns.SetRXPIconStyle("rainbow")
+    Check(account.rxpIconStyle == nil and w.ns.RXPIconStyle() == "", "one that is not a style is not")
+    w.ns.SetRXPIconStyle("line")
+    w.ns.SetRXPIconStyle("")
+    Check(account.rxpIconStyle == nil, "and RestedXP's own is not stored")
+    account.rxpIconStyle = "junk"
+    Check(w.ns.RXPIconStyle() == "", "a saved value that is not a style is RestedXP's own")
+end
+
+-- the colors: a theme token each to start, a color of their own picked, and the window told
+do
+    local account = {}
+    local w = World(account)
+    local T = w.ns.THEME
+    T.accent = { r = 0.5, g = 0.25, b = 1 }
+    T.accentSoft = { r = 0, g = 1, b = 0.5 }
+    T.fg = { r = 0.2, g = 0.4, b = 0.6 }
+    local function Is(name, r, g, b)
+        local cr, cg, cb = w.ns.RXPIconColor(name)
+        return math.abs(cr - r) < 1e-9 and math.abs(cg - g) < 1e-9 and math.abs(cb - b) < 1e-9
+    end
+    Check(#w.ns.RXPIconColors() == 3, "three colors: the quests', the travel's and the rest's")
+    Check(Is("quest", 0.5, 0.25, 1) and Is("travel", 0, 1, 0.5) and Is("other", 0.5, 0.25, 1),
+        "each is a token of the theme to start: the accent, the soft accent and the accent")
+    T.accent = { r = 0.9, g = 0.1, b = 0.1 }
+    Check(Is("quest", 0.9, 0.1, 0.1), "and follows the theme")
+    Check(Is("nothing", 0.9, 0.1, 0.1) and Is("other", 0.9, 0.1, 0.1), "a color that is not one is the rest's")
+    local redraws = 0
+    w.ns.RXPWindowRefresh = function() redraws = redraws + 1 end
+    w.ns.SetRXPIconColor("travel", 1, 0.5, 0)
+    Check(Is("travel", 1, 0.5, 0) and account.rxpIconColors.travel.g == 0.5 and redraws == 1,
+        "a color picked is kept, and the window is told")
+    Check(Is("quest", 0.9, 0.1, 0.1) and account.rxpIconColors.quest == nil, "the others are as they were")
+    w.ns.SetRXPIconColor("bogus", 1, 1, 1)
+    Check(account.rxpIconColors.bogus == nil and redraws == 1, "a name that is not a color is not kept")
+    w.ns.SetRXPIconColor("travel", "red", 1, 1)
+    Check(account.rxpIconColors == nil and Is("travel", 0, 1, 0.5) and redraws == 2,
+        "what is not a color puts it back, and the table goes with the last one")
+    w.ns.SetRXPIconColor("quest", 0, 0, 0)
+    w.ns.SetRXPIconColor("other", 1, 1, 1)
+    w.ns.ResetRXPIconColors()
+    Check(account.rxpIconColors == nil and Is("quest", 0.9, 0.1, 0.1) and redraws == 5, "reset puts every color back")
+    w.ns.RXPWindowRefresh = nil
+    w.ns.SetRXPIconColor("quest", 0, 1, 0)
+    Check(Is("quest", 0, 1, 0), "no window: nothing raised")
+
+    -- what the Naowh window asks of a line of text
+    w.ns.SetRXPIconColor("quest", 1, 0, 0)
+    local text = ("|T%saccept.tga:0|t"):format(ART .. "filled\\")
+    local path, r, g, b = w.ns.RXPIconLook(text)
+    Check(path == ART .. "filled\\accept.tga" and r == 1 and g == 0 and b == 0,
+        "an icon of ours: its file, and its group's color as it is now")
+    w.ns.SetRXPIconColor("quest", 0, 0, 1)
+    local _, _, _, blue = w.ns.RXPIconLook(text)
+    Check(blue == 1, "and as it is changed")
+    Check(w.ns.RXPIconLook("|TInterface/GossipFrame/AvailableQuestIcon:0|t") == nil
+        and w.ns.RXPIconLook("") == nil and w.ns.RXPIconLook(nil) == nil and w.ns.RXPIconLook(12) == nil,
+        "RestedXP's own, and what is not text, are not ours")
+    Check(w.ns.RXPIconLook(("|T%srainbow\\accept.tga:0|t"):format(ART)) == nil, "a style that is not one is not ours")
+    local _, tr, tg = w.ns.RXPIconLook(("|T%sline\\goto.tga:0|t"):format(ART))
+    Check(tr == 0 and tg == 1, "a glyph is in its group: goto in the travel color")
+    local _, orr, org = w.ns.RXPIconLook(("|T%sline\\clock.tga:0|t"):format(ART))
+    Check(math.abs(orr - 0.9) < 1e-9 and math.abs(org - 0.1) < 1e-9, "and one in none is in the rest's")
+end
+
+-- the icons inside a guide's text: the two RestedXP puts in most of its lines
+do
+    local w = World({ rxpIconStyle = "line" })
+    local T = w.ns.THEME
+    T.accent = { r = 0.5, g = 0.25, b = 1 }
+    T.accentSoft = { r = 0, g = 1, b = 0.5 }
+    local bubble = "|Tinterface/worldmap/chatbubble_64grey.blp:20|t"
+    local line = bubble .. " Talk to |cffffd100Shindrell|r"
+    Check(w.ns.RXPIconText(line) == Expected("line", "gossip", 128, 64, 255) .. " Talk to |cffffd100Shindrell|r",
+        "the speech bubble in a line is ours, in the quest color, and the rest is as it was")
+    Check(w.ns.RXPIconText("|TInterface\\worldmap\\ChatBubble_64Grey.blp:20|t x")
+        == Expected("line", "gossip", 128, 64, 255) .. " x", "whatever its case and slashes")
+    Check(w.ns.RXPIconText("|TInterface/cursor/crosshair/interact.blp:20|t Use")
+        == Expected("line", "interact", 128, 64, 255) .. " Use", "and so is the interact cursor")
+    Check(w.ns.RXPIconText(bubble .. bubble) == Expected("line", "gossip", 128, 64, 255):rep(2),
+        "each one in a line is")
+    local other = "|T134419:0|t Kill |T133970:0|t"
+    Check(w.ns.RXPIconText(other) == other, "an icon that is not one of them is left alone")
+    Check(w.ns.RXPIconText("|TInterface/Anywhere/Else.blp:20|t") == "|TInterface/Anywhere/Else.blp:20|t",
+        "and a path we do not know")
+    Check(w.ns.RXPIconText("") == "" and w.ns.RXPIconText(nil) == nil and w.ns.RXPIconText(5) == 5,
+        "what is not text comes back as it was")
+    w.ns.SetRXPIconStyle(nil)
+    Check(w.ns.RXPIconText(line) == line, "no style: the line is as RestedXP has it")
+    w.ns.SetRXPIconStyle("filled")
+    T.accent = { r = 1, g = 1, b = 1 }
+    Check(w.ns.RXPIconText(bubble) == Expected("filled", "gossip", 255, 255, 255), "the other style, and as the theme is")
+end
+
+-- every glyph there is a key for has its file, in both styles
+do
+    local w = World({})
+    local seen, count = {}, 0
+    for key, glyph in pairs(w.ns.RXPIconGlyphs()) do
+        Check(type(key) == "string" and type(glyph) == "string", "a key and a glyph name: " .. tostring(key))
+        for _, style in ipairs({ "line", "filled" }) do
+            local path = w.ns.RXPIconPath(style, glyph):gsub("^Interface\\AddOns\\NaowhForever\\", ""):gsub("\\", "/")
+            local f = io.open(path, "rb")
+            Check(f ~= nil, "the file is there: " .. path)
+            local data = f:read("*a"); f:close()
+            Check(#data == 18 + 64 * 64 * 4, "a 64 by 64 32-bit image: " .. path)
+            count = count + 1
+        end
+        seen[glyph] = true
+    end
+    for _, glyph in pairs(w.ns.RXPIconInline()) do
+        for _, style in ipairs({ "line", "filled" }) do
+            local path = w.ns.RXPIconPath(style, glyph):gsub("^Interface\\AddOns\\NaowhForever\\", ""):gsub("\\", "/")
+            local f = io.open(path, "rb")
+            Check(f ~= nil, "the file is there: " .. path)
+            f:close()
+        end
+        seen[glyph] = true
+    end
+    local glyphs = 0
+    for _ in pairs(seen) do glyphs = glyphs + 1 end
+    Check(glyphs == 29 and count >= 56, "29 glyphs, each in two styles")
+end
+
+print("PASS rxp icons: " .. cases .. " checks")

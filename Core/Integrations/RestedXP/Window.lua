@@ -18,7 +18,10 @@ local BAR_W, ICON_GAP, GRIP_SIZE = 2, 5, 16
 local FIRST_GROW, FIRST_ICON_GROW, LOGO_SIZE, BAR_HEIGHT, INDENT, ICON_SIZE = 2, 2, 24, 5, 12, 18
 local PANEL_ALPHA, EDGE_ALPHA, RULE_ALPHA, MUTED_ALPHA, HOVER_ALPHA = 0.92, 0.8, 0.5, 0.9, 0.25
 local BOX_OPACITY = 55
+local ICON_DONE_ALPHA = 0.5
 local COUNT_PATTERN, COUNT_MIN, COUNT_GAP = "(%d+)%s*/%s*(%d+)", 2, 2
+local LEAD_ICON, LEAD_PLAIN = "^%s*(|T[^|]*|t)%s*", "^|T([^|:]+):%d+|t$"
+local LEAD_PATH, CONTENT_ID, CONTENT_DIR = "^|T([^|:]+)", "^%d+$", "interface[/\\]icons[/\\]"
 local BAG_EVENT = "BAG_UPDATE_DELAYED"
 local SHADOW, SHADOW_ALPHA = 1, 0.9
 local TEXT_FOLD, TEXT_UNFOLD, TEXT_DOT = "-", "+", " \194\183 "
@@ -182,6 +185,8 @@ local function Refresh()
     end)
 end
 
+function ns.RXPWindowRefresh() Refresh() end
+
 function ns.SetRXPWindowOption(key, value)
     local option = OPTION_BY_KEY[key]
     if not option then return end
@@ -303,6 +308,16 @@ local function Counted(element, shown)
     return tonumber(have), tonumber(need), false
 end
 
+local function Lifted(shown, glyph)
+    if glyph ~= "" then return shown, glyph, false end
+    local lead = shown:match(LEAD_ICON)
+    if not lead then return shown, glyph, false end
+    local path = lead:match(LEAD_PLAIN)
+    local named = lead:match(LEAD_PATH) or ""
+    local content = named:match(CONTENT_ID) or named:lower():find(CONTENT_DIR)
+    return (shown:gsub(LEAD_ICON, "", 1)), path and ("|T" .. path .. ":0|t") or lead, content and true or false
+end
+
 local function Row(rxp, element)
     local frame = element.frame
     local text = Dig(frame, "text")
@@ -312,14 +327,17 @@ local function Row(rxp, element)
         shown = type(raw) == "string" and raw or ""
         if Has(rxp, "ReplaceNpcIds") then shown = Run("WindowNpc", rxp.ReplaceNpcIds, shown, element) or shown end
     end
+    if type(ns.RXPIconText) == "function" then shown = ns.RXPIconText(shown) end
     local icon = Dig(frame, "icon")
     local glyph = Has(icon, "GetText") and icon:GetText()
     if type(glyph) ~= "string" then glyph = element.icon or Dig(rxp, "icons", element.tag) or "" end
+    local nested
+    shown, glyph, nested = Lifted(shown, glyph)
     local button = Dig(frame, "button")
     local done = Has(button, "GetChecked") and button:GetChecked() or element.completed or element.skip
     local have, need, bags = Counted(element, shown)
     return { text = shown, icon = glyph, done = done and true or false, button = button, source = text,
-        have = have, need = need, bags = bags }
+        have = have, need = need, bags = bags, nested = nested }
 end
 
 local function ActiveSteps(rxp)
@@ -819,6 +837,7 @@ local function MakeRow()
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
     row.icon = Text(row, ICON_SIZE)
+    row.glyph = row:CreateTexture(nil, "OVERLAY")
     row.meter = MakeBar(row)
     row.text = Text(row, "rxpWindowTextSize")
     row.text:SetWordWrap(true)
@@ -892,6 +911,24 @@ local function Spacing()
     return ns.RXPWindowOption("rxpWindowSpacing")
 end
 
+local function DrawIcon(item, row, size)
+    local path, r, g, b
+    if type(ns.RXPIconLook) == "function" then path, r, g, b = ns.RXPIconLook(row.icon) end
+    if not path then
+        item.glyph:Hide()
+        item.icon:SetText(row.icon)
+        return
+    end
+    item.icon:SetText("")
+    item.glyph:ClearAllPoints()
+    item.glyph:SetPoint("TOPLEFT", item.icon, "TOPLEFT", 0, 0)
+    item.glyph:SetSize(size, size)
+    item.glyph:SetTexture(path)
+    item.glyph:SetVertexColor(r, g, b)
+    item.glyph:SetAlpha(row.done and ICON_DONE_ALPHA or 1)
+    item.glyph:Show()
+end
+
 local function DrawRow(box, row, x, y, width, first)
     local item = Acquire("row")
     item:SetParent(box)
@@ -920,7 +957,7 @@ local function DrawRow(box, row, x, y, width, first)
     item.icon:ClearAllPoints()
     item.icon:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap, 0)
     Faced(item.icon, iconSize)
-    item.icon:SetText(row.icon)
+    DrawIcon(item, row, iconSize)
     item.text:ClearAllPoints()
     item.text:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + iconW, -drop)
     item.text:SetWidth(textWidth)
@@ -973,8 +1010,10 @@ local function DrawBox(step, y, inner, current)
         box.logo:Hide()
     end
     local by = -BOX_PAD - head - gap
+    local column = ICON_SIZE + ICON_GAP
     for i, row in ipairs(step.rows) do
         local set = i > 1 and INDENT or 0
+        if i > 1 and row.nested then set = set + column end
         by = by - DrawRow(box, row, BOX_PAD + set, by, inner - BOX_PAD * 2 - set, i == 1) - gap
     end
     box:SetHeight(-by + BOX_PAD - gap)

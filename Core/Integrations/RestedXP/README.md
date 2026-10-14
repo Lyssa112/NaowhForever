@@ -15,7 +15,9 @@ Core/Integrations/RestedXP/
   RestedXP.xml                what loads
   Themes.lua     the themes, the settings behind the RESTEDXP card, and the hooks
   Window.lua     the Naowh guide window, its settings and what it reads from RestedXP
+  Icons.lua      Naowh's step icons, put in RestedXP's icon table as it loads
   Media/         the themes' arrow, frame and grip art (rxp_*.tga), drawn by Tools/media/make_media.py
+  Media/Icons/   the step icons, line/ and filled/ (28 each), drawn by Tools/media/make_rxp_icons.py
 ```
 
 ## Why
@@ -217,3 +219,33 @@ Core/Integrations/RestedXP/
   until one is picked), the window is shown as that: "No guide selected" and a line, Pick a guide, which
   opens RestedXP's list of guides (`v2:ShowGuideSelectionMenu`, the one its welcome window opens on a right
   click, or its menu when it has none) with a plain click: there is nothing to skip, so it takes no shift.
+- The step icons are a style (`rxpIconStyle`: RestedXP's own, line or filled) and not a switch, kept only
+  when picked. RestedXP builds its rows, tooltips and quest log lines from `RXP.icons` as a guide loads
+  (`element.icon`, `tooltipText = icon .. text`) and its v2 window takes an icon off the front of a line by
+  comparing text with the table's current value. The table is therefore replaced when RestedXP's
+  `ADDON_LOADED` arrives, before any guide parses, and a change of style waits for a /reload: an icon
+  baked under the old style would no longer match and would show twice. Every key RestedXP files (and the
+  aliases it makes from them at load, such as `explore` and `groundgoto`) is replaced by its own name, and
+  only when its value is text, so a key it drops or renames is left alone. Without a style nothing is
+  listened for.
+- The icons are white over alpha at 64 texels, drawn from one geometry per glyph: the body is outlined in
+  the line style and solid in the filled one, the detail is stroked and cut out. The escape that draws
+  them carries the theme's accent as its vertex color (`|T...:r:g:b|t`), read as RestedXP loads, so it
+  follows a theme change after a /reload. Their size is `0`, the height of the text, as RestedXP's own.
+- The icons' colors are three groups (quests, travel, the rest), each a theme token to start (accent, soft
+  accent, accent: so that no icon reads as unthemed) and a color of its own when picked (`rxpIconColors`, sparse). The escape bakes the color
+  in, so RestedXP's own windows take a change at the next /reload; the Naowh window does not use the
+  escape: it reads the path out of the row's text (`RXPIconLook`) and draws a texture, so a color picked,
+  or a theme token, is live there, and a done row is dimmed.
+- Two icons are not in `RXP.icons` but inside the guides' text, in most of its lines: the grey speech bubble
+  (`chatbubble_64grey`, on every Talk to) and the interact cursor. They are baked into the text RestedXP
+  parses, so the table cannot reach them and rewriting 27 thousand lines of guide text would not be ours to
+  do; the Naowh window swaps them as it reads a row (`RXPIconText`, by path, whatever its case and
+  slashes), in the row's group color. RestedXP's own windows keep theirs.
+- A line that begins with an icon of its own (the speech bubble of a Talk to) has it lifted into the icon
+  column when the row has none, at the height of the text, so every row has its icon and its text at the
+  same place; a row that has an icon keeps the one in its line, and one in the middle of a line stays.
+- An item's icon at the start of a line (a file ID, or `Interface/Icons/...`) is lifted into the icon
+  column like a marker is, and the line is set in as far as the column on top of the sub task indent, so
+  the items listed under a "Buy the following:" sit under its text and not at its marker. A marker (the
+  speech bubble, the interact cursor, ours) is set in as a sub task is, and the first line never is.

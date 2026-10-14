@@ -9,6 +9,7 @@ local coreSource = Read("Core/Core.lua")
 local featuresSource = Read("Core/Features.lua")
 local themesSource = Read("Core/Integrations/RestedXP/Themes.lua")
 local windowSource = Read("Core/Integrations/RestedXP/Window.lua")
+local iconsSource = Read("Core/Integrations/RestedXP/Icons.lua")
 
 local cases = 0
 local function Check(ok, label) assert(ok, label); cases = cases + 1 end
@@ -47,6 +48,13 @@ local function Object(everything)
     function o:UnregisterEvent(event)
         if self.events then self.events[event] = nil end
     end
+    function o:SetNormalTexture(path) self.normalPath = path end
+    function o:SetHighlightTexture(path) self.highlightPath = path end
+    function o:GetNormalTexture()
+        self.normalTexture = self.normalTexture or Object(everything)
+        return self.normalTexture
+    end
+    function o:SetVertexColor(r, g, b, a) self.vertex = { r, g, b, a } end
     function o:SetFont(path, size, flags) self.font, self.fontSize, self.fontFlags = path, size, flags end
     function o:SetShown(on) self.shown = on and true or false end
     function o:SetShadowOffset(x, y) self.shadowX, self.shadowY = x, y end
@@ -165,6 +173,12 @@ local function World(account, opts)
         setfenv(chunk, env)
         chunk("NaowhForever")
     end
+    local make = env.CreateFrame
+    env.CreateFrame = function() return Object(w.everything) end
+    local icons = assert(loadstring(iconsSource, "Icons"))
+    setfenv(icons, env)
+    icons("NaowhForever")
+    env.CreateFrame = make
     w.env, w.ns = env, ns
     return w
 end
@@ -1253,6 +1267,106 @@ do
     Check(Window(bare) ~= nil and Window(bare).shown, "frames without a background, a border or a title: nothing raises")
 end
 
+-- the icons of ours are drawn as a texture in their group's color, as it is now
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local f = Window(w)
+    local ns = w.ns
+    local T = ns.THEME
+    T.accentSoft = { r = 0.1, g = 0.8, b = 0.4 }
+    local function Rows()
+        local out = {}
+        for _, o in ipairs(w.frames) do
+            if o.glyph and Seen(o) then out[#out + 1] = o end
+        end
+        return out
+    end
+    local function Row(text)
+        for _, o in ipairs(Rows()) do
+            if o.text and o.text.text == text then return o end
+        end
+    end
+    local function Is(color, r, g, b)
+        return color and math.abs(color[1] - r) < 1e-9 and math.abs(color[2] - g) < 1e-9
+            and math.abs(color[3] - b) < 1e-9
+    end
+    local before = Row("Talk to |cff00ff00Duokna|r")
+    Check(before and before.glyph.shown == false and before.icon.text == "|Ttalk|t",
+        "RestedXP's own icon is its text, and no texture is shown")
+
+    w.talk.frame.icon:SetText(("|T%s:0:0:0:0:64:64:0:64:0:64:1:2:3|t"):format(ns.RXPIconPath("line", "goto")))
+    w.buy.frame.icon:SetText(("|T%s:0|t"):format(ns.RXPIconPath("filled", "vendor")))
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    local talk, buy, vendor = Row("Talk to |cff00ff00Duokna|r"), Row("Buy [Refreshing Spring Water] from her"), Row("Vendor Trash")
+    Check(talk.glyph.shown and talk.glyph.texture == ns.RXPIconPath("line", "goto") and talk.icon.text == "",
+        "an icon of ours: its texture, and no text")
+    Check(Is(talk.glyph.vertex, 0.1, 0.8, 0.4), "in its group's color: goto's is the travel color")
+    Check(talk.glyph.width == 22 and talk.glyph.height == 22, "as big as the row's icon is: the title's, 18 and the bonus twice")
+    Check(talk.glyph.alpha == 1, "whole when the row is not done")
+    local r, g, b = ns.RXPIconColor("other")
+    Check(buy.glyph.texture == ns.RXPIconPath("filled", "vendor") and Is(buy.glyph.vertex, r, g, b),
+        "in the other style and group as well")
+    Check(vendor.glyph.shown == false and vendor.icon.text == "|Tv|t", "and a row with RestedXP's own is as it was")
+
+    ns.SetRXPIconColor("travel", 1, 0, 0)
+    Flush(w)
+    Check(Is(Row("Talk to |cff00ff00Duokna|r").glyph.vertex, 1, 0, 0), "a color picked is drawn as it is")
+    ns.ResetRXPIconColors()
+    Flush(w)
+    Check(Is(Row("Talk to |cff00ff00Duokna|r").glyph.vertex, 0.1, 0.8, 0.4), "and put back")
+
+    w.talk.frame.button.GetChecked = function() return true end
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(Row("Talk to |cff00ff00Duokna|r").glyph.alpha == 0.5, "a row that is done has its icon dimmed")
+
+    ns.SetRXPWindowOption("rxpWindowTextSize", 20)
+    Flush(w)
+    Check(Row("Talk to |cff00ff00Duokna|r").glyph.width == 22, "the text's size is not its size")
+    local big = Row("Talk to |cff00ff00Duokna|r")
+    Check(big.glyph.width == 22 and big.glyph.height == 22, "it is as big as the icon size, and the bonus twice")
+    ns.SetRXPWindowOption("rxpWindowTextSize", 13)
+
+    w.talk.frame.icon:SetText("|Ttalk|t")
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    local back = Row("Talk to |cff00ff00Duokna|r")
+    Check(back.glyph.shown == false and back.icon.text == "|Ttalk|t", "a row that is RestedXP's own again is its text again")
+
+    -- the speech bubble in the text of a row is ours as well
+    w.talk.frame.icon:SetText("|Ttalk|t")
+    w.talk.frame.text:SetText("|Tinterface/worldmap/chatbubble_64grey.blp:20|t Talk to Duokna")
+    ns.SetRXPIconStyle("line")
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    local function Spoken()
+        for _, o in ipairs(w.everything) do
+            if o.text and o.text:find("Talk to Duokna", 1, true) and Seen(o) then return o.text end
+        end
+    end
+    local bubble = Spoken()
+    Check(bubble and bubble:find(ns.RXPIconPath("line", "gossip"), 1, true) and not bubble:find("chatbubble", 1, true),
+        "the speech bubble in a row's text is ours")
+    ns.SetRXPIconStyle(nil)
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    local kept = Spoken()
+    Check(kept and kept:find("chatbubble", 1, true), "and RestedXP's own with no style")
+
+    w.talk.frame.text:SetText("Talk to |cff00ff00Duokna|r")
+
+    ns.RXPIconLook = nil
+    w.talk.frame.icon:SetText(("|T%s:0|t"):format(ns.RXPIconPath("line", "goto")))
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    local plain = Row("Talk to |cff00ff00Duokna|r")
+    Check(plain.glyph.shown == false and plain.icon.text:find("goto", 1, true),
+        "without the icons' module the text is shown as it is")
+    Check(f.shown, "and the window is still drawn")
+end
+
 -- a row that counts has a bar of its own: the items in the bags for a buy, the numbers in a counted line
 do
     local account = { rxpWindow = true }
@@ -1278,7 +1392,7 @@ do
 
     w.buy.id, w.buy.qty = 159, 5
     w.items[159] = 2
-    w.rxp.v2:UpdateGuideWindow()
+    ns.RXPWindowRefresh()
     Flush(w)
     local buy = Row(BUY)
     Check(buy.meter.shown and math.abs(buy.meter.value - 0.4) < 1e-9, "buy five with two in the bags: two fifths")
@@ -1296,7 +1410,7 @@ do
     Check(Row(BUY).meter.value == 1, "more than needed is a full bar")
 
     w.buy.qty = 1
-    w.rxp.v2:UpdateGuideWindow()
+    ns.RXPWindowRefresh()
     Flush(w)
     Check(Meters() == 0 and f.events[BAGS] == nil, "one of something is not a count: no bar, and the bags are let go")
 
@@ -1321,7 +1435,7 @@ do
     Check(Meters() == 0, "1/1 is not a count")
 
     w.buy.id, w.buy.qty = "Refreshing Spring Water", 5
-    w.rxp.v2:UpdateGuideWindow()
+    ns.RXPWindowRefresh()
     Flush(w)
     Check(Meters() == 0, "a buy that is of an item by name has nothing to count in the bags")
     w.buy.id = 159
@@ -1335,13 +1449,13 @@ do
     Check(f.events[BAGS] == true, "and the bags are listened to again")
 
     w.itemsRaise = true
-    w.rxp.v2:UpdateGuideWindow()
+    ns.RXPWindowRefresh()
     Flush(w)
     Check(Meters() == 0 and type(ns.RXPFailures.WindowCount) == "string" and f.shown,
         "bags that raise: no bar, kept by name, and the window is drawn")
     w.itemsRaise = false
 
-    w.rxp.v2:UpdateGuideWindow()
+    ns.RXPWindowRefresh()
     Flush(w)
     Check(Meters() == 1 and f.events[BAGS] == true, "and back when they do not")
     ns.SetRXPWindow(false)
@@ -1657,6 +1771,111 @@ do
     Flush(w)
     Check(f.shown == false, "RestedXP gone altogether: nothing to say, the window is not shown")
     w.env.RXP = rxp
+end
+
+-- a line that begins with an icon has it in the icon column, as a row with an icon of its own does
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local function Row(text)
+        for _, o in ipairs(w.frames) do
+            if o.glyph and o.text and o.text.text == text and Seen(o) then return o end
+        end
+    end
+    local function Draw()
+        w.rxp.v2:UpdateGuideWindow()
+        Flush(w)
+    end
+    local BUBBLE = "|Tinterface/worldmap/chatbubble_64grey.blp:20|t"
+
+    w.talk.frame.icon:SetText("")
+    w.talk.frame.text:SetText(BUBBLE .. " Talk to Duokna")
+    Draw()
+    local row = Row("Talk to Duokna")
+    Check(row and row.icon.text == "|Tinterface/worldmap/chatbubble_64grey.blp:0|t" and row.glyph.shown == false,
+        "the icon a line begins with is the row's, as tall as the text, and the line is without it")
+
+    ns.SetRXPIconStyle("line")
+    Draw()
+    row = Row("Talk to Duokna")
+    Check(row.glyph.shown and row.glyph.texture == ns.RXPIconPath("line", "gossip") and row.icon.text == "",
+        "and ours when there is a style, drawn as a texture in the column")
+
+    w.talk.frame.text:SetText("  |T134419:0|t Talk to Duokna")
+    Draw()
+    row = Row("Talk to Duokna")
+    Check(row and row.icon.text == "|T134419:0|t", "whatever room there is before it and after it")
+
+    w.talk.frame.text:SetText("|TInterface/x.blp:0:0:0:0:64:64:0:64:0:64:1:2:3|t Talk to Duokna")
+    Draw()
+    row = Row("Talk to Duokna")
+    Check(row and row.icon.text == "|TInterface/x.blp:0:0:0:0:64:64:0:64:0:64:1:2:3|t", "an icon with more to it is as it was")
+
+    w.talk.frame.icon:SetText("|Ttalk|t")
+    w.talk.frame.text:SetText("|T134419:0|t Talk to Duokna")
+    Draw()
+    row = Row("|T134419:0|t Talk to Duokna")
+    Check(row and row.icon.text == "|Ttalk|t", "a row that has an icon of its own keeps the one in its line where it is")
+
+    w.talk.frame.icon:SetText("")
+    w.talk.frame.text:SetText("Kill |T134419:0|t the boars")
+    Draw()
+    row = Row("Kill |T134419:0|t the boars")
+    Check(row and row.icon.text == "" and row.glyph.shown == false, "and an icon in the middle of a line is left there")
+    ns.SetRXPIconStyle(nil)
+end
+
+-- the items listed under a line are set in under its text, as an item is not the marker of a row
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local function Rows()
+        local out = {}
+        for _, o in ipairs(w.frames) do
+            if o.icon and o.text and o.bar and Seen(o) then out[#out + 1] = o end
+        end
+        return out
+    end
+    local function Draw()
+        w.rxp.v2:UpdateGuideWindow()
+        Flush(w)
+    end
+    w.talk.frame.text:SetText("Buy the following items:")
+    w.buy.frame.icon:SetText("")
+    w.buy.frame.text:SetText("|T135641:0|t (Darkshore Grouper)")
+    w.vendor.frame.icon:SetText("")
+    w.vendor.frame.text:SetText("|TInterface\\Icons\\INV_Misc_Food_01:0|t (Strider Meat)")
+    Draw()
+    local rows = Rows()
+    Check(#rows == 3 and rows[2].points[1][4] == 7 + 12 + 23 and rows[3].points[1][4] == 7 + 12 + 23,
+        "an item's icon at the start of a line: the line is set in as far as the icon column")
+    Check(rows[1].points[1][4] == 7 and rows[2].width == 380 - 20 - 14 - 12 - 23,
+        "the first line is not, and a nested one is that much narrower")
+    Check(rows[2].icon.text == "|T135641:0|t" and rows[2].text.text == "(Darkshore Grouper)",
+        "and the icon is lifted into the column of the line as it is")
+
+    w.vendor.frame.text:SetText("|Tinterface/worldmap/chatbubble_64grey.blp:20|t Talk to him")
+    Draw()
+    rows = Rows()
+    Check(rows[3].points[1][4] == 7 + 12, "the speech bubble of a Talk to is a marker: set in as a sub task is")
+
+    w.vendor.frame.text:SetText("|T135641:0|t (Strider Meat)")
+    w.vendor.frame.icon:SetText("|Ttalk|t")
+    Draw()
+    rows = Rows()
+    Check(rows[3].points[1][4] == 7 + 12, "a row with an icon of its own keeps its place")
+
+    w.talk.frame.icon:SetText("")
+    w.talk.frame.text:SetText("|T135641:0|t (First)")
+    Draw()
+    rows = Rows()
+    Check(rows[1].points[1][4] == 7, "and the first line of a step is never set in")
+    w.vendor.frame.icon:SetText("")
+    Draw()
+    rows = Rows()
+    Check(rows[3].points[1][4] == 7 + 12 + 23, "the column it is set in by is the icon's, and its gap")
 end
 
 print("PASS rxp window: " .. cases .. " checks")
