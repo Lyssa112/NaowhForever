@@ -63,7 +63,7 @@ end
 
 function DM.DeathClock(source)
     local seconds = source.deathTimeSeconds
-    if Plain(seconds, "number") then return DM.Clock(seconds) end
+    if Plain(seconds, "number") and seconds >= 0 then return DM.Clock(seconds) end
     return nil
 end
 
