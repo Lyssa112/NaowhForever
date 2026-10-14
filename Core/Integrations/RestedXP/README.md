@@ -249,3 +249,6 @@ Core/Integrations/RestedXP/
   column like a marker is, and the line is set in as far as the column on top of the sub task indent, so
   the items listed under a "Buy the following:" sit under its text and not at its marker. A marker (the
   speech bubble, the interact cursor, ours) is set in as a sub task is, and the first line never is.
+- The line of an item listed that way has no bar at its side: that bar says open or done, and
+  RestedXP's tracking of such a line marked items done that were not in the bags. The counts under it
+  (a line with a `5/5`, a buy) keep their bars.

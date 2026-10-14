@@ -1881,4 +1881,31 @@ do
     Check(rows[3].points[1][4] == 7 + 12 + 23, "the column it is set in by is the icon's, and its gap")
 end
 
+-- a step that lists items under a line has the bars of its counts, and not the bar at the side of the items
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local function Meters()
+        local count = 0
+        for _, o in ipairs(w.frames) do
+            if o.meter and Seen(o) and o.meter.shown then count = count + 1 end
+        end
+        return count
+    end
+    w.buy.id, w.buy.qty = 159, 5
+    w.items[159] = 2
+    w.talk.frame.text:SetText("Strider Meat: 5/5")
+    w.vendor.frame.icon:SetText("")
+    w.vendor.frame.text:SetText("|T135641:0|t (Darkshore Grouper)")
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(Meters() == 2, "the counted line and the buy have their bars with an item listed in the step")
+    local sides = {}
+    for _, o in ipairs(w.frames) do
+        if o.icon and o.text and o.bar and Seen(o) then sides[#sides + 1] = o.bar.shown end
+    end
+    Check(#sides == 3 and sides[1] == false and sides[2] == true and sides[3] == false,
+        "while the item's line has no bar at its side")
+end
+
 print("PASS rxp window: " .. cases .. " checks")
