@@ -1618,4 +1618,22 @@ do
         "the window turned on: the theme is off and the arrow is still on")
 end
 
+-- with no guide to show (a character that has not picked one) RestedXP's windows are not taken
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local f = Window(w)
+    Check(f.shown and w.guide.frame.alpha == 0 and w.guide.frame.mouse == false, "with a guide: RestedXP's window is taken")
+    local guide = w.rxp.currentGuide
+    w.rxp.currentGuide = nil
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(f.shown == false and w.guide.frame.alpha ~= 0 and w.guide.frame.mouse ~= false,
+        "no guide: ours is not shown, and RestedXP's own is given back to the player to pick one")
+    w.rxp.currentGuide = guide
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(f.shown and w.guide.frame.alpha == 0 and w.guide.frame.mouse == false, "and taken again when there is one")
+end
+
 print("PASS rxp window: " .. cases .. " checks")

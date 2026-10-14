@@ -418,7 +418,7 @@ local function Silence(frame, top)
             if not watched[frame] then
                 watched[frame] = true
                 hooksecurefunc(frame, "SetAlpha", function(self, alpha)
-                    if active and alpha ~= 0 then self:SetAlpha(0) end
+                    if silenced[self] and alpha ~= 0 then self:SetAlpha(0) end
                 end)
             end
         end
@@ -439,9 +439,9 @@ end
 
 local function Release()
     for frame, home in pairs(silenced) do
+        silenced[frame] = nil
         if home.alpha ~= nil and Has(frame, "SetAlpha") then frame:SetAlpha(home.alpha) end
         if home.mouse ~= nil and Has(frame, "EnableMouse") then frame:EnableMouse(home.mouse) end
-        silenced[frame] = nil
     end
 end
 
@@ -1025,12 +1025,13 @@ function Draw()
     wantsBags = false
     if not sizing then Quiet("WindowSkin", Skin) end
     window = window or Build()
-    if not sizing then Take() end
     local model = sizing and sizingModel or Read()
     if not model then
+        Release()
         window:Hide()
         return
     end
+    if not sizing then Take() end
     Reset()
     Refaced()
     local width = sizing and sizing.width or ns.RXPWindowWidth()
