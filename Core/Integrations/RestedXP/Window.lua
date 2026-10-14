@@ -456,6 +456,16 @@ local function Menu()
     if Has(frame, "DropDownMenu") then Quiet("WindowMenu", frame.DropDownMenu) end
 end
 
+-- RestedXP's list of guides, as its own welcome window opens it, or its menu when it has no such list
+local function PickGuide()
+    local v2 = Dig(_G.RXP, "v2")
+    if Has(v2, "ShowGuideSelectionMenu") then
+        Quiet("WindowPick", v2.ShowGuideSelectionMenu, v2)
+    else
+        Menu()
+    end
+end
+
 local function FacePath()
     local name = ns.RXPWindowOption("rxpWindowFont")
     local custom = name ~= "" and type(ns.UI) == "table" and ns.UI.FontPath and ns.UI.FontPath(name)
@@ -820,7 +830,7 @@ local function MakeHit()
     hit.shade = hit:CreateTexture(nil, "BACKGROUND")
     hit.shade:SetAllPoints()
     hit:SetScript("OnClick", function(self)
-        if self.menu then return Menu() end
+        if self.menu then return PickGuide() end
         if MaySkip() then GoTo(self.index) end
     end)
     hit:SetScript("OnEnter", function(self)
@@ -1020,7 +1030,7 @@ function Draw()
         window:Hide()
         return
     end
-    if model.empty then Release() elseif not sizing then Take() end
+    if not sizing then Take() end
     Reset()
     Refaced()
     local width = sizing and sizing.width or ns.RXPWindowWidth()

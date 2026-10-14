@@ -201,11 +201,11 @@ Core/Integrations/RestedXP/
   Addon Font, `rxpArrowFont`). An account from before follows the theme it had on until the arrow is
   set once, and the theme or the window being switched sets it as it was, so that taking the theme away
   does not take the arrow with it.
-- RestedXP's two v2 windows are taken (made see-through and click-free) only while there is a guide to
-  show: a character that has not picked one has RestedXP's own window to pick it with, and it is given
-  back as soon as the guide goes away. The hook that keeps them dark follows what is silenced and not
-  whether the window is on, as giving them back sets their alpha through it.
+- RestedXP's two v2 windows are taken (made see-through and click-free) whenever the window is on, with a
+  guide or without one: its welcome window ("Select a guide:") would say what ours says. They are given
+  back when the window goes off. The hook that keeps them dark follows what is silenced and not whether
+  the window is on, as giving them back sets their alpha through it.
 - With RestedXP there and no guide (a new character, in RestedXP's V2 interface, shows nothing of its own
   until one is picked), the window is shown as that: "No guide selected" and a line, Pick a guide, which
-  opens RestedXP's menu with a plain click (there is nothing to skip, so it takes no shift). RestedXP's own
-  windows are given back meanwhile and taken once there is a guide.
+  opens RestedXP's list of guides (`v2:ShowGuideSelectionMenu`, the one its welcome window opens on a right
+  click, or its menu when it has none) with a plain click: there is nothing to skip, so it takes no shift.

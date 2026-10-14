@@ -88,7 +88,7 @@ end
 -- The game, RestedXP's pieces and our window; each call builds a fresh one.
 local function World(account, opts)
     opts = opts or {}
-    local w = { everything = {}, timers = {}, frames = {}, menus = 0, links = {} }
+    local w = { everything = {}, timers = {}, frames = {}, menus = 0, picks = 0, links = {} }
     local env = { hooked = {} }
     env._G = env
     env.UIParent = Object(w.everything)
@@ -212,6 +212,10 @@ local function Rxp(w, opts)
         return { title = "", rows = rows }
     end
     function rxp.v2:UpdateGuideWindow() end
+    function rxp.v2:ShowGuideSelectionMenu()
+        assert(self == rxp.v2, "a method of v2")
+        w.picks = w.picks + 1
+    end
     function rxp.v2:UpdateActiveStepsFrame() end
     function rxp.v2:UpdatePlayerActiveStepItem() end
     env.RXP = rxp
@@ -646,7 +650,7 @@ do
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
     Check(Window(w).shown == true and Window(w).title.text:find("No guide selected", 1, true) ~= nil
-        and w.guide.frame.alpha ~= 0, "no guide: the window says so, and RestedXP's is left to pick one")
+        and w.guide.frame.alpha == 0, "no guide: the window says so, and RestedXP's welcome is taken")
     w = Start({ rxpWindow = true })
     w.rxp.RXPFrame.activeSteps = nil
     w.rxp.v2:UpdateGuideWindow()
@@ -1572,7 +1576,7 @@ do
         "the window turned on: the theme is off and the arrow is still on")
 end
 
--- with no guide (a character that has not picked one) RestedXP's windows are not taken, and ours says so
+-- with no guide (a character that has not picked one) ours says so, has the list of guides, and RestedXP's welcome is not shown twice
 do
     local account = { rxpWindow = true }
     local w = Start(account)
@@ -1584,8 +1588,8 @@ do
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
     Check(f.shown and f.title.text:find("No guide selected", 1, true), "no guide: the window says so")
-    Check(w.guide.frame.alpha ~= 0 and w.guide.frame.mouse ~= false,
-        "and RestedXP's own is given back to the player to pick one")
+    Check(w.guide.frame.alpha == 0 and w.guide.frame.mouse == false,
+        "and RestedXP's own welcome is taken too: it would say the same twice")
     local pick
     for _, o in ipairs(w.frames) do
         if o.shade and o.menu == true and Seen(o) then pick = o end
@@ -1595,9 +1599,18 @@ do
         if o.text == "Pick a guide" and Seen(o) then lineText = o end
     end
     Check(pick ~= nil and lineText ~= nil, "with a line, and a button over it, to pick one")
-    local menus = w.menus
+    local menus, picks = w.menus, w.picks
     pick.scripts.OnClick(pick, "LeftButton")
-    Check(w.menus == menus + 1, "which opens RestedXP's menu, with no shift: there is nothing to skip")
+    Check(w.picks == picks + 1 and w.menus == menus,
+        "which opens RestedXP's list of guides, with no shift: there is nothing to skip")
+    local list = w.rxp.v2.ShowGuideSelectionMenu
+    w.rxp.v2.ShowGuideSelectionMenu = nil
+    pick.scripts.OnClick(pick, "LeftButton")
+    Check(w.menus == menus + 1, "and its menu when it has no such list")
+    w.rxp.v2.ShowGuideSelectionMenu = function() error("pick") end
+    pick.scripts.OnClick(pick, "LeftButton")
+    Check(type(ns.RXPFailures.WindowPick) == "string", "a list that raises is kept by name and not raised")
+    w.rxp.v2.ShowGuideSelectionMenu = list
     pick.scripts.OnEnter(pick)
     Check(w.env.GameTooltip.text == "Pick a guide" and pick.shade.shown, "and says so")
     ns.SetRXPWindowOption("rxpWindowSkip", "off")
