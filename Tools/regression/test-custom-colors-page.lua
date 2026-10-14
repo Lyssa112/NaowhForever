@@ -772,4 +772,34 @@ do
         "V2: the window's sliders, then the arrow's options, then the window's look")
 end
 
+do
+    -- the search lists what the folds hold, under the fold's title, with no page to build
+    local from = assert(source:find("local Terms = {}", 1, true))
+    local upto = assert(source:find("function ns.SettingsSearchTerms", from, true))
+    local driver = assert(loadstring(constants .. empty .. section .. source:sub(from, upto - 1)
+        .. "local add = ...\nreturn RestedXPSection(setmetatable({ add = add }, Terms), nil, 0)"))
+    local function Terms(account)
+        local seen = {}
+        local env = { ns = RealCore(account, true), colorsPending = false, rxpPending = false,
+            UI = { FontChoices = function() return { [""] = "Addon Font" }, { "" } end,
+                TextureChoices = function(_, label) return { [""] = label }, { "" } end } }
+        env.UI.RefreshPage = function() end
+        env.W = {}
+        setmetatable(env, { __index = _G })
+        setfenv(driver, env)
+        driver(function(text, _, section) seen[text] = section end)
+        return seen
+    end
+    local theme = Terms({ rxpThemes = true })
+    Check(theme["RestedXP Theme (V1)"] == "RestedXP Theme (V1)" and theme["Use Addon Font"] == "RestedXP Theme (V1)"
+        and theme["Style RestedXP's Arrow"] == "RestedXP Theme (V1)", "V1's switch and rows, under its title")
+    Check(theme["RestedXP Naowh Window (V2)"] == "RestedXP Naowh Window (V2)", "and V2's switch, under its own")
+    local window = Terms({ rxpWindow = true })
+    Check(window["Naowh Window Width"] == "RestedXP Naowh Window (V2)" and window["Set Up New Characters"]
+        == "RestedXP Naowh Window (V2)" and window["Title Color"] ~= nil, "V2's rows, the set up and the look, under its title")
+    local none = Terms({})
+    Check(none["RestedXP Theme (V1)"] ~= nil and none["Naowh Window Width"] == nil and none["Style RestedXP's Arrow"] ~= nil,
+        "nothing wished for: the two switches and the arrow's own")
+end
+
 print("PASS custom colors page: " .. cases .. " checks")

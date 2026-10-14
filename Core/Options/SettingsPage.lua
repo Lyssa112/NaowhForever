@@ -627,6 +627,15 @@ function Terms:SectionHeader(_, text)
 end
 
 Terms.FoldHeader = Terms.SectionHeader
+Terms.GroupHeader = Terms.SectionHeader
+
+function Terms:SwitchFold(_, text, _, cfg)
+    self.section = text
+    self:Take({ text = text, tooltip = cfg.tooltip })
+    return nil, 0
+end
+
+function Terms:EndFeature() end
 
 function Terms:Take(row)
     if row.text == "" or row.type == "label" then return end
