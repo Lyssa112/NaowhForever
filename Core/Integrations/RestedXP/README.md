@@ -163,9 +163,12 @@ Core/Integrations/RestedXP/
 - A row that counts has a bar under its text: a buy by the items in the bags against `qty` (RestedXP shows
   no counter for it, so `GetItemCount(id)` is read, and the window listens to `BAG_UPDATE_DELAYED` only
   while such a row is drawn), and any other row by the `3/8` in its text, which RestedXP rewrites as the
-  count changes and so redraws the window. A count of one is a tick box and not a bar, a row that is done
-  is full, and a count past its total is full. Only `buy` tags are counted from the bags, as another tag's
-  `id` or `qty` can mean something else.
+  count changes and so redraws the window. A count of one is a tick box and not a bar, and a count past
+  its total is full. A buy that is done is full whatever the bags hold now (what was bought is used or
+  sold), but a line with its own count is drawn by that count, done or not: RestedXP marks some of them done
+  that still say 0/8 (an objective it skips, like a loot it says not to go out of the way for), and a
+  full bar under 0/8 would say the opposite of the number. Only `buy` tags are counted from the bags, as
+  another tag's `id` or `qty` can mean something else.
 - The Active Targets and Active Items windows (`RXPTargetFrame`, `RXPItemFrame`) take the look of the
   active step's box: the colors of their v2 background and border textures are set in place after
   `UpdateVisuals` (and after the targets' `RenderTargetFrameBackground`, which settings call alone), and

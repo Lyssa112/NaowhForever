@@ -1082,7 +1082,8 @@ local function DrawRow(box, row, x, y, width, first)
     item.text:SetText(row.text)
     local height = math.max(drop + math.max(item.text:GetStringHeight(), textSize), iconSize)
     if row.need and row.need >= COUNT_MIN then
-        local fraction = row.done and 1 or math.min(1, math.max(0, (row.have or 0) / row.need))
+        local counted = math.min(1, math.max(0, (row.have or 0) / row.need))
+        local fraction = row.bags and row.done and 1 or counted
         item.meter:ClearAllPoints()
         item.meter:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + iconW, -(height + COUNT_GAP))
         item.meter:SetWidth(textWidth)
