@@ -60,6 +60,7 @@ ns.FEATURES = {
         autoRepair = true,
         sellJunk = true,
         restock = true,
+        restockHunterAmmo = false,
         foodBar = false,
         consumableBar = false,
         bagSpace = false,
@@ -67,6 +68,7 @@ ns.FEATURES = {
         townMap = true,
         mapUnexplored = true,
         zoneLevels = false,
+        mapFishing = false,
         mapSkyborne = false,
         gearSets = true,
         gearBarVisible = true,
@@ -200,6 +202,13 @@ ns.FEATURES = {
     },
     instanceTracker = {
         enabled = false,
+    },
+    glimmer = {
+        enabled = false,
+        questSparkle = false,
+        minimapIcons = false,
+        gatheredPins = false,
+        cutout = false,
     },
     swingTimer = {
         enabled = true,

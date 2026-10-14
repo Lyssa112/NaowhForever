@@ -83,6 +83,7 @@ local ns = { L = dofile("Tools/regression/locale_stub.lua").L, Upper = string.up
         Style = setmetatable({ PLUS = "plus", CROSS = "cross", OPACITY_MIN = 20 },
             { __index = dofile("Tools/regression/shared_style.lua") }),
         Parts = { HudFont = function(fs, font, size, outline) fs.font, fs.size, fs.outline = font, size, outline end },
+        Anchor = { Rows = function(spec) return { { anchor = spec } } end },
         Settings = {
             Group = function(name) return { group = name } end,
             Look = function(prefix, opts) return { { look = prefix, opts = opts } } end,
@@ -149,6 +150,7 @@ local function Load(path)
     setfenv(fn, env)
     fn("NaowhForever", ns)
 end
+Load("Shared/UI/ItemBar.lua")
 for _, path in ipairs(dofile("Tools/regression/toc_files.lua")("^NaowhForever_Blessings/.*%.lua$")) do
     if not path:find("/UI/Window%.lua$") then Load(path) end
 end
@@ -327,6 +329,35 @@ check("the icon stops at 24 px on big buttons", classIcon.w == 24)
 settings.blessBarSize = 20
 studio.paint(preview, "group")
 check("and keeps two thirds on small ones", classIcon.w == 13)
+-- Growth Direction: Left and Up grow from the opposite edge; the saved Horizontal and Vertical still mean Right and Down.
+settings.blessBarSize, settings.blessLabelStyle, settings.blessLayout = nil, nil, "LEFT"
+studio.paint(preview, "group")
+check("left: the class buttons stack from the right edge", first.point == "RIGHT" and second.point == "RIGHT"
+    and second.x == first.x - 36 and second.y == 0)
+check("left: the bar is a row with the labels under it", preview.bar.h == 30 and first.label.point == "TOP"
+    and preview.plus.point == "RIGHT")
+cursorX = 100
+grip.scripts.OnMouseDown(grip, "LeftButton")
+cursorX = 90
+grip.scripts.OnUpdate(grip)
+check("left: dragging left widens the gap", S.Get("blessGroupSpacing") == 16)
+grip.scripts.OnMouseUp(grip, "LeftButton")
+cursorX, settings.blessGroupSpacing = 0, nil
+settings.blessLayout = "UP"
+studio.paint(preview, "group")
+check("up: the class buttons stack from the bottom", first.point == "BOTTOM" and second.point == "BOTTOM"
+    and second.y == first.y + 36 and second.x == 0)
+check("up: the bar is a column with the labels beside it", preview.bar.w == 30 and first.label.point == "LEFT")
+cursorY = 100
+grip.scripts.OnMouseDown(grip, "LeftButton")
+cursorY = 110
+grip.scripts.OnUpdate(grip)
+check("up: dragging up widens the gap", S.Get("blessGroupSpacing") == 16)
+grip.scripts.OnMouseUp(grip, "LeftButton")
+check("the card's summary says vertical for up", cards.bar.summary(S):find(", vertical", 1, true))
+cursorY, settings.blessGroupSpacing, settings.blessLayout = 0, nil, nil
+studio.paint(preview, "group")
+
 settings.blessShowLabels = false
 studio.paint(preview, "group")
 check("Class Labels off hides the icon too", not classIcon.shown and not warriorCell.label.shown)
@@ -347,6 +378,11 @@ check("a column's names sit beside it with nothing to run into: never squeezed",
     warriorCell.label.text == "Warrior" and warriorCell.label.size == 10)
 settings.blessBarSize, settings.blessSpacing, settings.blessLayout = nil, nil, nil
 studio.paint(preview, "group")
+
+-- The Anchor card: the shared anchor rows on the bar's own settings, and a way back above Buff Reminders.
+local anchorRows = cards.anchor and cards.anchor.rows
+check("the Anchor card has the shared rows and Reset Position", anchorRows and anchorRows[1].anchor.prefix == "bless"
+    and anchorRows[2].label == "Reset Position" and anchorRows[2].button == B.ResetPosition)
 
 -- Off: nothing in the preview edits.
 settings.blessings = false
