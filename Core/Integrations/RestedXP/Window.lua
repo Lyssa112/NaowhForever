@@ -929,7 +929,7 @@ local function DrawIcon(item, row, size)
     item.glyph:Show()
 end
 
-local function DrawRow(box, row, x, y, width, first, shop)
+local function DrawRow(box, row, x, y, width, first)
     local item = Acquire("row")
     item:SetParent(box)
     item.box = box
@@ -965,7 +965,7 @@ local function DrawRow(box, row, x, y, width, first, shop)
     Faced(item.text, textSize)
     item.text:SetText(row.text)
     local height = math.max(drop + math.max(item.text:GetStringHeight(), textSize), iconSize)
-    if not shop and row.need and row.need >= COUNT_MIN then
+    if row.need and row.need >= COUNT_MIN then
         local fraction = row.done and 1 or math.min(1, math.max(0, (row.have or 0) / row.need))
         item.meter:ClearAllPoints()
         item.meter:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + iconW, -(height + COUNT_GAP))
@@ -1011,14 +1011,10 @@ local function DrawBox(step, y, inner, current)
     end
     local by = -BOX_PAD - head - gap
     local column = ICON_SIZE + ICON_GAP
-    local shop = false
-    for _, row in ipairs(step.rows) do
-        if row.nested then shop = true end
-    end
     for i, row in ipairs(step.rows) do
         local set = i > 1 and INDENT or 0
         if i > 1 and row.nested then set = set + column end
-        by = by - DrawRow(box, row, BOX_PAD + set, by, inner - BOX_PAD * 2 - set, i == 1, shop) - gap
+        by = by - DrawRow(box, row, BOX_PAD + set, by, inner - BOX_PAD * 2 - set, i == 1) - gap
     end
     box:SetHeight(-by + BOX_PAD - gap)
     return y + by - BOX_PAD
