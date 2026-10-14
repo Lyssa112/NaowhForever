@@ -882,7 +882,106 @@ do
     Check(true, "with no arrow to paint: nothing raised")
 end
 
--- the look: panel, borders, menu, spacing and the colors of every text
+-- on the Forever skin: the bronze inset on the box and the window, the skin's rim and field on the bars, its sign
+do
+    local account = { rxpWindow = true, rxpWindowTheme = "forever" }
+    local w = Start(account)
+    local f = Window(w)
+    local ns = w.ns
+    local known = true
+    ns.Shared = { Style = { FOREVER_FIELD_RGB = { r = 0.1, g = 0.2, b = 0.3 }, FOREVER_PLUS_ATLAS = "plus",
+            FOREVER_MINUS_ATLAS = "minus" },
+        Parts = {
+            ForeverInset = function(parent)
+                local inset = Object(w.everything)
+                inset.fill = Object(w.everything)
+                inset.of = parent
+                return inset
+            end,
+            ForeverBox = function(frame)
+                local rim = { frame = frame, _frame = Object(w.everything) }
+                function rim:SetColor() end
+                return rim
+            end,
+            ForeverAtlas = function(texture, name)
+                if known then texture.atlas = name end
+                return known
+            end } }
+    local function Boxes()
+        local out = {}
+        for _, o in ipairs(w.frames) do
+            if o.label and o.logo and Seen(o) then out[#out + 1] = o end
+        end
+        return out
+    end
+    ns.SetRXPWindowOption("rxpWindowBoxOpacity", 40)
+    Flush(w)
+    local box = Boxes()[1]
+    Check(box.inset and box.inset.shown ~= false and box.inset.of == box, "the box has the skin's inset")
+    local solid = box.inset.fill.solid
+    Check(solid and math.abs(solid[4] - 0.4) < 1e-9, "its fill has the box's color and opacity")
+    Check(box.back.shown == false and box.borderObject._frame.shown == false, "and the flat back and line are not drawn")
+    ns.SetRXPWindowOption("rxpWindowBoxBorder", false)
+    Flush(w)
+    Check(box.inset.shown == false and box.back.shown ~= false and math.abs(box.back.solid[4] - 0.4) < 1e-9,
+        "no border: the inset is not drawn, and the box is the flat back as before")
+    ns.SetRXPWindowOption("rxpWindowBoxBorder", true)
+    Flush(w)
+
+    local bar = f.bar
+    Check(bar.rim and bar.rim.frame == bar and bar.rim._frame.shown ~= false, "the guide's bar has the skin's rim")
+    Check(bar.track.solid[1] == 0.1 and bar.track.solid[2] == 0.2 and bar.track.solid[4] == 1, "and the skin's field for its track")
+
+    Check(f.fold.sign.atlas == "minus" and f.fold.sign.shown ~= false and f.fold.text.shown == false,
+        "the fold has the skin's minus, not the text")
+    f.fold.scripts.OnClick(f.fold)
+    Flush(w)
+    Check(f.fold.sign.atlas == "plus", "and its plus when folded")
+    f.fold.scripts.OnClick(f.fold)
+    Flush(w)
+
+    ns.SetRXPWindowOption("rxpWindowBorder", true)
+    ns.SetRXPWindowOption("rxpWindowPanel", true)
+    Flush(w)
+    Check(f.inset and f.inset.shown ~= false and f.back.shown == false and f.borderObject._frame.shown == false,
+        "a window with a border: the inset in place of the flat back and line")
+    local pr = f.inset.fill.solid
+    Check(pr and pr[4] > 0, "with its panel's color")
+    ns.SetRXPWindowOption("rxpWindowPanel", false)
+    Flush(w)
+    Check(f.inset.fill.solid[4] == 0, "no panel: the inset's fill is clear")
+    ns.SetRXPWindowOption("rxpWindowBorder", false)
+    Flush(w)
+    Check(f.inset.shown == false, "no border: no inset")
+
+    known = false
+    Flush(w)
+    f.fold.scripts.OnClick(f.fold)
+    f.fold.scripts.OnClick(f.fold)
+    Flush(w)
+    Check(f.fold.text.shown ~= false and f.fold.sign.shown == false, "a client without the sign: the text stays")
+
+    ns.SetRXPWindowTheme(nil)
+    Flush(w)
+    Check(box.inset.shown == false and bar.rim._frame.shown == false and f.fold.sign.shown == false,
+        "with the addon's theme and the addon not in the skin: none of it")
+    ns.foreverSkin = true
+    ns.SetRXPWindowTheme(nil)
+    Flush(w)
+    Check(box.inset.shown ~= false and bar.rim._frame.shown ~= false,
+        "the addon in the skin and the window's theme the addon's: all of it")
+    ns.SetRXPWindowTheme("midnight")
+    Flush(w)
+    Check(box.inset.shown == false and bar.rim._frame.shown == false,
+        "and a theme of the presets is not the skin")
+    ns.foreverSkin = nil
+    ns.Shared = nil
+    ns.SetRXPWindowTheme("forever")
+    Flush(w)
+    Check(box.inset.shown == false and f.shown, "no skin parts in the client: nothing raised, nothing drawn")
+end
+
+-- the look: panel, borders, menu, spacing and the colors of every text
 do
     local account = { rxpWindow = true, rxpWindowTheme = "custom" }
     local w = Start(account)

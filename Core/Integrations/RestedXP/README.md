@@ -192,6 +192,11 @@ Core/Integrations/RestedXP/
   (`framePositions.arrowFrame`, by profile), and a character that is set up has an arrow that is still
   there in the middle: in the profile, which is read at load, and on the frame, so that the position
   RestedXP saves when the game closes is not the old one. One the player moved is left where it is.
+- In the Forever skin (the addon is in it and the window's theme is the addon's, or the window's theme is Forever) the
+  window is drawn in the skin's art where the client has it (`SkinParts`, `Skinned`): the bronze inset
+  (`ForeverInset`) behind the step box with its border on and behind the window with its border on, in place
+  of the flat back and line, the skin's rim and field on the bars, and its plus and minus for the fold. The
+  box's opacity and the window's panel are the fill of the inset; with no border the flat back is what is drawn.
 - The window has a theme of its own (`rxpWindowTheme`: the addon's to start, a preset, or Custom), picked in
   its fold and shown at once. It is the window's colors alone: the addon's theme (COLORS) is not read for
   a preset and not set by it, and the icons and the arrow follow the window's. The colors are the preset's
