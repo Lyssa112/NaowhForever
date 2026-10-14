@@ -714,6 +714,8 @@ do
     Check(switch and set and note and width and scale and switch < set and set < note and note < width
         and width < scale, "in the window's section it is the first thing: before what it needs and its sliders")
     Check(Position(s, "This Character") == set + 1, "and the button for the character played is beside it")
+    Check(("," .. table.concat(s.headers, ",") .. ","):find(",RESTEDXP,", 1, true) == nil,
+        "and there is no section of shared rows for it")
     Check(button and button.type == "button" and button.buttonText == "Set Up", "and a button for the character played")
     toggle.setValue(true)
     Check(s.account.rxpSetup == true and toggle.getValue() == true, "turned on, it is kept")
