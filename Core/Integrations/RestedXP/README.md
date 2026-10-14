@@ -81,10 +81,25 @@ Core/Integrations/RestedXP/
   RestedXP's own checkbox, so what it does for a skipped step is RestedXP's.
 - Everything that changes asks for a redraw, and the redraw is one per frame (`C_Timer.After(0)`):
   `SetStep`, `UpdateGuideWindow`, `UpdateActiveStepsFrame`, `UpdatePlayerActiveStepItem` and the
-  rows' text. The window needs RestedXP's V2 interface (`v2:IsGuideWindowEnabled()`): the active
-  step rows and the guide's rows are built for it.
+  rows' text. The first four are RestedXP building what it shows and the last is a counter ticking:
+  only the first four make the redraw read RestedXP's steps and walk its windows again (`Rebuilt`).
+  The window needs RestedXP's V2 interface (`v2:IsGuideWindowEnabled()`): the active step rows and
+  the guide's rows are built for it.
 - Steps after the active one come from `v2:BuildGuideStepsSnapshot`, which is what RestedXP's own
-  v2 guide window lists, so a step it hides or has done is not listed here either.
+  v2 guide window lists, so a step it hides or has done is not listed here either. It walks the
+  whole guide and joins every step's text, so it is read once and kept, for the most steps that can
+  be listed, by guide and by the step it follows, until RestedXP builds again. A counter ticking
+  redraws from what was kept, as RestedXP's own window is only rebuilt then too: with a guide of 700
+  steps a redraw went from reading it (2.6 ms of Lua, plus the same in RestedXP's own window at its
+  layout) to none.
+- RestedXP's two windows are walked (`Silence`) for frames made since the last time only when it built
+  something, and when they are given back and taken again. A window that is not there yet is asked
+  for at every redraw until both are.
+- A font string of the window's own is set once: `Faced` leaves it when its path, size and outline
+  are the ones it has, and the two font strings of a row, which their row sets at every draw, are not
+  in the loop that follows an option. A redraw that changes no size sets no font (22 calls before, in
+  a window of three rows and six lines). RestedXP's own title text, which it may set again itself,
+  is always set.
 - The window has no panel of its own, as RestedXP's coming layout has none: a header with a rule under
   it, the active step in a box (the only thing with a background), and the steps after it as plain
   shadowed lines over the world, so every text carries a shadow (`SHADOW`) to be read on any ground.

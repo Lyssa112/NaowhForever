@@ -39,9 +39,11 @@ local PLACEHOLDER_GLYPHS = { [TARGET_PLACEHOLDER] = "gossip", [MOB_PLACEHOLDER] 
 local OUTLINE_FLAGS = { outline = "OUTLINE", thick = "THICKOUTLINE" }
 
 local window, active, started, pending, styled, wantsBags
+local retake = true
 local sizing, sizingModel
 local pool, used = { box = {}, row = {}, line = {}, hit = {} }, { box = 0, row = 0, line = 0, hit = 0 }
 local silenced = setmetatable({}, { __mode = "k" })
+local dressed = setmetatable({}, { __mode = "k" })
 local watched = setmetatable({}, { __mode = "k" })
 local placeholders = setmetatable({}, { __mode = "k" })
 local targetingHooked = {}
@@ -62,6 +64,12 @@ local function Refresh()
 end
 
 ns.RXPWindowRefresh = Refresh
+
+local function Rebuilt()
+    retake = true
+    ns.RXPWindowStale()
+    Refresh()
+end
 
 local function Silence(frame, top)
     if type(frame) ~= "table" then return end
@@ -87,11 +95,13 @@ local function Silence(frame, top)
 end
 
 local function Take()
-    local rxp = _G.RXP
-    Silence(Dig(_G, "RXPV2GuideWindow", "frame"), true)
-    local name = Dig(rxp, "player", "name")
+    local guide = Dig(_G, "RXPV2GuideWindow", "frame")
+    local name = Dig(_G.RXP, "player", "name")
     local steps = type(name) == "string" and Dig(_G, "RXPActiveStepsFrame" .. name) or nil
-    Silence(Dig(steps, "frame") or steps, true)
+    steps = Dig(steps, "frame") or steps
+    Silence(guide, true)
+    Silence(steps, true)
+    return type(guide) == "table" and type(steps) == "table"
 end
 
 local function Release()
@@ -100,6 +110,7 @@ local function Release()
         if home.alpha ~= nil and Has(frame, "SetAlpha") then frame:SetAlpha(home.alpha) end
         if home.mouse ~= nil and Has(frame, "EnableMouse") then frame:EnableMouse(home.mouse) end
     end
+    retake = true
 end
 
 local function Save(frame)
@@ -145,7 +156,12 @@ end
 
 local function Faced(fs, size)
     local outline = ns.RXPWindowOption("rxpWindowOutline")
-    fs:SetFont(FacePath(), size, OUTLINE_FLAGS[outline] or "")
+    local path, last = FacePath(), dressed[fs]
+    if last and last.path == path and last.size == size and last.outline == outline then return end
+    local made = fs:SetFont(path, size, OUTLINE_FLAGS[outline] or "")
+    if last then
+        last.path, last.size, last.outline = made ~= false and path or nil, size, outline
+    end
     if outline == "shadow" then
         fs:SetShadowOffset(SHADOW, -SHADOW)
         fs:SetShadowColor(0, 0, 0, SHADOW_ALPHA)
@@ -158,10 +174,11 @@ local function Face(fs, sizeKey)
     Faced(fs, type(sizeKey) == "number" and sizeKey or ns.RXPWindowOption(sizeKey))
 end
 
-local function Text(parent, sizeKey, justify)
+local function Text(parent, sizeKey, justify, drawn)
     local fs = parent:CreateFontString(nil, "OVERLAY")
     fs.sizeKey = sizeKey
-    faced[#faced + 1] = fs
+    dressed[fs] = {}
+    if not drawn then faced[#faced + 1] = fs end
     Face(fs, sizeKey)
     fs:SetJustifyH(justify or "LEFT")
     fs:SetJustifyV("TOP")
@@ -539,10 +556,10 @@ local function MakeRow()
     row:SetScript("OnEnter", function(self) Tip(self.box or self, TEXT_SKIP, true) end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
-    row.icon = Text(row, ICON_SIZE)
+    row.icon = Text(row, ICON_SIZE, nil, true)
     row.glyph = row:CreateTexture(nil, "OVERLAY")
     row.meter = MakeBar(row)
-    row.text = Text(row, "rxpWindowTextSize")
+    row.text = Text(row, "rxpWindowTextSize", nil, true)
     row.text:SetWordWrap(true)
     Draggable(row)
     return row
@@ -853,7 +870,7 @@ function Draw()
         window:Hide()
         return
     end
-    if not sizing then Take() end
+    if not sizing and retake then retake = not Take() end
     Reset()
     Refaced()
     local width = sizing and sizing.width or ns.RXPWindowWidth()
@@ -889,7 +906,7 @@ local function Apply()
 end
 
 local function Hook(owner, name)
-    if Has(owner, name) then hooksecurefunc(owner, name, Guarded("WindowRefresh", Refresh)) end
+    if Has(owner, name) then hooksecurefunc(owner, name, Guarded("WindowRefresh", Rebuilt)) end
 end
 
 function ns.RXPWindowReady()

@@ -57,7 +57,10 @@ local function Object(everything)
         return self.normalTexture
     end
     function o:SetVertexColor(r, g, b, a) self.vertex = { r, g, b, a } end
-    function o:SetFont(path, size, flags) self.font, self.fontSize, self.fontFlags = path, size, flags end
+    function o:SetFont(path, size, flags)
+        self.font, self.fontSize, self.fontFlags = path, size, flags
+        self.fonts = (self.fonts or 0) + 1
+    end
     function o:SetShown(on) self.shown = on and true or false end
     function o:SetShadowOffset(x, y) self.shadowX, self.shadowY = x, y end
     function o:SetValue(v) self.value = v end
@@ -247,8 +250,10 @@ local function Rxp(w, opts)
     local stepsFrame = { frame = Object(w.everything) }
     local checkbox = Object(w.everything)
     stepsFrame.frame.kids[1] = checkbox
-    env.RXPV2GuideWindow = guide
-    env.RXPActiveStepsFrameTester = stepsFrame
+    if not opts.later then
+        env.RXPV2GuideWindow = guide
+        env.RXPActiveStepsFrameTester = stepsFrame
+    end
     w.rxp, w.guide, w.steps, w.rows, w.active, w.button, w.checkbox = rxp, guide, stepsFrame, rows, active, button, checkbox
     w.talk, w.buy, w.vendor = talk, buy, vendor
     return rxp
@@ -706,6 +711,113 @@ do
     Flush(w)
     rows = Rows()
     Check(rows[2].icon.text == "|Tshown|t", "an icon RestedXP shows is still shown")
+end
+
+-- a text that changes is no new guide: nothing is read again, walked again or set again; a step set is
+do
+    local w = Start({ rxpWindow = true })
+    local ns, rxp = w.ns, w.rxp
+    Flush(w)
+    local walks = 0
+    for _, frame in ipairs({ w.guide.frame, w.steps.frame, w.button, w.checkbox }) do
+        local get = frame.GetChildren
+        frame.GetChildren = function(self)
+            walks = walks + 1
+            return get(self)
+        end
+    end
+    local function Fonts()
+        local n = 0
+        for _, o in ipairs(w.everything) do n = n + (o.fonts or 0) end
+        return n
+    end
+    local function Lines()
+        local out = {}
+        for _, o in ipairs(w.everything) do
+            if o.text and Seen(o) and o.text:find("^%d+  ") then out[#out + 1] = o end
+        end
+        return out
+    end
+    local function Row(text)
+        for _, o in ipairs(w.frames) do
+            if o.icon and o.text and o.bar and Seen(o) and o.text.text == text then return o end
+        end
+    end
+    local snapshots, fonts = rxp.v2.snapshots, Fonts()
+    w.rows[3].text = "Step 37 renamed\nline two"
+    w.talk.frame.text:SetText("Talk to Duokna 1/2")
+    Flush(w)
+    Check(rxp.v2.snapshots == snapshots, "a text changing: the steps after the active one are not read again")
+    Check(Lines()[1].text == "37  Step 37 line one", "and are the list RestedXP's own window has, until it is laid out again")
+    Check(walks == 0, "RestedXP's windows are not walked again for it")
+    Check(Fonts() == fonts, "and no font is set that is set already, the first row's bigger one included")
+    Check(Row("Talk to Duokna 1/2") ~= nil, "while the row reads the text")
+
+    rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(rxp.v2.snapshots == snapshots + 1 and Lines()[1].text == "37  Step 37 renamed",
+        "RestedXP laying its window out: they are read, once, and the list follows")
+    Check(walks > 0, "and its windows are walked, for what it made")
+    local late = Object(w.everything)
+    w.guide.frame.kids[#w.guide.frame.kids + 1] = late
+    rxp.v2:UpdateActiveStepsFrame()
+    Flush(w)
+    Check(late.mouse == false, "a frame it made then is out of the mouse's way")
+
+    snapshots, fonts = rxp.v2.snapshots, Fonts()
+    ns.SetRXPWindowSteps(3)
+    Flush(w)
+    Check(#Lines() == 3 and rxp.v2.snapshots == snapshots, "fewer steps listed: taken from what was read")
+    ns.SetRXPWindowSteps(12)
+    Flush(w)
+    Check(#Lines() == 12 and rxp.v2.snapshots == snapshots, "and more, up to the most")
+    ns.SetRXPWindowSteps(6)
+    Flush(w)
+    ns.SetRXPWindowOption("rxpWindowListSize", 14)
+    ns.SetRXPWindowOption("rxpWindowTextSize", 15)
+    Flush(w)
+    local sized = true
+    for _, o in ipairs(Lines()) do
+        if o.fontSize ~= 14 then sized = false end
+    end
+    Check(Fonts() > fonts and sized and #Lines() == 6, "a size changed: the lines are set in it")
+    Check(Row("Talk to Duokna 1/2").text.fontSize == 17 and Row("Vendor Trash").text.fontSize == 15,
+        "and so are the rows, the first one bigger")
+    Check(rxp.v2.snapshots == snapshots, "none of it reads the steps")
+
+    snapshots = rxp.v2.snapshots
+    rxp.currentGuide = { name = "1-5 Mulgore", steps = rxp.currentGuide.steps }
+    w.talk.frame.text:SetText("Talk to Duokna 2/2")
+    Flush(w)
+    Check(rxp.v2.snapshots == snapshots + 1, "another guide is not listed from the last one's steps")
+    snapshots = rxp.v2.snapshots
+    rxp.GetGuideProgress = function() return 40, "id" end
+    w.talk.frame.text:SetText("Talk to Duokna 0/2")
+    Flush(w)
+    Check(rxp.v2.snapshots == snapshots + 1 and Lines()[1].text == "42  Step 42 line one",
+        "nor are the steps after another step")
+
+    walks = 0
+    ns.SetRXPWindow(false)
+    ns.SetRXPWindow(true)
+    Check(walks > 0 and w.guide.frame.alpha == 0 and w.button.mouse == false,
+        "off and on: its windows are taken again, whatever RestedXP did meanwhile")
+end
+
+-- RestedXP's windows that are not there yet are taken when they are, at whatever redraw is first
+do
+    local w = Start({ rxpWindow = true }, { later = true })
+    Flush(w)
+    Check(w.guide.frame.alpha == nil, "not there: nothing is taken")
+    w.env.RXPV2GuideWindow = w.guide
+    w.talk.frame.text:SetText("Talk to Duokna 1/3")
+    Flush(w)
+    Check(w.guide.frame.alpha == 0 and w.button.mouse == false and w.steps.frame.alpha == nil,
+        "one is there: it is taken, with what is in it, and the other is asked for again")
+    w.env.RXPActiveStepsFrameTester = w.steps
+    w.talk.frame.text:SetText("Talk to Duokna 2/3")
+    Flush(w)
+    Check(w.steps.frame.alpha == 0 and w.checkbox.mouse == false, "and when it is there too, it is taken")
 end
 
 -- what is missing or fails is left out, quietly

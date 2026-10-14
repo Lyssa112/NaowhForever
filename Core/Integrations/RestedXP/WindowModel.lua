@@ -4,6 +4,7 @@ local Safe = ns.RXPSafe
 local Has, Dig, Run = Safe.Has, Safe.Dig, Safe.Run
 
 local ACTIVE_SHOWN = 3
+local UPCOMING_MAX = select(2, ns.RXPWindowStepsRange())
 local PERCENT, ROUND = 100, 0.5
 local COUNT_PATTERN = "(%d+)%s*/%s*(%d+)"
 local LEAD_ICON, LEAD_PLAIN = "^%s*(|T[^|]*|t)%s*", "^|T([^|:]+):%d+|t$"
@@ -110,19 +111,37 @@ local function StepLabel(rxp, step)
     return (type(format) == "string" and format or TEXT_STEP):format(tonumber(step.index) or 0)
 end
 
+local kept
+
+function ns.RXPWindowStale()
+    kept = nil
+end
+
+local function Listed(v2, after)
+    local snapshot = Run("WindowSteps", v2.BuildGuideStepsSnapshot, v2, true)
+    if type(snapshot) ~= "table" or type(snapshot.rows) ~= "table" then return nil end
+    local list = {}
+    for _, row in ipairs(snapshot.rows) do
+        if type(row) == "table" and type(row.index) == "number" and row.index > after and not row.hidden
+                and not row.complete and type(row.text) == "string" then
+            list[#list + 1] = { index = row.index, text = Plain(row.text:match("^[^\n]*")) }
+            if #list == UPCOMING_MAX then break end
+        end
+    end
+    return list
+end
+
 local function Upcoming(rxp, after, count)
     local out = {}
     local v2 = Dig(rxp, "v2")
     if count == 0 or not Has(v2, "BuildGuideStepsSnapshot") then return out end
-    local snapshot = Run("WindowSteps", v2.BuildGuideStepsSnapshot, v2, true)
-    if type(snapshot) ~= "table" or type(snapshot.rows) ~= "table" then return out end
-    for _, row in ipairs(snapshot.rows) do
-        if type(row) == "table" and type(row.index) == "number" and row.index > after and not row.hidden
-                and not row.complete and type(row.text) == "string" then
-            out[#out + 1] = { index = row.index, text = Plain(row.text:match("^[^\n]*")) }
-            if #out == count then break end
-        end
+    local guide = rxp.currentGuide
+    if not (kept and kept.guide == guide and kept.after == after) then
+        local list = Listed(v2, after)
+        if not list then return out end
+        kept = { guide = guide, after = after, list = list }
     end
+    for i = 1, math.min(count, #kept.list) do out[i] = kept.list[i] end
     return out
 end
 
