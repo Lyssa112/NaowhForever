@@ -1158,7 +1158,7 @@ do
     Check(box.inset.shown == false and f.shown, "no skin parts in the client: nothing raised, nothing drawn")
 end
 
--- the look: panel, borders, menu, spacing and the colors of every text
+-- the look: panel, borders, menu, spacing and the colors of every text
 do
     local account = { rxpWindow = true, rxpWindowTheme = "custom" }
     local w = Start(account)
