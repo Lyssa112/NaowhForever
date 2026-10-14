@@ -14,7 +14,7 @@ local PERCENT, ROUND, CHANNEL_MAX = 100, 0.5, 255
 local PAD, BOX_PAD, FOLD_W, PROGRESS_W = 10, 7, 16, 120
 local HEAD_PAD, LIST_PAD = 10, 6
 local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
-local BAR_W, ICON_GAP, MENU_SIZE, GRIP_SIZE = 2, 5, 22, 16
+local BAR_W, ICON_GAP, GRIP_SIZE = 2, 5, 16
 local FIRST_ICON_GROW = 2
 local PANEL_ALPHA, EDGE_ALPHA, RULE_ALPHA, MUTED_ALPHA = 0.92, 0.8, 0.5, 0.9
 local BOX_OPACITY = 55
@@ -23,7 +23,6 @@ local BAG_EVENT = "BAG_UPDATE_DELAYED"
 local SHADOW, SHADOW_ALPHA = 1, 0.9
 local GOLD = { r = 1, g = 0.82, b = 0 }
 local TEXT_FOLD, TEXT_UNFOLD, TEXT_DOT = "-", "+", " \194\183 "
-local MENU_ICON = "Interface\\ChatFrame\\UI-ChatIcon-Chat-Up"
 local LOGO = "Interface\\AddOns\\RXPGuides\\Textures\\rxp_logo-64"
 local GRADIENT = ns.MEDIA .. "NaowhGradient.tga"
 local TEXT_GRADIENT = "Naowh Gradient"
@@ -34,6 +33,7 @@ local GRIP_CORNER = "BOTTOMRIGHT"
 local TEXT_STEP = "Step %d"
 local TEXT_SKIP = "Skip step"
 local TEXT_SHIFT = "Shift-click"
+local TEXT_MENU = "Right-click: menu"
 local TEXT_GO = "Go to step %d"
 local TIP_DIM = 0.7
 local HOME = { "LEFT", "LEFT", 0, 35 }
@@ -72,8 +72,6 @@ local OPTIONS = {
       min = 12, max = 48, tip = "How big RestedXP's logo is." },
     { key = "rxpWindowIndent", group = "Look", kind = "number", label = "Row Indent", default = 12, min = 0,
       max = 32, tip = "How far the rows after the first are set in." },
-    { key = "rxpWindowMenu", group = "Look", kind = "toggle", label = "Show Menu Button", default = true,
-      tip = "The button that opens RestedXP's menu." },
     { key = "rxpWindowGrip", group = "Look", kind = "toggle", label = "Show Resize Grip", default = true,
       tip = "The corner that is dragged to change the window's width and how many steps are listed." },
     { key = "rxpWindowSkip", group = "Look", kind = "choice", label = "Skipping Steps", default = "shift",
@@ -627,14 +625,17 @@ local function MaySkip()
 end
 
 local function Tip(owner, text)
+    if GameTooltip:IsForbidden() then return end
     local mode = ns.RXPWindowOption("rxpWindowSkip")
-    if mode == "off" or GameTooltip:IsForbidden() then return end
     GameTooltip:SetOwner(owner, TIP_ANCHOR)
-    GameTooltip:SetText(text)
-    if mode == "shift" then
-        GameTooltip:AddLine(TEXT_SHIFT, TIP_DIM, TIP_DIM, TIP_DIM)
-        GameTooltip:Show()
+    if mode == "off" then
+        GameTooltip:SetText(TEXT_MENU)
+    else
+        GameTooltip:SetText(text)
+        if mode == "shift" then GameTooltip:AddLine(TEXT_SHIFT, TIP_DIM, TIP_DIM, TIP_DIM) end
+        GameTooltip:AddLine(TEXT_MENU, TIP_DIM, TIP_DIM, TIP_DIM)
     end
+    GameTooltip:Show()
 end
 
 -- Dragging the corner sets the window's width, and how many steps are listed from how tall it was made: the
@@ -737,11 +738,6 @@ local function Build()
     f.rule = ns.Solid(f, "ARTWORK", T.fg, 1)
     ns.Hairline(f.rule, "h")
     f.bar = MakeBar(f)
-    f.menu = CreateFrame("Button", nil, f)
-    f.menu:SetSize(MENU_SIZE, MENU_SIZE)
-    f.menu:SetNormalTexture(MENU_ICON)
-    f.menu:SetHighlightTexture(MENU_ICON)
-    f.menu:SetScript("OnClick", Menu)
     f:SetScript("OnSizeChanged", function(_, width, height) LiveSize(width, height) end)
     f.grip = MakeGrip(f)
     Place(f)
@@ -751,8 +747,11 @@ end
 local function MakeBox()
     local T = ns.THEME
     local box = CreateFrame("Button", nil, window)
-    box:RegisterForClicks("LeftButtonUp")
-    box:SetScript("OnClick", function() if MaySkip() then SkipStep() end end)
+    box:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    box:SetScript("OnClick", function(_, button)
+        if button == "RightButton" then return Menu() end
+        if MaySkip() then SkipStep() end
+    end)
     box:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP) end)
     box:SetScript("OnLeave", function() GameTooltip:Hide() end)
     Draggable(box)
@@ -784,8 +783,11 @@ local function MakeRow()
     end)
     row:SetScript("OnHyperlinkEnter", LinkEnter)
     row:SetScript("OnHyperlinkLeave", LinkLeave)
-    row:RegisterForClicks("LeftButtonUp")
-    row:SetScript("OnClick", function() if MaySkip() then SkipStep() end end)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row:SetScript("OnClick", function(_, button)
+        if button == "RightButton" then return Menu() end
+        if MaySkip() then SkipStep() end
+    end)
     row:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP) end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
@@ -805,10 +807,13 @@ end
 
 local function MakeHit()
     local hit = CreateFrame("Button", nil, window)
-    hit:RegisterForClicks("LeftButtonUp")
+    hit:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     hit.shade = hit:CreateTexture(nil, "BACKGROUND")
     hit.shade:SetAllPoints()
-    hit:SetScript("OnClick", function(self) if MaySkip() then GoTo(self.index) end end)
+    hit:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then return Menu() end
+        if MaySkip() then GoTo(self.index) end
+    end)
     hit:SetScript("OnEnter", function(self)
         if ns.RXPWindowOption("rxpWindowSkip") == "off" then return end
         self.shade:SetColorTexture(ns.RXPWindowColor("line"))
@@ -1037,14 +1042,6 @@ function Draw()
             y = y - listH
         end
     end
-    window.menu:ClearAllPoints()
-    if folded or not ns.RXPWindowOption("rxpWindowMenu") then
-        window.menu:Hide()
-    else
-        window.menu:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y - gap)
-        window.menu:Show()
-        y = y - gap - MENU_SIZE
-    end
     if not sizing then window:SetHeight(-y + PAD) end
     if wantsBags then window:RegisterEvent(BAG_EVENT) else window:UnregisterEvent(BAG_EVENT) end
     window.lineHeight = listH
@@ -1054,7 +1051,7 @@ function Draw()
     if Has(window, "SetResizeBounds") then
         window:SetResizeBounds(WIDTH_MIN, window.chrome, WIDTH_MAX, window.chrome + STEPS_MAX * listH)
     end
-    window.grip:SetShown(ns.RXPWindowOption("rxpWindowGrip") and not folded)
+    window.grip:SetShown(ns.RXPWindowOption("rxpWindowGrip") and not folded and not locked)
     window:Show()
 end
 

@@ -85,8 +85,9 @@ Core/Integrations/RestedXP/
   it, the active step in a box (the only thing with a background), and the steps after it as plain
   shadowed lines over the world, so every text carries a shadow (`SHADOW`) to be read on any ground.
   The lines after the active step are plain text (`Plain`: no icons, colors or links), as the active
-  step's rows are what carries them. The small button below the list opens RestedXP's menu, as a right
-  click on a window with no panel is hard to find.
+  step's rows are what carries them. RestedXP's menu is a right click, on the window and on a row, the
+  box and a line of the list too (they take the mouse, so each is given the right button); a button for it
+  was taken out as it was the same menu, and each tooltip says where it is. A locked window has no grip.
 - The window's size is one scale (`SetScale`) for the whole of it, text included, and the width is the
   room the text has inside it. Changing the scale keeps the window in the same place on the screen:
   its anchor is kept in the scaled units, so it is multiplied by the old scale over the new one, in the

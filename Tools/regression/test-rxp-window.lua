@@ -39,6 +39,7 @@ local function Object(everything)
     function o:SetTextColor(r, g, b) self.color = { r, g, b } end
     function o:SetColorTexture(r, g, b, a) self.solid = { r, g, b, a } end
     function o:SetTexture(path) self.texture = path end
+    function o:RegisterForClicks(...) self.clicksFor = { ... } end
     function o:RegisterEvent(event)
         self.events = self.events or {}
         self.events[event] = true
@@ -93,8 +94,14 @@ local function World(account, opts)
     env.UIParent = Object(w.everything)
     env.GameTooltip = Object(w.everything)
     function env.GameTooltip:GetOwner() return self.owner end
-    function env.GameTooltip:SetOwner(owner) self.owner = owner end
-    function env.GameTooltip:AddLine(text) self.added = text end
+    function env.GameTooltip:SetOwner(owner)
+        self.owner = owner
+        self.lines = {}
+    end
+    function env.GameTooltip:AddLine(text)
+        self.lines = self.lines or {}
+        self.lines[#self.lines + 1] = text
+    end
     env.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
     env.CreateColor = function(r, g, b, a) return { r, g, b, a } end
     env.InCombatLockdown = function() return false end
@@ -312,10 +319,7 @@ do
         and lines[3] == "40  Step 40 line one" and lines[4] == "42  Step 42 line one",
         "six steps after it, one line each, without the one RestedXP hides and the one that is done")
     Check(progress.text:find(string.char(194, 183), 1, true), "the step and the percent are joined by a dot")
-    local menu = f.menu
-    Check(menu ~= nil and menu.shown, "a menu button sits below the list")
-    menu.scripts.OnClick(menu)
-    Check(w.menus == 1, "and it opens RestedXP's menu")
+    Check(f.menu == nil, "there is no menu button: the right click is the menu")
     local panel
     for _, o in ipairs(w.solids) do
         if o.parent == f and o.layer == "BACKGROUND" then panel = o end
@@ -404,8 +408,6 @@ do
     local expanded = f.height
     fold.scripts.OnClick(fold)
     Check(account.rxpWindowCollapsed == true and f.height < expanded, "folded: the header only, and it is kept")
-    local foldedMenu = f.menu
-    Check(foldedMenu and foldedMenu.shown == false, "and the menu button goes with the list")
     local leftShown = 0
     for _, o in ipairs(w.everything) do
         if Seen(o) and o.text and (o.text == "STEP 36" or o.text:find("^%d+  ")) then leftShown = leftShown + 1 end
@@ -481,10 +483,23 @@ do
     row.scripts.OnHyperlinkClick(row, "quest:1", "[Quest]", "LeftButton")
     Check(w.links[1] == "quest:1", "and a link in a row opens as RestedXP's would")
 
-    w.env.GameTooltip.added = nil
     row.scripts.OnEnter(row)
-    Check(w.env.GameTooltip.text == "Skip step" and w.env.GameTooltip.added == "Shift-click",
-        "a row says it skips the step, and that it takes shift")
+    local tip = w.env.GameTooltip
+    Check(tip.text == "Skip step" and tip.lines[1] == "Shift-click" and tip.lines[2] == "Right-click: menu",
+        "a row says it skips the step, that it takes shift, and where the menu is")
+
+    -- the menu is the right click, on a row, on the box and on a line of the list
+    local function RegistersRight(o)
+        for _, click in ipairs(o.clicksFor or {}) do
+            if click == "RightButtonUp" then return true end
+        end
+        return false
+    end
+    Check(RegistersRight(row) and RegistersRight(box), "a row and the box are given the right click")
+    local menus = w.menus
+    row.scripts.OnClick(row, "RightButton")
+    box.scripts.OnClick(box, "RightButton")
+    Check(w.menus == menus + 2 and #went == 2, "a right click on a row or the box is the menu, and no skip")
 
     local hits = {}
     for _, o in ipairs(w.frames) do
@@ -504,12 +519,15 @@ do
     hits[2].scripts.OnLeave(hits[2])
     Check(hits[2].shade.shown == false, "and not when the mouse leaves")
     Check(hits[1].scripts.OnDragStart ~= nil, "a line is still where the window is dragged from")
+    Check(RegistersRight(hits[1]), "and a line of the list")
+    hits[1].scripts.OnClick(hits[1], "RightButton")
+    Check(w.menus == menus + 3 and #went == 3, "and a right click on a line is the menu too")
 
     -- how it is done is a setting
     ns.SetRXPWindowOption("rxpWindowSkip", "click")
-    w.env.GameTooltip.added = nil
     row.scripts.OnEnter(row)
-    Check(w.env.GameTooltip.added == nil, "click: and it does not say shift")
+    Check(#w.env.GameTooltip.lines == 1 and w.env.GameTooltip.lines[1] == "Right-click: menu",
+        "click: and it does not say shift")
     row.scripts.OnClick(row)
     hits[1].scripts.OnClick(hits[1])
     Check(#went == 5 and went[4] == 37 and went[5] == 37, "click: a plain click does both")
@@ -522,9 +540,9 @@ do
     hits[1].shade:Hide()
     hits[1].scripts.OnEnter(hits[1])
     Check(hits[1].shade.shown == false, "and a line is not lit")
-    w.env.GameTooltip.text = nil
     row.scripts.OnEnter(row)
-    Check(w.env.GameTooltip.text == nil, "or a tooltip said")
+    Check(w.env.GameTooltip.text == "Right-click: menu" and #w.env.GameTooltip.lines == 0,
+        "and a row says only where the menu is")
     w.shift = false
     ns.SetRXPWindowOption("rxpWindowSkip", "shift")
 
@@ -662,8 +680,8 @@ do
     account.rxpWindowTitleSize, account.rxpWindowOutline, account.rxpWindowLine = 999, "bogus", 7
     Check(ns.RXPWindowOption("rxpWindowTitleSize") == 28 and ns.RXPWindowOption("rxpWindowOutline") == "shadow"
         and ns.RXPWindowOption("rxpWindowLine") == "bar", "a saved value that is out of range or no choice is held")
-    account.rxpWindowMenu = "no"
-    Check(ns.RXPWindowOption("rxpWindowMenu") == false, "and what is not true is off")
+    account.rxpWindowPanel = "no"
+    Check(ns.RXPWindowOption("rxpWindowPanel") == false, "and what is not true is off")
 end
 
 -- the colors: the theme's, until one is picked
@@ -694,10 +712,10 @@ do
     account.rxpWindowColors = { text = { r = "x" } }
     Check(ns.RXPWindowColor("text") == T.fg.r, "a color saved wrongly is the theme's")
     account.rxpWindowColors = nil
-    ns.SetRXPWindowOption("rxpWindowMenu", false)
+    ns.SetRXPWindowOption("rxpWindowPanel", true)
     ns.SetRXPWindowColor("fill", 1, 0, 0, 1)
     ns.ResetRXPWindowStyle()
-    Check(account.rxpWindowMenu == nil and account.rxpWindowColors == nil, "reset puts the look back")
+    Check(account.rxpWindowPanel == nil and account.rxpWindowColors == nil, "reset puts the look back")
     account.rxpWindowWidth, account.rxpWindowSteps, account.rxpWindowScale = 400, 3, 120
     ns.ResetRXPWindowStyle()
     Check(account.rxpWindowWidth == 400 and account.rxpWindowSteps == 3 and account.rxpWindowScale == 120,
@@ -807,9 +825,6 @@ do
     ns.SetRXPWindowOption("rxpWindowBoxOpacity", 30)
     Flush(w)
     Check(math.abs(box.back.solid[4] - 0.3) < 1e-9, "and in between")
-    ns.SetRXPWindowOption("rxpWindowMenu", false)
-    Flush(w)
-    Check(f.menu.shown == false, "the menu button can be left out")
     local before = f.height
     ns.SetRXPWindowOption("rxpWindowSpacing", 12)
     Flush(w)
@@ -965,7 +980,10 @@ do
     f.scripts.OnDragStart(f)
     Check(f.sizing == nil and f.moving == nil and f.resizable == false,
         "locked: it is not sized or moved, and is not resizable")
+    Check(f.grip.shown == false, "and the grip in the corner is not shown")
     ns.SetRXPWindowOption("rxpWindowLock", false)
+    Flush(w)
+    Check(f.grip.shown == true, "unlocked: it is back")
     ns.SetRXPWindowOption("rxpWindowGrip", false)
     Flush(w)
     Check(f.grip.shown == false and f.resizable == true, "the grip can be left out, and the window is still resizable")
