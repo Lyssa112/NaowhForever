@@ -1244,7 +1244,7 @@ do
     Flush(w)
     local buy = Row(BUY)
     Check(buy.meter.shown and math.abs(buy.meter.value - 0.4) < 1e-9, "buy five with two in the bags: two fifths")
-    Check(buy.meter.width == buy.width - 2 - 5 - 18 and buy.height == 13 + 2 + 5,
+    Check(buy.meter.points[1][4] == 2 + 5 + 23 and buy.meter.width == buy.width - 2 - 5 - 23 and buy.height == 18 + 2 + 5,
         "under the text as wide as it, and the row is as tall as both")
     Check(f.events and f.events[BAGS] == true, "and the bags are listened to")
 
@@ -1374,6 +1374,35 @@ do
     ns.SetRXPWindowOption("rxpWindowLogo", true)
     Flush(w)
     Check(boxes[1].logo.shown and account.rxpWindowLogo == nil, "and back: the default is not kept")
+end
+
+-- the icon at the start of a row has a size of its own, and the text is set against it
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local function First()
+        for _, o in ipairs(w.frames) do
+            if o.icon and o.text and o.bar and Seen(o) then return o end
+        end
+    end
+    local row = First()
+    Check(row.icon.fontSize == 18, "18 to start, bigger than the text")
+    Check(row.text.points[1][4] == 2 + 5 + 18 + 5 and row.text.points[1][5] == -2,
+        "the text starts after it, and is dropped to the middle of it")
+    Check(row.height >= 18, "and the row is as tall as it")
+    ns.SetRXPWindowOption("rxpWindowIconSize", 28)
+    Flush(w)
+    row = First()
+    Check(row.icon.fontSize == 28 and row.text.points[1][4] == 2 + 5 + 28 + 5 and row.text.points[1][5] == -7
+        and account.rxpWindowIconSize == 28, "its size is a setting: the text moves with it")
+    Check(row.text.width == row.width - 2 - 5 - 33, "and has that much less room")
+    ns.SetRXPWindowOption("rxpWindowIconSize", 10)
+    Flush(w)
+    row = First()
+    Check(row.text.points[1][4] == 2 + 5 + 10 + 5 and row.text.points[1][5] == 0, "smaller than the text: not dropped")
+    ns.SetRXPWindowOption("rxpWindowIconSize", 18)
+    Check(account.rxpWindowIconSize == nil, "the default is not kept")
 end
 
 print("PASS rxp window: " .. cases .. " checks")

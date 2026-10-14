@@ -14,7 +14,7 @@ local PERCENT, ROUND, CHANNEL_MAX = 100, 0.5, 255
 local PAD, BOX_PAD, FOLD_W, PROGRESS_W = 10, 7, 16, 120
 local HEAD_PAD, LIST_PAD = 10, 6
 local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
-local BAR_W, ICON_W, MENU_SIZE, GRIP_SIZE = 2, 18, 22, 16
+local BAR_W, ICON_GAP, MENU_SIZE, GRIP_SIZE = 2, 5, 22, 16
 local PANEL_ALPHA, EDGE_ALPHA, RULE_ALPHA, MUTED_ALPHA = 0.92, 0.8, 0.5, 0.9
 local BOX_OPACITY = 55
 local COUNT_PATTERN, COUNT_MIN, COUNT_GAP = "(%d+)%s*/%s*(%d+)", 2, 2
@@ -57,6 +57,8 @@ local OPTIONS = {
       max = 24, tip = "The active step." },
     { key = "rxpWindowListSize", group = "Text", kind = "number", label = "List Text Size", default = 12, min = 8,
       max = 24, tip = "The steps after the active one." },
+    { key = "rxpWindowIconSize", group = "Text", kind = "number", label = "Icon Size", default = 18, min = 10,
+      max = 32, tip = "The icon at the start of a row." },
     { key = "rxpWindowProgressText", group = "Look", kind = "toggle", label = "Show Progress Text", default = true,
       tip = "The step and the percent of the guide, beside its name." },
     { key = "rxpWindowLine", group = "Look", kind = "choice", label = "Under the Title", default = "bar",
@@ -789,7 +791,7 @@ local function MakeRow()
     row:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP) end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
-    row.icon = Text(row, "rxpWindowTextSize")
+    row.icon = Text(row, "rxpWindowIconSize")
     row.meter = MakeBar(row)
     row.text = Text(row, "rxpWindowTextSize")
     row.text:SetWordWrap(true)
@@ -863,7 +865,11 @@ local function DrawRow(box, row, x, y, width)
     item:SetPoint("TOPLEFT", box, "TOPLEFT", x, y)
     item:SetWidth(width)
     local gap = Spacing()
-    local textWidth = width - BAR_W - gap - ICON_W
+    local iconSize = ns.RXPWindowOption("rxpWindowIconSize")
+    local textSize = ns.RXPWindowOption("rxpWindowTextSize")
+    local iconW = iconSize + ICON_GAP
+    local drop = math.max(0, math.floor((iconSize - textSize) / 2))
+    local textWidth = width - BAR_W - gap - iconW
     item.bar:ClearAllPoints()
     item.bar:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
     item.bar:SetPoint("BOTTOMLEFT", item, "BOTTOMLEFT", 0, 0)
@@ -874,15 +880,15 @@ local function DrawRow(box, row, x, y, width)
     item.icon:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap, 0)
     item.icon:SetText(row.icon)
     item.text:ClearAllPoints()
-    item.text:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + ICON_W, 0)
+    item.text:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + iconW, -drop)
     item.text:SetWidth(textWidth)
     Coloured(item.text, row.done and "done" or "text")
     item.text:SetText(row.text)
-    local height = math.max(item.text:GetStringHeight(), ns.RXPWindowOption("rxpWindowTextSize"))
+    local height = math.max(drop + math.max(item.text:GetStringHeight(), textSize), iconSize)
     if row.need and row.need >= COUNT_MIN and ns.RXPWindowOption("rxpWindowCountBar") then
         local fraction = row.done and 1 or math.min(1, math.max(0, (row.have or 0) / row.need))
         item.meter:ClearAllPoints()
-        item.meter:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + ICON_W, -(height + COUNT_GAP))
+        item.meter:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + iconW, -(height + COUNT_GAP))
         item.meter:SetWidth(textWidth)
         PaintBar(item.meter, fraction)
         item.meter:Show()

@@ -164,3 +164,7 @@ Core/Integrations/RestedXP/
   border follows the background, so a background RestedXP hides keeps its border hidden. Turned off
   (the window, or Style Targets and Items), RestedXP's own `UpdateVisuals` paints them again, and the
   border is shown where the background is, as the title's is not set by it.
+- The icon at the start of a row has a size of its own (Icon Size, 18 to start, over the text's 13): the
+  icon's font string is faced at it, so RestedXP's own icons (`|T...:0|t`, as tall as the text they are in)
+  grow with it, and the column and the row are as big. The text is dropped to the middle of an icon that
+  is taller than it, and not when it is smaller.
