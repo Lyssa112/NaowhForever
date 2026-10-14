@@ -1,7 +1,7 @@
 -- Window.lua: RestedXP's guide in one Naowh window: its progress, the active step and the steps after it.
 local ns = _G.NaowhForever
 local Safe = ns.RXPSafe
-local Has, Dig, Quiet, Guarded, Run = Safe.Has, Safe.Dig, Safe.Quiet, Safe.Guarded, Safe.Run
+local Has, Dig, Run = Safe.Has, Safe.Dig, Safe.Run
 
 local WIDTH_MIN, WIDTH_MAX = ns.RXPWindowWidthRange()
 local STEPS_MAX = select(2, ns.RXPWindowStepsRange())
@@ -25,11 +25,11 @@ local GRIP_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
 local GRIP_DOWN = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down"
 local GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight"
 local GRIP_CORNER = "BOTTOMRIGHT"
-local TEXT_SKIP = "Skip step"
-local TEXT_SHIFT = "Shift-click"
-local TEXT_MENU = "Right-click: menu"
-local TEXT_GO = "Go to step %d"
-local TEXT_PICK = "Pick a guide"
+local TEXT_SKIP = ns.L("Skip step")
+local TEXT_SHIFT = ns.L("Shift-click")
+local TEXT_MENU = ns.L("Right-click: menu")
+local TEXT_GO = ns.L("Go to step %d")
+local TEXT_PICK = ns.L("Pick a guide")
 local TIP_DIM = 0.7
 local HOME = { "LEFT", "LEFT", 0, 35 }
 local DRAG_BUTTON, TIP_ANCHOR = "LeftButton", "ANCHOR_TOP"
@@ -46,7 +46,7 @@ local silenced = setmetatable({}, { __mode = "k" })
 local dressed = setmetatable({}, { __mode = "k" })
 local watched = setmetatable({}, { __mode = "k" })
 local placeholders = setmetatable({}, { __mode = "k" })
-local targetingHooked = {}
+local targetingHooked
 local faced = {}
 local Draw
 
@@ -59,7 +59,7 @@ local function Refresh()
     pending = true
     C_Timer.After(0, function()
         pending = false
-        Quiet("WindowDraw", Draw)
+        Draw()
     end)
 end
 
@@ -72,13 +72,12 @@ local function Rebuilt()
 end
 
 local function Silence(frame, top)
-    if type(frame) ~= "table" then return end
+    if not frame then return end
     if not silenced[frame] then
-        local home = {}
-        if top and Has(frame, "GetAlpha") then home.alpha = frame:GetAlpha() end
-        if Has(frame, "IsMouseEnabled") then home.mouse = frame:IsMouseEnabled() end
+        local home = { mouse = frame:IsMouseEnabled() }
         silenced[frame] = home
-        if top and Has(frame, "SetAlpha") then
+        if top then
+            home.alpha = frame:GetAlpha()
             frame:SetAlpha(0)
             if not watched[frame] then
                 watched[frame] = true
@@ -87,28 +86,25 @@ local function Silence(frame, top)
                 end)
             end
         end
-        if Has(frame, "EnableMouse") then frame:EnableMouse(false) end
+        frame:EnableMouse(false)
     end
-    if Has(frame, "GetChildren") then
-        for _, child in ipairs({ frame:GetChildren() }) do Silence(child, false) end
-    end
+    for _, child in ipairs({ frame:GetChildren() }) do Silence(child, false) end
 end
 
 local function Take()
-    local guide = Dig(_G, "RXPV2GuideWindow", "frame")
-    local name = Dig(_G.RXP, "player", "name")
-    local steps = type(name) == "string" and Dig(_G, "RXPActiveStepsFrame" .. name) or nil
+    local guide = Dig(_G.RXPV2GuideWindow, "frame")
+    local steps = _G["RXPActiveStepsFrame" .. _G.RXP.player.name]
     steps = Dig(steps, "frame") or steps
     Silence(guide, true)
     Silence(steps, true)
-    return type(guide) == "table" and type(steps) == "table"
+    return guide ~= nil and steps ~= nil
 end
 
 local function Release()
     for frame, home in pairs(silenced) do
         silenced[frame] = nil
-        if home.alpha ~= nil and Has(frame, "SetAlpha") then frame:SetAlpha(home.alpha) end
-        if home.mouse ~= nil and Has(frame, "EnableMouse") then frame:EnableMouse(home.mouse) end
+        if home.alpha then frame:SetAlpha(home.alpha) end
+        frame:EnableMouse(home.mouse)
     end
     retake = true
 end
@@ -121,13 +117,13 @@ end
 local function Place(frame)
     local saved = Settings().rxpWindowPos
     frame:ClearAllPoints()
-    if type(saved) == "table" and type(saved[1]) == "string" then
+    if saved then
         frame:SetPoint(saved[1], UIParent, saved[2] or saved[1], saved[3] or 0, saved[4] or 0)
         return
     end
-    local home = Dig(_G, "RXPV2GuideWindow", "frame")
+    local home = Dig(_G.RXPV2GuideWindow, "frame")
     local point, relativePoint, x, y = HOME[1], HOME[2], HOME[3], HOME[4]
-    if Has(home, "GetPoint") then
+    if home then
         local first, _, relative, dx, dy = home:GetPoint(1)
         if first then point, relativePoint, x, y = first, relative, dx, dy end
     end
@@ -135,14 +131,13 @@ local function Place(frame)
 end
 
 local function Menu()
-    local frame = Dig(_G.RXP, "RXPFrame")
-    if Has(frame, "DropDownMenu") then Quiet("WindowMenu", frame.DropDownMenu) end
+    Run("WindowMenu", _G.RXP.RXPFrame.DropDownMenu)
 end
 
 local function PickGuide()
-    local v2 = Dig(_G.RXP, "v2")
-    if Has(v2, "ShowGuideSelectionMenu") then
-        Quiet("WindowPick", v2.ShowGuideSelectionMenu, v2)
+    local v2 = _G.RXP.v2
+    if v2.ShowGuideSelectionMenu then
+        Run("WindowPick", v2.ShowGuideSelectionMenu, v2)
     else
         Menu()
     end
@@ -150,7 +145,7 @@ end
 
 local function FacePath()
     local name = ns.RXPWindowOption("rxpWindowFont")
-    local custom = name ~= "" and type(ns.UI) == "table" and ns.UI.FontPath and ns.UI.FontPath(name)
+    local custom = name ~= "" and ns.UI.FontPath(name)
     return custom or ns.AddonFontPath(ns.RXPWindowForeverTheme() or nil)
 end
 
@@ -195,39 +190,30 @@ local function Coloured(fs, name)
 end
 
 local function SkinBox(part)
-    local fill = Dig(part, "rxpBackground", "textures", 1)
-    if Has(fill, "SetVertexColor") then
+    local back, border = part.rxpBackground, part.rxpBorder
+    if back then
         local r, g, b = ns.RXPWindowColor("box")
-        fill:SetVertexColor(r, g, b, ns.RXPWindowOption("rxpWindowBoxOpacity") / PERCENT)
+        back.textures[1]:SetVertexColor(r, g, b, ns.RXPWindowOption("rxpWindowBoxOpacity") / PERCENT)
     end
-    local border = Dig(part, "rxpBorder")
-    if type(border) ~= "table" then return end
+    if not border then return end
     local r, g, b, a = ns.RXPWindowColor("border")
-    for _, texture in ipairs(type(border.textures) == "table" and border.textures or {}) do
-        if Has(texture, "SetColorTexture") then texture:SetColorTexture(r, g, b, a) end
-    end
-    local back = part.rxpBackground
-    local shown = not Has(back, "IsShown") or back:IsShown()
-    if Has(border, "SetShown") then
-        border:SetShown(ns.RXPWindowOption("rxpWindowBoxBorder") and shown and true or false)
-    end
+    for _, texture in ipairs(border.textures) do texture:SetColorTexture(r, g, b, a) end
+    border:SetShown(ns.RXPWindowOption("rxpWindowBoxBorder") and (not back or back:IsShown()))
 end
 
 local function SkinTitle(title)
     SkinBox(title)
     local text = title.text
-    if not (Has(text, "SetFont") and Has(text, "GetFont") and Has(text, "GetStringWidth")) then return end
     local _, size = text:GetFont()
-    Faced(text, type(size) == "number" and size or BOX_TITLE_TEXT)
+    Faced(text, size or BOX_TITLE_TEXT)
     Coloured(text, "title")
-    if Has(title, "SetSize") then title:SetSize(text:GetStringWidth() + BOX_TITLE_ROOM, BOX_TITLE_HEIGHT) end
+    title:SetSize(text:GetStringWidth() + BOX_TITLE_ROOM, BOX_TITLE_HEIGHT)
 end
 
 local function SkinPlaceholders(frame)
-    if type(ns.RXPIconTexture) ~= "function" or not Has(frame, "GetChildren") then return end
     for _, button in ipairs({ frame:GetChildren() }) do
-        local texture = Dig(button, "placeholder")
-        if Has(texture, "GetTexture") and Has(texture, "SetTexture") then
+        local texture = button.placeholder
+        if texture then
             local id = texture:GetTexture()
             local glyph = PLACEHOLDER_GLYPHS[id]
             local path = glyph and ns.RXPIconTexture(glyph)
@@ -242,13 +228,13 @@ end
 local function RestorePlaceholders()
     for texture, id in pairs(placeholders) do
         placeholders[texture] = nil
-        if Has(texture, "SetTexture") then texture:SetTexture(id) end
+        texture:SetTexture(id)
     end
 end
 
 local function SkinFrame(frame)
     SkinBox(frame)
-    if type(frame.title) == "table" then SkinTitle(frame.title) end
+    if frame.title then SkinTitle(frame.title) end
     SkinPlaceholders(frame)
 end
 
@@ -256,42 +242,36 @@ local function SkinFrames()
     local rxp = _G.RXP
     local frames = {}
     local target, items = Dig(rxp, "targeting", "activeTargetFrame"), Dig(rxp, "activeItemFrame")
-    if type(target) == "table" then table.insert(frames, target) end
-    if type(items) == "table" then table.insert(frames, items) end
+    if target then table.insert(frames, target) end
+    if items then table.insert(frames, items) end
     return frames
 end
 
 local function SkinHooks(frames)
     for _, frame in ipairs(frames) do
-        if not watched[frame] and Has(frame, "UpdateVisuals") then
+        if not watched[frame] then
             watched[frame] = true
-            hooksecurefunc(frame, "UpdateVisuals", Guarded("WindowSkin", function(self)
+            hooksecurefunc(frame, "UpdateVisuals", function(self)
                 if active then SkinFrame(self) end
-            end))
+            end)
         end
     end
     local targeting = Dig(_G.RXP, "targeting")
-    if not targetingHooked.background and Has(targeting, "RenderTargetFrameBackground") then
-        targetingHooked.background = true
-        hooksecurefunc(targeting, "RenderTargetFrameBackground", Guarded("WindowSkin", function()
-            local target = Dig(_G.RXP, "targeting", "activeTargetFrame")
-            if active and type(target) == "table" then SkinBox(target) end
-        end))
-    end
-    if not targetingHooked.update and Has(targeting, "UpdateTargetFrame") then
-        targetingHooked.update = true
-        hooksecurefunc(targeting, "UpdateTargetFrame", Guarded("WindowSkin", function()
-            local target = Dig(_G.RXP, "targeting", "activeTargetFrame")
-            if active and type(target) == "table" then SkinPlaceholders(target) end
-        end))
-    end
+    if not targeting or targetingHooked then return end
+    targetingHooked = true
+    hooksecurefunc(targeting, "RenderTargetFrameBackground", function()
+        if active and targeting.activeTargetFrame then SkinBox(targeting.activeTargetFrame) end
+    end)
+    hooksecurefunc(targeting, "UpdateTargetFrame", function()
+        if active and targeting.activeTargetFrame then SkinPlaceholders(targeting.activeTargetFrame) end
+    end)
 end
 
 local function SkinRestore(frame)
-    if Has(frame, "UpdateVisuals") then Quiet("WindowSkin", frame.UpdateVisuals, frame) end
+    Run("WindowSkin", frame.UpdateVisuals, frame)
     for _, part in ipairs({ frame, frame.title }) do
-        local border, back = Dig(part, "rxpBorder"), Dig(part, "rxpBackground")
-        if Has(border, "SetShown") then border:SetShown(not Has(back, "IsShown") or back:IsShown()) end
+        local border, back = part.rxpBorder, part.rxpBackground
+        if border then border:SetShown(not back or back:IsShown()) end
     end
 end
 
@@ -300,7 +280,7 @@ local function Skin()
     if active then
         styled = true
         SkinHooks(frames)
-        for _, frame in ipairs(frames) do Quiet("WindowSkin", SkinFrame, frame) end
+        for _, frame in ipairs(frames) do SkinFrame(frame) end
     elseif styled then
         styled = false
         RestorePlaceholders()
@@ -320,26 +300,25 @@ local function Draggable(frame)
 end
 
 local function GoTo(index)
-    local rxp = _G.RXP
-    if type(index) == "number" and Has(rxp, "SetStep") then Quiet("WindowGo", rxp.SetStep, index) end
+    Run("WindowGo", _G.RXP.SetStep, index)
 end
 
 local function SkipObjectives(rxp, step)
     for _, element in ipairs(step.elements or {}) do
-        if type(element) == "table" and not element.optional and not element.skip then
+        if not element.optional and not element.skip then
             element.skip = true
-            if type(element.OnComplete) == "function" then Quiet("WindowComplete", element.OnComplete, element) end
+            if element.OnComplete then Run("WindowComplete", element.OnComplete, element) end
         end
     end
     rxp.updateSteps = true
-    if Has(rxp, "UpdateMap") then Quiet("WindowMap", rxp.UpdateMap) end
+    Run("WindowMap", rxp.UpdateMap)
 end
 
 local function SkipStep(step)
     local rxp = _G.RXP
-    local progress = Has(rxp, "GetGuideProgress") and Run("WindowProgress", rxp.GetGuideProgress)
-    if type(progress) ~= "number" then return end
-    if type(step) == "table" and type(step.index) == "number" and step.index ~= progress then
+    local progress = Run("WindowProgress", rxp.GetGuideProgress)
+    if not progress then return end
+    if step and step.index ~= progress then
         SkipObjectives(rxp, step)
     else
         GoTo(progress + 1)
@@ -374,27 +353,22 @@ local function Tip(owner, text, menu, plain)
 end
 
 local function StepsFor(height)
-    local base, line = window.chrome, window.lineHeight
-    if type(height) == "number" and type(base) == "number" and type(line) == "number" and line > 0 then
-        return math.floor((height - base) / line)
-    end
+    return math.floor((height - window.chrome) / window.lineHeight)
 end
 
 local function LiveSize(width, height)
     if not (sizing and sizingModel and window) then return end
     sizing.width = math.min(WIDTH_MAX, math.max(WIDTH_MIN, width))
-    sizing.steps = StepsFor(height) or sizing.steps
-    Quiet("WindowDraw", Draw)
+    sizing.steps = StepsFor(height)
+    Draw()
 end
 
 local function Resized()
     if not window then return end
-    local width = window:GetWidth()
-    if type(width) == "number" then ns.SetRXPWindowWidth(width) end
-    local steps = StepsFor(window:GetHeight())
-    if steps then ns.SetRXPWindowSteps(steps) end
+    ns.SetRXPWindowWidth(window:GetWidth())
+    ns.SetRXPWindowSteps(StepsFor(window:GetHeight()))
     Save(window)
-    Quiet("WindowDraw", Draw)
+    Draw()
 end
 
 local function MakeGrip(parent)
@@ -420,7 +394,7 @@ end
 
 local function TexturePath()
     local name = ns.RXPWindowOption("rxpWindowBarTexture")
-    local custom = name ~= "" and type(ns.UI) == "table" and ns.UI.TexturePath and ns.UI.TexturePath(name, GRADIENT)
+    local custom = name ~= "" and ns.UI.TexturePath(name, GRADIENT)
     return custom or GRADIENT
 end
 
@@ -432,15 +406,11 @@ local function MakeBar(parent)
 end
 
 local function ForeverParts()
-    local shared = type(ns.Shared) == "table" and ns.Shared or nil
-    local parts = shared and shared.Parts
-    if type(parts) == "table" and parts.ForeverInset and parts.ForeverBox and parts.ForeverAtlas then
-        return parts, shared.Style
-    end
+    return ns.Shared.Parts, ns.Shared.Style
 end
 
 local function ForeverLook()
-    return ForeverParts() ~= nil and ns.RXPWindowInForever()
+    return ns.RXPWindowInForever()
 end
 
 local function PaintInset(frame, on)
@@ -448,8 +418,7 @@ local function PaintInset(frame, on)
         if not frame.inset then
             frame.inset = ForeverParts().ForeverInset(frame)
             frame.inset:SetAllPoints(frame)
-            local level = frame:GetFrameLevel()
-            if type(level) == "number" then frame.inset:SetFrameLevel(math.max(0, level - 1)) end
+            frame.inset:SetFrameLevel(math.max(0, frame:GetFrameLevel() - 1))
         end
         frame.inset:Show()
     elseif frame.inset then
@@ -465,7 +434,7 @@ local function PaintBar(bar, fraction)
     local forever = ForeverLook()
     if forever and not bar.rim then bar.rim = parts.ForeverBox(bar) end
     if bar.rim then bar.rim._frame:SetShown(forever) end
-    if forever and style and style.FOREVER_FIELD_RGB then
+    if forever then
         local field = style.FOREVER_FIELD_RGB
         bar.track:SetColorTexture(field.r, field.g, field.b, 1)
     else
@@ -501,7 +470,7 @@ local function Build()
     f.fold:SetScript("OnClick", function()
         local on = Settings().rxpWindowCollapsed ~= true
         Settings().rxpWindowCollapsed = on or nil
-        Quiet("WindowDraw", Draw)
+        Draw()
     end)
     f.title = Text(f, "rxpWindowTitleSize")
     f.title:SetWordWrap(false)
@@ -547,7 +516,7 @@ local function MakeRow()
     local row = CreateFrame("Button", nil, window)
     row:SetHyperlinksEnabled(true)
     row:SetScript("OnHyperlinkClick", function(_, link, text, button)
-        Quiet("WindowLink", SetItemRef, link, text, button)
+        SetItemRef(link, text, button)
     end)
     row:SetScript("OnHyperlinkEnter", LinkEnter)
     row:SetScript("OnHyperlinkLeave", LinkLeave)
@@ -622,9 +591,9 @@ local function Reset()
 end
 
 local function Watch(source)
-    if type(source) ~= "table" or watched[source] or not Has(source, "SetText") then return end
+    if not source or watched[source] then return end
     watched[source] = true
-    hooksecurefunc(source, "SetText", Guarded("WindowText", Refresh))
+    hooksecurefunc(source, "SetText", Refresh)
 end
 
 local function Spacing()
@@ -632,8 +601,7 @@ local function Spacing()
 end
 
 local function DrawIcon(item, row, size)
-    local path, r, g, b
-    if type(ns.RXPIconLook) == "function" then path, r, g, b = ns.RXPIconLook(row.icon) end
+    local path, r, g, b = ns.RXPIconLook(row.icon)
     if not path then
         item.glyph:Hide()
         item.icon:SetText(row.icon)
@@ -757,8 +725,8 @@ local function DrawFold(folded, headH)
     fold:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, -PAD)
     fold.text:SetText(folded and TEXT_UNFOLD or TEXT_FOLD)
     local parts, style = ForeverParts()
-    local name = style and ForeverLook() and (folded and style.FOREVER_PLUS_ATLAS or style.FOREVER_MINUS_ATLAS)
-    local sign = type(name) == "string" and parts.ForeverAtlas(fold.sign, name, true) == true
+    local name = ForeverLook() and (folded and style.FOREVER_PLUS_ATLAS or style.FOREVER_MINUS_ATLAS)
+    local sign = name and parts.ForeverAtlas(fold.sign, name, true) or false
     fold.sign:SetShown(sign)
     fold.text:SetShown(not sign)
     Coloured(fold.text, "line")
@@ -853,23 +821,16 @@ local function DrawChrome(y, listH, folded)
     window.chrome = -y + PAD - used.line * listH
     local locked = ns.RXPWindowOption("rxpWindowLock")
     window:SetResizable(not locked and not folded)
-    if Has(window, "SetResizeBounds") then
-        window:SetResizeBounds(WIDTH_MIN, window.chrome, WIDTH_MAX, window.chrome + STEPS_MAX * listH)
-    end
+    window:SetResizeBounds(WIDTH_MIN, window.chrome, WIDTH_MAX, window.chrome + STEPS_MAX * listH)
     window.grip:SetShown(not folded and not locked)
 end
 
 function Draw()
     if not active then return end
     wantsBags = false
-    if not sizing then Quiet("WindowSkin", Skin) end
+    if not sizing then Skin() end
     window = window or Build()
     local model = sizing and sizingModel or ns.RXPWindowRead() or ns.RXPWindowNoGuide()
-    if not model then
-        Release()
-        window:Hide()
-        return
-    end
     if not sizing and retake then retake = not Take() end
     Reset()
     Refaced()
@@ -894,19 +855,19 @@ local function Apply()
     end
     active = want
     if want then
-        Quiet("WindowDraw", Draw)
+        Draw()
     else
         Release()
         if window then
             window:Hide()
             window:UnregisterEvent(BAG_EVENT)
         end
-        Quiet("WindowSkin", Skin)
+        Skin()
     end
 end
 
 local function Hook(owner, name)
-    if Has(owner, name) then hooksecurefunc(owner, name, Guarded("WindowRefresh", Rebuilt)) end
+    if Has(owner, name) then hooksecurefunc(owner, name, Rebuilt) end
 end
 
 function ns.RXPWindowReady()
@@ -930,7 +891,7 @@ end
 function ns.SetRXPWindow(on)
     Settings().rxpWindow = on and true or nil
     if on then
-        if type(ns.RXPArrowKept) == "function" then ns.RXPArrowKept() end
+        ns.RXPArrowKept()
         Settings().rxpThemes = nil
     end
     ns.RXPWindowStart()
@@ -949,7 +910,7 @@ function ns.SetRXPWindowScale(scale)
             window:SetPoint(point, UIParent, relativePoint, x * was / now, y * was / now)
             Save(window)
         end
-    elseif type(saved) == "table" and type(saved[3]) == "number" and type(saved[4]) == "number" then
+    elseif saved then
         saved[3], saved[4] = saved[3] * was / now, saved[4] * was / now
     end
 end

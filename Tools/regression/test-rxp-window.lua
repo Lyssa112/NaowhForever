@@ -73,6 +73,8 @@ local function Object(everything)
     function o:EnableMouse(on) self.mouse = on end
     function o:IsMouseEnabled() return self.mouse ~= false end
     function o:IsForbidden() return false end
+    function o:GetFrameLevel() return self.level or 1 end
+    function o:SetFrameLevel(level) self.level = level end
     function o:GetChildren() return unpack(self.kids) end
     function o:CreateFontString()
         local fs = Object(everything)
@@ -121,6 +123,8 @@ local function World(account, opts)
     env.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
     env.CreateColor = function(r, g, b, a) return { r, g, b, a } end
     env.InCombatLockdown = function() return false end
+    w.reported = {}
+    env.geterrorhandler = function() return function(e) w.reported[#w.reported + 1] = tostring(e) end end
     env.IsShiftKeyDown = function() return w.shift == true end
     env.C_AddOns = { DoesAddOnExist = function(name) return opts.installed ~= false and name == "RXPGuides" end }
     env.C_Timer = { After = function(_, fn) w.timers[#w.timers + 1] = fn end }
@@ -172,6 +176,18 @@ local function World(account, opts)
     ns.UI = { FontPath = function(name) return "Fonts\\" .. name .. ".ttf" end,
         TexturePath = function(name) return "Textures\\" .. name end }
     ns.Hairline = function() end
+    ns.Shared = { Style = { FOREVER_FIELD_RGB = { r = 0, g = 0, b = 0 } }, Parts = {
+        ForeverInset = function(parent)
+            local inset = Object(w.everything)
+            inset.fill, inset.of = Object(w.everything), parent
+            return inset
+        end,
+        ForeverBox = function(frame)
+            local rim = { frame = frame, _frame = Object(w.everything) }
+            function rim:SetColor() end
+            return rim
+        end,
+        ForeverAtlas = function() return false end } }
     ns.AddonFontPath = function(classic) return classic and "Fonts\\Forever.ttf" or "Fonts\\Naowh.ttf" end
     for _, part in ipairs({ { themesSource, "Themes" }, { settingsSource, "WindowSettings" },
             { modelSource, "WindowModel" }, { windowSource, "Window" } }) do
@@ -600,24 +616,13 @@ do
     Check(went[8] == 41, "it is from the guide's progress as it is now")
     rxp.GetGuideProgress = function() error("progress") end
     row.scripts.OnClick(row)
-    Check(#went == 8 and type(ns.RXPFailures.WindowProgress) == "string", "progress that raises: no step, kept by name")
-    rxp.GetGuideProgress = function() return "none" end
+    Check(#went == 8 and #w.reported == 1 and w.reported[1]:find("progress", 1, true),
+        "progress that raises: no step, and reported")
     row.scripts.OnClick(row)
-    Check(#went == 8, "and one that is no number")
-    rxp.SetStep = nil
-    hits[1].scripts.OnClick(hits[1])
-    Check(#went == 8 and ns.RXPFailures.WindowGo == nil, "no step to go to: nothing")
-
-    local calls = 0
-    rxp.SetStep = function() calls = calls + 1 end
-    local index = hits[1].index
-    hits[1].index = nil
-    hits[1].scripts.OnClick(hits[1])
-    Check(calls == 0, "a line with no step is not a step to go to")
-    hits[1].index = index
+    Check(#w.reported == 1, "once")
     rxp.SetStep = function() error("step") end
     hits[1].scripts.OnClick(hits[1])
-    Check(type(ns.RXPFailures.WindowGo) == "string" and f.shown, "a step that raises: kept by name, and not raised")
+    Check(#w.reported == 2 and w.reported[2]:find("step", 1, true) and f.shown, "a step that raises: reported, and not raised")
 
     -- a button that is lit when the line under it is drawn for another step is not
     rxp.GetGuideProgress = function() return 36, "id" end
@@ -810,15 +815,15 @@ do
     Check(w.steps.frame.alpha == 0 and w.checkbox.mouse == false, "and when it is there too, it is taken")
 end
 
--- what is missing or fails is left out, quietly
+-- what is missing is left out, and a call into RestedXP that fails is reported
 do
     local w = Start({ rxpWindow = true }, { snapshotRaises = true })
     local lines = 0
     for _, o in ipairs(w.everything) do
         if o.text and o.shown and o.text:find("^%d+  ") then lines = lines + 1 end
     end
-    Check(Window(w) and lines == 0 and w.ns.RXPFailures.WindowSteps and w.ns.RXPFailures.WindowSteps:find("snapshot", 1, true),
-        "the steps after it failing: none listed, kept by name, and the rest is drawn")
+    Check(Window(w) and lines == 0 and #w.reported == 1 and w.reported[1]:find("snapshot", 1, true),
+        "the steps after it failing: none listed, reported, and the rest is drawn")
     w = Start({ rxpWindow = true }, { v2 = false })
     Check(Window(w) == nil and w.ns.RXPWindowReady() == false and w.guide.frame.alpha == nil,
         "RestedXP's V2 interface off: no window, and RestedXP's own is left alone")
@@ -828,11 +833,6 @@ do
     Flush(w)
     Check(Window(w).shown == true and Window(w).title.text:find("No guide selected", 1, true) ~= nil
         and w.guide.frame.alpha == 0, "no guide: the window says so, and RestedXP's welcome is taken")
-    w = Start({ rxpWindow = true })
-    w.rxp.RXPFrame.activeSteps = nil
-    w.rxp.v2:UpdateGuideWindow()
-    Flush(w)
-    Check(Window(w).shown == true, "no active steps: the heading and the steps after it are still drawn")
     w = Start({ rxpWindow = true }, { installed = false })
     Check(Window(w) == nil, "RestedXP not installed: nothing")
 end
@@ -1046,9 +1046,6 @@ do
     Check(select(3, ns.RXPWindowColor("arrow")) == ns.THEME_PRESETS.midnight.accent.b, "and the arrow's color is the theme's accent")
     ns.ResetRXPWindowStyle()
     Check(paints == 3, "and so does the reset")
-    ns.RXPPaintArrow = nil
-    ns.SetRXPWindowColor("arrow", 0, 0, 0, 1)
-    Check(true, "with no arrow to paint: nothing raised")
 end
 
 -- on the Forever skin: the bronze inset on the box and the window, the skin's rim and field on the bars, its sign
@@ -1144,10 +1141,6 @@ do
     Check(box.inset.shown == false and bar.rim._frame.shown == false,
         "and a theme of the presets is not the skin")
     ns.foreverSkin = nil
-    ns.Shared = nil
-    ns.SetRXPWindowTheme("forever")
-    Flush(w)
-    Check(box.inset.shown == false and f.shown, "no skin parts in the client: nothing raised, nothing drawn")
 end
 
 -- the look: panel, borders, menu, spacing and the colors of every text
@@ -1609,17 +1602,6 @@ do
     Flush(w)
     Check(buttons[1].placeholder.id == 2056011 and buttons[2].placeholder.id == 135274,
         "the window off: RestedXP's placeholders are back")
-    ns.RXPIconTexture = nil
-
-    -- pieces that are not there raise nothing
-    local bare = Begin({ rxpWindow = true }, function(world, rxp)
-        rxp.targeting = { activeTargetFrame = Object(world.everything) }
-        rxp.activeItemFrame = { UpdateVisuals = function() end, title = {} }
-    end)
-    bare.rxp.activeItemFrame:UpdateVisuals()
-    bare.rxp.SetStep()
-    Flush(bare)
-    Check(Window(bare) ~= nil and Window(bare).shown, "frames without a background, a border or a title: nothing raises")
 end
 
 -- the icons of ours are drawn as a texture in the window's accent, as it is now
@@ -1711,15 +1693,6 @@ do
     Check(kept and kept:find("chatbubble", 1, true), "and RestedXP's own with no style")
 
     w.talk.frame.text:SetText("Talk to |cff00ff00Duokna|r")
-
-    ns.RXPIconLook = nil
-    w.talk.frame.icon:SetText(("|T%s:0|t"):format(ns.RXPIconPath("line", "goto")))
-    w.rxp.v2:UpdateGuideWindow()
-    Flush(w)
-    local plain = Row("Talk to |cff00ff00Duokna|r")
-    Check(plain.glyph.shown == false and plain.icon.text:find("goto", 1, true),
-        "without the icons' module the text is shown as it is")
-    Check(f.shown, "and the window is still drawn")
 end
 
 -- a row that counts has a bar of its own: the items in the bags for a buy, the numbers in a counted line
@@ -1819,27 +1792,6 @@ do
     Check(Meters() == 1 and Row(BUY).meter.shown, "the buy only, and not a row that is not a buy with an id")
     Check(f.events[BAGS] == true, "and the bags are listened to again")
 
-    w.itemsRaise = true
-    ns.RXPWindowRefresh()
-    Flush(w)
-    Check(Meters() == 0 and type(ns.RXPFailures.WindowCount) == "string" and f.shown,
-        "bags that raise: no bar, kept by name, and the window is drawn")
-    w.itemsRaise = false
-
-    ns.RXPWindowRefresh()
-    Flush(w)
-    Check(Meters() == 1 and f.events[BAGS] == true, "and back when they do not")
-    w.env.GetItemCount = w.env.C_Item.GetItemCount
-    w.env.C_Item = nil
-    ns.RXPWindowRefresh()
-    Flush(w)
-    Check(Meters() == 0 and f.events[BAGS] == nil and f.shown,
-        "no C_Item, and the game's older global is not looked for: no bar, no listening, and the window is drawn")
-    w.env.C_Item = { GetItemCount = w.env.GetItemCount }
-    w.env.GetItemCount = nil
-    ns.RXPWindowRefresh()
-    Flush(w)
-    Check(Meters() == 1 and f.events[BAGS] == true, "and back with it")
     ns.SetRXPWindow(false)
     Flush(w)
     Check(f.events[BAGS] == nil, "the window turned off: the bags are let go")
@@ -2057,13 +2009,12 @@ do
     Check(train.skip == true and learn.skip == true and #went == 1, "a click on the box is that step's, and not the guide's")
 
     -- an objective that has nothing to run and a step with none
-    sticky.elements = { { text = "Nothing to run" }, "not an element" }
+    sticky.elements = { { text = "Nothing to run" } }
     rows[1].scripts.OnClick(rows[1])
     Check(sticky.elements[1].skip == true, "an element without anything to run is skipped too")
-    ns.RXPFailures.WindowComplete = nil
     sticky.elements = { { text = "Raises", OnComplete = function() error("complete") end } }
     rows[1].scripts.OnClick(rows[1])
-    Check(type(ns.RXPFailures.WindowComplete) == "string", "an objective that raises is kept by name and not raised")
+    Check(#w.reported == 1 and w.reported[1]:find("complete", 1, true), "an objective that raises is reported and not raised")
 end
 
 -- the window and the old theme are never both on
@@ -2123,7 +2074,7 @@ do
     Check(w.menus == menus + 1, "and its menu when it has no such list")
     w.rxp.v2.ShowGuideSelectionMenu = function() error("pick") end
     pick.scripts.OnClick(pick, "LeftButton")
-    Check(type(ns.RXPFailures.WindowPick) == "string", "a list that raises is kept by name and not raised")
+    Check(#w.reported == 1 and w.reported[1]:find("pick", 1, true), "a list that raises is reported and not raised")
     w.rxp.v2.ShowGuideSelectionMenu = list
     pick.scripts.OnEnter(pick)
     Check(w.env.GameTooltip.text == "Pick a guide" and pick.shade.shown, "and says so")
@@ -2145,12 +2096,6 @@ do
         if o.text == "Pick a guide" and Seen(o) then lines = lines + 1 end
     end
     Check(lines == 0 and pick.menu == false, "and the line to pick one is gone")
-    local rxp = w.env.RXP
-    w.env.RXP = nil
-    rxp.v2:UpdateGuideWindow()
-    Flush(w)
-    Check(f.shown == false, "RestedXP gone altogether: nothing to say, the window is not shown")
-    w.env.RXP = rxp
 end
 
 -- a line that begins with an icon has it in the icon column, as a row with an icon of its own does

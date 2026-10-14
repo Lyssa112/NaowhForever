@@ -587,11 +587,11 @@ do
     Check(objective and objective.type == "toggle" and objective.getValue() == false and onImage.account.rxpArrowObjective == nil,
         "an Arrow Shows Objective toggle, off by default")
     Check(textSize and textSize.type == "slider" and textSize.text == "Arrow Text Size" and textSize.min == 8 and textSize.max == 24
-        and textSize.step == 1 and textSize.getValue() == 13, "and the arrow text's size beside it, 13 to start")
+        and textSize.step == 1 and textSize.getValue() == 9, "and the arrow text's size beside it, RestedXP's 9 to start")
     textSize.setValue(18)
     Check(onImage.account.rxpArrowTextSize == 18, "a size is stored")
-    textSize.setValue(13)
-    Check(onImage.account.rxpArrowTextSize == nil, "and the default is not")
+    textSize.setValue(9)
+    Check(onImage.account.rxpArrowTextSize == 9, "and so is RestedXP's own once picked")
     objective.setValue(true)
     Check(onImage.account.rxpArrowObjective == true, "on is stored")
     objective.setValue(false)

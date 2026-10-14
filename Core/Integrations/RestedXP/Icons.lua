@@ -1,7 +1,5 @@
 -- Icons.lua: RestedXP's step icons in Naowh's own, in a line or a filled style, put in its icon table as it loads.
 local ns = _G.NaowhForever
-local Safe = ns.RXPSafe
-local Dig, Quiet = Safe.Dig, Safe.Quiet
 
 local RXP_ADDON = "RXPGuides"
 local ART = "Interface\\AddOns\\NaowhForever\\Core\\Integrations\\RestedXP\\Media\\Icons\\"
@@ -56,7 +54,7 @@ local GLYPH_NAMES = {}
 for _, glyph in pairs(GLYPHS) do GLYPH_NAMES[glyph] = true end
 
 function ns.RXPIconStyle()
-    if type(ns.RXPWindowEnabled) == "function" and not ns.RXPWindowEnabled() then return NONE end
+    if not ns.RXPWindowEnabled() then return NONE end
     local style = ns.AccountSettings().rxpIconStyle
     return STYLES[style] and style or NONE
 end
@@ -73,21 +71,9 @@ function ns.RXPIconPath(style, glyph)
     return ART .. style .. "\\" .. glyph .. EXTENSION
 end
 
-local function Rgb(color)
-    if type(color) == "table" and type(color.r) == "number" and type(color.g) == "number"
-            and type(color.b) == "number" then
-        return color.r, color.g, color.b
-    end
-end
-
 function ns.RXPIconColor()
-    if type(ns.RXPWindowColor) == "function" then
-        local ok, r, g, b = pcall(ns.RXPWindowColor, ACCENT)
-        if ok and type(r) == "number" and type(g) == "number" and type(b) == "number" then return r, g, b end
-    end
-    local r, g, b = Rgb(ns.THEME.accent)
-    if r then return r, g, b end
-    return 1, 1, 1
+    local r, g, b = ns.RXPWindowColor(ACCENT)
+    return r, g, b
 end
 
 function ns.RXPIconTexture(glyph)
@@ -125,8 +111,8 @@ end
 
 function ns.RXPIconsApply()
     local style = ns.RXPIconStyle()
-    local icons = Dig(_G.RXP, "icons")
-    if style == NONE or type(icons) ~= "table" then return end
+    if style == NONE then return end
+    local icons = _G.RXP.icons
     for key, glyph in pairs(GLYPHS) do
         if type(icons[key]) == "string" then icons[key] = Escape(style, glyph) end
     end
@@ -138,11 +124,11 @@ local function OnEvent(self, _, name)
             self:UnregisterAllEvents()
         elseif C_AddOns.IsAddOnLoaded(RXP_ADDON) then
             self:UnregisterAllEvents()
-            Quiet("Icons", ns.RXPIconsApply)
+            ns.RXPIconsApply()
         end
     elseif name == RXP_ADDON then
         self:UnregisterAllEvents()
-        Quiet("Icons", ns.RXPIconsApply)
+        ns.RXPIconsApply()
     end
 end
 

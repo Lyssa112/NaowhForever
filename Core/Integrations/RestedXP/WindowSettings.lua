@@ -80,15 +80,11 @@ local function Snap(value, lo, hi, step)
 end
 
 local function Changed()
-    if type(ns.RXPWindowRefresh) == "function" then ns.RXPWindowRefresh() end
-end
-
-local function RepaintArrow()
-    if type(ns.RXPPaintArrow) == "function" then ns.RXPPaintArrow() end
+    ns.RXPWindowRefresh()
 end
 
 local function IsPreset(key)
-    return type(key) == "string" and type(ns.THEME_PRESETS) == "table" and ns.THEME_PRESETS[key] ~= nil
+    return ns.THEME_PRESETS[key] ~= nil
 end
 
 local function IsTheme(key)
@@ -196,7 +192,7 @@ end
 function ns.SetRXPWindowTheme(key)
     Settings()[THEME_KEY] = IsTheme(key) and key or nil
     Changed()
-    RepaintArrow()
+    ns.RXPPaintArrow()
 end
 
 function ns.RXPWindowOwnColors()
@@ -216,14 +212,10 @@ function ns.RXPWindowColor(name)
     local color = COLOR_BY_NAME[name]
     if not color then return 1, 1, 1, 1 end
     local saved = ns.RXPWindowOwnColors() and Dig(Settings(), COLORS_KEY, name)
-    if type(saved) == "table" and type(saved.r) == "number" and type(saved.g) == "number"
-            and type(saved.b) == "number" then
-        return saved.r, saved.g, saved.b, type(saved.a) == "number" and saved.a or 1
-    end
+    if saved then return saved.r, saved.g, saved.b, saved.a end
     local key = ns.RXPWindowThemeKey()
     local source = (key == FOREVER and ns.FOREVER_SKIN) or (IsPreset(key) and ns.THEME_PRESETS[key]) or nil
-    local preset = type(source) == "table" and source[color.token]
-    local base = type(preset) == "table" and preset or ns.THEME[color.token]
+    local base = source and source[color.token] or ns.THEME[color.token]
     return base.r, base.g, base.b, color.alpha or 1
 end
 
@@ -242,7 +234,7 @@ function ns.SetRXPWindowColor(name, r, g, b, a)
     end
     if next(all) == nil then Settings()[COLORS_KEY] = nil end
     Changed()
-    RepaintArrow()
+    ns.RXPPaintArrow()
 end
 
 function ns.RXPWindowTint(name, text)
@@ -255,5 +247,5 @@ function ns.ResetRXPWindowStyle()
     Settings()[COLORS_KEY] = nil
     Settings()[THEME_KEY] = nil
     Changed()
-    RepaintArrow()
+    ns.RXPPaintArrow()
 end

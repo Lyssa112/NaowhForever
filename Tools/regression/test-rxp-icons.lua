@@ -8,6 +8,7 @@ end
 local coreSource = Read("Core/Core.lua")
 local featuresSource = Read("Core/Features.lua")
 local themesSource = Read("Core/Integrations/RestedXP/Themes.lua")
+local settingsSource = Read("Core/Integrations/RestedXP/WindowSettings.lua")
 local iconsSource = Read("Core/Integrations/RestedXP/Icons.lua")
 
 local cases = 0
@@ -53,7 +54,7 @@ local function World(account, opts)
         chunk("NaowhForever")
     end
     local ns = env.NaowhForever
-    for _, part in ipairs({ { themesSource, "Themes" }, { iconsSource, "Icons" } }) do
+    for _, part in ipairs({ { themesSource, "Themes" }, { settingsSource, "WindowSettings" }, { iconsSource, "Icons" } }) do
         local chunk = assert(loadstring(part[1], part[2]))
         setfenv(chunk, env)
         chunk("NaowhForever")
@@ -101,7 +102,7 @@ end
 
 -- a style, with RestedXP loading after: its icons are replaced as it loads, tinted with the accent
 do
-    local w = World({ rxpIconStyle = "line" })
+    local w = World({ rxpWindow = true, rxpIconStyle = "line" })
     w.ns.THEME.accent = { r = 0.5, g = 0.25, b = 1 }
     w.ns.THEME.accentSoft = { r = 0, g = 1, b = 0.5 }
     w.ns.THEME.fg = { r = 0.2, g = 0.4, b = 0.6 }
@@ -128,12 +129,11 @@ do
     local before = icons.accept
     w.ns.RXPIconsApply()
     Check(icons.accept == before, "applied again it is the same")
-    Check(w.ns.RXPFailures.Icons == nil, "and nothing failed")
 end
 
 -- RestedXP loaded before us, and the filled style: done at once
 do
-    local w = World({ rxpIconStyle = "filled" }, { loaded = true })
+    local w = World({ rxpWindow = true, rxpIconStyle = "filled" }, { loaded = true })
     w.ns.THEME.accent = { r = 1, g = 1, b = 1 }
     w.env.RXP = { icons = Icons() }
     Boot(w, "NaowhForever")
@@ -143,37 +143,26 @@ end
 
 -- no RestedXP: nothing is listened for
 do
-    local w = World({ rxpIconStyle = "line" }, { installed = false })
+    local w = World({ rxpWindow = true, rxpIconStyle = "line" }, { installed = false })
     Boot(w, "NaowhForever")
     Check(next(w.watcher.events) == nil, "RestedXP not installed: it listens for nothing")
 end
 
--- what is missing or wrong raises nothing
+-- a table that raises as it is written raises, so the game reports it
 do
-    local w = World({ rxpIconStyle = "line" })
-    Boot(w, "NaowhForever")
-    Boot(w, "RXPGuides")
-    Check(w.ns.RXPFailures.Icons == nil, "no RestedXP table: nothing raised, nothing failed")
-    w.env.RXP = { icons = "not a table" }
-    w.ns.RXPIconsApply()
-    Check(w.env.RXP.icons == "not a table", "a table that is not one is left alone")
     local locked = setmetatable({}, { __index = function() return "|Tx:0|t" end,
         __newindex = function() error("locked") end })
-    local raising = World({ rxpIconStyle = "line" })
+    local raising = World({ rxpWindow = true, rxpIconStyle = "line" })
     raising.env.RXP = { icons = locked }
     Boot(raising, "NaowhForever")
-    Boot(raising, "RXPGuides")
-    Check(type(raising.ns.RXPFailures.Icons) == "string" and raising.ns.RXPFailures.Icons:find("locked", 1, true),
-        "a table that raises: kept by name, and not raised")
-    w.ns.THEME.accent = nil
-    w.env.RXP = { icons = { accept = "|Tx:0|t" } }
-    w.ns.RXPIconsApply()
-    Check(w.env.RXP.icons.accept == Expected("line", "accept", 255, 255, 255), "no accent: white")
+    local ok, problem = pcall(Boot, raising, "RXPGuides")
+    Check(not ok and tostring(problem):find("locked", 1, true), "a table that raises: the error is the game's to show")
 end
 
 -- the setting: only a style is kept
 do
     local account = {}
+    account.rxpWindow = true
     local w = World(account)
     w.ns.SetRXPIconStyle("filled")
     Check(account.rxpIconStyle == "filled" and w.ns.RXPIconStyle() == "filled", "a style is kept")
@@ -188,9 +177,9 @@ end
 
 -- the style is the window's: with it off there is none, and it comes back as the window does
 do
-    local account = { rxpIconStyle = "line" }
+    local account = { rxpWindow = true, rxpIconStyle = "line" }
     local w = World(account)
-    Check(w.ns.RXPIconStyle() == "line", "with no window module to ask: the style as it is kept")
+    Check(w.ns.RXPIconStyle() == "line", "the window on: the style as it is kept")
     w.ns.RXPWindowEnabled = function() return false end
     Check(w.ns.RXPIconStyle() == "" and account.rxpIconStyle == "line",
         "the window not wished for: RestedXP's own, and the style kept")
@@ -205,7 +194,7 @@ end
 
 -- a glyph's file, for what RestedXP draws itself (the placeholders of its target buttons)
 do
-    local w = World({ rxpIconStyle = "filled" })
+    local w = World({ rxpWindow = true, rxpIconStyle = "filled" })
     Check(w.ns.RXPIconTexture("gossip") == ART .. "filled\\gossip.tga" and w.ns.RXPIconTexture("combat") == ART .. "filled\\combat.tga",
         "a glyph of ours: its file in the style picked")
     Check(w.ns.RXPIconTexture("nothing") == nil and w.ns.RXPIconTexture(5) == nil and w.ns.RXPIconTexture(nil) == nil,
@@ -238,10 +227,6 @@ do
         return 0, 1, 0, 1
     end
     Check(Is(0, 1, 0) and asked == "accent", "with the window there: its Accent Color")
-    w.ns.RXPWindowColor = function() error("window") end
-    Check(Is(0.9, 0.1, 0.1), "one that raises: the theme's")
-    w.ns.RXPWindowColor = function() return "red" end
-    Check(Is(0.9, 0.1, 0.1), "and one that gives no color")
     w.ns.RXPWindowColor = function() return 1, 0, 0, 1 end
 
     local text = ("|T%saccept.tga:0|t"):format(ART .. "filled\\")
@@ -262,7 +247,7 @@ end
 
 -- the icons inside a guide's text: the two RestedXP puts in most of its lines
 do
-    local w = World({ rxpIconStyle = "line" })
+    local w = World({ rxpWindow = true, rxpIconStyle = "line" })
     local T = w.ns.THEME
     T.accent = { r = 0.5, g = 0.25, b = 1 }
     T.accentSoft = { r = 0, g = 1, b = 0.5 }

@@ -1,7 +1,7 @@
 # RestedXP themes and guide window
 
 Naowh's theme, the eight theme presets and the player's current theme in RestedXP Guides, and the
-hooks that style its arrow, title bar, quest list and scroll bar. Off unless Settings > RESTEDXP
+hooks that style its arrow, title bar, quest list and scroll bar. Off unless Settings > RestedXP Theme (V1)
 turns it on (`ns.FEATURES.account.rxpThemes`), and only with RestedXP Guides installed. Loads
 through `RestedXP.xml`, after `Core/Core.xml`.
 
@@ -29,12 +29,12 @@ Core/Integrations/RestedXP/
   a saved theme of ours it fell back from is reloaded at login.
 - The hooks need RestedXP's frames, so they wait for PLAYER_LOGIN. Each checks what it needs and
   does nothing without it.
-- Nothing here raises through RestedXP, whose frames and functions change with its releases and
-  whose own code calls our hooks. Every hook, every installer and every call into RestedXP's
-  functions runs under `pcall` (`Quiet` and `Guarded`), so one that fails neither breaks RestedXP's
-  call nor keeps the others from being made. What failed is kept, the last of each by name, in
-  `ns.RXPFailures` (`/dump NaowhForever.RXPFailures`) and nothing is printed. Rows are remembered
-  only when a pass got to the end, so one that failed is tried again.
+- RestedXP's functions change with its releases, so every call into one of them (its theme reload and
+  `RegisterTheme`, `ReplaceNpcIds`, `GetGuideProgress`, `SetStep`, its menus, an objective's `OnComplete`)
+  runs under `pcall` (`Run`), and a failure goes to `geterrorhandler()` once per call site, so BugSack
+  shows it without one a frame. Our own hooks and drawing are not wrapped: an error in them is ours and
+  shows like any other. Rows are remembered only when a pass got to the end, so one that failed is tried
+  again.
 - RestedXP's UI v2 hides its legacy window (`DisableLegacyGuideWindow`) but leaves the cog showing,
   as the cog hangs from the window and not from the footer. The banners, cog, grip, scroll bar and
   rules are therefore painted only while their part is visible (`Visible`), and again when it is
@@ -125,10 +125,11 @@ Core/Integrations/RestedXP/
   words are not part of how the arrow is drawn. Turning it off makes RestedXP say its own text again by clearing
   `arrow.distance`, which RestedXP compares before it sets the text.
 - The arrow's font is set by RestedXP's `SetupArrow` and by its Arrow Text Size setting, from
-  the font of the theme picked, which is ours only when one of ours is picked. With Use Addon
-  Font on, a post-hook on its `SetFont` puts it in the Addon Font, and in Naowh's size for it (13 to
-  start, RestedXP's own is 9, Arrow Text Size), with the outline RestedXP gave it, so it is in the Addon
-  Font at that size whichever theme is picked and whatever RestedXP sets next. A path the client
+  the font of the theme picked, which is ours only when one of ours is picked. While the arrow is ours to
+  style (below), a post-hook on its `SetFont` puts it in the Addon Font (Arrow Addon Font), with the outline
+  RestedXP gave it, whatever RestedXP sets next. Its size is RestedXP's own (its Arrow Text Size, 9 to
+  start) until Arrow Text Size is picked here: only then is ours held, so RestedXP's slider keeps working
+  for a player who never picked one, and ours shows RestedXP's until it is picked. A path the client
   hands back spelled differently would make the font chase itself, so a flag (`keeping`) holds the
   hook while it sets one. With Arrow Shows Objective its text is also given a width (`TEXT_WIDTH`) so a long
   objective wraps under the arrow and does not run across the screen; it is its own width again without it.
@@ -139,7 +140,8 @@ Core/Integrations/RestedXP/
   live by the others; it tells the window to draw again through `ns.RXPWindowRefresh`, which the window
   defines), `WindowModel.lua` (reads RestedXP and returns tables; draws nothing) and `Window.lua` (frames).
   What each reads of the others is a function on `ns`, never a file-level local. `Run`, which returns
-  what a call returned and keeps what raised, is shared through `ns.RXPSafe` with `Quiet` and `Guarded`.
+  what a call into RestedXP returned and reports what raised, is shared through `ns.RXPSafe` with `Has`
+  and `Dig`.
 - What the window can be changed in is two lists in `WindowSettings.lua` (`OPTIONS` and `COLORS`), each with its
   kind, default, range and tip, and the settings page draws its rows from them (`WindowOptionCell`,
   `WindowColorCell`), so a new option is one entry. A value is kept only when it is not the default, and
@@ -226,7 +228,10 @@ Core/Integrations/RestedXP/
   first login of a character, `enableBetaFeatures`, `enableV2Interface` and the Naowh current theme in its
   profile for what is wished for, and asks for a reload as the interface is read when RestedXP loads; what
   the player changes after is theirs, as the characters done are kept (`rxpSetUp`, by GUID). The button
-  does it for the character played, seen or not. RestedXP puts its waypoint arrow at the top of the screen
+  does it for the character played, seen or not. The Naowh themes are registered in RestedXP while the
+  window is on as well as with the theme (V1), so Set Up has the Naowh current theme to pick; one turned on
+  since the last load is registered by Set Up itself. A theme picked with RestedXP's live reload off waits
+  for a reload, so the button asks for one. RestedXP puts its waypoint arrow at the top of the screen
   (`framePositions.arrowFrame`, by profile), and a character that is set up has an arrow that is still
   there in the middle: in the profile, which is read at load, and on the frame, so that the position
   RestedXP saves when the game closes is not the old one. One the player moved is left where it is.
@@ -249,14 +254,19 @@ Core/Integrations/RestedXP/
   the text's color or the game's gold.
 - The theme (RestedXP Theme (V1)), the arrow (Style RestedXP's Arrow) and the window (RestedXP Naowh
   Window (V2)) are each a switch, and the theme and the window each a fold with its switch on its title
-  (`W:SwitchFold`: open to start, kept as it is left, no chevron while there is nothing under it), and none
+  (`W:SwitchFold`, a `W:FoldHeader` with a switch: shut to start and kept as it is left like the other
+  folds, opened when its switch is turned on and while searching, no chevron while there is nothing under
+  it, ended by `W:EndFold` so the rows after it are not held back; `W:GroupHeader` is a title inside a
+  fold that goes with it), and none
   reads another's rows. The arrow's options are in the fold of whichever of the two is on (once), and in a
   section of their own, RESTEDXP ARROW, while neither is. The theme and the window are
   never both on: turning one on turns the other off (`SetRXPThemes`, `SetRXPWindow`), and a saved pair is
   read as the window's (`RXPThemesEnabled` is false while the window is wished for). The arrow is its own
   module (`RXPArrowEnabled`): it is hooked at login when it is on, with the theme or the window or neither,
-  in the live Naowh accent when the active theme is not one of ours, and with a font of its own (Arrow
-  Addon Font, `rxpArrowFont`). An account from before follows the theme it had on until the arrow is
+  and with a font of its own (Arrow Addon Font, `rxpArrowFont`). With the theme (V1) on it is styled only
+  while one of ours is RestedXP's active theme, as it was before the window, and given back as RestedXP
+  draws it under one of RestedXP's own (`ArrowStyled`); with the window on, or neither, there is no theme
+  of ours to pick, so it is styled in the window's color or the live Naowh accent. An account from before follows the theme it had on until the arrow is
   set once, and the theme or the window being switched sets it as it was, so that taking the theme away
   does not take the arrow with it.
 - RestedXP's two v2 windows are taken (made see-through and click-free) whenever the window is on, with a
