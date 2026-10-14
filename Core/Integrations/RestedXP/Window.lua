@@ -392,7 +392,9 @@ local function Read(steps)
         local rows = {}
         for _, element in ipairs(activeStep.elements or {}) do
             if type(element) == "table" and (element.text or element.rawtext or element.tooltipText) then
-                rows[#rows + 1] = Row(rxp, element)
+                local row = Row(rxp, element)
+                row.step = activeStep
+                rows[#rows + 1] = row
             end
         end
         model.steps[#model.steps + 1] = { label = StepLabel(rxp, activeStep), rows = rows }
@@ -613,10 +615,28 @@ local function GoTo(index)
     if type(index) == "number" and Has(rxp, "SetStep") then Quiet("WindowGo", rxp.SetStep, index) end
 end
 
-local function SkipStep()
+-- a step that stays while the guide goes on (a trainer to see, say) is not the guide's progress: skipping
+-- it is its objectives skipped, as RestedXP's checkboxes do, and RestedXP then lets it go
+local function SkipObjectives(rxp, step)
+    for _, element in ipairs(step.elements or {}) do
+        if type(element) == "table" and not element.optional and not element.skip then
+            element.skip = true
+            if type(element.OnComplete) == "function" then Quiet("WindowComplete", element.OnComplete, element) end
+        end
+    end
+    rxp.updateSteps = true
+    if Has(rxp, "UpdateMap") then Quiet("WindowMap", rxp.UpdateMap) end
+end
+
+local function SkipStep(step)
     local rxp = _G.RXP
-    local step = Has(rxp, "GetGuideProgress") and Run("WindowProgress", rxp.GetGuideProgress)
-    if type(step) == "number" then GoTo(step + 1) end
+    local progress = Has(rxp, "GetGuideProgress") and Run("WindowProgress", rxp.GetGuideProgress)
+    if type(progress) ~= "number" then return end
+    if type(step) == "table" and type(step.index) == "number" and step.index ~= progress then
+        SkipObjectives(rxp, step)
+    else
+        GoTo(progress + 1)
+    end
 end
 
 local function MaySkip()
@@ -783,7 +803,7 @@ local function MakeRow()
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetScript("OnClick", function(self, button)
         if button == "RightButton" then return Menu() end
-        if self.first and MaySkip() then SkipStep() end
+        if self.first and MaySkip() then SkipStep(self.step) end
     end)
     row:SetScript("OnEnter", function(self)
         if self.first then Tip(self, TEXT_SKIP, true) end
@@ -862,6 +882,7 @@ local function DrawRow(box, row, x, y, width, first)
     local item = Acquire("row")
     item:SetParent(box)
     item.first = first and true or false
+    item.step = row.step
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", box, "TOPLEFT", x, y)
     item:SetWidth(width)

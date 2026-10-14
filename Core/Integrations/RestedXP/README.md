@@ -147,8 +147,11 @@ Core/Integrations/RestedXP/
   Buy under a Talk to reads as a part of it.
 - A click skips or goes to a step and never ticks an objective: a sub task completes itself as RestedXP
   sees it done, and skipping one by hand is not offered. On the first line of the active step (its title;
-  `first` on its row) a click goes to the step after the guide's progress, and on a line of the list to
-  that line's step, and only there: the sub tasks and the box say and do nothing of the kind, both
+  `first` on its row) a click goes to the step after the guide's progress, unless the step is not the
+  guide's progress (a trainer to see, which stays active beside it, `sticky`): then its objectives are
+  skipped as RestedXP's checkbox does (`element.skip`, `OnComplete` once, `updateSteps`) and RestedXP lets
+  it go, as going to the next step would leave it where it is. On a line of the list it goes to that
+  line's step, and only there: the sub tasks and the box say and do nothing of the kind, both
   through `RXP.SetStep` as RestedXP's own Go to step does. Both need Shift by default (Skipping Steps), as
   a plain click is also where a window is grabbed to be moved and a step skipped by it is not given back;
   Click and Off are the other two. The list's lines are a transparent button each (pooled as `hit`) over

@@ -558,6 +558,7 @@ do
     -- the guide's progress is read when it is skipped, and what is missing is left out
     w.shift = true
     rxp.GetGuideProgress = function() return 40, "id" end
+    w.active.index = 40
     row.scripts.OnClick(row)
     Check(went[5] == 41, "it is from the guide's progress as it is now")
     rxp.GetGuideProgress = function() error("progress") end
@@ -583,6 +584,7 @@ do
 
     -- a button that is lit when the line under it is drawn for another step is not
     rxp.GetGuideProgress = function() return 36, "id" end
+    w.active.index = 36
     w.shift = false
     hits[3].scripts.OnEnter(hits[3])
     Check(hits[3].shade.shown == true, "lit under the mouse")
@@ -1501,6 +1503,60 @@ do
     rows = Rows()
     Check(#rows == 3 and rows[1].bar.shown == false and rows[2].bar.shown == true and rows[3].bar.shown == true,
         "and a row that was a first and is not has its bar again")
+end
+
+-- a step that stays active beside the guide's own (a trainer to see) is skipped by its objectives
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local rxp = w.rxp
+    local ns = w.ns
+    local went = {}
+    rxp.SetStep = function(n) went[#went + 1] = n end
+    rxp.updateSteps = false
+    local completes, mapped = 0, 0
+    rxp.UpdateMap = function() mapped = mapped + 1 end
+    local function Element(text)
+        local frame = { text = Object(w.everything), icon = Object(w.everything), button = Object(w.everything) }
+        frame.text:SetText(text)
+        frame.icon:SetText("|Ttrain|t")
+        function frame.button:GetChecked() return false end
+        return { text = text, tag = "trainer", frame = frame,
+            OnComplete = function() completes = completes + 1 end }
+    end
+    local train, learn = Element("Train your pet skills"), Element("Learn the skills")
+    local optional = Element("An optional thing")
+    optional.optional = true
+    local sticky = { active = true, index = 20, sticky = true, title = "Step 20", elements = { train, learn, optional } }
+    rxp.RXPFrame.activeSteps = { sticky, w.active }
+    rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    local rows = {}
+    for _, o in ipairs(w.frames) do
+        if o.icon and o.text and o.bar and o.scripts.OnClick and Seen(o) and o.first then rows[#rows + 1] = o end
+    end
+    Check(#rows == 2, "two steps, each with a first line")
+    w.shift = true
+    rows[1].scripts.OnClick(rows[1])
+    Check(#went == 0, "the step that stays is not a step to go to")
+    Check(train.skip == true and learn.skip == true and optional.skip == nil,
+        "its objectives are skipped, and one that is optional is not")
+    Check(completes == 2 and rxp.updateSteps == true and mapped == 1,
+        "as RestedXP's checkbox does it: each completes once, and the steps are asked to be looked at")
+    rows[1].scripts.OnClick(rows[1])
+    Check(completes == 2, "and not again")
+    rows[2].scripts.OnClick(rows[2])
+    Check(#went == 1 and went[1] == 37, "the guide's own step goes to the next one as it did")
+    Check(w.active.elements[1].skip == nil, "and its objectives are not touched")
+
+    -- an objective that has nothing to run and a step with none
+    sticky.elements = { { text = "Nothing to run" }, "not an element" }
+    rows[1].scripts.OnClick(rows[1])
+    Check(sticky.elements[1].skip == true, "an element without anything to run is skipped too")
+    ns.RXPFailures.WindowComplete = nil
+    sticky.elements = { { text = "Raises", OnComplete = function() error("complete") end } }
+    rows[1].scripts.OnClick(rows[1])
+    Check(type(ns.RXPFailures.WindowComplete) == "string", "an objective that raises is kept by name and not raised")
 end
 
 print("PASS rxp window: " .. cases .. " checks")
