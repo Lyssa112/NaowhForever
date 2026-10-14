@@ -624,7 +624,7 @@ local function MaySkip()
     return mode == "click" or (mode == "shift" and IsShiftKeyDown())
 end
 
-local function Tip(owner, text)
+local function Tip(owner, text, menu)
     if GameTooltip:IsForbidden() then return end
     local mode = ns.RXPWindowOption("rxpWindowSkip")
     GameTooltip:SetOwner(owner, TIP_ANCHOR)
@@ -633,7 +633,7 @@ local function Tip(owner, text)
     else
         GameTooltip:SetText(text)
         if mode == "shift" then GameTooltip:AddLine(TEXT_SHIFT, TIP_DIM, TIP_DIM, TIP_DIM) end
-        GameTooltip:AddLine(TEXT_MENU, TIP_DIM, TIP_DIM, TIP_DIM)
+        if menu then GameTooltip:AddLine(TEXT_MENU, TIP_DIM, TIP_DIM, TIP_DIM) end
     end
     GameTooltip:Show()
 end
@@ -786,7 +786,7 @@ local function MakeRow()
         if self.first and MaySkip() then SkipStep() end
     end)
     row:SetScript("OnEnter", function(self)
-        if self.first then Tip(self, TEXT_SKIP) end
+        if self.first then Tip(self, TEXT_SKIP, true) end
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
@@ -806,11 +806,10 @@ end
 
 local function MakeHit()
     local hit = CreateFrame("Button", nil, window)
-    hit:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    hit:RegisterForClicks("LeftButtonUp")
     hit.shade = hit:CreateTexture(nil, "BACKGROUND")
     hit.shade:SetAllPoints()
-    hit:SetScript("OnClick", function(self, button)
-        if button == "RightButton" then return Menu() end
+    hit:SetScript("OnClick", function(self)
         if MaySkip() then GoTo(self.index) end
     end)
     hit:SetScript("OnEnter", function(self)

@@ -523,12 +523,14 @@ do
     w.shift = false
     hits[2].scripts.OnEnter(hits[2])
     Check(w.env.GameTooltip.text == "Go to step 39" and hits[2].shade.shown, "it says so, and is lit")
+    Check(#w.env.GameTooltip.lines == 1 and w.env.GameTooltip.lines[1] == "Shift-click",
+        "and it does not say where the menu is")
     hits[2].scripts.OnLeave(hits[2])
     Check(hits[2].shade.shown == false, "and not when the mouse leaves")
     Check(hits[1].scripts.OnDragStart ~= nil, "a line is still where the window is dragged from")
-    Check(RegistersRight(hits[1]), "and a line of the list")
+    Check(not RegistersRight(hits[1]), "and a line of the list is not: the menu is of the current step")
     hits[1].scripts.OnClick(hits[1], "RightButton")
-    Check(w.menus == menus + 4 and #went == 2, "and a right click on a line is the menu too")
+    Check(w.menus == menus + 3 and #went == 2, "a right click on a line is no menu, and no step")
 
     -- how it is done is a setting
     ns.SetRXPWindowOption("rxpWindowSkip", "click")
