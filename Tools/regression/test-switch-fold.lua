@@ -164,4 +164,29 @@ do
     check("when something follows it again, it folds", again.arrow.shown == true and again.hit.shown == true)
 end
 
+-- on the Forever skin the header is a banner with its text in the middle: the switch is after the text
+do
+    ns.foreverSkin = true
+    ns.Shared.Parts = ns.Shared.Parts or {}
+    local pill
+    ns.Shared.Parts.ForeverPill = function(parent)
+        pill = New("Frame", parent)
+        pill.text = New("FontString", pill)
+        return pill
+    end
+    ns.Shared.Parts.ForeverCheck = function(t)
+        return New("Texture", t), New("Texture", t), { r = 0, g = 0, b = 0 }
+    end
+    local parent = Page()
+    local f = W:SwitchFold(parent, "Skinned Thing", 0, cfg)
+    local at = f.switch.points[#f.switch.points]
+    check("the banner is the header's", f._pill == pill)
+    check("the switch follows its text, not the title that is hidden",
+        at and at[1] == "LEFT" and at[2] == pill.text and at[3] == "RIGHT")
+    ns.foreverSkin = nil
+    local plain = W:SwitchFold(Page(), "Plain Thing", 0, cfg)
+    local lead = plain.switch.points[#plain.switch.points]
+    check("and without the skin it follows the title", plain._pill == nil and lead[2] == plain._label)
+end
+
 print("PASS switch fold: " .. checks .. " checks")
