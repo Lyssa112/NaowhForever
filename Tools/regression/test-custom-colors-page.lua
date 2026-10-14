@@ -81,6 +81,8 @@ local function Page(account, rxp, up)
     local ns = RealCore(account, rxp, up)
     e.ns = ns
     ns.Confirm = function(text, onYes) e.confirms[#e.confirms + 1] = { text = text, yes = onYes } end
+    e.reloads = {}
+    ns.ConfirmReload = function(text) e.reloads[#e.reloads + 1] = text end
     local env = { ns = ns, W = {}, colorsPending = false, rxpPending = false,
         UI = { RefreshPage = function() e.refreshes = e.refreshes + 1 end,
             FontChoices = function() return { [""] = "Addon Font" }, { "" } end,
@@ -204,6 +206,7 @@ do
     Check(k.getValue() == "" and not e.theme.disabled(), "nothing saved: the default, and Theme can be picked")
     k.setValue("forever")
     Check(a.skin == "forever" and e.refreshes == 1, "Forever is stored and the page redraws")
+    Check(#e.reloads == 1 and e.reloads[1]:find("skin", 1, true), "and a reload is offered right away")
     e.build()
     Check(#e.notes == 1 and e.notes[1] == HINT and e.theme.disabled(), "the hint shows, and Theme is greyed out")
     e.skin.setValue("")
