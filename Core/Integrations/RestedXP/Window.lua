@@ -951,7 +951,7 @@ local function DrawRow(box, row, x, y, width, first, shop)
     item.bar:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
     item.bar:SetPoint("BOTTOMLEFT", item, "BOTTOMLEFT", 0, 0)
     item.bar:SetWidth(BAR_W)
-    item.bar:SetShown(not first)
+    item.bar:SetShown(not first and not row.nested)
     local a = row.done and "muted" or "accent"
     item.bar:SetColorTexture(ns.RXPWindowColor(a))
     item.icon:ClearAllPoints()

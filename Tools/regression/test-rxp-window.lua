@@ -1855,11 +1855,14 @@ do
         "the first line is not, and a nested one is that much narrower")
     Check(rows[2].icon.text == "|T135641:0|t" and rows[2].text.text == "(Darkshore Grouper)",
         "and the icon is lifted into the column of the line as it is")
+    Check(rows[2].bar.shown == false and rows[3].bar.shown == false,
+        "and such a line has no bar at its side: what RestedXP tracks there is not what is in the bags")
 
     w.vendor.frame.text:SetText("|Tinterface/worldmap/chatbubble_64grey.blp:20|t Talk to him")
     Draw()
     rows = Rows()
     Check(rows[3].points[1][4] == 7 + 12, "the speech bubble of a Talk to is a marker: set in as a sub task is")
+    Check(rows[3].bar.shown == true, "and it has its bar, as a sub task has")
 
     w.vendor.frame.text:SetText("|T135641:0|t (Strider Meat)")
     w.vendor.frame.icon:SetText("|Ttalk|t")
