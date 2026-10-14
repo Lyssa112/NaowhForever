@@ -25,10 +25,10 @@ local EMPTY_SIZE = 12
 local TITLE_X = C.TITLE_X
 local TITLE_SIZE, TIME_SIZE, HEAD_SIZE, HEAD_PAD, SUMMARY_SIZE = 12, 11, 10, 3, 11
 
-local TEXT_EMPTY = "No data yet"
-local TEXT_NAME_HEAD, TEXT_TOTAL, TEXT_RATE, TEXT_PERCENT_HEAD = "Name", "Total", "Per Sec", "%"
-local DIVIDED_TEXT, TEXT_YOU = "%s | %s", "You"
-local SUMMARY_GAP, TEXT_RAID, TEXT_RANK = "   ", "Raid %s", "Rank %d/%d"
+local TEXT_EMPTY = ns.L("No data yet")
+local TEXT_NAME_HEAD, TEXT_TOTAL, TEXT_RATE, TEXT_PERCENT_HEAD = ns.L("Name"), ns.L("Total"), ns.L("Per Sec"), "%"
+local DIVIDED_TEXT, TEXT_YOU = "%s | %s", ns.L("You")
+local SUMMARY_GAP, TEXT_RAID, TEXT_RANK = "   ", ns.L("Raid %s"), ns.L("Rank %d/%d")
 local RANK_TEXT = "%d"
 
 local Look = {}
@@ -325,9 +325,13 @@ local function SizeCells(row, pane, g)
     PlaceName(row, pane, g)
 end
 
+local function ListTitle(mode)
+    return mode.total and ns.L(mode.total) or TEXT_TOTAL
+end
+
 local function ColumnTitle(mode, kind)
-    if kind == "rate" then return mode.perSecond or TEXT_RATE end
-    return mode.totalHead or mode.total or TEXT_TOTAL
+    if kind == "rate" then return mode.perSecond and ns.L(mode.perSecond) or TEXT_RATE end
+    return mode.totalHead and ns.L(mode.totalHead) or ListTitle(mode)
 end
 
 local function TitleWidths(pane, g)
@@ -360,7 +364,7 @@ local function HeadText(pane, mode, id)
         if cols.merged then return DIVIDED_TEXT:format(ColumnTitle(mode, cols.a), ColumnTitle(mode, cols.b)) end
         return ColumnTitle(mode, cols.b)
     end
-    return DM.Mode(cols.x[id]).total or TEXT_TOTAL
+    return ListTitle(DM.Mode(cols.x[id]))
 end
 
 local function LayRow(row, pane, i, g)
@@ -751,7 +755,7 @@ function Look.PaintSummary(f, session, mode, name, seconds)
         args[#args + 1] = name
     end
     if S.Get("summaryTotal") ~= false then
-        parts[#parts + 1] = (mode.total or TEXT_TOTAL) .. " %s"
+        parts[#parts + 1] = ListTitle(mode) .. " %s"
         if mode.deathTime == true then
             args[#args + 1] = #session.combatSources
         else
@@ -760,7 +764,7 @@ function Look.PaintSummary(f, session, mode, name, seconds)
     end
     local rate = S.Get("summaryRate") ~= false and mode.rate and DM.PerSecond(session.totalAmount, seconds)
     if rate then
-        parts[#parts + 1] = TEXT_RAID:format(mode.perSecond or TEXT_RATE) .. " %s"
+        parts[#parts + 1] = TEXT_RAID:format(ColumnTitle(mode, "rate")) .. " %s"
         args[#args + 1] = Format(rate)
     end
     local rank, count = DM.Rank(session)
