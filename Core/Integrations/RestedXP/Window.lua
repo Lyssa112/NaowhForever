@@ -779,12 +779,53 @@ local function MakeBar(parent)
     return bar
 end
 
+-- The window is in the Forever skin's art when its theme is Forever, or is the addon's and the addon is in the
+-- skin: the bronze inset on the step box and the window, the skin's field and rim on the bars, its sign to fold.
+local function SkinParts()
+    local shared = type(ns.Shared) == "table" and ns.Shared or nil
+    local parts = shared and shared.Parts
+    if type(parts) == "table" and parts.ForeverInset and parts.ForeverBox and parts.ForeverAtlas then
+        return parts, shared.Style
+    end
+end
+
+local function Skinned()
+    if not SkinParts() then return false end
+    local key = ns.RXPWindowThemeKey()
+    return key == FOREVER or (key == FOLLOW and ns.foreverSkin == true)
+end
+
+-- A bronze inset behind a frame, drawn under what the frame holds.
+local function SkinInset(frame, on)
+    if on then
+        if not frame.inset then
+            local parts = SkinParts()
+            frame.inset = parts.ForeverInset(frame)
+            frame.inset:SetAllPoints(frame)
+            local level = frame:GetFrameLevel()
+            if type(level) == "number" then frame.inset:SetFrameLevel(math.max(0, level - 1)) end
+        end
+        frame.inset:Show()
+    elseif frame.inset then
+        frame.inset:Hide()
+    end
+end
+
 local function PaintBar(bar, fraction)
     bar:SetStatusBarTexture(TexturePath())
     local r, g, b, a = ns.RXPWindowColor("accent")
     bar:SetStatusBarColor(r, g, b, a)
-    r, g, b, a = ns.RXPWindowColor("line")
-    bar.track:SetColorTexture(r, g, b, a)
+    local parts, style = SkinParts()
+    local skinned = Skinned()
+    if skinned and not bar.rim then bar.rim = parts.ForeverBox(bar) end
+    if bar.rim then bar.rim._frame:SetShown(skinned) end
+    if skinned and style and style.FOREVER_FIELD_RGB then
+        local field = style.FOREVER_FIELD_RGB
+        bar.track:SetColorTexture(field.r, field.g, field.b, 1)
+    else
+        r, g, b, a = ns.RXPWindowColor("line")
+        bar.track:SetColorTexture(r, g, b, a)
+    end
     bar:SetMinMaxValues(0, 1)
     bar:SetValue(fraction)
     bar:SetHeight(BAR_HEIGHT)
@@ -809,6 +850,8 @@ local function Build()
     f.fold = CreateFrame("Button", nil, f)
     f.fold.text = Text(f.fold, "rxpWindowTitleSize", "CENTER")
     f.fold.text:SetAllPoints()
+    f.fold.sign = f.fold:CreateTexture(nil, "OVERLAY")
+    f.fold.sign:SetPoint("CENTER")
     f.fold:SetScript("OnClick", function()
         local on = Settings().rxpWindowCollapsed ~= true
         Settings().rxpWindowCollapsed = on or nil
@@ -1028,10 +1071,16 @@ local function DrawBox(step, y, inner, current)
     box:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
     box:SetWidth(inner)
     local boxR, boxG, boxB = ns.RXPWindowColor("box")
-    box.back:SetColorTexture(boxR, boxG, boxB, ns.RXPWindowOption("rxpWindowBoxOpacity") / PERCENT)
+    local opacity = ns.RXPWindowOption("rxpWindowBoxOpacity") / PERCENT
+    local bordered = ns.RXPWindowOption("rxpWindowBoxBorder")
+    local skinned = bordered and Skinned()
+    SkinInset(box, skinned)
+    if skinned then box.inset.fill:SetColorTexture(boxR, boxG, boxB, opacity) end
+    box.back:SetColorTexture(boxR, boxG, boxB, opacity)
+    box.back:SetShown(not skinned)
     local r, g, b, a = ns.RXPWindowColor("border")
     box.edge:SetColor(r, g, b, a)
-    box.edge._frame:SetShown(ns.RXPWindowOption("rxpWindowBoxBorder"))
+    box.edge._frame:SetShown(bordered and not skinned)
     box.label:ClearAllPoints()
     box.label:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, -BOX_PAD)
     Coloured(box.label, "accent")
@@ -1062,6 +1111,11 @@ local function DrawHeader(model, folded, width, headH)
     window.fold:ClearAllPoints()
     window.fold:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, -PAD)
     window.fold.text:SetText(folded and TEXT_UNFOLD or TEXT_FOLD)
+    local parts, style = SkinParts()
+    local name = style and Skinned() and (folded and style.FOREVER_PLUS_ATLAS or style.FOREVER_MINUS_ATLAS)
+    local sign = type(name) == "string" and parts.ForeverAtlas(window.fold.sign, name, true) == true
+    window.fold.sign:SetShown(sign)
+    window.fold.text:SetShown(not sign)
     Coloured(window.fold.text, "line")
     window.title:ClearAllPoints()
     window.title:SetPoint("TOPLEFT", window, "TOPLEFT", PAD + FOLD_W + Spacing(), -PAD)
@@ -1125,10 +1179,17 @@ function Draw()
     local gap = Spacing()
     local listH = ns.RXPWindowOption("rxpWindowListSize") + LIST_PAD
     if not sizing then window:SetWidth(width) end
+    local panelOn, borderOn = ns.RXPWindowOption("rxpWindowPanel"), ns.RXPWindowOption("rxpWindowBorder")
+    local skinned = borderOn and Skinned()
+    SkinInset(window, skinned)
+    if skinned then
+        local pr, pg, pb, pa = ns.RXPWindowColor("panel")
+        window.inset.fill:SetColorTexture(pr, pg, pb, panelOn and pa or 0)
+    end
     window.back:SetColorTexture(ns.RXPWindowColor("panel"))
-    window.back:SetShown(ns.RXPWindowOption("rxpWindowPanel"))
+    window.back:SetShown(panelOn and not skinned)
     window.edge:SetColor(ns.RXPWindowColor("border"))
-    window.edge._frame:SetShown(ns.RXPWindowOption("rxpWindowBorder"))
+    window.edge._frame:SetShown(borderOn and not skinned)
     DrawHeader(model, folded, width, headH)
     local y = DrawLine(model, -PAD - headH)
     if not folded then
