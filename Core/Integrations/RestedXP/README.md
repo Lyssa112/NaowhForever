@@ -153,7 +153,10 @@ Core/Integrations/RestedXP/
   list (`chrome`) and the height of a line, and letting go of the grip turns the width and
   `(height - chrome) / line` into the width and steps settings and draws again at the size that fits.
   Its bounds are the smallest (no steps) and the tallest (all of them). Lock Window stops moving and
-  sizing, and a folded window has nothing to size.
+  sizing, and a folded window has nothing to size. The width has no slider and the grip no switch:
+  the corner is the way to size the window, so a setting for either was one more row to say the same
+  (only the steps keep one, Upcoming Steps, as a number is exact where a drag is not). A grip that an
+  older version had switched off is shown.
 - The window follows the drag as it happens (`OnSizeChanged` while the grip is held): what the list can
   show is read once when the grip is pressed, with every step it could list, and each size drawn from
   that, so nothing is read again per frame; the window does not set its own width or height while it is

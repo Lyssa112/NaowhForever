@@ -1367,12 +1367,17 @@ do
     ns.SetRXPWindowOption("rxpWindowLock", false)
     Flush(w)
     Check(f.grip.shown == true, "unlocked: it is back")
-    ns.SetRXPWindowOption("rxpWindowGrip", false)
+    local grips = 0
+    for _, option in ipairs(ns.RXPWindowOptions()) do
+        if option.label == "Show Resize Grip" or option.key == "rxpWindowGrip" then grips = grips + 1 end
+    end
+    Check(grips == 0, "there is no setting for the grip: it is how the window is sized")
+    account.rxpWindowGrip = false
+    ns.RXPWindowRefresh()
     Flush(w)
-    Check(f.grip.shown == false and f.resizable == true, "the grip can be left out, and the window is still resizable")
-    ns.SetRXPWindowOption("rxpWindowGrip", true)
+    Check(f.grip.shown == true and f.resizable == true, "one an older version left off is shown, and the window is resizable")
     account.rxpWindowCollapsed = true
-    ns.SetRXPWindowOption("rxpWindowGrip", true)
+    ns.RXPWindowRefresh()
     Flush(w)
     Check(f.grip.shown == false and f.resizable == false, "folded: there is no list to size, and no grip")
 end

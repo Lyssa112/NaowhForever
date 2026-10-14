@@ -587,26 +587,19 @@ local function RxpWindowRows(W, parent, y)
     if not ns.RXPWindowReady() then
         _, h = W:DualRow(parent, y, { type = "label", text = TEXT_RXP_WINDOW_NEEDS }, Empty()); y = y - h
     end
-    local widthMin, widthMax, widthStep = ns.RXPWindowWidthRange()
     local stepsMin, stepsMax, stepsStep = ns.RXPWindowStepsRange()
     local scaleMin, scaleMax, scaleStep = ns.RXPWindowScaleRange()
     _, h = W:DualRow(parent, y,
-        { type = "slider", text = "Naowh Window Width", min = widthMin, max = widthMax, step = widthStep,
-          tooltip = "How wide the Naowh guide window is.",
-          getValue = ns.RXPWindowWidth,
-          setValue = function(v) ns.SetRXPWindowWidth(v) end },
         { type = "slider", text = "Upcoming Steps", min = stepsMin, max = stepsMax, step = stepsStep,
           tooltip = "How many of the steps after the active one are listed.",
           getValue = ns.RXPWindowSteps,
-          setValue = function(v) ns.SetRXPWindowSteps(v) end }
-    ); y = y - h
-    _, h = W:DualRow(parent, y,
+          setValue = function(v) ns.SetRXPWindowSteps(v) end },
         { type = "slider", text = "Naowh Window Scale", min = scaleMin, max = scaleMax, step = scaleStep,
           tooltip = "How big the whole window is, its text with it.",
           getValue = ns.RXPWindowScale,
-          setValue = function(v) ns.SetRXPWindowScale(v) end },
-        IconStyleRow()
+          setValue = function(v) ns.SetRXPWindowScale(v) end }
     ); y = y - h
+    _, h = W:DualRow(parent, y, IconStyleRow(), Empty()); y = y - h
     y = RxpArrowRows(W, parent, y)
     y = RxpWindowStyleRows(W, parent, y)
     W:EndFeature(parent)

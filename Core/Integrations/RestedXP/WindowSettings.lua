@@ -30,8 +30,6 @@ local OPTIONS = {
       max = 24, tip = "The steps after the active one." },
     { key = "rxpWindowLine", group = "Look", kind = "choice", label = "Under the Title", default = "bar",
       values = LINES, order = { "bar", "rule", "none" }, tip = "A progress bar of the guide, a line, or nothing." },
-    { key = "rxpWindowGrip", group = "Look", kind = "toggle", label = "Show Resize Grip", default = true,
-      tip = "The corner that is dragged to change the window's width and how many steps are listed." },
     { key = "rxpWindowSkip", group = "Look", kind = "choice", label = "Skipping Steps", default = "shift",
       values = SKIPS, order = { "shift", "click", "off" },
       tip = "What it takes to click the active step to skip it, or a step of the list to go to it." },

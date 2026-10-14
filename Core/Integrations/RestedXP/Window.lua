@@ -856,7 +856,7 @@ local function DrawChrome(y, listH, folded)
     if Has(window, "SetResizeBounds") then
         window:SetResizeBounds(WIDTH_MIN, window.chrome, WIDTH_MAX, window.chrome + STEPS_MAX * listH)
     end
-    window.grip:SetShown(ns.RXPWindowOption("rxpWindowGrip") and not folded and not locked)
+    window.grip:SetShown(not folded and not locked)
 end
 
 function Draw()
