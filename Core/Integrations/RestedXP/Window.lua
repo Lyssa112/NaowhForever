@@ -55,6 +55,8 @@ local OPTIONS = {
       max = 28, tip = "The guide's name and its progress." },
     { key = "rxpWindowTextSize", group = "Text", kind = "number", label = "Step Text Size", default = 13, min = 8,
       max = 24, tip = "The active step." },
+    { key = "rxpWindowFirstGrow", group = "Text", kind = "number", label = "First Line Bonus", default = 2, min = 0,
+      max = 8, tip = "How much bigger the first line of a step is than its sub tasks." },
     { key = "rxpWindowListSize", group = "Text", kind = "number", label = "List Text Size", default = 12, min = 8,
       max = 24, tip = "The steps after the active one." },
     { key = "rxpWindowIconSize", group = "Text", kind = "number", label = "Icon Size", default = 18, min = 10,
@@ -852,7 +854,7 @@ local function Spacing()
     return ns.RXPWindowOption("rxpWindowSpacing")
 end
 
-local function DrawRow(box, row, x, y, width)
+local function DrawRow(box, row, x, y, width, first)
     local item = Acquire("row")
     item:SetParent(box)
     item:ClearAllPoints()
@@ -861,6 +863,7 @@ local function DrawRow(box, row, x, y, width)
     local gap = Spacing()
     local iconSize = ns.RXPWindowOption("rxpWindowIconSize")
     local textSize = ns.RXPWindowOption("rxpWindowTextSize")
+    if first then textSize = textSize + ns.RXPWindowOption("rxpWindowFirstGrow") end
     local iconW = iconSize + ICON_GAP
     local drop = math.max(0, math.floor((iconSize - textSize) / 2))
     local textWidth = width - BAR_W - gap - iconW
@@ -877,6 +880,7 @@ local function DrawRow(box, row, x, y, width)
     item.text:SetPoint("TOPLEFT", item, "TOPLEFT", BAR_W + gap + iconW, -drop)
     item.text:SetWidth(textWidth)
     Coloured(item.text, row.done and "done" or "text")
+    Faced(item.text, textSize)
     item.text:SetText(row.text)
     local height = math.max(drop + math.max(item.text:GetStringHeight(), textSize), iconSize)
     if row.need and row.need >= COUNT_MIN and ns.RXPWindowOption("rxpWindowCountBar") then
@@ -927,7 +931,7 @@ local function DrawBox(step, y, inner, current)
     local indent = ns.RXPWindowOption("rxpWindowIndent")
     for i, row in ipairs(step.rows) do
         local set = i > 1 and indent or 0
-        by = by - DrawRow(box, row, BOX_PAD + set, by, inner - BOX_PAD * 2 - set) - gap
+        by = by - DrawRow(box, row, BOX_PAD + set, by, inner - BOX_PAD * 2 - set, i == 1) - gap
     end
     box:SetHeight(-by + BOX_PAD - gap)
     return y + by - BOX_PAD

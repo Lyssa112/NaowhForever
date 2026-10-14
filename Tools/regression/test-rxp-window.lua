@@ -865,6 +865,7 @@ do
     ns.SetRXPWindowOption("rxpWindowTitleSize", 20)
     ns.SetRXPWindowOption("rxpWindowTextSize", 15)
     ns.SetRXPWindowOption("rxpWindowListSize", 9)
+    ns.SetRXPWindowOption("rxpWindowFirstGrow", 0)
     Flush(w)
     for _, size in ipairs({ { "rxpWindowTitleSize", 20 }, { "rxpWindowTextSize", 15 }, { "rxpWindowListSize", 9 } }) do
         local group = Texts(size[1])
@@ -1372,13 +1373,13 @@ do
     end
     local row = First()
     Check(row.icon.fontSize == 18, "18 to start, bigger than the text")
-    Check(row.text.points[1][4] == 2 + 5 + 18 + 5 and row.text.points[1][5] == -2,
+    Check(row.text.points[1][4] == 2 + 5 + 18 + 5 and row.text.points[1][5] == -1,
         "the text starts after it, and is dropped to the middle of it")
     Check(row.height >= 18, "and the row is as tall as it")
     ns.SetRXPWindowOption("rxpWindowIconSize", 28)
     Flush(w)
     row = First()
-    Check(row.icon.fontSize == 28 and row.text.points[1][4] == 2 + 5 + 28 + 5 and row.text.points[1][5] == -7
+    Check(row.icon.fontSize == 28 and row.text.points[1][4] == 2 + 5 + 28 + 5 and row.text.points[1][5] == -6
         and account.rxpWindowIconSize == 28, "its size is a setting: the text moves with it")
     Check(row.text.width == row.width - 2 - 5 - 33, "and has that much less room")
     ns.SetRXPWindowOption("rxpWindowIconSize", 10)
@@ -1387,6 +1388,53 @@ do
     Check(row.text.points[1][4] == 2 + 5 + 10 + 5 and row.text.points[1][5] == 0, "smaller than the text: not dropped")
     ns.SetRXPWindowOption("rxpWindowIconSize", 18)
     Check(account.rxpWindowIconSize == nil, "the default is not kept")
+end
+
+-- the first line of a step is bigger than its sub tasks by a little
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local function Rows()
+        local out = {}
+        for _, o in ipairs(w.frames) do
+            if o.icon and o.text and o.bar and Seen(o) then out[#out + 1] = o end
+        end
+        return out
+    end
+    local rows = Rows()
+    Check(#rows == 3 and rows[1].text.fontSize == 15 and rows[2].text.fontSize == 13 and rows[3].text.fontSize == 13,
+        "the first is two bigger than the text of its sub tasks to start")
+    Check(rows[1].icon.fontSize == 18 and rows[2].icon.fontSize == 18, "and the icons are alike")
+    ns.SetRXPWindowOption("rxpWindowFirstGrow", 5)
+    Flush(w)
+    rows = Rows()
+    Check(rows[1].text.fontSize == 18 and rows[2].text.fontSize == 13 and account.rxpWindowFirstGrow == 5,
+        "by as much as is set, kept")
+    ns.SetRXPWindowOption("rxpWindowFirstGrow", 0)
+    Flush(w)
+    rows = Rows()
+    Check(rows[1].text.fontSize == 13 and rows[2].text.fontSize == 13, "none: all alike")
+    ns.SetRXPWindowOption("rxpWindowFirstGrow", 2)
+    ns.SetRXPWindowOption("rxpWindowTextSize", 16)
+    Flush(w)
+    rows = Rows()
+    Check(rows[1].text.fontSize == 18 and rows[2].text.fontSize == 16, "and it follows the text's size")
+
+    -- a row that was the first and is not is the text's size again
+    local steps = w.rxp.RXPFrame.activeSteps
+    w.rxp.RXPFrame.activeSteps = { { active = true, index = 37, title = "Step 37", elements = { w.buy } }, steps[1] }
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    rows = Rows()
+    Check(#rows == 4 and rows[1].text.fontSize == 18 and rows[2].text.fontSize == 18 and rows[3].text.fontSize == 16
+        and rows[4].text.fontSize == 16, "each step has its first line bigger")
+    w.rxp.RXPFrame.activeSteps = steps
+    w.rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    rows = Rows()
+    Check(#rows == 3 and rows[1].text.fontSize == 18 and rows[2].text.fontSize == 16 and rows[3].text.fontSize == 16,
+        "and back to one step: the others are the text's size again")
 end
 
 print("PASS rxp window: " .. cases .. " checks")

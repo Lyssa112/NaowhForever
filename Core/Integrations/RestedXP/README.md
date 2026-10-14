@@ -169,3 +169,7 @@ Core/Integrations/RestedXP/
   icon's font string is faced at it, so RestedXP's own icons (`|T...:0|t`, as tall as the text they are in)
   grow with it, and the column and the row are as big. The text is dropped to the middle of an icon that
   is taller than it, and not when it is smaller.
+- The first line of a step is bigger than its sub tasks (First Line Bonus, 2 over the text size to start).
+  `Refaced` sets every row's text to the text size at the start of a draw, and `DrawRow` sets the first
+  row's again with the bonus, so a pooled row that was the first and is not is back at the text size at
+  the next draw. The bonus is part of the size the icon is set against.
