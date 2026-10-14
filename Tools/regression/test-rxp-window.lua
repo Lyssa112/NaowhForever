@@ -126,10 +126,10 @@ local function World(account, opts)
     env.C_Timer = { After = function(_, fn) w.timers[#w.timers + 1] = fn end }
     env.SetItemRef = function(link) w.links[#w.links + 1] = link end
     w.items = {}
-    env.GetItemCount = function(id)
+    env.C_Item = { GetItemCount = function(id)
         if w.itemsRaise then error("items") end
         return w.items[id] or 0
-    end
+    end }
     env.NaowhForeverDB = { account = account, profiles = {}, charActive = {} }
     env.CreateFrame = function(_, name, parent)
         local f = Object(w.everything)
@@ -1841,6 +1841,17 @@ do
     ns.RXPWindowRefresh()
     Flush(w)
     Check(Meters() == 1 and f.events[BAGS] == true, "and back when they do not")
+    w.env.GetItemCount = w.env.C_Item.GetItemCount
+    w.env.C_Item = nil
+    ns.RXPWindowRefresh()
+    Flush(w)
+    Check(Meters() == 0 and f.events[BAGS] == nil and f.shown,
+        "no C_Item, and the game's older global is not looked for: no bar, no listening, and the window is drawn")
+    w.env.C_Item = { GetItemCount = w.env.GetItemCount }
+    w.env.GetItemCount = nil
+    ns.RXPWindowRefresh()
+    Flush(w)
+    Check(Meters() == 1 and f.events[BAGS] == true, "and back with it")
     ns.SetRXPWindow(false)
     Flush(w)
     Check(f.events[BAGS] == nil, "the window turned off: the bags are let go")

@@ -188,7 +188,7 @@ Core/Integrations/RestedXP/
   (pooled as `hit`) over the text, so they are also where the window is dragged from, and with Off they
   are not lit.
 - A row that counts has a bar under its text: a buy by the items in the bags against `qty` (RestedXP shows
-  no counter for it, so `GetItemCount(id)` is read, and the window listens to `BAG_UPDATE_DELAYED` only
+  no counter for it, so `C_Item.GetItemCount(id)` is read, and the window listens to `BAG_UPDATE_DELAYED` only
   while such a row is drawn), and any other row by the `3/8` in its text, which RestedXP rewrites as the
   count changes and so redraws the window. A count of one is a tick box and not a bar, and a count past
   its total is full. A buy that is done is full whatever the bags hold now (what was bought is used or

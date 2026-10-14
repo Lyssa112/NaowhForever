@@ -40,9 +40,8 @@ end
 
 local function ItemCount(id)
     local item = _G.C_Item
-    local count = Has(item, "GetItemCount") and item.GetItemCount or _G.GetItemCount
-    if type(count) ~= "function" then return nil end
-    local have = Run("WindowCount", count, id)
+    if not Has(item, "GetItemCount") then return nil end
+    local have = Run("WindowCount", item.GetItemCount, id)
     return type(have) == "number" and have or nil
 end
 
