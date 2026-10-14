@@ -289,14 +289,6 @@ local function Seen(o)
     return true
 end
 
-local function Texts(w, owner)
-    local out = {}
-    for _, o in ipairs(w.everything) do
-        if o.parent == owner and o.text then out[#out + 1] = o.text end
-    end
-    return out
-end
-
 -- off by default: nothing is built, and RestedXP's windows are as they were
 do
     local w = Start({})
@@ -649,7 +641,6 @@ end
 do
     local account = { rxpWindow = true }
     local w = Start(account)
-    local ns = w.ns
     local function Rows()
         local out = {}
         for _, o in ipairs(w.frames) do
@@ -668,7 +659,6 @@ end
 -- a line of words that is not a task has no icon and no bar of its own
 do
     local w = Start({ rxpWindow = true })
-    local ns = w.ns
     local function Rows()
         local out = {}
         for _, o in ipairs(w.frames) do
@@ -908,9 +898,11 @@ do
     r, g, b, a = ns.RXPWindowColor("accent")
     Check(r == T.accent.r and g == T.accent.g and b == T.accent.b and a == 1, "the accent is the theme's accent")
     r, g, b, a = ns.RXPWindowColor("muted")
-    Check(r == T.muted.r and a == 0.9, "the muted text is the theme's muted, a little see-through")
+    Check(r == T.muted.r and g == T.muted.g and b == T.muted.b and a == 0.9,
+        "the muted text is the theme's muted, a little see-through")
     r, g, b, a = ns.RXPWindowColor("panel")
-    Check(r == T.panel.r and a == 0.92, "the panel is the theme's panel color")
+    Check(r == T.panel.r and g == T.panel.g and b == T.panel.b and a == 0.92,
+        "the panel is the theme's panel color")
     Check(#ns.RXPWindowColors() == 9, "the nine colors it lists, each for several things")
     ns.SetRXPWindowColor("title", 0.1, 0.2, 0.3, 0.4)
     r, g, b, a = ns.RXPWindowColor("title")
@@ -1164,7 +1156,6 @@ do
     local w = Start(account)
     local ns = w.ns
     local f = Window(w)
-    local T = ns.THEME
     ns.SetRXPWindowOption("rxpWindowPanel", true)
     ns.SetRXPWindowColor("panel", 0.1, 0.2, 0.3, 0.4)
     ns.SetRXPWindowOption("rxpWindowBorder", true)
@@ -1265,10 +1256,8 @@ do
     end
     ns.SetRXPWindowOption("rxpWindowOutline", "thick")
     Flush(w)
-    for _, o in ipairs(Texts()) do
-        Check(o.fontFlags == "THICKOUTLINE" and o.shadowX == 0, "a thick outline, with no shadow")
-        break
-    end
+    local thick = Texts()[1]
+    Check(thick.fontFlags == "THICKOUTLINE" and thick.shadowX == 0, "a thick outline, with no shadow")
     ns.SetRXPWindowOption("rxpWindowOutline", "none")
     Flush(w)
     Check(Texts("rxpWindowListSize")[1].fontFlags == "" and Texts("rxpWindowListSize")[1].shadowX == 0,
@@ -1753,7 +1742,6 @@ do
         return count
     end
     local BUY = "Buy [Refreshing Spring Water] from her"
-    local TALK = "Talk to |cff00ff00Duokna|r"
     Check(Meters() == 0 and (f.events == nil or f.events[BAGS] == nil), "nothing counts to start: no bar, and no event")
 
     w.buy.id, w.buy.qty = 159, 5
@@ -1862,7 +1850,6 @@ do
     local account = { rxpWindow = true }
     local w = Start(account)
     local f = Window(w)
-    local ns = w.ns
     local LOGO = "Interface\\AddOns\\RXPGuides\\Textures\\rxp_logo-64"
     local function Boxes()
         local out = {}
@@ -1975,7 +1962,6 @@ end
 do
     local account = { rxpWindow = true }
     local w = Start(account)
-    local ns = w.ns
     local function Rows()
         local out = {}
         for _, o in ipairs(w.frames) do
@@ -2224,7 +2210,6 @@ end
 do
     local account = { rxpWindow = true }
     local w = Start(account)
-    local ns = w.ns
     local function Rows()
         local out = {}
         for _, o in ipairs(w.frames) do
