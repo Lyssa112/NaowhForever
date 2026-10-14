@@ -77,6 +77,8 @@ local OPTIONS = {
     { key = "rxpWindowSkip", group = "Look", kind = "choice", label = "Skipping Steps", default = "shift",
       values = SKIPS, order = { "shift", "click", "off" },
       tip = "What it takes to click the active step to skip it, or a step of the list to go to it." },
+    { key = "rxpWindowTips", group = "Look", kind = "toggle", label = "Show Tooltips", default = true,
+      tip = "What a click on a step does, said when the mouse is over it." },
     { key = "rxpWindowLock", group = "Look", kind = "toggle", label = "Lock Window", default = false,
       tip = "The window cannot be moved or resized." },
     { key = "rxpWindowPanel", group = "Look", kind = "toggle", label = "Window Background", default = false,
@@ -397,7 +399,7 @@ local function Read(steps)
                 rows[#rows + 1] = row
             end
         end
-        model.steps[#model.steps + 1] = { label = StepLabel(rxp, activeStep), rows = rows }
+        model.steps[#model.steps + 1] = { label = StepLabel(rxp, activeStep), rows = rows, source = activeStep }
         if type(activeStep.index) == "number" and activeStep.index > after then after = activeStep.index end
     end
     model.upcoming = Upcoming(rxp, after, steps or ns.RXPWindowSteps())
@@ -645,7 +647,7 @@ local function MaySkip()
 end
 
 local function Tip(owner, text, menu)
-    if GameTooltip:IsForbidden() then return end
+    if not ns.RXPWindowOption("rxpWindowTips") or GameTooltip:IsForbidden() then return end
     local mode = ns.RXPWindowOption("rxpWindowSkip")
     GameTooltip:SetOwner(owner, TIP_ANCHOR)
     if mode == "off" then
@@ -768,9 +770,12 @@ local function MakeBox()
     local T = ns.THEME
     local box = CreateFrame("Button", nil, window)
     box:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    box:SetScript("OnClick", function(_, button)
-        if button == "RightButton" then Menu() end
+    box:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then return Menu() end
+        if MaySkip() then SkipStep(self.step) end
     end)
+    box:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP, true) end)
+    box:SetScript("OnLeave", function() GameTooltip:Hide() end)
     Draggable(box)
     box.back = ns.Solid(box, "BACKGROUND", T.bg, 1)
     box.back:SetAllPoints()
@@ -803,11 +808,9 @@ local function MakeRow()
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetScript("OnClick", function(self, button)
         if button == "RightButton" then return Menu() end
-        if self.first and MaySkip() then SkipStep(self.step) end
+        if MaySkip() then SkipStep(self.step) end
     end)
-    row:SetScript("OnEnter", function(self)
-        if self.first then Tip(self, TEXT_SKIP, true) end
-    end)
+    row:SetScript("OnEnter", function(self) Tip(self.box or self, TEXT_SKIP, true) end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
     row.icon = Text(row, "rxpWindowIconSize")
@@ -881,7 +884,7 @@ end
 local function DrawRow(box, row, x, y, width, first)
     local item = Acquire("row")
     item:SetParent(box)
-    item.first = first and true or false
+    item.box = box
     item.step = row.step
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", box, "TOPLEFT", x, y)
@@ -934,6 +937,7 @@ end
 
 local function DrawBox(step, y, inner, current)
     local box = Acquire("box")
+    box.step = step.source
     local gap = Spacing()
     local size = ns.RXPWindowOption("rxpWindowTextSize")
     box:ClearAllPoints()

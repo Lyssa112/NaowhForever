@@ -146,17 +146,18 @@ Core/Integrations/RestedXP/
 - The rows after the first of a step are set in (Row Indent, 12 to start), and narrower by as much, so a
   Buy under a Talk to reads as a part of it.
 - A click skips or goes to a step and never ticks an objective: a sub task completes itself as RestedXP
-  sees it done, and skipping one by hand is not offered. On the first line of the active step (its title;
-  `first` on its row) a click goes to the step after the guide's progress, unless the step is not the
-  guide's progress (a trainer to see, which stays active beside it, `sticky`): then its objectives are
-  skipped as RestedXP's checkbox does (`element.skip`, `OnComplete` once, `updateSteps`) and RestedXP lets
-  it go, as going to the next step would leave it where it is. On a line of the list it goes to that
-  line's step, and only there: the sub tasks and the box say and do nothing of the kind, both
-  through `RXP.SetStep` as RestedXP's own Go to step does. Both need Shift by default (Skipping Steps), as
-  a plain click is also where a window is grabbed to be moved and a step skipped by it is not given back;
-  Click and Off are the other two. The list's lines are a transparent button each (pooled as `hit`) over
-  the text, so they are also where the window is dragged from, and with Off they are not lit and nothing
-  is said.
+  sees it done, and skipping one by hand is not offered. On the whole of an active step (its rows and the
+  box round them, which each know their step: `step` on a row, on the box) a click goes to the step after
+  the guide's progress, unless the step is not the guide's progress (a trainer to see, which stays active
+  beside it, `sticky`): then its objectives are skipped as RestedXP's checkbox does (`element.skip`,
+  `OnComplete` once, `updateSteps`) and RestedXP lets it go, as going to the next step would leave it
+  where it is. On a line of the list it goes to that line's step. Both need Shift by default (Skipping
+  Steps), as a plain click is also where a window is grabbed to be moved and a step skipped by it is not
+  given back; Click and Off are the other two. The tooltip is the box's wherever the mouse is in the step,
+  and Show Tooltips turns it off. A right click is RestedXP's menu on the window and on a step, and not on
+  a line of the list, those being for going to a step. The list's lines are a transparent button each
+  (pooled as `hit`) over the text, so they are also where the window is dragged from, and with Off they
+  are not lit.
 - A row that counts has a bar under its text: a buy by the items in the bags against `qty` (RestedXP shows
   no counter for it, so `GetItemCount(id)` is read, and the window listens to `BAG_UPDATE_DELAYED` only
   while such a row is drawn), and any other row by the `3/8` in its text, which RestedXP rewrites as the
