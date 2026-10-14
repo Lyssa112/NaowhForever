@@ -32,7 +32,7 @@ local GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight"
 local GRIP_CORNER = "BOTTOMRIGHT"
 local TEXT_STEP = "Step %d"
 local TEXT_SKIP = "Skip step"
-local TEXT_SKIP_ROW = "Shift-click: skip this objective"
+local TEXT_SHIFT = "Shift-click"
 local TEXT_GO = "Go to step %d"
 local TIP_DIM = 0.7
 local HOME = { "LEFT", "LEFT", 0, 35 }
@@ -42,6 +42,7 @@ local COLORS_KEY = "rxpWindowColors"
 -- Everything the window can be changed in, in the order a page lists it. A saved value is only kept when it
 -- is not the default, as in the other settings of this integration.
 local OUTLINES = { shadow = "Shadow", outline = "Outline", thick = "Thick Outline", none = "None" }
+local SKIPS = { shift = "Shift-click", click = "Click", off = "Off" }
 local OUTLINE_FLAGS = { outline = "OUTLINE", thick = "THICKOUTLINE" }
 local LINES = { bar = "Progress Bar", rule = "Line", none = "Nothing" }
 local OPTIONS = {
@@ -70,6 +71,9 @@ local OPTIONS = {
       tip = "The button that opens RestedXP's menu." },
     { key = "rxpWindowGrip", group = "Look", kind = "toggle", label = "Show Resize Grip", default = true,
       tip = "The corner that is dragged to change the window's width and how many steps are listed." },
+    { key = "rxpWindowSkip", group = "Look", kind = "choice", label = "Skipping Steps", default = "shift",
+      values = SKIPS, order = { "shift", "click", "off" },
+      tip = "What it takes to click the active step to skip it, or a step of the list to go to it." },
     { key = "rxpWindowLock", group = "Look", kind = "toggle", label = "Lock Window", default = false,
       tip = "The window cannot be moved or resized." },
     { key = "rxpWindowPanel", group = "Look", kind = "toggle", label = "Window Background", default = false,
@@ -616,12 +620,18 @@ local function SkipStep()
     if type(step) == "number" then GoTo(step + 1) end
 end
 
-local function Tip(owner, text, extra)
-    if GameTooltip:IsForbidden() then return end
+local function MaySkip()
+    local mode = ns.RXPWindowOption("rxpWindowSkip")
+    return mode == "click" or (mode == "shift" and IsShiftKeyDown())
+end
+
+local function Tip(owner, text)
+    local mode = ns.RXPWindowOption("rxpWindowSkip")
+    if mode == "off" or GameTooltip:IsForbidden() then return end
     GameTooltip:SetOwner(owner, TIP_ANCHOR)
     GameTooltip:SetText(text)
-    if extra then
-        GameTooltip:AddLine(extra, TIP_DIM, TIP_DIM, TIP_DIM)
+    if mode == "shift" then
+        GameTooltip:AddLine(TEXT_SHIFT, TIP_DIM, TIP_DIM, TIP_DIM)
         GameTooltip:Show()
     end
 end
@@ -741,7 +751,7 @@ local function MakeBox()
     local T = ns.THEME
     local box = CreateFrame("Button", nil, window)
     box:RegisterForClicks("LeftButtonUp")
-    box:SetScript("OnClick", function() SkipStep() end)
+    box:SetScript("OnClick", function() if MaySkip() then SkipStep() end end)
     box:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP) end)
     box:SetScript("OnLeave", function() GameTooltip:Hide() end)
     Draggable(box)
@@ -775,11 +785,8 @@ local function MakeRow()
     row:SetScript("OnHyperlinkEnter", LinkEnter)
     row:SetScript("OnHyperlinkLeave", LinkLeave)
     row:RegisterForClicks("LeftButtonUp")
-    row:SetScript("OnClick", function(self)
-        if not IsShiftKeyDown() then return SkipStep() end
-        if Has(self.source, "Click") then Quiet("WindowSkip", self.source.Click, self.source) end
-    end)
-    row:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP, self.source and TEXT_SKIP_ROW or nil) end)
+    row:SetScript("OnClick", function() if MaySkip() then SkipStep() end end)
+    row:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP) end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
     row.icon = Text(row, "rxpWindowTextSize")
@@ -801,8 +808,9 @@ local function MakeHit()
     hit:RegisterForClicks("LeftButtonUp")
     hit.shade = hit:CreateTexture(nil, "BACKGROUND")
     hit.shade:SetAllPoints()
-    hit:SetScript("OnClick", function(self) GoTo(self.index) end)
+    hit:SetScript("OnClick", function(self) if MaySkip() then GoTo(self.index) end end)
     hit:SetScript("OnEnter", function(self)
+        if ns.RXPWindowOption("rxpWindowSkip") == "off" then return end
         self.shade:SetColorTexture(ns.RXPWindowColor("line"))
         self.shade:Show()
         Tip(self, TEXT_GO:format(self.index or 0))
@@ -851,7 +859,6 @@ end
 local function DrawRow(box, row, x, y, width)
     local item = Acquire("row")
     item:SetParent(box)
-    item.source = row.button
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", box, "TOPLEFT", x, y)
     item:SetWidth(width)

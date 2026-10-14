@@ -94,6 +94,7 @@ local function World(account, opts)
     env.GameTooltip = Object(w.everything)
     function env.GameTooltip:GetOwner() return self.owner end
     function env.GameTooltip:SetOwner(owner) self.owner = owner end
+    function env.GameTooltip:AddLine(text) self.added = text end
     env.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
     env.CreateColor = function(r, g, b, a) return { r, g, b, a } end
     env.InCombatLockdown = function() return false end
@@ -453,7 +454,7 @@ do
     Check(Window(sized).scale == 1.25, "a saved size is the size it is built at")
 end
 
--- a click on the step skips it, a click on a step of the list goes to it, and shift is the objective's own
+-- a click on the step skips it, and a click on a step of the list goes to it, with shift to start
 do
     local w = Start({ rxpWindow = true })
     local rxp = w.rxp
@@ -463,24 +464,27 @@ do
     rxp.SetStep = function(n) went[#went + 1] = n end
     local row, box
     for _, o in ipairs(w.frames) do
-        if o.scripts.OnClick and o.source == w.talk.frame.button then row = o end
+        if o.icon and o.text and o.bar and o.scripts.OnClick and not row then row = o end
         if o.label and o.logo then box = o end
     end
-    Check(row ~= nil, "each row knows RestedXP's button for its element")
+    Check(row ~= nil and box ~= nil, "a row and a box to click")
     row.scripts.OnClick(row)
-    Check(#went == 1 and went[1] == 37 and w.talk.frame.button.clicks == nil,
-        "a click on a row skips the step: to the one after the guide's 36th")
     box.scripts.OnClick(box)
-    Check(#went == 2 and went[2] == 37, "and on the box round them")
+    Check(#went == 0, "a click without shift is not a skip: it is a misclick")
     w.shift = true
     row.scripts.OnClick(row)
-    Check(w.talk.frame.button.clicks == 1 and #went == 2, "with shift it is RestedXP's own checkbox, and the step stays")
+    Check(#went == 1 and went[1] == 37 and w.talk.frame.button.clicks == nil,
+        "with shift a row skips the step: to the one after the guide's 36th, and not the objective")
+    box.scripts.OnClick(box)
+    Check(#went == 2 and went[2] == 37, "and so does the box round the rows")
     w.shift = false
     row.scripts.OnHyperlinkClick(row, "quest:1", "[Quest]", "LeftButton")
-    Check(w.links[1] == "quest:1", "and a link in it opens as RestedXP's would")
+    Check(w.links[1] == "quest:1", "and a link in a row opens as RestedXP's would")
 
+    w.env.GameTooltip.added = nil
     row.scripts.OnEnter(row)
-    Check(w.env.GameTooltip.text == "Skip step", "a row says it skips the step")
+    Check(w.env.GameTooltip.text == "Skip step" and w.env.GameTooltip.added == "Shift-click",
+        "a row says it skips the step, and that it takes shift")
 
     local hits = {}
     for _, o in ipairs(w.frames) do
@@ -490,26 +494,54 @@ do
         "each line of the list has a button for its step")
     Check(hits[2].width == 380 - 20 and hits[2].height == 12 + 6, "as big as the line")
     hits[2].scripts.OnClick(hits[2])
-    Check(#went == 3 and went[3] == 39, "a click on it goes to that step")
+    Check(#went == 2, "a click on one without shift goes nowhere")
+    w.shift = true
+    hits[2].scripts.OnClick(hits[2])
+    Check(#went == 3 and went[3] == 39, "with shift it goes to that step")
+    w.shift = false
     hits[2].scripts.OnEnter(hits[2])
     Check(w.env.GameTooltip.text == "Go to step 39" and hits[2].shade.shown, "it says so, and is lit")
     hits[2].scripts.OnLeave(hits[2])
     Check(hits[2].shade.shown == false, "and not when the mouse leaves")
     Check(hits[1].scripts.OnDragStart ~= nil, "a line is still where the window is dragged from")
 
+    -- how it is done is a setting
+    ns.SetRXPWindowOption("rxpWindowSkip", "click")
+    w.env.GameTooltip.added = nil
+    row.scripts.OnEnter(row)
+    Check(w.env.GameTooltip.added == nil, "click: and it does not say shift")
+    row.scripts.OnClick(row)
+    hits[1].scripts.OnClick(hits[1])
+    Check(#went == 5 and went[4] == 37 and went[5] == 37, "click: a plain click does both")
+    ns.SetRXPWindowOption("rxpWindowSkip", "off")
+    w.shift = true
+    row.scripts.OnClick(row)
+    box.scripts.OnClick(box)
+    hits[1].scripts.OnClick(hits[1])
+    Check(#went == 5, "off: no click does either")
+    hits[1].shade:Hide()
+    hits[1].scripts.OnEnter(hits[1])
+    Check(hits[1].shade.shown == false, "and a line is not lit")
+    w.env.GameTooltip.text = nil
+    row.scripts.OnEnter(row)
+    Check(w.env.GameTooltip.text == nil, "or a tooltip said")
+    w.shift = false
+    ns.SetRXPWindowOption("rxpWindowSkip", "shift")
+
     -- the guide's progress is read when it is skipped, and what is missing is left out
+    w.shift = true
     rxp.GetGuideProgress = function() return 40, "id" end
     box.scripts.OnClick(box)
-    Check(went[4] == 41, "it is from the guide's progress as it is now")
+    Check(went[6] == 41, "it is from the guide's progress as it is now")
     rxp.GetGuideProgress = function() error("progress") end
     box.scripts.OnClick(box)
-    Check(#went == 4 and type(ns.RXPFailures.WindowProgress) == "string", "progress that raises: no step, kept by name")
+    Check(#went == 6 and type(ns.RXPFailures.WindowProgress) == "string", "progress that raises: no step, kept by name")
     rxp.GetGuideProgress = function() return "none" end
     box.scripts.OnClick(box)
-    Check(#went == 4, "and one that is no number")
+    Check(#went == 6, "and one that is no number")
     rxp.SetStep = nil
     hits[1].scripts.OnClick(hits[1])
-    Check(#went == 4 and ns.RXPFailures.WindowGo == nil, "no step to go to: nothing")
+    Check(#went == 6 and ns.RXPFailures.WindowGo == nil, "no step to go to: nothing")
 
     local calls = 0
     rxp.SetStep = function() calls = calls + 1 end
@@ -524,6 +556,7 @@ do
 
     -- a button that is lit when the line under it is drawn for another step is not
     rxp.GetGuideProgress = function() return 36, "id" end
+    w.shift = false
     hits[3].scripts.OnEnter(hits[3])
     Check(hits[3].shade.shown == true, "lit under the mouse")
     rxp.v2:UpdateGuideWindow()
@@ -539,7 +572,7 @@ do
     local function Rows()
         local out = {}
         for _, o in ipairs(w.frames) do
-            if o.source and o.icon and o.bar and Seen(o) then out[#out + 1] = o end
+            if o.icon and o.text and o.bar and Seen(o) then out[#out + 1] = o end
         end
         return out
     end
@@ -1307,7 +1340,7 @@ do
         "and the guide's name has all its room")
     local firstRow
     for _, o in ipairs(w.frames) do
-        if o.source == w.talk.frame.button and o.parent == boxes[1] then firstRow = o end
+        if o.icon and o.text and o.bar and o.parent == boxes[1] and not firstRow then firstRow = o end
     end
     Check(firstRow.points[1][5] == -7 - 24 - 5, "the rows start below it")
     ns.SetRXPWindowOption("rxpWindowLogoSize", 40)

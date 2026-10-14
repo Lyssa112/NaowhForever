@@ -142,12 +142,14 @@ Core/Integrations/RestedXP/
   smaller. The window hides RestedXP's own and so would otherwise show nothing of it anywhere.
 - The rows after the first of a step are set in (Row Indent, 12 to start), and narrower by as much, so a
   Buy under a Talk to reads as a part of it.
-- A click skips or goes to a step and does not tick an objective. On the active step (a row or the box
-  round them) it goes to the step after the guide's progress, and on a line of the list it goes to that
-  line's step, both through `RXP.SetStep` as RestedXP's own Go to step does. Shift-click on a row is what
-  a click was: RestedXP's checkbox for the objective, which the step then counts as RestedXP does. The
-  list's lines are a transparent button each (pooled as `hit`) over the text, so they are also where the
-  window is dragged from.
+- A click skips or goes to a step and never ticks an objective: a sub task completes itself as RestedXP
+  sees it done, and skipping one by hand is not offered. On the active step (a row, or the box round them)
+  a click goes to the step after the guide's progress, and on a line of the list to that line's step, both
+  through `RXP.SetStep` as RestedXP's own Go to step does. Both need Shift by default (Skipping Steps), as
+  a plain click is also where a window is grabbed to be moved and a step skipped by it is not given back;
+  Click and Off are the other two. The list's lines are a transparent button each (pooled as `hit`) over
+  the text, so they are also where the window is dragged from, and with Off they are not lit and nothing
+  is said.
 - A row that counts has a bar under its text: a buy by the items in the bags against `qty` (RestedXP shows
   no counter for it, so `GetItemCount(id)` is read, and the window listens to `BAG_UPDATE_DELAYED` only
   while such a row is drawn), and any other row by the `3/8` in its text, which RestedXP rewrites as the
