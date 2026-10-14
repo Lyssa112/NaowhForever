@@ -131,10 +131,11 @@ Core/Integrations/RestedXP/
   that, so nothing is read again per frame; the window does not set its own width or height while it is
   dragged, as the drag does, and what is kept is set when the grip is let go. The width is kept to the
   pixel.
-- The step objectives bar is a divider under the active step's box and not a part of it, as the guide's
-  is under the title, and is off to start so the guide's is the only bar; the box's own opacity is a setting (`rxpWindowBoxOpacity`) and not a part of its
-  color. The bars are in the Naowh Gradient to start (`GRADIENT`, which is `ns.MEDIA`'s, so a texture of
-  SharedMedia is only needed when another is wanted).
+- The guide's progress under the title is the only bar of the window besides the ones of a row that
+  counts: a bar of the objectives done under the active step was tried and taken out, as it read as one
+  thing counted twice beside the guide's. The box's own opacity is a setting (`rxpWindowBoxOpacity`) and
+  not a part of its color. The bars are in the Naowh Gradient to start (`GRADIENT`, which is `ns.MEDIA`'s,
+  so a texture of SharedMedia is only needed when another is wanted).
 - RestedXP's logo (`Textures/rxp_logo-64`, the one its own window and quest log use) is drawn from
   RestedXP's files in the top right corner of the current step's box (the first, when there are more),
   untinted, at a size of its own (24 to start); Show RestedXP Logo turns it off. It is a texture of the

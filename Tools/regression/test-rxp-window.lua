@@ -718,32 +718,23 @@ do
     Check(f.bar.track.solid[1] == T.fg.r and f.bar.track.solid[4] == 0.5, "over a track of the line's color")
     local box
     for _, o in ipairs(w.frames) do
-        if o.label and o.bar then box = o end
+        if o.label and o.logo then box = o end
     end
-    Check(box and box.bar.shown == false and w.ns.RXPWindowOption("rxpWindowStepBar") == false,
-        "the active step's bar is off to start: the guide's is the only one")
-    w.ns.SetRXPWindowOption("rxpWindowStepBar", true)
-    Check(account.rxpWindowStepBar == true, "and kept when it is turned on")
-    Flush(w)
-    Check(box and box.bar.shown == true and math.abs(box.bar.value - 1 / 3) < 1e-9,
-        "turned on, the active step has a bar of its objectives done: one of three")
-    Check(box.bar.parent == f and box.bar.points[1][2] == f and box.bar.points[2][2] == f,
-        "it is a divider of the window and not in the step's box")
-    Check(math.abs(box.bar.points[1][5] - (box.points[1][5] - box.height - 5)) < 1e-9
-        and box.bar.points[1][4] == box.points[1][4], "under the box, as wide as it, a gap below it")
+    local bars = 0
+    for _, o in ipairs(w.frames) do
+        if o.track and o.parent == f then bars = bars + 1 end
+    end
+    Check(box and box.bar == nil and bars == 1 and w.ns.RXPWindowOption("rxpWindowStepBar") == nil,
+        "the guide's is the only bar of the window: none between the active step and the list")
     local activeSteps = w.rxp.RXPFrame.activeSteps
     w.rxp.RXPFrame.activeSteps = {}
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
-    Check(box.shown == false and box.bar.shown == false, "with no active step the divider goes with its box")
+    Check(box.shown == false, "with no active step the box goes")
     w.rxp.RXPFrame.activeSteps = activeSteps
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
-    Check(box.bar.shown == true, "and comes back with it")
-    w.ns.SetRXPWindowOption("rxpWindowStepBar", false)
-    Flush(w)
-    Check(box.bar.shown == false, "off: not drawn")
-    w.ns.SetRXPWindowOption("rxpWindowStepBar", true)
+    Check(box.shown == true, "and comes back")
     w.ns.SetRXPWindowOption("rxpWindowLine", "rule")
     Flush(w)
     Check(f.bar.shown == false and f.rule.shown == true and f.rule.solid[4] == 0.5, "a line instead: the bar is not drawn")
@@ -764,7 +755,6 @@ do
     Flush(w)
     Check(f.bar.height == 9 and f.bar.barTexture == "Textures\\Flat Name" and f.bar.barColor[1] == 1
         and f.bar.barColor[4] == 0.5 and f.bar.track.solid[3] == 1, "the height, the texture and the colors are its own")
-    Check(box.bar.height == 9 and box.bar.barTexture == "Textures\\Flat Name", "and the active step's bar follows")
     w.rows[1].complete = true
     w.rxp.GetGuideProgress = function() return 66, "id" end
     w.rxp.v2:UpdateGuideWindow()
@@ -774,12 +764,6 @@ do
     w.rxp.v2:UpdateGuideWindow()
     Flush(w)
     Check(f.bar.value == 0, "and none an empty one")
-    w.vendor.frame.button.GetChecked = function() return true end
-    w.talk.frame.button.GetChecked = function() return true end
-    w.buy.frame.button.GetChecked = function() return true end
-    w.rxp.v2:UpdateGuideWindow()
-    Flush(w)
-    Check(box.bar.value == 1, "all three objectives done is a full bar")
     w.ns.SetRXPWindowOption("rxpWindowProgressText", false)
     Flush(w)
     Check(f.progress.text == "", "the progress text can be left out")
@@ -802,7 +786,7 @@ do
         "a border round it, in its color")
     local box
     for _, o in ipairs(w.frames) do
-        if o.label and o.bar then box = o end
+        if o.label and o.logo then box = o end
     end
     Check(box.borderObject._frame.shown == true and box.borderObject.color[1] == T.line.r, "the step's box has its own border")
     Check(math.abs(box.back.solid[4] - 0.55) < 1e-9, "the box is a little see-through to start")
@@ -938,7 +922,7 @@ do
         "dragged to two lines: two are listed, and nothing is kept yet")
     local box
     for _, o in ipairs(w.frames) do
-        if o.label and o.bar then box = o end
+        if o.label and o.logo then box = o end
     end
     Check(box.width == 450 - 20 and f.title.width == 450 - 20 - 16 - 5 - 120,
         "and everything is laid out to the width it has now")

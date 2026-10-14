@@ -94,8 +94,6 @@ local OPTIONS = {
       max = 16, tip = "How thick the progress bars are." },
     { key = "rxpWindowBarTexture", group = "Progress", kind = "texture", label = "Bar Texture",
       defaultLabel = TEXT_GRADIENT, tip = "The texture of the progress bars, the Naowh Gradient to start." },
-    { key = "rxpWindowStepBar", group = "Progress", kind = "toggle", label = "Step Objectives Bar", default = false,
-      tip = "A bar under the active step of the objectives done." },
     { key = "rxpWindowCountBar", group = "Progress", kind = "toggle", label = "Item Count Bars", default = true,
       tip = "A bar under a row that counts, as in Buy 5 or 3/8 Boar Meat." },
 }
@@ -390,15 +388,13 @@ local function Read(steps)
     end
     local after = step or 0
     for _, activeStep in ipairs(ActiveSteps(rxp)) do
-        local rows, done = {}, 0
+        local rows = {}
         for _, element in ipairs(activeStep.elements or {}) do
             if type(element) == "table" and (element.text or element.rawtext or element.tooltipText) then
-                local row = Row(rxp, element)
-                rows[#rows + 1] = row
-                if row.done then done = done + 1 end
+                rows[#rows + 1] = Row(rxp, element)
             end
         end
-        model.steps[#model.steps + 1] = { label = StepLabel(rxp, activeStep), rows = rows, done = done }
+        model.steps[#model.steps + 1] = { label = StepLabel(rxp, activeStep), rows = rows }
         if type(activeStep.index) == "number" and activeStep.index > after then after = activeStep.index end
     end
     model.upcoming = Upcoming(rxp, after, steps or ns.RXPWindowSteps())
@@ -763,7 +759,6 @@ local function MakeBox()
     box.label = Text(box, "rxpWindowTextSize")
     box.logo = box:CreateTexture(nil, "OVERLAY")
     box.logo:SetTexture(LOGO)
-    box.bar = MakeBar(window)
     return box
 end
 
@@ -842,7 +837,6 @@ local function Reset()
     for kind, list in pairs(pool) do
         for i = 1, #list do
             list[i]:Hide()
-            if kind == "box" then list[i].bar:Hide() end
         end
         used[kind] = 0
     end
@@ -936,20 +930,7 @@ local function DrawBox(step, y, inner, current)
         by = by - DrawRow(box, row, BOX_PAD + set, by, inner - BOX_PAD * 2 - set) - gap
     end
     box:SetHeight(-by + BOX_PAD - gap)
-    local bottom = y + by - BOX_PAD
-    -- the objectives done are a divider under the box, as the guide's is under the title
-    if ns.RXPWindowOption("rxpWindowStepBar") and #step.rows > 0 then
-        local top = bottom
-        box.bar:ClearAllPoints()
-        box.bar:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, top)
-        box.bar:SetPoint("TOPRIGHT", window, "TOPRIGHT", -PAD, top)
-        PaintBar(box.bar, step.done / #step.rows)
-        box.bar:Show()
-        bottom = top - ns.RXPWindowOption("rxpWindowBarHeight") - gap
-    else
-        box.bar:Hide()
-    end
-    return bottom
+    return y + by - BOX_PAD
 end
 
 local function DrawHeader(model, folded, width, headH)
