@@ -538,6 +538,7 @@ local function RxpWindowRows(W, parent, y)
         tooltip = "RestedXP's guide and active steps in one Naowh window, in place of its own and of the theme.",
         rows = on }); y = y - h
     if not on then return y end
+    y = SetUpRows(W, parent, y)
     if not ns.RXPWindowReady() then
         _, h = W:DualRow(parent, y, { type = "label", text = TEXT_RXP_WINDOW_NEEDS }, Empty()); y = y - h
     end
@@ -561,7 +562,6 @@ local function RxpWindowRows(W, parent, y)
           setValue = function(v) ns.SetRXPWindowScale(v) end },
         Empty()
     ); y = y - h
-    y = SetUpRows(W, parent, y)
     y = RxpArrowRows(W, parent, y)
     y = RxpWindowStyleRows(W, parent, y)
     W:EndFeature(parent)

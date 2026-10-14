@@ -666,10 +666,12 @@ do
             end
         end
     end
-    local scale, set, arrow = Position(s, "Naowh Window Scale"), Position(s, "Set Up New Characters"),
-        Position(s, "Style RestedXP's Arrow")
-    Check(scale and set and arrow and scale < set and set < arrow,
-        "in the window's section: after its sliders, before the arrow's options")
+    local switch, set, note = Position(s, "RestedXP Naowh Window (V2)"), Position(s, "Set Up New Characters"),
+        Position(s, "Turn on RestedXP's Beta Features and V2 interface.")
+    local width, scale = Position(s, "Naowh Window Width"), Position(s, "Naowh Window Scale")
+    Check(switch and set and note and width and scale and switch < set and set < note and note < width
+        and width < scale, "in the window's section it is the first thing: before what it needs and its sliders")
+    Check(Position(s, "This Character") == set + 1, "and the button for the character played is beside it")
     Check(("," .. table.concat(s.headers, ",") .. ","):find(",RESTEDXP,", 1, true) == nil,
         "and there is no section of shared rows for it")
     Check(button and button.type == "button" and button.buttonText == "Set Up", "and a button for the character played")
