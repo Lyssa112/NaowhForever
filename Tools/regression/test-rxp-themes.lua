@@ -2003,7 +2003,7 @@ do
         "the button sets it, wished for or not, seen or not")
 
     -- what is missing raises nothing
-    _, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, nil, "Player-9", true)
+    _, _, confirms = Run({ rxpThemes = true, rxpSetup = true }, nil, "Player-9", true)
     Check(#confirms == 0, "no profile: nothing")
     _, ns, confirms = Run({ rxpThemes = true, rxpSetup = true }, { activeTheme = "RXP Blue" }, nil, true)
     Check(#confirms == 0, "no character to say who it is: nothing")
