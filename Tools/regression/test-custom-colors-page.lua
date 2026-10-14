@@ -592,7 +592,7 @@ end
 do
     -- the window's look: a row for each thing it can be changed in, from its own list
     local styled = {}
-    local s = Page({ rxpWindow = true, themePreset = "custom" }, true)
+    local s = Page({ rxpWindow = true, rxpWindowTheme = "custom" }, true)
     Check(table.concat(s.headers, ","):find("WINDOW LOOK", 1, true) ~= nil, "a WINDOW LOOK section with it on")
     Check(table.concat(Page({}, true).headers, ","):find("WINDOW LOOK", 1, true) == nil, "and none with it off")
     local cells = {}
@@ -638,7 +638,7 @@ do
 end
 
 do
-    -- the theme picker is in the window's fold as well, and the colors are the window's own only with Custom
+    -- the window has a theme of its own in its fold, and its colors are its own only with Custom
     local function All(page, text)
         local out = {}
         for _, row in ipairs(page.rows) do
@@ -649,30 +649,39 @@ do
         return out
     end
     local s = Page({ rxpWindow = true }, true)
-    local pickers = All(s, "Theme")
-    Check(#pickers == 2 and pickers[2].type == "dropdown" and pickers[2].getValue == pickers[1].getValue,
-        "the addon's theme picker is there once more, in the window's fold, and is the same setting")
-    Check(pickers[2].tooltip == "The addon's theme, whose colors are the window's; Custom lets you pick them.",
-        "with a short tooltip of its own")
-    Check(#All(s, "Title Color") == 0 and #All(s, "Accent Color") == 0 and #All(s, "Window Color") == 0,
+    local pickers, addons = All(s, "Window Theme"), All(s, "Theme")
+    Check(#pickers == 1 and pickers[1].type == "dropdown" and #addons == 1, "a picker of its own, and the addon's is one")
+    Check(pickers[1].getValue ~= addons[1].getValue and pickers[1].getValue() == "",
+        "it is not the addon's setting, and is the addon's theme to start")
+    Check(pickers[1].values[""] == "Same as the Addon" and pickers[1].values.midnight == "Midnight"
+        and pickers[1].values.custom == "Custom" and pickers[1].order[1] == ""
+        and pickers[1].order[#pickers[1].order] == "custom", "the addon's, every preset and Custom last")
+    Check(pickers[1].tooltip == "The window's colors alone, whatever the addon's theme is; Custom lets you pick them.",
+        "with a short tooltip")
+    Check(#All(s, "Title Color") == 0 and #All(s, "Accent Color") == 0 and #All(s, "Arrow Color") == 0,
         "a theme picked: no colors to pick")
-    Check(#All(Page({ rxpWindow = true, themePreset = "midnight" }, true), "Title Color") == 0,
-        "and a theme of the addon's is the same")
-    local custom = Page({ rxpWindow = true, themePreset = "custom" }, true)
-    Check(#All(custom, "Title Color") == 1 and #All(custom, "Accent Color") == 1 and #All(custom, "Window Color") == 1,
-        "Custom: the colors, each once")
+    Check(#All(Page({ rxpWindow = true, rxpWindowTheme = "midnight" }, true), "Title Color") == 0,
+        "and a theme of the presets is the same")
+    Check(#All(Page({ rxpWindow = true, themePreset = "custom" }, true), "Title Color") == 0,
+        "the addon's theme being Custom is not the window's")
+    local custom = Page({ rxpWindow = true, rxpWindowTheme = "custom" }, true)
+    Check(#All(custom, "Title Color") == 1 and #All(custom, "Accent Color") == 1 and #All(custom, "Window Color") == 1
+        and #All(custom, "Arrow Color") == 1, "Custom: the colors, each once, the arrow's with them")
+    local arrow = All(custom, "Arrow Color")[1]
+    Check(arrow.type == "colorpicker" and arrow.tooltip == "RestedXP's waypoint arrow.", "the arrow's is a swatch")
     Check(#All(Page({ rxpWindow = true }, true), "Naowh Window Width") == 1, "the sliders are there either way")
     local pick = Page({ rxpWindow = true }, true)
-    local picker = All(pick, "Theme")[2]
+    local picker = All(pick, "Window Theme")[1]
+    local refreshed = pick.refreshes
     picker.setValue("custom")
-    Check(pick.account.themePreset == "custom", "the picker sets the addon's theme")
+    Check(pick.account.rxpWindowTheme == "custom" and pick.account.themePreset == nil,
+        "the picker sets the window's theme and leaves the addon's alone")
+    Check(pick.refreshes == refreshed + 1, "and the page is drawn again")
     pick.build()
-    Check(#All(pick, "Title Color") == 1, "and the colors are there once it is Custom")
-    local noted = false
-    for _, note in ipairs(pick.notes) do
-        if note == "Reload UI to apply your color changes." then noted = true end
-    end
-    Check(noted, "with the note that a reload applies it")
+    Check(#All(pick, "Title Color") == 1, "the colors are there once it is Custom")
+    Check(#pick.notes == 0, "and no reload is asked for: it is at once")
+    picker.setValue("")
+    Check(pick.account.rxpWindowTheme == nil, "the addon's is not stored")
 end
 
 do
@@ -838,7 +847,7 @@ do
     Check(window["Naowh Window Width"] == "RestedXP Naowh Window (V2)" and window["Set Up New Characters"]
         == "RestedXP Naowh Window (V2)" and window["Title Color"] == nil and window["Window Look"] ~= nil,
         "V2's rows, the set up and the look, under its title, and no colors with a theme")
-    Check(Terms({ rxpWindow = true, themePreset = "custom" })["Title Color"] == "WINDOW LOOK",
+    Check(Terms({ rxpWindow = true, rxpWindowTheme = "custom" })["Title Color"] == "WINDOW LOOK",
         "and the colors with Custom, in the look's group")
     local none = Terms({})
     Check(none["RestedXP Theme (V1)"] ~= nil and none["Naowh Window Width"] == nil and none["Style RestedXP's Arrow"] ~= nil,

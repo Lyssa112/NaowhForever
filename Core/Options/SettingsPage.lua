@@ -31,6 +31,7 @@ local TEXT_COLORS_RELOAD = ns.L("Reload UI to apply your color changes.")
 local TEXT_RXP_RELOAD = ns.L("Reload UI to apply your RestedXP changes.")
 local TEXT_RXP_PICK_RELOAD = "Reload UI to pick a theme."
 local TEXT_RXP_WINDOW_NEEDS = "Turn on RestedXP's Beta Features and V2 interface."
+local TEXT_WINDOW_THEME_SAME = "Same as the Addon"
 local TEXT_SKIN_TIP = ns.L("Classic+ dresses the addon's windows like the game's own, in gold and bronze. "
     .. "It has its own colors and uses the game's fonts unless you pick an Addon Font. Saved "
     .. "for this computer.|n|nTakes effect after a /reload.")
@@ -318,9 +319,15 @@ local function SkinRow()
         end }
 end
 
-local function ThemePicker(tooltip)
+local function ColorsSection(W, parent, y)
+    local _, h = W:SectionHeader(parent, "COLORS", y); y = y - h
+    _, h = W:DualRow(parent, y, SkinRow(), Empty()); y = y - h
     local themes, themeOrder = ThemeChoices()
-    return { type = "dropdown", text = "Theme", values = themes, order = themeOrder, tooltip = tooltip,
+    _, h = W:DualRow(parent, y,
+        { type = "dropdown", text = "Theme", values = themes, order = themeOrder,
+          tooltip = "Theme presets for the addon's windows and HUD frames, plus a Custom "
+          .. "option for your own colors. If text gets hard to read, pick Naowh (default). "
+          .. "Saved for this computer.|n|nTakes effect after a /reload.",
           getValue = ns.ThemePresetKey,
           disabled = ClassicSkin,
           setValue = function(v)
@@ -328,14 +335,7 @@ local function ThemePicker(tooltip)
               ColorsChanged()
           end },
         { type = "palette", text = "", colors = function() return ns.ThemePalette(ns.ThemePresetKey()) end }
-end
-
-local function ColorsSection(W, parent, y)
-    local _, h = W:SectionHeader(parent, "COLORS", y); y = y - h
-    _, h = W:DualRow(parent, y, SkinRow(), Empty()); y = y - h
-    _, h = W:DualRow(parent, y, ThemePicker("Theme presets for the addon's windows and HUD frames, plus a Custom "
-          .. "option for your own colors. If text gets hard to read, pick Naowh (default). "
-          .. "Saved for this computer.|n|nTakes effect after a /reload.")); y = y - h
+    ); y = y - h
     if ns.ThemePresetKey() == CUSTOM and not ClassicSkin() then y = CustomRows(W, parent, y) end
     if colorsPending then
         _, h = W:Note(parent, TEXT_COLORS_RELOAD, y); y = y - h
@@ -489,13 +489,26 @@ local function WindowColorCell(color)
       setValue = function(r, g, b, a) ns.SetRXPWindowColor(name, r, g, b, a) end }
 end
 
+local function WindowThemeRow()
+    local values, order = { [""] = TEXT_WINDOW_THEME_SAME }, { "" }
+    for _, key in ipairs(ns.THEME_PRESET_ORDER) do
+        values[key] = ns.THEME_PRESETS[key].name
+        order[#order + 1] = key
+    end
+    values[CUSTOM] = TEXT_CUSTOM
+    order[#order + 1] = CUSTOM
+    return { type = "dropdown", text = "Window Theme", values = values, order = order,
+        tooltip = "The window's colors alone, whatever the addon's theme is; Custom lets you pick them.",
+        getValue = ns.RXPWindowThemeKey,
+        setValue = function(v)
+            ns.SetRXPWindowTheme(v)
+            UI:RefreshPage(true)
+        end }
+end
+
 local function RxpWindowStyleRows(W, parent, y)
     local _, h = W:GroupHeader(parent, "WINDOW LOOK", y); y = y - h
-    _, h = W:DualRow(parent, y, ThemePicker("The addon's theme, whose colors are the window's; Custom lets you pick them."))
-    y = y - h
-    if colorsPending then
-        _, h = W:Note(parent, TEXT_COLORS_RELOAD, y); y = y - h
-    end
+    _, h = W:DualRow(parent, y, WindowThemeRow(), Empty()); y = y - h
     local cells = {}
     for _, group in ipairs({ "Text", "Look", "Progress" }) do
         for _, option in ipairs(ns.RXPWindowOptions()) do

@@ -722,7 +722,7 @@ end
 
 -- the colors: the theme's, until one is picked
 do
-    local account = { rxpWindow = true, themePreset = "custom" }
+    local account = { rxpWindow = true, rxpWindowTheme = "custom" }
     local w = Start(account)
     local ns = w.ns
     local T = ns.THEME
@@ -734,7 +734,7 @@ do
     Check(r == T.muted.r and a == 0.9, "the muted text is the theme's muted, a little see-through")
     r, g, b, a = ns.RXPWindowColor("panel")
     Check(r == T.panel.r and a == 0.92, "the panel is the theme's panel color")
-    Check(#ns.RXPWindowColors() == 8, "the eight colors it lists, each for several things")
+    Check(#ns.RXPWindowColors() == 9, "the nine colors it lists, each for several things")
     ns.SetRXPWindowColor("title", 0.1, 0.2, 0.3, 0.4)
     r, g, b, a = ns.RXPWindowColor("title")
     Check(r == 0.1 and g == 0.2 and b == 0.3 and a == 0.4 and account.rxpWindowColors.title.a == 0.4,
@@ -746,22 +746,47 @@ do
     ns.SetRXPWindowColor("nothing", 1, 1, 1, 1)
     Check(account.rxpWindowColors == nil, "a color that is not one of them is not kept")
     ns.SetRXPWindowColor("title", 0.1, 0.2, 0.3, 1)
-    Check(ns.RXPWindowOwnColors() == true and ns.RXPWindowColor("title") == 0.1, "Custom: a color picked is the window's")
-    account.themePreset = "midnight"
-    Check(ns.RXPWindowOwnColors() == false and ns.RXPWindowColor("title") == T.fg.r
-        and account.rxpWindowColors.title.r == 0.1, "a theme: the theme's color, and the one picked is kept")
-    account.themePreset = nil
-    Check(ns.RXPWindowColor("title") == T.fg.r, "the addon's own theme the same")
-    account.themePreset = "custom"
+    Check(ns.RXPWindowThemeKey() == "custom" and ns.RXPWindowOwnColors() == true and ns.RXPWindowColor("title") == 0.1,
+        "Custom: a color picked is the window's")
+    ns.SetRXPWindowTheme("midnight")
+    local midnight = ns.THEME_PRESETS.midnight
+    Check(account.rxpWindowTheme == "midnight" and ns.RXPWindowOwnColors() == false
+        and ns.RXPWindowColor("title") == midnight.fg.r and account.rxpWindowColors.title.r == 0.1,
+        "a theme of the presets: its color, and the one picked is kept")
+    local accent = { ns.RXPWindowColor("accent") }
+    Check(accent[1] == midnight.accent.r and accent[2] == midnight.accent.g and accent[3] == midnight.accent.b,
+        "every color of the window is the preset's")
+    local box = { ns.RXPWindowColor("box") }
+    Check(box[1] == midnight.bg.r and box[4] == 1, "the box has the preset's background, solid")
+    Check(account.themePreset == nil and ns.ThemePresetKey() == "", "and the addon's own theme is not touched")
+    ns.SetRXPWindowTheme(nil)
+    Check(account.rxpWindowTheme == nil and ns.RXPWindowThemeKey() == "" and ns.RXPWindowColor("title") == T.fg.r,
+        "the addon's own: the addon's colors, and nothing stored")
+    ns.SetRXPWindowTheme("not a theme")
+    Check(account.rxpWindowTheme == nil, "a theme that is none is not kept")
+    account.rxpWindowTheme = "junk"
+    Check(ns.RXPWindowThemeKey() == "" and ns.RXPWindowColor("title") == T.fg.r, "and one saved wrongly is the addon's")
+    account.rxpWindowTheme = nil
+    ns.SetRXPWindowTheme("custom")
     Check(ns.RXPWindowColor("title") == 0.1, "and Custom again: the one picked is back")
+    account.themePreset = "crimson"
+    Check(ns.RXPWindowColor("title") == 0.1, "the addon's theme picked after changes nothing of Custom")
+    ns.SetRXPWindowTheme("forest")
+    Check(account.themePreset == "crimson" and ns.RXPWindowColor("accent") == ns.THEME_PRESETS.forest.accent.r,
+        "a window theme is not the addon's: it does not set it")
+    account.themePreset = nil
+    ns.SetRXPWindowTheme("custom")
     ns.SetRXPWindowColor("title", nil)
+    ns.SetRXPWindowTheme(nil)
     account.rxpWindowColors = { text = { r = "x" } }
     Check(ns.RXPWindowColor("text") == T.fg.r, "a color saved wrongly is the theme's")
     account.rxpWindowColors = nil
     ns.SetRXPWindowOption("rxpWindowPanel", true)
     ns.SetRXPWindowColor("accent", 1, 0, 0, 1)
+    ns.SetRXPWindowTheme("midnight")
     ns.ResetRXPWindowStyle()
-    Check(account.rxpWindowPanel == nil and account.rxpWindowColors == nil, "reset puts the look back")
+    Check(account.rxpWindowPanel == nil and account.rxpWindowColors == nil and account.rxpWindowTheme == nil,
+        "reset puts the look back, the window's theme with it")
     account.rxpWindowWidth, account.rxpWindowSteps, account.rxpWindowScale = 400, 3, 120
     ns.ResetRXPWindowStyle()
     Check(account.rxpWindowWidth == 400 and account.rxpWindowSteps == 3 and account.rxpWindowScale == 120,
@@ -770,7 +795,7 @@ end
 
 -- the bars
 do
-    local account = { rxpWindow = true, themePreset = "custom" }
+    local account = { rxpWindow = true, rxpWindowTheme = "custom" }
     local w = Start(account)
     local f = Window(w)
     local T = w.ns.THEME
@@ -829,9 +854,29 @@ do
     Check(f.bar.value == 0, "and none an empty one")
 end
 
+-- the arrow has a color of its own with Custom, and is painted again when it or the theme is changed
+do
+    local account = { rxpWindow = true, rxpWindowTheme = "custom" }
+    local w = Start(account)
+    local ns = w.ns
+    local paints = 0
+    ns.RXPPaintArrow = function() paints = paints + 1 end
+    ns.SetRXPWindowColor("arrow", 1, 0, 0.5, 1)
+    Check(paints == 1 and account.rxpWindowColors.arrow.b == 0.5, "a color picked for the arrow: kept, and the arrow painted")
+    Check(select(3, ns.RXPWindowColor("arrow")) == 0.5, "and the arrow's color is that")
+    ns.SetRXPWindowTheme("midnight")
+    Check(paints == 2, "a theme picked paints it again")
+    Check(select(3, ns.RXPWindowColor("arrow")) == ns.THEME_PRESETS.midnight.accent.b, "and the arrow's color is the theme's accent")
+    ns.ResetRXPWindowStyle()
+    Check(paints == 3, "and so does the reset")
+    ns.RXPPaintArrow = nil
+    ns.SetRXPWindowColor("arrow", 0, 0, 0, 1)
+    Check(true, "with no arrow to paint: nothing raised")
+end
+
 -- the look: panel, borders, menu, spacing and the colors of every text
 do
-    local account = { rxpWindow = true, themePreset = "custom" }
+    local account = { rxpWindow = true, rxpWindowTheme = "custom" }
     local w = Start(account)
     local ns = w.ns
     local f = Window(w)
@@ -1128,7 +1173,7 @@ do
     Check(Is(Fill(target), 0.1, 0.2, 0.3, 0.9) and items.paints == 1, "and are painted that way again")
 
     -- the window on: both take its look, and keep it when RestedXP paints them again
-    local account = { rxpWindow = true, themePreset = "custom" }
+    local account = { rxpWindow = true, rxpWindowTheme = "custom" }
     local w = Begin(account, Both)
     local ns = w.ns
     target, items = w.rxp.targeting.activeTargetFrame, w.rxp.activeItemFrame

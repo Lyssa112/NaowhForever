@@ -39,7 +39,9 @@ local TIP_DIM = 0.7
 local HOME = { "LEFT", "LEFT", 0, 35 }
 local DRAG_BUTTON, TIP_ANCHOR = "LeftButton", "ANCHOR_TOP"
 local COLORS_KEY = "rxpWindowColors"
+local THEME_KEY = "rxpWindowTheme"
 local CUSTOM = "custom"
+local FOLLOW = ""
 local ACCENT = "accent"
 
 -- Everything the window can be changed in, in the order a page lists it. A saved value is only kept when it
@@ -99,6 +101,7 @@ local COLORS = {
     { name = "border", label = "Border Color", token = "line", alpha = EDGE_ALPHA,
       tip = "Round the active step and round the whole window." },
     { name = "panel", label = "Window Color", token = "panel", alpha = PANEL_ALPHA, tip = "Behind the whole window." },
+    { name = "arrow", label = "Arrow Color", token = "accent", tip = "RestedXP's waypoint arrow." },
 }
 
 local OPTION_BY_KEY, COLOR_BY_NAME = {}, {}
@@ -202,9 +205,31 @@ function ns.SetRXPWindowOption(key, value)
     Refresh()
 end
 
+-- The window has a theme of its own: the addon's to start, one of the presets, or Custom. It is the window's
+-- colors only; the addon's theme is not read or changed by it, and a change shows at once.
+local function RepaintArrow()
+    if type(ns.RXPPaintArrow) == "function" then ns.RXPPaintArrow() end
+end
+
+local function IsPreset(key)
+    return type(key) == "string" and type(ns.THEME_PRESETS) == "table" and ns.THEME_PRESETS[key] ~= nil
+end
+
+function ns.RXPWindowThemeKey()
+    local key = Settings()[THEME_KEY]
+    if key == CUSTOM or IsPreset(key) then return key end
+    return FOLLOW
+end
+
+function ns.SetRXPWindowTheme(key)
+    Settings()[THEME_KEY] = (key == CUSTOM or IsPreset(key)) and key or nil
+    Refresh()
+    RepaintArrow()
+end
+
 -- The colors are the theme's, and the player's own only when the theme is Custom: a theme is a look as a whole.
 function ns.RXPWindowOwnColors()
-    return type(ns.ThemePresetKey) == "function" and ns.ThemePresetKey() == CUSTOM
+    return ns.RXPWindowThemeKey() == CUSTOM
 end
 
 function ns.RXPWindowColor(name)
@@ -215,7 +240,9 @@ function ns.RXPWindowColor(name)
             and type(saved.b) == "number" then
         return saved.r, saved.g, saved.b, type(saved.a) == "number" and saved.a or 1
     end
-    local base = ns.THEME[color.token]
+    local key = ns.RXPWindowThemeKey()
+    local preset = IsPreset(key) and ns.THEME_PRESETS[key][color.token]
+    local base = type(preset) == "table" and preset or ns.THEME[color.token]
     return base.r, base.g, base.b, color.alpha or 1
 end
 
@@ -234,12 +261,15 @@ function ns.SetRXPWindowColor(name, r, g, b, a)
     end
     if next(all) == nil then Settings()[COLORS_KEY] = nil end
     Refresh()
+    RepaintArrow()
 end
 
 function ns.ResetRXPWindowStyle()
     for _, option in ipairs(OPTIONS) do Settings()[option.key] = nil end
     Settings()[COLORS_KEY] = nil
+    Settings()[THEME_KEY] = nil
     Refresh()
+    RepaintArrow()
 end
 
 local function Run(name, fn, ...)

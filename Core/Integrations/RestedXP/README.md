@@ -192,11 +192,15 @@ Core/Integrations/RestedXP/
   (`framePositions.arrowFrame`, by profile), and a character that is set up has an arrow that is still
   there in the middle: in the profile, which is read at load, and on the frame, so that the position
   RestedXP saves when the game closes is not the old one. One the player moved is left where it is.
-- The window's colors are the theme's, and the player's own only while the addon's theme is Custom
-  (`RXPWindowOwnColors`): a theme is a look as a whole. The window's fold has the addon's Theme picker
-  (the same setting as the one under COLORS) and shows the eight colors only for Custom; what was picked is
-  kept for when it is Custom again. A step of the list lit by the mouse and the title of the tooltips are in
-  the accent, a little see-through for the first, and not the text's color or the game's gold.
+- The window has a theme of its own (`rxpWindowTheme`: the addon's to start, a preset, or Custom), picked in
+  its fold and shown at once. It is the window's colors alone: the addon's theme (COLORS) is not read for
+  a preset and not set by it, and the icons and the arrow follow the window's. The colors are the preset's
+  and the player's own only while it is Custom (`RXPWindowOwnColors`): a theme is a look as a whole, so the
+  nine colors are shown only for Custom, and what was picked is kept for when it is Custom again. The
+  waypoint arrow's color is one of them, used by the arrow (`OwnArrowColor`) only with the window on and
+  Custom, and the arrow is painted again when it, the theme or the reset changes it. A step of the list lit
+  by the mouse and the title of the tooltips are in the accent, a little see-through for the first, and not
+  the text's color or the game's gold.
 - The theme (RestedXP Theme (V1)), the arrow (Style RestedXP's Arrow) and the window (RestedXP Naowh
   Window (V2)) are each a switch, and the theme and the window each a fold with its switch on its title
   (`W:SwitchFold`: open to start, kept as it is left, no chevron while there is nothing under it), and none

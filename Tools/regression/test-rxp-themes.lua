@@ -742,6 +742,28 @@ do
     tint = drawn.tints[#drawn.tints]
     Check(drawn.texture.path == OURS and #drawn.sets == 3 and Hex(tint) == "5b8cff", "back to one of ours: the image and Midnight's Accent")
 
+    -- the window on with its theme Custom: the arrow is in the color the player picked for it
+    local own = imageEnv.NaowhForever
+    own.RXPWindowEnabled = function() return true end
+    own.RXPWindowOwnColors = function() return true end
+    own.RXPWindowColor = function(name) return name == "arrow" and 1 or 0, 0, 0.5, 1 end
+    own.RXPPaintArrow()
+    Check(Same(drawn.tints[#drawn.tints], { 1, 0, 0.5, 1 }), "the window on, its theme Custom: the arrow's own color")
+    own.RXPWindowOwnColors = function() return false end
+    own.RXPPaintArrow()
+    Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "a theme of the window's: the theme's own color")
+    own.RXPWindowOwnColors = function() return true end
+    own.RXPWindowEnabled = function() return false end
+    own.RXPPaintArrow()
+    Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "the window off: the theme's own color")
+    own.RXPWindowOwnColors = function() return true end
+    own.RXPWindowEnabled = function() return true end
+    own.RXPWindowColor = function() return "red" end
+    own.RXPPaintArrow()
+    Check(Hex(drawn.tints[#drawn.tints]) == "5b8cff", "a color that is none: the theme's own color")
+    own.RXPWindowEnabled, own.RXPWindowOwnColors, own.RXPWindowColor = nil, nil, nil
+    own.RXPPaintArrow()
+
     local styles = imageEnv.NaowhForever
     styles.SetRXPArrowStyle("layer")
     Check(drawn.texture.path == IMAGE and Same(drawn.tints[#drawn.tints], { 1, 1, 1, 1 }),
