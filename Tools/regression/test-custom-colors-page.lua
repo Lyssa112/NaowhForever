@@ -99,7 +99,7 @@ local function Page(account, rxp, up)
         e.headers[#e.headers + 1] = text
         return nil, 0
     end
-    function env.W:EndFeature() end
+    function env.W:EndFold() end
     function env.W:DualRow(_, _, left, right)
         -- The Skin row carries the Theme dropdown; the rows after it keep their places.
         if left.text == "Skin" then

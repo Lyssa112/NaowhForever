@@ -1,4 +1,4 @@
--- Walk.lua: walking costs over the baked walking maps (NaowhForever_JourneysData), loaded when first needed.
+-- Walk.lua: walking costs over the baked walking maps (NaowhForever_JourneysData), built when needed, let go when idle.
 local ns = _G.NaowhForever
 
 local sqrt, floor = math.sqrt, math.floor
@@ -26,6 +26,7 @@ local loaded, store
 local tiles, used = {}, {}
 local graphs, places = {}, {}
 local budgetEnd = 0
+local lastUse, releasing = 0, false
 
 local function Decode(s)
     local u = C_EncodingUtil
@@ -41,6 +42,26 @@ end
 
 function Walk.StartBudget()
     budgetEnd = debugprofilestop() + C.WALK_BUDGET
+end
+
+local function Release()
+    local idle = GetTime() - lastUse
+    if idle < C.WALK_RELEASE then
+        C_Timer.After(C.WALK_RELEASE - idle, Release)
+        return
+    end
+    releasing = false
+    wipe(tiles)
+    wipe(used)
+    wipe(graphs)
+    wipe(places)
+end
+
+local function Used()
+    lastUse = GetTime()
+    if releasing then return end
+    releasing = true
+    C_Timer.After(C.WALK_RELEASE, Release)
 end
 
 function Walk.Ready()
@@ -127,6 +148,7 @@ function Walk.Tile(map, tx, ty)
         tiles[key] = tile
     end
     used[key] = GetTime()
+    Used()
     return tile or nil
 end
 
@@ -240,6 +262,7 @@ function Walk.Spread(tile, from, extra)
 end
 
 local function Graph(map)
+    Used()
     local g = graphs[map]
     if g == nil then
         local s = store.graph[map]
@@ -265,6 +288,7 @@ local function Graph(map)
 end
 
 local function Places(map)
+    Used()
     local p = places[map]
     if p == nil then
         local s = store.walks[map]
@@ -327,7 +351,6 @@ local function Pier(map, spot)
     end
 end
 
--- A spot's walking reach, for Walk.Cost: nil where the map has no walking data, false where the spot is off it.
 function Walk.From(spot)
     if not Walk.Ready() then return nil end
     local map = spot.c
@@ -484,8 +507,6 @@ local function Ends(b, out)
     return out
 end
 
--- The walk from reach a to reach b as corner points { x1, y1, x2, y2, ... }, start and end included,
--- or nil when there is no walk between them.
 function Walk.Path(a, b)
     local _, via = Between(a, b)
     local out = a.off and { a.off[1], a.off[2], a.x, a.y } or { a.x, a.y }
@@ -522,9 +543,6 @@ function Walk.Path(a, b)
     return Segment(tile, fromPoly, fromX, fromY, b.poly, b.x, b.y, out) and Ends(b, out) or nil
 end
 
--- Walking yards (water counted dearer) between two ends: each a place key of the network ("f2",
--- "s3.1", "l1.2") or a reach from Walk.From. false when there is no walk; nil when the data cannot
--- say, as for a place with no ground baked near it (the Stormwind Harbor dock).
 function Walk.Cost(map, a, b)
     if not Walk.Ready() then return nil end
     local p = Places(map)

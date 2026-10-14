@@ -2,6 +2,75 @@
 
 ## Unreleased
 
+## 1.1.16
+
+### Added
+- XP Bar: Keep Blizzard XP Bar setting, so Blizzard's experience bar can stay between your action
+  bars alongside ours.
+
+### Changed
+- Glimmer: herbs and ore light up grey with the skill they need on a character without Herbalism or
+  Mining, instead of staying unlit.
+
+### Fixed
+- Journeys: following a journey no longer builds up memory and lag while you fight and move around,
+  as when farming.
+
+## 1.1.15
+
+### Fixed
+- Training Planner: resetting your talents while following a build asks whether to learn it again,
+  instead of spending the points straight away.
+
+## 1.1.14
+
+### Changed
+- Glimmer: its map data is now part of Quality of Life, one addon fewer in your list; delete an old
+  NaowhForever_GlimmerData folder if you install by hand.
+
+### Fixed
+- Journeys: routes use the Deeprun Tram again, so Dun Morogh and Ironforge journeys from Stormwind
+  no longer walk the long way round.
+- Journeys: the route on the world map follows every walk instead of a straight line, and rides are
+  drawn in their own colour.
+- Journeys: flight points learned at a flight master are picked up straight away, and a character
+  with none learned is told to open a flight master's map.
+- Journeys: focusing a quest again after closing its Journey card brings the card back.
+- Journeys: dungeon quests like Save Techbot's Brain! start a journey to the dungeon's entrance.
+
+## 1.1.13
+
+### Added
+- Quality of Life: Shift-click the on-screen Disband button to disband without the question.
+- Restock Reminder: a live preview on its settings card.
+- XP Bar: Show Texts On Mouseover hides the texts around the bar, or all of them, until you hover
+  it, and its times are shorter, with Time to Level and XP/Hour hidden until you earn XP.
+- XP Bar: Leveling Pace, Time to Level and XP/h in one text.
+- XP Bar: effects, each with its own switch: Shine, Notches, Rested Stripes, Quest XP Pulse, Ready
+  to Level, Level-Up Flash and Hover Breakdown.
+- Glimmer: quest givers light up when they have a quest to pick up or hand in.
+
+### Changed
+- Blessings: Growth Direction is at the top of the Anchor card.
+- Professions: Add to List opens the Shopping List.
+- Restock Reminder: the Hunter Ammo settings show on every class, to set up a profile on any
+  character.
+- Buffs & Consumables: the weapon reminder's default icon is a classic sharpening stone.
+- Glimmer is now a tab under Quality of Life instead of its own module; delete an old
+  NaowhForever_Glimmer folder if you install by hand.
+- Glimmer: Show the Cut-Out is a toggle; click again to hide it.
+- Glimmer: the tab opens on the Glimmer card, with its on/off in the header.
+- Glimmer: herbs and ore stay unlit on a character without Herbalism or Mining.
+- XP Bar: a cleaner settings card; reset it by right-clicking the preview.
+- Naowh Score: graded against the best for your level by default.
+
+### Fixed
+- Blessings: the bar's buttons no longer show Blizzard's square glow over their black edge when
+  hovered or pressed.
+- Glimmer: quest objects and quest turn-ins light up in the effect picked for quest objects.
+- Journeys: frees its walking maps after a minute unused, so it holds much less memory between
+  journeys.
+
 ## 1.1.12
 
 ### Added

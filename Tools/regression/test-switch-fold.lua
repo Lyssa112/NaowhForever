@@ -1,6 +1,6 @@
 -- Run with Lua 5.1 from the repository root: the settings fold with a switch on its title (Widgets:SwitchFold):
--- the switch is the title's own, the fold opens to start and keeps how it was left, a fold with nothing under it
--- has no chevron, and a group title inside a shut fold goes with it.
+-- the switch is the title's own, the fold is a FoldHeader that opens when the switch is turned on, a fold with
+-- nothing under it has no chevron, and a group title inside a shut fold goes with it.
 local checks = 0
 local function check(label, value) assert(value, label); checks = checks + 1 end
 
@@ -99,43 +99,50 @@ do
     check("and back", sets[2] == false)
 end
 
--- it folds what follows, open to start, and keeps how it was left
+-- it folds what follows like any fold: shut to start, and kept how it was left
 do
     local parent = Page()
     local f = W:SwitchFold(parent, "Folding Thing", 0, cfg)
     check("with something to fold: a chevron and a hit", f.arrow.shown == true and f.hit.shown == true)
-    check("open to start", parent._nsuiCollapsed == nil)
-    local _, open = W:GroupHeader(parent, "INSIDE", -40)
-    check("so a title inside it is there", open > 0)
+    check("shut to start", parent._nsuiCollapsed == true)
+    local shut, height = W:GroupHeader(parent, "INSIDE", -40)
+    check("a title inside it is gone with the rest, and the fold stays shut",
+        height == 0 and shut.shown == false and parent._nsuiCollapsed == true)
     local before = refreshes
     f.hit.scripts.OnClick(f.hit)
     check("a click on the title asks for the page again", refreshes == before + 1)
     parent = Page()
-    f = W:SwitchFold(parent, "Folding Thing", 0, cfg)
-    check("and it is shut now", parent._nsuiCollapsed == true)
-    local shut, height = W:GroupHeader(parent, "INSIDE", -40)
-    check("a title inside it is gone with the rest, and the fold stays shut",
-        height == 0 and shut.shown == false and parent._nsuiCollapsed == true)
-    local other = W:SwitchFold(parent, "Another Thing", -80, cfg)
-    check("another fold has its own state", parent._nsuiCollapsed == nil and other.arrow.shown == true)
-    f.hit.scripts.OnClick(f.hit)
-    parent = Page()
     W:SwitchFold(parent, "Folding Thing", 0, cfg)
-    check("and opens again", parent._nsuiCollapsed == nil)
+    check("and it is open now", parent._nsuiCollapsed == nil)
+    local _, open = W:GroupHeader(parent, "INSIDE", -40)
+    check("so a title inside it is there", open > 0)
+    W:SwitchFold(parent, "Another Thing", -80, cfg)
+    check("another fold has its own state", parent._nsuiCollapsed == true)
+    W:EndFold(parent)
+    check("and the end of a fold lets the rows after it show", parent._nsuiCollapsed == nil)
+end
+
+-- turning the switch on opens the fold, and a search opens it whatever was left
+do
+    local parent = Page()
+    local f = W:SwitchFold(parent, "Switched Thing", 0, cfg)
+    check("shut", parent._nsuiCollapsed == true)
+    on = false
+    f.switch._refreshValue()
+    f.switch.scripts.OnClick(f.switch)
+    parent = Page()
+    W:SwitchFold(parent, "Switched Thing", 0, cfg)
+    check("turned on: open", parent._nsuiCollapsed == nil)
+    parent = Page()
+    W:SwitchFold(parent, "Searched Thing", 0, { get = cfg.get, set = cfg.set, rows = true, open = true })
+    check("held open by a search", parent._nsuiCollapsed == nil)
 end
 
 -- with nothing under it there is nothing to fold, whatever was left shut
 do
     local parent = Page()
-    local f = W:SwitchFold(parent, "Folding Thing", 0, cfg)
-    f.hit.scripts.OnClick(f.hit)
-    parent = Page()
-    f = W:SwitchFold(parent, "Folding Thing", 0, cfg)
-    check("shut", parent._nsuiCollapsed == true)
-    parent = Page()
-    W:SwitchFold(parent, "Folding Thing", 0, { get = cfg.get, set = cfg.set, rows = false })
+    W:SwitchFold(parent, "Bare Shut Thing", 0, { get = cfg.get, set = cfg.set, rows = false })
     check("with nothing under it, shut or not: nothing is held back", parent._nsuiCollapsed == nil)
-    f.hit.scripts.OnClick(f.hit)
 end
 
 -- the switch reads again each time the page is drawn

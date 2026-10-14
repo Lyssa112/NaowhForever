@@ -56,7 +56,8 @@ Core/Integrations/RestedXP/
   OnSizeChanged is watched.
 - The colored layer over RestedXP's arrow is lighter at the top, deeper at the bottom and not full
   strength, so the dark arrow still shades it. It follows the arrow's rotation through a post-hook
-  on its SetRotation.
+  on its SetRotation. A turned arrow reaches past its square frame, so the layer covers the square's
+  diagonal and its mask cuts it to the arrow; at the frame's own size the tips lost their color.
 - RestedXP only sets the distance text, never shows or hides it, so hiding it is ours to undo.
   Moving it needs the anchor RestedXP gave it; a text with none has nothing to move or to give
   back, so it is left alone.

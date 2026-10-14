@@ -97,6 +97,7 @@ ns.FEATURES = {
         focusCastBar = false,
         trainerPopup = true,
         flightTimer = true,
+        flightPoint = false,
         quizCamp = true,
         aimTrainer = true,
         waypoints = true,
@@ -208,7 +209,6 @@ ns.FEATURES = {
         questSparkle = false,
         minimapIcons = false,
         gatheredPins = false,
-        cutout = false,
     },
     swingTimer = {
         enabled = true,
