@@ -137,9 +137,17 @@ Core/Integrations/RestedXP/
   SharedMedia is only needed when another is wanted).
 - RestedXP's logo (`Textures/rxp_logo-64`, the one its own window and quest log use) is drawn from
   RestedXP's files in the top right corner of the current step's box (the first, when there are more),
-  untinted and a little taller than the step's text; Show RestedXP Logo turns it off. It is a texture of
-  the box, so it is above the box's background, and the rows start below it. The window hides RestedXP's
-  own and so would otherwise show nothing of it anywhere.
+  untinted, at a size of its own (24 to start); Show RestedXP Logo turns it off. It is a texture of the
+  box, so it is above the box's background, and the rows start below it, or below the label when it is
+  smaller. The window hides RestedXP's own and so would otherwise show nothing of it anywhere.
+- The rows after the first of a step are set in (Row Indent, 12 to start), and narrower by as much, so a
+  Buy under a Talk to reads as a part of it.
+- A click skips or goes to a step and does not tick an objective. On the active step (a row or the box
+  round them) it goes to the step after the guide's progress, and on a line of the list it goes to that
+  line's step, both through `RXP.SetStep` as RestedXP's own Go to step does. Shift-click on a row is what
+  a click was: RestedXP's checkbox for the objective, which the step then counts as RestedXP does. The
+  list's lines are a transparent button each (pooled as `hit`) over the text, so they are also where the
+  window is dragged from.
 - A row that counts has a bar under its text: a buy by the items in the bags against `qty` (RestedXP shows
   no counter for it, so `GetItemCount(id)` is read, and the window listens to `BAG_UPDATE_DELAYED` only
   while such a row is drawn), and any other row by the `3/8` in its text, which RestedXP rewrites as the

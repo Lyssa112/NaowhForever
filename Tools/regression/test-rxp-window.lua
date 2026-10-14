@@ -97,6 +97,7 @@ local function World(account, opts)
     env.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
     env.CreateColor = function(r, g, b, a) return { r, g, b, a } end
     env.InCombatLockdown = function() return false end
+    env.IsShiftKeyDown = function() return w.shift == true end
     env.C_AddOns = { DoesAddOnExist = function(name) return opts.installed ~= false and name == "RXPGuides" end }
     env.C_Timer = { After = function(_, fn) w.timers[#w.timers + 1] = fn end }
     env.SetItemRef = function(link) w.links[#w.links + 1] = link end
@@ -310,10 +311,7 @@ do
         and lines[3] == "40  Step 40 line one" and lines[4] == "42  Step 42 line one",
         "six steps after it, one line each, without the one RestedXP hides and the one that is done")
     Check(progress.text:find(string.char(194, 183), 1, true), "the step and the percent are joined by a dot")
-    local menu
-    for _, o in ipairs(w.frames) do
-        if o.parent == f and o.scripts.OnClick and o.text == nil then menu = o end
-    end
+    local menu = f.menu
     Check(menu ~= nil and menu.shown, "a menu button sits below the list")
     menu.scripts.OnClick(menu)
     Check(w.menus == 1, "and it opens RestedXP's menu")
@@ -401,17 +399,11 @@ do
     local account = { rxpWindow = true }
     local w = Start(account)
     local f = Window(w)
-    local fold
-    for _, o in ipairs(w.frames) do
-        if o.parent == f and o.scripts.OnClick then fold = fold or o end
-    end
+    local fold = f.fold
     local expanded = f.height
     fold.scripts.OnClick(fold)
     Check(account.rxpWindowCollapsed == true and f.height < expanded, "folded: the header only, and it is kept")
-    local foldedMenu
-    for _, o in ipairs(w.frames) do
-        if o.parent == f and o.scripts.OnClick and o.text == nil then foldedMenu = o end
-    end
+    local foldedMenu = f.menu
     Check(foldedMenu and foldedMenu.shown == false, "and the menu button goes with the list")
     local leftShown = 0
     for _, o in ipairs(w.everything) do
@@ -461,18 +453,108 @@ do
     Check(Window(sized).scale == 1.25, "a saved size is the size it is built at")
 end
 
--- a row's click is RestedXP's own, on its own hidden button
+-- a click on the step skips it, a click on a step of the list goes to it, and shift is the objective's own
 do
     local w = Start({ rxpWindow = true })
-    local row
+    local rxp = w.rxp
+    local ns = w.ns
+    local f = Window(w)
+    local went = {}
+    rxp.SetStep = function(n) went[#went + 1] = n end
+    local row, box
     for _, o in ipairs(w.frames) do
         if o.scripts.OnClick and o.source == w.talk.frame.button then row = o end
+        if o.label and o.logo then box = o end
     end
     Check(row ~= nil, "each row knows RestedXP's button for its element")
     row.scripts.OnClick(row)
-    Check(w.talk.frame.button.clicks == 1, "a click on it is a click on RestedXP's")
+    Check(#went == 1 and went[1] == 37 and w.talk.frame.button.clicks == nil,
+        "a click on a row skips the step: to the one after the guide's 36th")
+    box.scripts.OnClick(box)
+    Check(#went == 2 and went[2] == 37, "and on the box round them")
+    w.shift = true
+    row.scripts.OnClick(row)
+    Check(w.talk.frame.button.clicks == 1 and #went == 2, "with shift it is RestedXP's own checkbox, and the step stays")
+    w.shift = false
     row.scripts.OnHyperlinkClick(row, "quest:1", "[Quest]", "LeftButton")
     Check(w.links[1] == "quest:1", "and a link in it opens as RestedXP's would")
+
+    row.scripts.OnEnter(row)
+    Check(w.env.GameTooltip.text == "Skip step", "a row says it skips the step")
+
+    local hits = {}
+    for _, o in ipairs(w.frames) do
+        if o.index and o.shade and Seen(o) then hits[#hits + 1] = o end
+    end
+    Check(#hits == 6 and hits[1].index == 37 and hits[2].index == 39 and hits[6].index == 44,
+        "each line of the list has a button for its step")
+    Check(hits[2].width == 380 - 20 and hits[2].height == 12 + 6, "as big as the line")
+    hits[2].scripts.OnClick(hits[2])
+    Check(#went == 3 and went[3] == 39, "a click on it goes to that step")
+    hits[2].scripts.OnEnter(hits[2])
+    Check(w.env.GameTooltip.text == "Go to step 39" and hits[2].shade.shown, "it says so, and is lit")
+    hits[2].scripts.OnLeave(hits[2])
+    Check(hits[2].shade.shown == false, "and not when the mouse leaves")
+    Check(hits[1].scripts.OnDragStart ~= nil, "a line is still where the window is dragged from")
+
+    -- the guide's progress is read when it is skipped, and what is missing is left out
+    rxp.GetGuideProgress = function() return 40, "id" end
+    box.scripts.OnClick(box)
+    Check(went[4] == 41, "it is from the guide's progress as it is now")
+    rxp.GetGuideProgress = function() error("progress") end
+    box.scripts.OnClick(box)
+    Check(#went == 4 and type(ns.RXPFailures.WindowProgress) == "string", "progress that raises: no step, kept by name")
+    rxp.GetGuideProgress = function() return "none" end
+    box.scripts.OnClick(box)
+    Check(#went == 4, "and one that is no number")
+    rxp.SetStep = nil
+    hits[1].scripts.OnClick(hits[1])
+    Check(#went == 4 and ns.RXPFailures.WindowGo == nil, "no step to go to: nothing")
+
+    local calls = 0
+    rxp.SetStep = function() calls = calls + 1 end
+    local index = hits[1].index
+    hits[1].index = nil
+    hits[1].scripts.OnClick(hits[1])
+    Check(calls == 0, "a line with no step is not a step to go to")
+    hits[1].index = index
+    rxp.SetStep = function() error("step") end
+    hits[1].scripts.OnClick(hits[1])
+    Check(type(ns.RXPFailures.WindowGo) == "string" and f.shown, "a step that raises: kept by name, and not raised")
+
+    -- a button that is lit when the line under it is drawn for another step is not
+    rxp.GetGuideProgress = function() return 36, "id" end
+    hits[3].scripts.OnEnter(hits[3])
+    Check(hits[3].shade.shown == true, "lit under the mouse")
+    rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(hits[3].shade.shown == false, "and not when it is drawn again")
+end
+
+-- the rows after the first are set in
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local function Rows()
+        local out = {}
+        for _, o in ipairs(w.frames) do
+            if o.source and o.icon and o.bar and Seen(o) then out[#out + 1] = o end
+        end
+        return out
+    end
+    local rows = Rows()
+    Check(#rows == 3, "three rows in the active step")
+    Check(rows[1].points[1][4] == 7 and rows[2].points[1][4] == 7 + 12 and rows[3].points[1][4] == 7 + 12,
+        "the first starts at the start of the box, the others are set in")
+    Check(rows[1].width == 380 - 20 - 14 and rows[2].width == 380 - 20 - 14 - 12,
+        "and are that much narrower")
+    ns.SetRXPWindowOption("rxpWindowIndent", 20)
+    Flush(w)
+    Check(rows[2].points[1][4] == 7 + 20 and account.rxpWindowIndent == 20, "how far is a setting")
+    ns.SetRXPWindowOption("rxpWindowIndent", 0)
+    Flush(w)
+    Check(rows[2].points[1][4] == 7 and rows[2].width == rows[1].width, "none sets none in")
 end
 
 -- what is missing or fails is left out, quietly
@@ -1220,13 +1302,24 @@ do
     local logo = boxes[1].logo
     Check(logo.points[1][1] == "TOPRIGHT" and logo.points[1][2] == boxes[1] and logo.points[1][3] == "TOPRIGHT"
         and logo.points[1][4] == -7 and logo.points[1][5] == -7, "in its top right corner")
-    Check(logo.width == 17 and logo.height == 17, "a little taller than the step's text")
+    Check(logo.width == 24 and logo.height == 24, "24 to start, bigger than the step's text")
     Check(f.title.points[1][4] == 31 and f.title.width == 380 - 10 - 31 - 120,
         "and the guide's name has all its room")
-    ns.SetRXPWindowOption("rxpWindowTextSize", 20)
+    local firstRow
+    for _, o in ipairs(w.frames) do
+        if o.source == w.talk.frame.button and o.parent == boxes[1] then firstRow = o end
+    end
+    Check(firstRow.points[1][5] == -7 - 24 - 5, "the rows start below it")
+    ns.SetRXPWindowOption("rxpWindowLogoSize", 40)
     Flush(w)
-    Check(logo.width == 24, "it follows the size of the text")
-    ns.SetRXPWindowOption("rxpWindowTextSize", 13)
+    Check(logo.width == 40 and firstRow.points[1][5] == -7 - 40 - 5 and account.rxpWindowLogoSize == 40,
+        "its size is a setting, and the rows make room for it")
+    ns.SetRXPWindowOption("rxpWindowLogoSize", 24)
+    ns.SetRXPWindowOption("rxpWindowLogo", false)
+    Flush(w)
+    Check(firstRow.points[1][5] == -7 - 13 - 5, "and without it the rows start below the label")
+    ns.SetRXPWindowOption("rxpWindowLogo", true)
+    Flush(w)
 
     -- with a second active step, only the first has it
     local second = { active = true, index = 37, title = "Step 37", elements = { w.buy } }

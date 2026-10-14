@@ -24,7 +24,6 @@ local GOLD = { r = 1, g = 0.82, b = 0 }
 local TEXT_FOLD, TEXT_UNFOLD, TEXT_DOT = "-", "+", " \194\183 "
 local MENU_ICON = "Interface\\ChatFrame\\UI-ChatIcon-Chat-Up"
 local LOGO = "Interface\\AddOns\\RXPGuides\\Textures\\rxp_logo-64"
-local LOGO_GROW = 4
 local GRADIENT = ns.MEDIA .. "NaowhGradient.tga"
 local TEXT_GRADIENT = "Naowh Gradient"
 local GRIP_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
@@ -33,6 +32,9 @@ local GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight"
 local GRIP_CORNER = "BOTTOMRIGHT"
 local TEXT_STEP = "Step %d"
 local TEXT_SKIP = "Skip step"
+local TEXT_SKIP_ROW = "Shift-click: skip this objective"
+local TEXT_GO = "Go to step %d"
+local TIP_DIM = 0.7
 local HOME = { "LEFT", "LEFT", 0, 35 }
 local DRAG_BUTTON, TIP_ANCHOR = "LeftButton", "ANCHOR_TOP"
 local COLORS_KEY = "rxpWindowColors"
@@ -60,6 +62,10 @@ local OPTIONS = {
       values = LINES, order = { "bar", "rule", "none" }, tip = "A progress bar of the guide, a line, or nothing." },
     { key = "rxpWindowLogo", group = "Look", kind = "toggle", label = "Show RestedXP Logo", default = true,
       tip = "RestedXP's logo in the corner of the current step." },
+    { key = "rxpWindowLogoSize", group = "Look", kind = "number", label = "RestedXP Logo Size", default = 24,
+      min = 12, max = 48, tip = "How big RestedXP's logo is." },
+    { key = "rxpWindowIndent", group = "Look", kind = "number", label = "Row Indent", default = 12, min = 0,
+      max = 32, tip = "How far the rows after the first are set in." },
     { key = "rxpWindowMenu", group = "Look", kind = "toggle", label = "Show Menu Button", default = true,
       tip = "The button that opens RestedXP's menu." },
     { key = "rxpWindowGrip", group = "Look", kind = "toggle", label = "Show Resize Grip", default = true,
@@ -116,7 +122,7 @@ for _, color in ipairs(COLORS) do COLOR_BY_NAME[color.name] = color end
 
 local window, active, started, pending, skinned, wantsBags
 local sizing, sizingModel
-local pool, used = { box = {}, row = {}, line = {} }, { box = 0, row = 0, line = 0 }
+local pool, used = { box = {}, row = {}, line = {}, hit = {} }, { box = 0, row = 0, line = 0, hit = 0 }
 local silenced = setmetatable({}, { __mode = "k" })
 local watched = setmetatable({}, { __mode = "k" })
 local faced = {}
@@ -599,6 +605,27 @@ local function Draggable(frame)
     end)
 end
 
+local function GoTo(index)
+    local rxp = _G.RXP
+    if type(index) == "number" and Has(rxp, "SetStep") then Quiet("WindowGo", rxp.SetStep, index) end
+end
+
+local function SkipStep()
+    local rxp = _G.RXP
+    local step = Has(rxp, "GetGuideProgress") and Run("WindowProgress", rxp.GetGuideProgress)
+    if type(step) == "number" then GoTo(step + 1) end
+end
+
+local function Tip(owner, text, extra)
+    if GameTooltip:IsForbidden() then return end
+    GameTooltip:SetOwner(owner, TIP_ANCHOR)
+    GameTooltip:SetText(text)
+    if extra then
+        GameTooltip:AddLine(extra, TIP_DIM, TIP_DIM, TIP_DIM)
+        GameTooltip:Show()
+    end
+end
+
 -- Dragging the corner sets the window's width, and how many steps are listed from how tall it was made: the
 -- height the window has without any, and the height of a line, are what Draw last drew.
 local function LiveSize(width, height)
@@ -712,7 +739,12 @@ end
 
 local function MakeBox()
     local T = ns.THEME
-    local box = CreateFrame("Frame", nil, window)
+    local box = CreateFrame("Button", nil, window)
+    box:RegisterForClicks("LeftButtonUp")
+    box:SetScript("OnClick", function() SkipStep() end)
+    box:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP) end)
+    box:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    Draggable(box)
     box.back = ns.Solid(box, "BACKGROUND", T.bg, 1)
     box.back:SetAllPoints()
     box.edge = ns.Border(box, T.line, EDGE_ALPHA)
@@ -744,14 +776,10 @@ local function MakeRow()
     row:SetScript("OnHyperlinkLeave", LinkLeave)
     row:RegisterForClicks("LeftButtonUp")
     row:SetScript("OnClick", function(self)
+        if not IsShiftKeyDown() then return SkipStep() end
         if Has(self.source, "Click") then Quiet("WindowSkip", self.source.Click, self.source) end
     end)
-    row:SetScript("OnEnter", function(self)
-        if self.source and not GameTooltip:IsForbidden() then
-            GameTooltip:SetOwner(self, TIP_ANCHOR)
-            GameTooltip:SetText(TEXT_SKIP)
-        end
-    end)
+    row:SetScript("OnEnter", function(self) Tip(self, TEXT_SKIP, self.source and TEXT_SKIP_ROW or nil) end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.bar = ns.Solid(row, "ARTWORK", ns.THEME.accent, 1)
     row.icon = Text(row, "rxpWindowTextSize")
@@ -768,7 +796,26 @@ local function MakeLine()
     return line
 end
 
-local MAKERS = { box = MakeBox, row = MakeRow, line = MakeLine }
+local function MakeHit()
+    local hit = CreateFrame("Button", nil, window)
+    hit:RegisterForClicks("LeftButtonUp")
+    hit.shade = hit:CreateTexture(nil, "BACKGROUND")
+    hit.shade:SetAllPoints()
+    hit:SetScript("OnClick", function(self) GoTo(self.index) end)
+    hit:SetScript("OnEnter", function(self)
+        self.shade:SetColorTexture(ns.RXPWindowColor("line"))
+        self.shade:Show()
+        Tip(self, TEXT_GO:format(self.index or 0))
+    end)
+    hit:SetScript("OnLeave", function(self)
+        self.shade:Hide()
+        GameTooltip:Hide()
+    end)
+    Draggable(hit)
+    return hit
+end
+
+local MAKERS = { box = MakeBox, row = MakeRow, line = MakeLine, hit = MakeHit }
 
 local function Acquire(kind)
     used[kind] = used[kind] + 1
@@ -858,18 +905,22 @@ local function DrawBox(step, y, inner, current)
     box.label:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, -BOX_PAD)
     Coloured(box.label, "label")
     box.label:SetText(step.label:upper())
+    local head = size
     if current and ns.RXPWindowOption("rxpWindowLogo") then
-        local logo = size + LOGO_GROW
+        local logo = ns.RXPWindowOption("rxpWindowLogoSize")
         box.logo:ClearAllPoints()
         box.logo:SetPoint("TOPRIGHT", box, "TOPRIGHT", -BOX_PAD, -BOX_PAD)
         box.logo:SetSize(logo, logo)
         box.logo:Show()
+        head = math.max(size, logo)
     else
         box.logo:Hide()
     end
-    local by = -BOX_PAD - size - gap
-    for _, row in ipairs(step.rows) do
-        by = by - DrawRow(box, row, BOX_PAD, by, inner - BOX_PAD * 2) - gap
+    local by = -BOX_PAD - head - gap
+    local indent = ns.RXPWindowOption("rxpWindowIndent")
+    for i, row in ipairs(step.rows) do
+        local set = i > 1 and indent or 0
+        by = by - DrawRow(box, row, BOX_PAD + set, by, inner - BOX_PAD * 2 - set) - gap
     end
     box:SetHeight(-by + BOX_PAD - gap)
     local bottom = y + by - BOX_PAD
@@ -972,6 +1023,12 @@ function Draw()
             item:SetWidth(inner)
             Coloured(item, "list")
             item:SetText(("%d  %s"):format(entry.index, entry.text))
+            local hit = Acquire("hit")
+            hit:ClearAllPoints()
+            hit:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
+            hit:SetSize(inner, listH)
+            hit.index = entry.index
+            hit.shade:Hide()
             y = y - listH
         end
     end
