@@ -1269,7 +1269,7 @@ end
 
 -- the icons of ours are drawn as a texture in the window's accent, as it is now
 do
-    local account = { rxpWindow = true }
+    local account = { rxpWindow = true, themePreset = "custom" }
     local w = Start(account)
     local f = Window(w)
     local ns = w.ns
