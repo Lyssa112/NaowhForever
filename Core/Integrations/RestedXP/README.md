@@ -111,10 +111,10 @@ Core/Integrations/RestedXP/
   are the ones it has, and the two font strings of a row, which their row sets at every draw, are not
   in the loop that follows an option. A redraw that changes no size sets no font (22 calls before, in
   a window of three rows and six lines). RestedXP's own title text, which it may set again itself,
-  is always set, and at the size it answers to `GetFont` only when that answers a face and a size
-  between `BOX_TITLE_TEXT_MIN` and `BOX_TITLE_TEXT_MAX`: a title whose font did not load (a cold login,
-  before the font is there) answers a size that is garbage, `SetFont` refuses a height of 0 or less
-  with an error the client reports even when it is caught, and RestedXP's own size is 9.
+  is always set, at RestedXP's own size (`BOX_TITLE_TEXT`, 9) and never at the size `GetFont` answers:
+  a title whose font did not load (a cold login, before the font is there) answers a size that is
+  garbage, and `SetFont` refuses a height of 0 or less with an error the client reports even when it
+  is caught. RestedXP sets every one of these titles at 9 itself.
 - The window has no panel of its own, as RestedXP's coming layout has none: a header with a rule under
   it, the active step in a box (the only thing with a background), and the steps after it as plain
   shadowed lines over the world, so every text carries a shadow (`SHADOW`) to be read on any ground.

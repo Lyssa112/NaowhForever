@@ -1800,10 +1800,15 @@ do
     huge.GetFont = function() return "Fonts\\RXP.ttf", 12, "" end
     unset.rxp.activeItemFrame:UpdateVisuals()
     Flush(unset)
-    Check(huge.bad == 0 and huge.fontSize == 12, "while a size RestedXP gave it is kept")
+    Check(huge.bad == 0 and huge.fontSize == 9, "and a readable size gets RestedXP's 9 as well")
 
     target:UpdateVisuals()
     Look(target, "targets painted again")
+    local read = target.title.text.GetFont
+    function target.title.text:GetFont() return self.font, -1566.5, self.fontFlags end
+    target:UpdateVisuals()
+    Look(target, "targets with a junk size from the game")
+    target.title.text.GetFont = read
     w.rxp.targeting:RenderTargetFrameBackground()
     local r, g, b = ns.RXPWindowColor("box")
     Check(Is(Fill(target), r, g, b, 0.55) and w.rxp.targeting.renders == 1,
