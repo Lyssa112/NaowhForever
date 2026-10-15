@@ -172,9 +172,11 @@ Core/Integrations/RestedXP/
   Size and Color, and the bar's background. The color is themed (`edge` in `COLORS`, `ThemedEdge`): black
   for the addon's own theme, the preset's line color for a preset (the window's or the addon's), and the
   Forever skin's bronze for the skin, so a theme keeps its look and only the Naowh theme is black. The
-  size is in screen pixels (`ns.Border:SetPixels`, a count of `ns.Hairline`'s pixel) in steps of a half
+  size is in screen pixels (`Edge` in `Window.lua`: four textures of that many `ns.OnePixel`, as the
+  window's own border is made by `ns.Border`, which has no size, and Core is left alone) in steps of a half
   (`step` of the option): a size that is not whole is not snapped to the pixel grid, or the engine would
-  draw it as the whole one next to it, and it is snapped again when it is whole. The bar is that much
+  draw it as the whole one next to it, and it is snapped again when it is whole. It is set at every draw,
+  so a change of the UI scale shows at the next one. The bar is that much
   taller, `EDGE_SIDES` times the size, so its fill is as thick as it was: the border is inside the bar's
   frame and over it. The three colors are the player's in every theme (`always` is set on them): a
   theme's edge is not what a player has to take, so Custom is not needed to change it. The window's own

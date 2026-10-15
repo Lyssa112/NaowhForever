@@ -75,6 +75,8 @@ local function Object(everything)
     function o:IsForbidden() return false end
     function o:GetFrameLevel() return self.level or 1 end
     function o:SetFrameLevel(level) self.level = level end
+    function o:SetSnapToPixelGrid(on) self.snap = on end
+    function o:SetTexelSnappingBias(bias) self.bias = bias end
     function o:GetChildren() return unpack(self.kids) end
     function o:CreateFontString()
         local fs = Object(everything)
@@ -370,8 +372,8 @@ do
     Check(panel and panel.shown == false and f.borderObject._frame.shown == false,
         "the window has a panel and a border to turn on, and both are off to start")
     local boxed = 0
-    for _, parent in ipairs(w.borders) do
-        if parent ~= f and not parent.track then boxed = boxed + 1 end
+    for _, o in ipairs(w.frames) do
+        if o.label and o.logo and Seen(o) then boxed = boxed + 1 end
     end
     Check(boxed == 1, "only the active step is in a box")
     Check(not seenTip, "a step that is a tip only, or not active, is not a box")
@@ -978,7 +980,7 @@ do
         "both borders are black to start")
     Check(ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1 and ns.RXPWindowOption("rxpWindowBarBorderSize") == 1,
         "and one pixel")
-    Check(Box().borderObject.pixels == 1 and f.bar.edge and f.bar.edge.pixels == 1 and Black(unpack(f.bar.edge.color)),
+    Check(Box().edge.pixels == 1 and f.bar.edge and f.bar.edge.pixels == 1 and Black(unpack(f.bar.edge.color)),
         "as drawn: the step's box and the guide's bar")
     Check(select(4, ns.RXPWindowColor("barBack")) == 0.5 and select(1, ns.RXPWindowColor("barBack"))
         == select(1, ns.RXPWindowColor("line")), "the bar's background is the line's color to start")
@@ -1013,8 +1015,10 @@ do
     Flush(w)
     Check(f.height == tall + 2, "the window is as tall as the bar's border makes it, the step box's being inside its own")
     local box = Box()
-    Check(box.borderObject.pixels == 3 and box.borderObject.color[1] == 1 and box.borderObject._frame.shown == true,
+    Check(box.edge.pixels == 3 and box.edge.color[1] == 1 and box.edge._frame.shown == true,
         "a size and a color for the step's box, in the addon's own theme")
+    Check(box.edge.textures[1].solid[1] == 1 and box.edge.textures[4].solid[1] == 1 and box.edge.textures[2].solid[2] == 0,
+        "drawn on all four of its edges")
     Check(f.bar.edge.pixels == 2 and f.bar.edge.color[2] == 1 and f.bar.edge.color[4] == 0.5 and f.bar.height == 5 + 2 * 2,
         "and for the bar: the size, the color, and room for it, so the fill is as thick as it was")
     Check(f.bar.track.solid[3] == 1 and f.bar.track.solid[4] == 0.25, "and the bar's background its own")
@@ -1037,7 +1041,10 @@ do
     Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 0, "down to none")
     ns.SetRXPWindowOption("rxpWindowBarBorderSize", 1.5)
     Flush(w)
-    Check(Box().borderObject.pixels == 1.5 and f.bar.edge.pixels == 1.5 and f.bar.height == 5 + 2 * 1.5
+    local halves = Box().edge.textures
+    Check(halves[1].snap == false and halves[4].snap == false and halves[1].bias == 0 and halves[1].height == 1.5
+        and halves[3].width == 1.5, "a half step is as many pixels, and is not snapped to the pixel grid")
+    Check(Box().edge.pixels == 1.5 and f.bar.edge.pixels == 1.5 and f.bar.height == 5 + 2 * 1.5
         and account.rxpWindowBoxBorderSize == 1.5, "a half step is drawn and given room, and kept")
 
     ns.SetRXPWindowOption("rxpWindowBarBorderSize", 1)
@@ -1057,6 +1064,8 @@ do
     Flush(w)
     Check(ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1 and Black(ns.RXPWindowColor("boxBorder"))
         and f.bar.edge.pixels == 1, "Reset puts the sizes and colors back")
+    Check(Box().edge.textures[1].snap == true and f.bar.edge.textures[1].snap == true and Box().edge.pixels == 1,
+        "and a whole size is on the pixel grid again")
 
     local accent = { ns.RXPWindowColor("accent") }
     local fill = { ns.RXPWindowColor("barFill") }
@@ -1368,7 +1377,7 @@ do
     Check(box.inset and box.inset.shown ~= false and box.inset.of == box, "the box has the skin's inset")
     local solid = box.inset.fill.solid
     Check(solid and math.abs(solid[4] - 0.4) < 1e-9, "its fill has the box's color and opacity")
-    Check(box.back.shown == false and box.borderObject._frame.shown == false, "and the flat back and line are not drawn")
+    Check(box.back.shown == false and box.edge._frame.shown == false, "and the flat back and line are not drawn")
     ns.SetRXPWindowOption("rxpWindowBoxBorder", false)
     Flush(w)
     Check(box.inset.shown == false and box.back.shown ~= false and math.abs(box.back.solid[4] - 0.4) < 1e-9,
@@ -1443,15 +1452,15 @@ do
     for _, o in ipairs(w.frames) do
         if o.label and o.logo then box = o end
     end
-    Check(box.borderObject._frame.shown == true and box.borderObject.color[1] == 0 and box.borderObject.color[2] == 0
-        and box.borderObject.color[3] == 0 and box.borderObject.color[4] == 1 and box.borderObject.pixels == 1,
+    Check(box.edge._frame.shown == true and box.edge.color[1] == 0 and box.edge.color[2] == 0
+        and box.edge.color[3] == 0 and box.edge.color[4] == 1 and box.edge.pixels == 1,
         "the step's box has its border, black and one pixel: it is not the window's")
     Check(math.abs(box.back.solid[4] - 0.55) < 1e-9, "the box is a little see-through to start")
     ns.SetRXPWindowOption("rxpWindowBoxBorder", false)
     ns.SetRXPWindowColor("box", 0.3, 0.3, 0.3, 0.3)
     ns.SetRXPWindowColor("border", 1, 1, 0, 1)
     Flush(w)
-    Check(box.borderObject._frame.shown == false and box.back.solid[1] == 0.3 and f.borderObject.color[1] == 1,
+    Check(box.edge._frame.shown == false and box.back.solid[1] == 0.3 and f.borderObject.color[1] == 1,
         "which can be turned off, and has its color, the window's border its own")
     Check(math.abs(box.back.solid[4] - 0.55) < 1e-9 and select(4, ns.RXPWindowColor("box")) == 1,
         "the opacity of the box is not part of its color")
