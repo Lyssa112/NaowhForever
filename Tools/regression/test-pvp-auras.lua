@@ -131,6 +131,7 @@ local function Fixture(qol, pvp)
     env.Hooked = function(name) return hooks[name] ~= nil end
     env.combat = false
     env.InCombatLockdown = function() return env.combat end
+    env.C_AddOns = { DoesAddOnExist = function() return false end, GetAddOnEnableState = function() return 0 end }
     local now = 100
     env.GetTime = function() return now end
     env.Advance = function(s) now = now + s end
@@ -212,7 +213,7 @@ local function Fixture(qol, pvp)
     env.NaowhForever = ns
     env._G = env
     Load({ "Core/Features.lua" }, env)
-    local files = TocFiles("^NaowhForever_PvP/.*%.lua$")
+    local files = TocFiles("^NaowhForever_Combat/PvP/.*%.lua$")
     files[#files + 1] = "NaowhForever_QoL/Combat/CursorCooldown.lua"
     Load(files, env)
     env.Fire("PLAYER_LOGIN")
@@ -413,14 +414,14 @@ do
         "Focus Panel off: the focus's hidden and not followed, the target's stays")
     S.Set("focus", true)
 
-    -- How to set a focus: NF Focus, in Naowh's Forge.
+    -- How to set a focus: NF Focus, on Macros' Smart Macros tab.
     local forge
     for _, row in ipairs(env.cards.auras.rows) do
-        if row.buttonText == "Open Forge" then forge = row end
+        if row.buttonText == "Smart Macros" then forge = row end
     end
     Check(forge and forge.needs() and forge.help:find("NF Focus", 1, true), "the Focus group points to NF Focus")
     forge.button()
-    Check(env.opened[1] == "from options" and env.opened[2] == "smart", "Open Forge: Naowh's Forge, on its Smart Macros")
+    Check(env.opened[1] == "smart" and #env.opened == 1, "the button opens Macros on its Smart Macros tab")
     local openMacros = ns.OpenMacroWindow
     ns.OpenMacroWindow = nil
     Check(not forge.needs(), "without the Macros module the button is greyed out")

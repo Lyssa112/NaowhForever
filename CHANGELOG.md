@@ -2,6 +2,439 @@
 
 ## Unreleased
 
+## 1.1.19
+
+### Changed
+- Consumable Bar, Food Bar, Gear Sets, Trinkets, Group Buttons and the Finder role buttons hover and
+  press with the same flat look as the Blessings bar, without Blizzard's square border.
+
+### Fixed
+- Scrap Marker: the Razormane Backstabber, Charred Razormane Wand and Razormane War Shield, needed
+  for Weapons of Choice, are never marked as scrap or sold.
+
+## 1.1.18
+
+### Added
+- RestedXP: a RestedXP Naowh Window (V2) in Settings, with the guide's progress, the active step and
+  the steps after it in one window in your theme, resizable from its corner, with a Window Theme of
+  its own, the Forever look, and a bar under a row that counts. Added: RestedXP: Step Icons in the
+  RestedXP Naowh Window (V2) settings, Naowh's own step icons in a line or a filled style, in place
+  of RestedXP's, in its windows, tooltips and quest log, in the window's Accent Color. Added:
+  RestedXP: Set Up New Characters in the RestedXP Naowh Window (V2) settings, off to start, that
+  turns on RestedXP's new interface and the Naowh theme for a character the first time you play it
+  and puts the waypoint arrow in the middle of the screen, and a button to do it for the one you are
+  playing. Added: RestedXP: the Active Targets and Active Items windows take the look of the window,
+  and the chat bubble and sword on a target button are our icons. Added: RestedXP: an Arrow Shows
+  Objective switch, so the text under the arrow says the distance and the objective (Talk to Duokna)
+  in place of the step number, wrapped under the arrow, and an Arrow Text Size. Changed: RestedXP:
+  the theme (V1) and the Naowh window (V2) are separate folds with a switch on their title and
+  cannot both be on, and the waypoint arrow's options are in both (and on their own while neither
+  is).
+- Gamble: This feature adds in two gambling modes (Classic and Deathroll) to play with friends in
+  party or raid chat.
+- Performance: HDR and Peak Brightness settings, under QoL > System, for HDR monitors.
+- Waypoint Pin: an Arrival Distance slider for how close counts as arriving (QoL > Interface).
+- AuraBuffs: Worn Gear Reminder (Buffs & Consumables, off by default) shows an icon while you wear
+  Cloak of Hermitic Bliss in Wailing Caverns, with the cloak's effects in its tooltip.
+- AuraBuffs window: drag an item from your bags onto a section to add it.
+- Glimmer: Quest Givers is its own category under Objects, so you can keep quest objects lit without
+  the nameplate bar on quest givers.
+- Buffs & Reminders: click a reminder icon to use the food, flask, elixir, scroll, stone or oil it
+  shows, without opening its item menu.
+- Scrap Marker: choose Alt or Ctrl as the marking modifier in QoL > Loot & Items.
+- Professions: Show Normal Cast Bar in Total Craft Timer settings keeps individual craft progress
+  visible alongside the batch timer.
+- Professions: optional recipe-row markers for Shopping List quantities and bag or bank stock.
+- Professions: optional Scan, Pause and Resume controls with paging for Favorite Patterns at the
+  auction house.
+- Professions: optional crafting ROI display with configurable colour thresholds.
+- Settings search: a word with a letter missing still finds the setting, after the exact matches,
+  with the matching letters lit.
+- Settings search: modules that are turned off are searched too. Their matches show under Turned Off
+  at the bottom of the sidebar, with a switch to turn the module on.
+
+### Changed
+- Glimmer: the Sparkles effect has twice as many stars.
+- Campfire: click anywhere on Camp Nearby, the bar or the alert, to sit.
+- Campfire: Alert Size shows a number instead of a percent.
+- Dungeon Journal: a waypoint to a dungeon's entrance clears once you are inside the dungeon.
+- The Window Opacity option is gone from every module's window and title bar; the windows are always
+  fully solid.
+- Buffs & Reminders: the item menu you get by hovering a reminder icon now uses the row's Icon Size
+  and opens centred under the icon you hovered, above it when there is no room below.
+- Options: every section starts folded when you open a tab, except on Damage Meter, Glimmer and Top
+  Bar, which still open their first section.
+- Buffs & Reminders: pressing a reminder icon or an item in its menu makes it glow, so you can see
+  the press went through.
+- Buffs & Reminders: the reminder row no longer updates during combat: a consumable that runs low or
+  expires mid-fight appears once combat ends, and one used in combat stays on the row until then.
+- AuraBuffs: the Weapon Enhancement Reminder shows each stone, weightstone and oil with its classic
+  icon, and a Rough Sharpening Stone when you carry none.
+- The Top Bar is now part of Quality of Life and no longer has its own line in the AddOns list. Turn
+  it on or off on its card under QoL > Interface.
+- Options: Cursor & Crosshair and Damage Meter are now the last Quality of Life tabs, after System.
+- Options: Consumable Bar moves to the top of Combat, and Group Inspect moves to Utilities.
+- Gear & Trinkets, Blessings, AuraBuffs, Threat Meter, PvP and Swing Timer are now one line in the
+  AddOns list, Naowh Forever: Combat. Turn each one on or off under Settings > Modules, and it takes
+  effect without a reload.
+- Forever skin: Settings, Profiles, Patch Notes and Credits are back at the bottom of the sidebar.
+- Forever skin: the options sidebar lists modules as gold text under group bars, with the picked one
+  between gold lines, as the game's Options window does.
+- Forever skin: section headings are plain bold text over a brown line, and every options page has
+  the same row lines.
+- Forever skin: folding sections on the Settings page look like the other collapsible bars.
+- Forever skin: the window's lines, the logo ring, the help tip and tab rows all use the border's
+  bronze metal.
+- Forever skin: dropdowns and sliders get a soft sheen under the mouse instead of a yellow edge, and
+  the scroll bar no longer lights bright yellow.
+- The Naowh Forever: Language addon is gone; the language you pick in Settings is saved with the
+  rest of Naowh Forever's settings. If you had picked a language other than your game's, pick it
+  again once.
+
+### Fixed
+- Glimmer: herbs, ore and other objects light up on every setup; on some, the game never showed the
+  nameplate Glimmer's effect needs.
+- Waypoint Pin: hides when you are at a tracked quest's area and comes back when you walk away.
+- Waypoint Pin: the walking time is right on a mount, instead of about double.
+- Flight Point Reminder now alerts once when entering a zone with an unlearned flight point and adds
+  a learn hint to existing flight-master pin tooltips.
+- Flight Point Reminder remembers opened flight maps across reloads, including existing saved flight
+  points.
+- Flight Point Reminder no longer repeats "the" in reminders for The Sepulcher and other towns whose
+  names start with "The ".
+- Buff Thanks thanks the player who buffed you with its emote and skips unknown casters.
+- Settings search reveals the module switch when a disabled module matches its description.
+- AuraBuffs window: an added consumable shows its icon and name instead of its item ID.
+- Forever skin: Quality of Life's tabs fit inside the window instead of running off its right edge.
+- Campfire: on the Round reminder, clicking the "Click to sit" words makes you sit, not just the
+  icon.
+- Buffs & Reminders: the reminder icons and their item menu now take the theme's Borders & Lines
+  color for their edges.
+- AuraBuffs: the Buffs & Consumables preview no longer shows Arcane Intellect (or any raid buff) you
+  do not track.
+- AuraBuffs: with Icon set to Last Used, the Weapon Enhancement Reminder shows and uses the stone or
+  oil you used last when you carry it.
+- Restock Reminder: counts equipped Rogue and Warrior thrown weapons as ammo, and groups ammo after
+  Class Reagents under class-coloured headings.
+- The Gear & Trinkets and Blessings bars no longer stay on screen after being switched off around
+  Unlock Mode.
+- Forever skin: every Quality of Life tab shows its full name.
+- Map: mount vendors such as Veron Amberstill no longer show as innkeeper pins.
+- Professions: the Disenchant window no longer blocks keyboard input while it is open.
+
+## 1.1.17
+
+### Added
+- German: Glimmer, Naowh's Forge's Simple view, Mana Efficiency, the Shopping List's consumables,
+  the XP bar's new effects and the other new parts of 1.1.12 to 1.1.15 now show in German on German
+  clients.
+- Professions: the Shopping List's Consumables picker has a search box, and a star on each item that
+  pins it under Favorites at the top of the list (saved per profile).
+- Ability to remind a player to learn a new flight point if unknown
+- Damage Meter: a left click on a death in the Deaths list opens the game's Death Recap for it.
+- QoL: Group Finder Roles, role buttons on the Group Finder that show only players of a role, or
+  only groups that still need one.
+
+### Changed
+- Journeys: the minimap route draws flights, ships, the tram and portals in their own colours, as
+  the world map does.
+- Journeys: a flight is drawn through each flight point it stops at, on the world map and the
+  minimap.
+- Consumable Bar: Ask to Add asks at the bar even when it has no items yet.
+- Lighter at login: about 3 MB less memory while the Quest List or Journeys is off; their quests,
+  rares and quest spots load the first time those features need them, from Naowh Forever: Discovery
+  Data and Naowh Forever: Journeys Data in your AddOns list, so keep both enabled.
+- Lighter all the time: about 0.6 MB less memory for the English text, and a smaller download
+  without an unused font and two unused icons.
+- Lighter in combat and at idle: the Damage Meter, Threat Meter, Instance Tracker, Pet Tracker, Zone
+  Levels, Bag Space and Restock do less work.
+- Glimmer: the Behind My Character cut-out is removed.
+- Glimmer: Quest Item Sparkle is a toggle in the Glimmer card, next to Show Skill and Quest Line.
+- Scrap Marker: a mark now ends when the item leaves your bags, so copies you loot later are not
+  scrap. Turn on Save Marks to keep marks for good.
+- Macros: My Macros, Smart Macros and Library are now tabs of the Macros page instead of a separate
+  window; /nfmacros opens them there.
+- Macros: Simple mode is a short form (spell, who to aim at, what to do if no one is there) that
+  says what one press does and shows the macro it writes.
+- Macros: "the unit under your mouse" is now "mouseover" everywhere.
+- PvP: the Focus Macro button opens Macros on its Smart Macros tab.
+- Onboarding: the Minimalist setup is now Recommended, and both setups have clearer descriptions.
+- Onboarding: a module you turn on moves to the end of the Enabled list.
+- Settings: changing the Skin asks to reload right away.
+
+### Fixed
+- Journeys: a far-away quest you track now goes to the quest itself, flying when that is quicker,
+  instead of walking to the next zone border.
+- Journeys: learning a flight point at a flight master plans the journey you are on again, so it can
+  take that flight.
+- Journeys: walks start from the ground you stand on instead of the lowest ground nearby, and are no
+  longer counted as longer the higher up you are.
+- German: the Mana Efficiency line in spell tooltips says Heilung or Schaden instead of the English
+  healing or damage.
+- Damage Meter: a Lua error that repeated after you died in a fight, from the figure columns being
+  sized from text the game keeps secret.
+- Damage Meter: the Deaths list shows when each death was instead of 0, and its summary and a Deaths
+  column on another list count the deaths.
+- Journeys: walking routes cut straight across open ground instead of bending at every map tile
+  edge.
+
+## 1.1.16
+
+### Added
+- XP Bar: Keep Blizzard XP Bar setting, so Blizzard's experience bar can stay between your action
+  bars alongside ours.
+
+### Changed
+- Glimmer: herbs and ore light up grey with the skill they need on a character without Herbalism or
+  Mining, instead of staying unlit.
+
+### Fixed
+- Journeys: following a journey no longer builds up memory and lag while you fight and move around,
+  as when farming.
+
+## 1.1.15
+
+### Fixed
+- Training Planner: resetting your talents while following a build asks whether to learn it again,
+  instead of spending the points straight away.
+
+## 1.1.14
+
+### Changed
+- Glimmer: its map data is now part of Quality of Life, one addon fewer in your list; delete an old
+  NaowhForever_GlimmerData folder if you install by hand.
+
+### Fixed
+- Journeys: routes use the Deeprun Tram again, so Dun Morogh and Ironforge journeys from Stormwind
+  no longer walk the long way round.
+- Journeys: the route on the world map follows every walk instead of a straight line, and rides are
+  drawn in their own colour.
+- Journeys: flight points learned at a flight master are picked up straight away, and a character
+  with none learned is told to open a flight master's map.
+- Journeys: focusing a quest again after closing its Journey card brings the card back.
+- Journeys: dungeon quests like Save Techbot's Brain! start a journey to the dungeon's entrance.
+
+## 1.1.13
+
+### Added
+- Quality of Life: Shift-click the on-screen Disband button to disband without the question.
+- Restock Reminder: a live preview on its settings card.
+- XP Bar: Show Texts On Mouseover hides the texts around the bar, or all of them, until you hover
+  it, and its times are shorter, with Time to Level and XP/Hour hidden until you earn XP.
+- XP Bar: Leveling Pace, Time to Level and XP/h in one text.
+- XP Bar: effects, each with its own switch: Shine, Notches, Rested Stripes, Quest XP Pulse, Ready
+  to Level, Level-Up Flash and Hover Breakdown.
+- Glimmer: quest givers light up when they have a quest to pick up or hand in.
+
+### Changed
+- Blessings: Growth Direction is at the top of the Anchor card.
+- Professions: Add to List opens the Shopping List.
+- Restock Reminder: the Hunter Ammo settings show on every class, to set up a profile on any
+  character.
+- Buffs & Consumables: the weapon reminder's default icon is a classic sharpening stone.
+- Glimmer is now a tab under Quality of Life instead of its own module; delete an old
+  NaowhForever_Glimmer folder if you install by hand.
+- Glimmer: Show the Cut-Out is a toggle; click again to hide it.
+- Glimmer: the tab opens on the Glimmer card, with its on/off in the header.
+- Glimmer: herbs and ore stay unlit on a character without Herbalism or Mining.
+- XP Bar: a cleaner settings card; reset it by right-clicking the preview.
+- Naowh Score: graded against the best for your level by default.
+
+### Fixed
+- Blessings: the bar's buttons no longer show Blizzard's square glow over their black edge when
+  hovered or pressed.
+- Glimmer: quest objects and quest turn-ins light up in the effect picked for quest objects.
+- Journeys: frees its walking maps after a minute unused, so it holds much less memory between
+  journeys.
+
+## 1.1.12
+
+### Added
+- GCD Tracker: Show Icons and Show Activity Bar switches in QoL > Combat, so you can keep the
+  scrolling icons and hide the blue bar under them (or the other way round).
+- Campfire: a Sit button beside the Refresh Camp reminder and the Camp Nearby alert (Show Sit
+  Button).
+- Campfire: a glow on the reminder while you have no Camp Benefits (Glow When Refresh Needed).
+- Key Bindings: Naowh Forever now has a key for Instance Tracker, Discovery, Gear Sets, Blessings,
+  Macros, Action Bars, AuraBuffs, Threat Meter and PvP.
+- Training Planner: talent builds can carry spells to skip, picked in the build editor; Learn All at
+  the trainer follows the build you follow and trains the rest.
+- German: the Damage Meter, Journeys, invite buttons and the other new parts now show in German on
+  German clients.
+- Buffs & Consumables: Weapon Enhancement Reminder (off by default) for a weapon with no sharpening
+  stone, weightstone or oil.
+- Training Planner: a Weapon Skills section on the Spells tab lists the weapon skills your class can
+  learn and the weapon master that teaches each; click one for a waypoint to the nearest.
+- Restock Reminder: Hunters can set an ammo warning amount and buy ammo independently at vendors.
+- Professions: the Shopping List is a window of its own (Shopping List button on the profession
+  window, or /nf shopping), so it stays open when you close the profession window.
+- Professions: add any item to the Shopping List, not just recipe materials: shift-click it, drag it
+  in, or type its name or ID.
+- Mana Efficiency now covers Blizzard, Rain of Fire, Flamestrike, Consecration, Hurricane, Volley,
+  Fire Nova and Holy Shock, with the area spells shown per target.
+- Growth Direction (Right, Left, Up or Down) for the Food & Drink Bar, Gear Set Bar and Trinket Bar,
+  on their settings cards.
+- Training Planner: the build editor has a Talents tab and a Spells tab, and the Spells tab has
+  Select All and Clear for the spells a build skips.
+- Settings > Minimap Icons: minimap buttons for the Scrap List, the Quiz and the Aim Trainer, off by
+  default.
+- Consumable Bar: the Food & Drink buttons in Adding Items, your best food and drink (food only for
+  warriors and rogues).
+- QoL > Questing & Group: Open Saved Rewards shows every reward you saved for a quest, with a Remove
+  button on each and Clear All.
+- Bars: the Consumable, Food & Drink, Blessing, Gear Set and Trinket bars and On-Screen Buttons now
+  glow under the mouse and look pressed while clicked or while their key is held, like the game's
+  action buttons.
+- Key Bindings: keys for Journeys, Professions, Consumable Bar, Swing Timer, Top Bar, Scrap List,
+  Disenchant, Quiz and Aim Trainer.
+- Mana Efficiency counts your talents: percent healing and damage talents, Illumination's mana back
+  on crit heals and Elemental Focus's free casts, at your ranks. Turn it off with Include My Talents
+  in Tooltips > Spell Efficiency.
+- Buffs & Consumables: an Icon choice, Default or Last Used, to show the item you used last.
+- Buffs & Consumables: an optional glow on each reminder icon.
+- Profiles > Share: Saved Quest Items, so the quest rewards you saved can be left out of a shared
+  profile or sent on their own.
+- WagoUI Packs can export, import and switch your Naowh Forever profiles.
+- Fishing Levels (QoL > Map & Pins > Map Options) shows the Fishing skill a zone needs under its
+  name on the world map.
+- A Forever skin (Settings > Colors > Skin) that dresses the windows like WoW Forever's own, by
+  Dieman.
+- Blessings: an Anchor card to anchor the Blessing Bar to another element or a unit frame, and Reset
+  Position to put it back above Buff Reminders.
+- Glimmer (Adventure): herbs, ore, chests, quest objects and your fishing bobber light up as you
+  walk up to them, colored by your chance of a skill-up, with five effects to pick from. It can also
+  keep the loot sparkle on quest items.
+- Glimmer: Minimap Icons shows where herbs and ore grow near you, ringed in your skill-up color,
+  both at once whatever you track.
+- Glimmer: Gathered on the Map pins every herb and vein you gather on the world map; click one for a
+  waypoint. Also under QoL > Map & Pins.
+- Glimmer: Behind My Character cuts the effect out around you, so it passes behind you instead of
+  over you, with a size, a height and a red outline to fit it.
+- Quality of Life, Tooltips: a Mana Efficiency report of every rank in your spellbook (/nf
+  efficiency).
+- Professions: the Shopping List has a Consumables picker (title bar) with the food, flasks,
+  elixirs, potions, scrolls, weapon stones and oils and bandages that suit your class and level, the
+  best for your level marked; set an amount to add it to the list and buy it at the auction house
+  with Buy All.
+- Professions: the search box also finds recipes by their reagents, like Blizzard's.
+- Journeys: Waypoint Only Where Steps End (on) puts the game's waypoint on the dock, flight master
+  or goal, not on every bend.
+- Training Planner and Discovery: a Key Binding card on their settings page to set the key that
+  opens them.
+- Macros: Naowh's Forge has My Macros again: your macros and an editor with a Simple view (each line
+  as a sentence with menus, Fix it, recipes and Test it) and an Advanced view (colored text, Build,
+  Reads as, Simulate).
+- Macros: the Forge's spell boxes offer the spells you know as you type.
+
+### Changed
+- Dungeon Journal: its data is updated to WoW Forever build 1.60.1.70374.
+- Dungeon Journal: drop chances updated from Wowhead's latest kill counts.
+- Campfire: the Enchanted Lute bonus is labelled +MotW instead of +ARM.
+- Quality of Life: Buff Thank You Message is on the Interface tab, and Durability is on the Combat
+  tab.
+- Settings: Modules and Minimap Icons are closed by default and open from their header.
+- Mana Efficiency: area spells (Frost Nova, Arcane Explosion, Holy Nova, Prayer of Healing and the
+  like) now say "per mana / target" (HPM and DPM in Short), the numbers being for one target.
+- Quality of Life, Loot & Items: Looting, Vendors, Auction Prices and Mail & Alts are one card, and
+  the Scrap List button is at the bottom of the tab.
+- Buffs & Consumables: with Only If I Carry One off, flasks and elixirs are reminded about too,
+  whether or not you listed any.
+- Quality of Life: the Equipment Reminder is removed.
+- Training Planner: no longer needs the Professions module, so enabling it no longer enables both.
+- The Damage Meter module is no longer part of Naowh Forever. The Default Damage Meter settings
+  under Quality of Life are unchanged.
+- The ten language addons in the AddOn list are now one, Naowh Forever: Locales.
+- The Top Bar is part of Quality of Life now: its settings are the Top Bar card on Quality of Life >
+  Interface, and it is no longer listed as a module under Settings or in the setup.
+- Blessing Bar: the Direction setting now also grows the bar Left or Up, and is called Growth
+  Direction.
+- On-Screen Buttons: Button Layout is now Growth Direction, with Right and Down as before plus Left
+  and Up.
+- Blessings: Auto-Assign now plans Blessing of Salvation for the paladins when the group has two or
+  more paladins and none of them is a tank.
+- Training Planner: the Train Now button at your class trainer is now called Learn Selected.
+- QoL: the Default Damage Meter skin and layout settings have their own Damage Meter tab, after
+  Combat.
+- Journeys and Instance Tracker are now listed under Utilities in the settings sidebar.
+- QoL, Loot & Items: Scrap Marker sits directly above the Scrap List, after Bag Space.
+- Onboarding: the Minimalist setup's description says who it is for.
+- Loot Feed: looting an item that already has a line adds to its count instead of adding another
+  line.
+- Food & Drink Bar: steps aside while its buttons are on the Consumable Bar (its settings greyed),
+  and its key bindings work for them there too.
+- Settings > Colors: Theme sits beside Skin, with a three-color preview on its left.
+- Buffs & Consumables: the personal buff reminders of every class are listed, your own in its class
+  color and the others in grey, and can be switched on or off for when you play that class.
+- Buffs & Consumables: the reminder icons are bigger by default (48), and the Icon Size slider goes
+  up to 96.
+- Camp reminder: the Sit button is now a seated-figure icon with its label, the camp icon's size on
+  the Round look and the bar's height on Simple and Camp Nearby.
+- Swapping to a spec with its own profile now also turns modules on or off to match that profile,
+  with a reload prompt when the AddOn list changes.
+- The first login after this update turns off, in the AddOn list, every module that is already
+  switched off in your profile (for example after Minimalist), and offers one reload.
+- Campfire and Low Health: the glow can be a Pixel Glow or the Standard Glow, with its own color,
+  lines, thickness and speed.
+- Profiles > Share no longer has Macro Library or Consumables.
+- The Forever skin replaces Classic+; if you used Classic+ you are moved to it.
+- Onboarding: Minimalist is the recommended start, picked for you on a new account, and turns on
+  only Quality of Life, the Dungeon Journal and the BiS List.
+- Onboarding and Profiles > Setups: Recommended is now Everything Enabled, which turns on every
+  module.
+- Blessings: the Blessing Bar keeps its first button in place as classes join or leave, starts above
+  Buff Reminders and moves with them; drag or re-anchor it in the HUD Editor.
+- Onboarding: the modules step is bigger, with the modules you turned on at the top and a line
+  before the ones that are off.
+- Buff reminders: with Only If I Carry One on, a flask, elixir or buff food in your bags reminds you
+  even if you have not listed it.
+- Journeys: the route on the world map and minimap is drawn as dots.
+- Onboarding: the Forever skin's preview is a small Forever window.
+- Campfire: click the fire to sit when a campfire is in range, instead of a separate Sit button; the
+  fire lights up to show it.
+- Campfire: the Glow When Refresh Needed outline is off by default.
+
+### Fixed
+- the Weapon Imbue and Poisons reminders now clear when an imbue or poison is on the weapon,
+  including Windfury.
+- Dungeon Journal > Quest Tracker: Hide the Game's Quest Tracker keeps the game's tracker hidden
+  after the UI comes back (Alt-Z, cinematics).
+- Campfire: the Resting and Refresh Camp label no longer touches the Round icon's ring.
+- Mana Efficiency: Hellfire counted its self damage on top of what each enemy takes.
+- Training Planner: a build's skipped spells now come with it when you copy it, export it, share
+  your profile, or follow it on a new character.
+- RestedXP themes: Naowh (current) is drawn in the Classic+ colors when the Classic+ skin is on,
+  instead of the theme picked last.
+- Buffs & Consumables: with Only If I Carry One off, the food reminder shows even when you have not
+  listed any food, and its icon follows the last food you ate.
+- Trainer Popup: learning profession abilities no longer pops the New Abilities card.
+- Questing & Group: Disband now removes everyone from your group instead of doing nothing.
+- Professions: the Unlearn button beside each skill bar is easy to see again, and the profession
+  tabs on the window's edge have an outline so they stand out.
+- Quest List: a quest that needs several quests done first stays locked until all of them are, and a
+  locked quest says which quests it is waiting on.
+- Discovery: the scroll bar on the Library Books, Sleeping Bag, Quest List and Rares tabs always
+  works, no matter which tabs you opened before.
+- Settings: the Modules and Minimap Icons arrows are on the left, like the rest of the addon.
+- Consumable Bar: Ask to Add asks again about a consumable that left your bags and is looted again.
+- Modules you turned off stay off on new characters and in imported profiles, and turning a module
+  on or off in Settings now also enables or disables it in the game's AddOn list for that character.
+- Professions: the Total Craft Timer no longer counts down a batch the game refused (no reagents),
+  and counts only the crafts your bags can pay for.
+- Professions: the Disenchant window shows every item's real quality colour; the next item to
+  disenchant gets an accent ring instead of a blue border.
+- Onboarding: a module's description no longer runs out of its tile on the modules step.
+- Journeys: a journey to a boat no longer turns into one straight walk at the dock or while you
+  ride, and walks to and from boats go along the pier instead of swimming.
+- Journeys: a route no longer flips between two near-equal ways as you move; it changes only for a
+  clearly quicker one.
+- Journeys: walks that used to show a straight line on the map are drawn along their path.
+- Onboarding: a profile's description no longer runs out of its card.
+- Opening the options window no longer throws a "Division by zero" error.
+- Discovery: the scroll bar shows as soon as a tab opens, without scrolling with the mouse wheel
+  first.
+- Campfire settings: the Active preview no longer shows an empty box when Show Only When Low is on;
+  it shows the reminder dimmed with a note.
+
 ## 1.1.11
 
 ### Added

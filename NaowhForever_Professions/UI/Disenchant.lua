@@ -22,6 +22,7 @@ local BOTTOM_H = 34
 local ALL_W, ALL_H = 150, 24
 local SUMMARY_SIZE = 12
 local MARK_SIZE, MARK_IN, MARK_LEVEL = 10, 2, 5
+local RING_IN = 2
 local KEPT_ALPHA = 0.35
 local HIGHLIGHT_ALPHA = 0.15
 local OPEN_W, OPEN_H, OPEN_RIGHT, OPEN_DROP = 90, 22, 36, 7
@@ -62,7 +63,9 @@ local function PaintSlot(b, r)
     b.icon.texture:SetDesaturated(kept or refused or r.locked)
     b.icon:SetAlpha((kept or refused) and KEPT_ALPHA or 1)
     b.mark:SetShown(kept)
-    local edge = r == armed and T.accent or ITEM_QUALITY_COLORS[r.quality] or T.line
+    b.ring:SetShown(r == armed)
+    b.ring.edge:SetColor(T.accent.r, T.accent.g, T.accent.b, 1)
+    local edge = ITEM_QUALITY_COLORS[r.quality] or T.line
     b.icon.edge:SetColor(edge.r, edge.g, edge.b, 1)
     Parts.MarkForever(b.icon, r.itemID)
     b:Show()
@@ -113,6 +116,10 @@ local function NewSlot(i)
     b.mark = ns.Font(over, MARK_SIZE, "OUTLINE", St.RED_RGB)
     b.mark:SetPoint("BOTTOM", 0, MARK_IN)
     b.mark:SetText(TEXT_KEEP_MARK)
+    b.ring = CreateFrame("Frame", nil, over)
+    b.ring:SetPoint("TOPLEFT", b.icon, RING_IN, -RING_IN)
+    b.ring:SetPoint("BOTTOMRIGHT", b.icon, -RING_IN, RING_IN)
+    b.ring.edge = ns.Border(b.ring)
     local light = b:CreateTexture(nil, "HIGHLIGHT")
     light:SetAllPoints()
     light:SetColorTexture(1, 1, 1, HIGHLIGHT_ALPHA)
@@ -218,8 +225,31 @@ local function OnHide()
     events:UnregisterAllEvents()
 end
 
+local function OnKeyDown(keys, key)
+    if InCombatLockdown() then return end
+    local escape = key == "ESCAPE"
+    keys:SetPropagateKeyboardInput(not escape)
+    if escape then window:Hide() end
+end
+
+local function OnKeysShow(keys)
+    if not InCombatLockdown() then keys:SetPropagateKeyboardInput(true) end
+end
+
+-- Disenchant All makes the window protected, and a protected frame refuses EnableKeyboard from addon code,
+-- so the window would keep every key. Escape lives on a plain child instead.
+local function BuildKeys()
+    window:SetScript("OnKeyDown", nil)
+    window:EnableKeyboard(false)
+    local keys = CreateFrame("Frame", nil, window)
+    keys:SetAllPoints()
+    keys:SetScript("OnKeyDown", OnKeyDown)
+    keys:SetScript("OnShow", OnKeysShow)
+end
+
 local function Build()
     window = Parts.Window(WIDTH, HEIGHT, "disenchantWindow")
+    BuildKeys()
     window.backdrop:Card(CARD_INSET, HEADER + CARD_INSET, CARD_INSET, FOOTER + CARD_INSET)
     Parts.TitleBar(window, TEXT_TITLE, TEXT_SUBTITLE, PAGE)
     Parts.FooterBrand(window, PAGE)
@@ -227,7 +257,7 @@ local function Build()
     BuildFooter()
     events = CreateFrame("Frame")
     events:SetScript("OnEvent", OnEvent)
-    window:HookScript("OnShow", OnShow)
+    window:SetScript("OnShow", OnShow)
     window:HookScript("OnHide", OnHide)
 end
 

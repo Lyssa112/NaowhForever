@@ -56,6 +56,7 @@ local CAN_WEAR = {
 }
 local NEVER_RULED = { [""] = true, INVTYPE_BODY = true, INVTYPE_TABARD = true, INVTYPE_BAG = true,
     INVTYPE_QUIVER = true, INVTYPE_NON_EQUIP_IGNORE = true }
+local QUEST_GEAR = { [5092] = true, [5093] = true, [5094] = true }
 
 local RULE_WEAR, RULE_OLD = ns.L("Can't wear"), ns.L("Outlevelled")
 local TIPS = {
@@ -72,6 +73,11 @@ local NOT_SCRAP = {
 }
 local VENDOR = { { sell = "Sell", ask = "Ask First", none = "Nothing" }, { "sell", "ask", "none" } }
 local SCOPE = { { account = "Account", char = "This Character" }, { "account", "char" } }
+local MODIFIER = { { alt = "Alt", ctrl = "Ctrl" }, { "alt", "ctrl" } }
+local MARK_HELP = {
+    alt = ns.L("Alt-click an item in your bags to mark it as scrap, and sell it at the next vendor."),
+    ctrl = ns.L("Ctrl-click an item in your bags to mark it as scrap, and sell it at the next vendor."),
+}
 
 local TEXT_ITEM = ns.L("item ")
 local TEXT_MARKED = ns.L(" marked as scrap.")
@@ -100,6 +106,7 @@ local guid, class
 local listeners = {}
 local askIDs, askCount, askValue = {}, {}, {}
 local countTexts = {}
+local held, inBags = {}, {}
 local AskPanel, Toggle, Step
 
 local Scrap = {}
@@ -109,6 +116,10 @@ local function On()
     return S.Get("enabled") and S.Get("scrapMarker") == true
 end
 Scrap.On = On
+
+function Scrap.Modifier()
+    return S.Get("scrapMarkerModifier") == "ctrl" and "ctrl" or "alt"
+end
 
 local function SellPrice(id)
     return select(SELL_PRICE, GetItemInfo(id))
@@ -173,7 +184,7 @@ end
 
 local function RuleMatch(id)
     local wear, old = S.Get("scrapRuleWear"), S.Get("scrapRuleOld")
-    if not (wear or old) or Kept()[id] then return nil end
+    if not (wear or old) or Kept()[id] or QUEST_GEAR[id] then return nil end
     local _, _, _, equipLoc, _, classID, sub = GetItemInfoInstant(id)
     if (classID ~= WEAPON and classID ~= ARMOR) or NEVER_RULED[equipLoc or ""] then return nil end
     local name, _, quality, itemLevel, minLevel, _, _, _, _, _, price = GetItemInfo(id)
@@ -187,6 +198,7 @@ end
 Scrap.RuleMatch = RuleMatch
 
 local function State(id)
+    if QUEST_GEAR[id] then return nil end
     if AccountMarks()[id] or CharMarks()[id] then return MARKED end
     if RuleMatch(id) then return RULED end
 end
@@ -211,7 +223,7 @@ end
 
 local function Refusal(id, bag, slot)
     local _, _, _, _, _, classID = GetItemInfoInstant(id)
-    if classID == QUEST_CLASS then return NOT_SCRAP.quest end
+    if classID == QUEST_CLASS or QUEST_GEAR[id] then return NOT_SCRAP.quest end
     if classID == KEY_CLASS then return NOT_SCRAP.key end
     local info = bag and GetContainerItemInfo(bag, slot)
     if (info and info.hasNoValue) or SellPrice(id) == 0 then return NOT_SCRAP.value end
@@ -246,8 +258,12 @@ local function Paint(button, over, id)
 end
 
 local function OnClick(button, mouse)
-    if mouse ~= "LeftButton" or not IsAltKeyDown() or IsControlKeyDown() or IsShiftKeyDown() then return end
-    if not On() or GetCursorInfo() then return end
+    if not On() or mouse ~= "LeftButton" or IsShiftKeyDown() or GetCursorInfo() then return end
+    if Scrap.Modifier() == "ctrl" then
+        if not IsControlKeyDown() or IsAltKeyDown() then return end
+    elseif not IsAltKeyDown() or IsControlKeyDown() then
+        return
+    end
     local bag, slot = bagOf[button], slotOf[button]
     local id = bag and GetContainerItemID(bag, slot)
     if id then Toggle(id, bag, slot) end
@@ -344,6 +360,7 @@ function Scrap.Mark(id, link, bag, slot)
     else
         Writable("scrapItems")[id] = true
     end
+    if bag then held[id] = true end
     if link then ns.Print(link .. TEXT_MARKED) end
     Changed()
     return true
@@ -386,6 +403,35 @@ end
 function Toggle(id, bag, slot)
     local link = GetContainerItemLink(bag, slot) or (TEXT_ITEM .. id)
     if State(id) then Scrap.Unscrap(id, link) else Scrap.Mark(id, link, bag, slot) end
+end
+
+local function Forget(list)
+    local dropped = false
+    for id in pairs(list) do
+        if inBags[id] then
+            held[id] = true
+        elseif held[id] then
+            list[id], dropped = nil, true
+        end
+    end
+    return dropped
+end
+
+local function Prune()
+    if S.Get("scrapMarkerSave") then return end
+    wipe(inBags)
+    for bag = BACKPACK_CONTAINER, LAST_BAG do
+        for slot = 1, GetContainerNumSlots(bag) do
+            local id = GetContainerItemID(bag, slot)
+            if id then inBags[id] = true end
+        end
+    end
+    local dropped = Forget(AccountMarks())
+    dropped = Forget(CharMarks()) or dropped
+    for id in pairs(held) do
+        if not inBags[id] then held[id] = nil end
+    end
+    if dropped then Changed() end
 end
 
 local function Sellable(info)
@@ -575,6 +621,8 @@ local function OnEvent(_, event)
         Changed()
     elseif event == "PLAYER_LEVEL_UP" then
         Repaint()
+    elseif event == "BAG_UPDATE_DELAYED" then
+        Prune()
     end
 end
 
@@ -627,6 +675,10 @@ local function Apply()
     events:RegisterEvent("EQUIPMENT_SETS_CHANGED")
     watchingSets = true
     if S.Get("scrapRuleOld") then events:RegisterEvent("PLAYER_LEVEL_UP") end
+    if not S.Get("scrapMarkerSave") then
+        events:RegisterEvent("BAG_UPDATE_DELAYED")
+        Prune()
+    end
     if S.Get("scrapMarkerVendor") ~= "none" then
         atMerchant = MerchantFrame ~= nil and MerchantFrame:IsShown()
         events:RegisterEvent("MERCHANT_SHOW")
@@ -656,11 +708,13 @@ local function Summary()
 end
 
 Shared.Settings.Page("QoL/Loot & Items", S):Card({
-    id = "scrapMarker", name = "Scrap Marker", order = 25, switch = "scrapMarker",
-    help = "Alt-click an item in your bags to mark it as scrap, and sell it at the next vendor.",
-    search = "/nf scrap nf scrap list",
+    id = "scrapMarker", name = "Scrap Marker", order = 65, switch = "scrapMarker",
+    help = function() return MARK_HELP[Scrap.Modifier()] end,
+    search = "/nf scrap nf scrap list alt-click ctrl-click mark scrap sell vendor",
     summary = Summary,
     rows = {
+        { key = "scrapMarkerModifier", label = "Marking Modifier", choice = MODIFIER,
+          help = "The key to hold as you click an item to mark it; Ctrl also opens the dressing room on gear." },
         { key = "scrapMarkerVendor", label = "At the Vendor", choice = VENDOR,
           help = "Sell your scrap when you open a vendor, ask you first, or do nothing." },
         { key = "scrapMarkerScope", label = "New Marks", choice = SCOPE,
@@ -669,6 +723,8 @@ Shared.Settings.Page("QoL/Loot & Items", S):Card({
           help = "A scrap icon on the bag slot of each item marked as scrap." },
         { key = "scrapMarkerProtect", label = "Protect BiS and Gear Sets", toggle = true,
           help = "Items on your BiS list or in a gear set are never scrap." },
+        { key = "scrapMarkerSave", label = "Save Marks", toggle = true,
+          help = "Keep a mark after the item leaves your bags, so the next one you loot is scrap too." },
         Group("Rules"),
         { key = "scrapRuleWear", label = "Gear You Can't Wear", toggle = true,
           help = "Armour and weapons your class can never use count as scrap." },

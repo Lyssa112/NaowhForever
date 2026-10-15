@@ -3,6 +3,7 @@ local ns = _G.NaowhForever
 
 local S = ns.QoLSettings
 local T = ns.THEME
+local St = ns.Shared.Style
 local Parts = ns.Shared.Parts
 local Group = ns.Shared.Settings.Group
 
@@ -39,7 +40,10 @@ local TARGETS = {
     [5140] = 20,
 }
 
-local AMMO_SLOT = 0
+local AMMO_SLOT, RANGED_SLOT = 0, 18
+local WEAPON_CLASS, THROWN_SUBCLASS = 2, 16
+local THROWN_CLASSES = { ROGUE = true, WARRIOR = true }
+local PLAYER_CLASS = select(2, UnitClass("player"))
 local FOOD_CLASS, FOOD_SUBCLASS = 0, 5
 local DRINK_ITEM = 159
 local PLAIN_BAG = ns.QoLConstants.PLAIN_BAG
@@ -62,6 +66,12 @@ local ITEM_PATTERN = "item:(%d+)"
 local CHECKS = { { "restockReagents", "reagents" }, { "restockAmmo", "ammo" }, { "restockFood", ns.L("food & drink") },
     { "restockVendor", ns.L("junk & bags") } }
 local SAMPLE = { "Arcane Powder  3 / 20", "Rough Arrow  150 / 1000", ns.L("Junk to sell  6") }
+local STAGE_H, STAGE_MARGIN = 200, St.STAGE_MARGIN
+local NOTE_Y, NOTE_SIZE, NOTE_LINE = St.STAGE_NOTE_Y, St.STAGE_NOTE_SIZE, 15
+local TEXT_ROOM = NOTE_Y + NOTE_LINE
+local SAMPLE_REAGENT, SAMPLE_AMMO = 17020, 2512
+local SAMPLE_SHARE, SAMPLE_DRINK_SHARE = 0.25, 0.5
+local SAMPLE_JUNK = 6
 
 local TEXT_ITEM = ns.L("item ")
 local TEXT_TITLE = ns.L("Restock")
@@ -78,6 +88,8 @@ local TEXT_BOUGHT = "x "
 local CARRY_HELP = ns.L("How many to carry. 0 stops reminding you about it.")
 local TEXT_NOTHING = ns.L("Nothing to check")
 local TEXT_BUYS = ns.L("; buys at vendors")
+local TEXT_STOCKED = "Nothing shows while you carry what you need."
+local TEXT_HUNTER_OFF = "Turn on Hunter Ammo Reminder below to get it."
 
 local alert, flash
 local wasResting
@@ -87,6 +99,10 @@ local events = CreateFrame("Frame")
 
 local function On()
     return S.Get("enabled") and S.Get("restock")
+end
+
+local function HunterAmmoOn()
+    return PLAYER_CLASS == "HUNTER" and S.Get("restockHunterAmmo")
 end
 
 local function ItemName(itemID)
@@ -105,6 +121,17 @@ local function KnownReagent(family)
     return item
 end
 
+local function CarriedAmmo()
+    if THROWN_CLASSES[PLAYER_CLASS] then
+        local item = GetInventoryItemID("player", RANGED_SLOT)
+        if item then
+            local _, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(item)
+            if classID == WEAPON_CLASS and subclassID == THROWN_SUBCLASS then return item end
+        end
+    end
+    return GetInventoryItemID("player", AMMO_SLOT)
+end
+
 local function Wanted()
     local want = {}
     if S.Get("restockReagents") then
@@ -113,7 +140,7 @@ local function Wanted()
             if item and Target(item) > 0 then want[item] = Target(item) end
         end
     end
-    local ammo = S.Get("restockAmmo") and GetInventoryItemID("player", AMMO_SLOT)
+    local ammo = S.Get("restockAmmo") and CarriedAmmo()
     if ammo and ammo > 0 then want[ammo] = S.Get("restockAmmoTarget") end
     return want
 end
@@ -123,6 +150,7 @@ local function FoodLevel(itemID)
     if level then return level end
     if not pendingItems[itemID] then
         pendingItems[itemID] = true
+        events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
         C_Item.RequestLoadItemDataByID(itemID)
     end
 end
@@ -162,34 +190,26 @@ local function ScanBags()
     return food, junk, free, drink
 end
 
-function ns.RestockReagentSliders()
-    local class = select(2, UnitClass("player"))
-    local sliders, seen = {}, {}
-    for _, family in ipairs(FAMILIES) do
-        if family.class == class then
-            for _, rank in ipairs(family) do
-                local item = rank[2]
-                if not seen[item] then
-                    seen[item] = true
-                    local slider = S.Slider("restockTarget" .. item, ItemName(item), 0, CARRY_MAX, 1,
-                        CARRY_HELP, "restockReagents")
-                    slider.getValue = function() return Target(item) end
-                    sliders[#sliders + 1] = slider
-                end
-            end
-        end
-    end
-    return sliders
-end
-
 local function ReagentLines(lines)
     for itemID, target in pairs(Wanted()) do
         local have = C_Item.GetItemCount(itemID)
-        if have < target then
+        local hunterAmmo = HunterAmmoOn() and itemID == GetInventoryItemID("player", AMMO_SLOT)
+        if not hunterAmmo and have < target then
             lines[#lines + 1] = TEXT_SHORT:format(ItemName(itemID), have, target)
         end
     end
     table.sort(lines)
+end
+
+local function HunterAmmoLines(lines)
+    if not HunterAmmoOn() then return end
+    local ammo = GetInventoryItemID("player", AMMO_SLOT)
+    if not ammo or ammo <= 0 then return end
+    local have = C_Item.GetItemCount(ammo)
+    local below = S.Get("restockHunterAmmoBelow")
+    if have <= below then
+        lines[#lines + 1] = TEXT_SHORT:format(ItemName(ammo), have, below)
+    end
 end
 
 local function BagLines(lines)
@@ -212,6 +232,7 @@ end
 local function Lines()
     local lines = {}
     ReagentLines(lines)
+    HunterAmmoLines(lines)
     BagLines(lines)
     return lines
 end
@@ -221,17 +242,35 @@ local function OnFlashLoop(self)
     if self.loops >= FLASH_LOOPS then self:Stop() end
 end
 
+local function NewView(view)
+    view.title = ns.Font(view, TITLE_SIZE, "OUTLINE", T.accent)
+    view.title:SetPoint("TOP", 0, -TITLE_TOP)
+    view.title:SetText(TEXT_TITLE)
+    view.text = ns.Font(view, TEXT_SIZE, "OUTLINE")
+    view.text:SetPoint("TOP", view.title, "BOTTOM", 0, -TEXT_GAP)
+    view.text:SetJustifyH("CENTER")
+    view.backdrop = Parts.HudBackdrop(view, { mode = "none" })
+    return view
+end
+
+local function Restyle(view)
+    local font, size, outline = S.Get("restockFont"), S.Get("restockFontSize"), S.Get("restockOutline")
+    local mode = view.backdrop:SetMode(S.Get("restockBackground"))
+    Parts.HudFont(view.title, font, size + TITLE_GROW, outline, mode)
+    Parts.HudFont(view.text, font, size, outline, mode)
+end
+
+local function Fill(view, lines)
+    Restyle(view)
+    view.text:SetText(table.concat(lines, "\n"))
+    view:SetSize(math.max(view.title:GetStringWidth(), view.text:GetStringWidth()) + PAD_W,
+        view.title:GetStringHeight() + view.text:GetStringHeight() + PAD_H)
+end
+
 local function BuildAlert()
-    alert = CreateFrame("Frame", "NaowhForeverRestock", UIParent)
+    alert = NewView(CreateFrame("Frame", "NaowhForeverRestock", UIParent))
     alert:SetMovable(true)
     alert:SetClampedToScreen(true)
-    alert.title = ns.Font(alert, TITLE_SIZE, "OUTLINE", T.accent)
-    alert.title:SetPoint("TOP", 0, -TITLE_TOP)
-    alert.title:SetText(TEXT_TITLE)
-    alert.text = ns.Font(alert, TEXT_SIZE, "OUTLINE")
-    alert.text:SetPoint("TOP", alert.title, "BOTTOM", 0, -TEXT_GAP)
-    alert.text:SetJustifyH("CENTER")
-    alert.backdrop = Parts.HudBackdrop(alert, { mode = "none" })
 
     flash = alert:CreateAnimationGroup()
     flash:SetLooping("BOUNCE")
@@ -252,19 +291,9 @@ local function HideAlert()
     end
 end
 
-local function Restyle()
-    local font, size, outline = S.Get("restockFont"), S.Get("restockFontSize"), S.Get("restockOutline")
-    local mode = alert.backdrop:SetMode(S.Get("restockBackground"))
-    Parts.HudFont(alert.title, font, size + TITLE_GROW, outline, mode)
-    Parts.HudFont(alert.text, font, size, outline, mode)
-end
-
 local function ShowAlert(lines)
     if not alert then BuildAlert() end
-    Restyle()
-    alert.text:SetText(table.concat(lines, "\n"))
-    alert:SetSize(math.max(alert.title:GetStringWidth(), alert.text:GetStringWidth()) + PAD_W,
-        alert.title:GetStringHeight() + alert.text:GetStringHeight() + PAD_H)
+    Fill(alert, lines)
     if not alert:IsShown() then
         alert:Show()
         flash.loops = 0
@@ -364,6 +393,7 @@ local function OnEvent(_, event, itemID)
     if event == "GET_ITEM_INFO_RECEIVED" then
         if not pendingItems[itemID] then return end
         pendingItems[itemID] = nil
+        if not next(pendingItems) then events:UnregisterEvent("GET_ITEM_INFO_RECEIVED") end
     end
     if event == "MERCHANT_SHOW" then
         OnMerchantShow()
@@ -372,7 +402,7 @@ local function OnEvent(_, event, itemID)
     elseif event == "PLAYER_REGEN_DISABLED" then
         HideAlert()
     elseif event == "BAG_UPDATE_DELAYED" or event == "PLAYER_REGEN_ENABLED"
-        or event == "GET_ITEM_INFO_RECEIVED" then
+        or event == "GET_ITEM_INFO_RECEIVED" or event == "UNIT_INVENTORY_CHANGED" then
         Check()
     else
         OnRestingChanged()
@@ -393,10 +423,13 @@ local function Apply()
     events:RegisterEvent("PLAYER_ENTERING_WORLD")
     events:RegisterEvent("PLAYER_REGEN_DISABLED")
     events:RegisterEvent("PLAYER_REGEN_ENABLED")
-    events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
     events:RegisterEvent("MERCHANT_CLOSED")
     events:RegisterEvent("BAG_UPDATE_DELAYED")
+    if S.Get("restockAmmo") or HunterAmmoOn() then
+        events:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
+    end
     pendingItems[DRINK_ITEM] = true
+    events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
     C_Item.RequestLoadItemDataByID(DRINK_ITEM)
     wasResting = IsResting()
     Check()
@@ -426,8 +459,7 @@ boot:SetScript("OnEvent", Apply)
 local loot = ns.Shared.Settings.Page(PAGE, S)
 
 loot:Card({
-    id = "vendors", name = "Vendors", order = 20,
-    help = "What happens when you open a vendor. Both work whether or not the Restock Reminder is on.",
+    id = "vendors", name = "Vendors", order = 20, into = "lootTrade",
     rows = {
         { key = "autoRepair", label = "Auto Repair", toggle = true,
           help = "Repairs all gear when you open a vendor who can." },
@@ -437,15 +469,20 @@ loot:Card({
 })
 
 local FIXED = {
-    Group("Reagents & Ammo"),
+    Group("Class Reagents"),
     { key = "restockReagents", label = "Class Reagents", toggle = true,
       help = "The reagents your known spells use, such as Arcane Powder, candles, seeds, Symbols "
           .. "of Kings and Flash Powder, matched to the highest rank you know." },
     { key = "restockBuy", label = "Buy at Vendors", toggle = true,
       help = "At a vendor who sells them, tops your class reagents and ammo up to what you carry, "
           .. "and prints what it spent. Off by default: it spends gold for you." },
-    { key = "restockAmmo", label = "Ammo", toggle = true, help = "The arrows or shot in your ammo slot." },
+}
+local AMMO = {
+    { key = "restockAmmo", label = "Ammo", toggle = true,
+      help = "Restocks equipped thrown weapons, or the arrows or shot in your ammo slot." },
     { key = "restockAmmoTarget", label = "Ammo to Carry", slider = AMMO_RANGE, needs = "restockAmmo" },
+}
+local OTHER = {
     Group("Food & Drink"),
     { key = "restockFood", label = "Food & Drink", toggle = true,
       help = "Counts food and drink separately across all stacks. Warriors and rogues do not need drink." },
@@ -458,6 +495,13 @@ local FIXED = {
     { key = "restockVendor", label = "Junk & Full Bags", toggle = true,
       help = "Reminds you to vendor junk, and when your bags are nearly full." },
     { key = "restockBagsBelow", label = "Free Slots Below", slider = BAGS_BELOW_RANGE, needs = "restockVendor" },
+}
+local HUNTER = {
+    { key = "restockHunterAmmo", label = "Hunter Ammo Reminder", toggle = true,
+      help = "Reminds you about your equipped ammo at its own amount, not the carry target." },
+    { key = "restockHunterAmmoBelow", label = "Remind Me When Ammo Falls To", slider = AMMO_RANGE,
+      needs = "restockHunterAmmo",
+      help = "Reminds at or below this many equipped arrows or shot across all bag stacks." },
 }
 local CARRY_GROUP = Group("Reagents to Carry")
 local LOOK = ns.Shared.Settings.Look("restock", { text = true, size = TEXT_RANGE, background = "card" })
@@ -490,6 +534,10 @@ local function AddReagentRows(family, grouped)
     return grouped
 end
 
+local function ClassName(class)
+    return C_ClassColor.GetClassColor(class):WrapTextInColorCode(LOCALIZED_CLASS_NAMES_MALE[class])
+end
+
 local function RestockRows()
     wipe(restockRows)
     wipe(seenReagents)
@@ -499,6 +547,12 @@ local function RestockRows()
     for _, family in ipairs(FAMILIES) do
         if family.class == class then grouped = AddReagentRows(family, grouped) end
     end
+    restockRows[#restockRows + 1] = Group(ns.L("Ammo: %s, %s and %s", ClassName("ROGUE"), ClassName("WARRIOR"),
+        ClassName("HUNTER")))
+    for _, row in ipairs(AMMO) do restockRows[#restockRows + 1] = row end
+    restockRows[#restockRows + 1] = Group(ns.L("Ammo: %s", ClassName("HUNTER")))
+    for _, row in ipairs(HUNTER) do restockRows[#restockRows + 1] = row end
+    for _, row in ipairs(OTHER) do restockRows[#restockRows + 1] = row end
     restockRows[#restockRows + 1] = LOOK
     return restockRows
 end
@@ -508,9 +562,105 @@ local function RestockSummary(store)
     for _, pair in ipairs(CHECKS) do
         if store.Get(pair[1]) then text = text and (text .. ", " .. pair[2]) or pair[2] end
     end
+    if HunterAmmoOn() then
+        local hunter = ns.L("Hunter Ammo")
+        text = text and (text .. ", " .. hunter) or hunter
+    end
     if not text then return TEXT_NOTHING end
     text = text:sub(1, 1):upper() .. text:sub(2)
     return store.Get("restockBuy") and (text .. TEXT_BUYS) or text
+end
+
+local STATES = {
+    { key = "low", label = "Running Low", tip = "What you are short on when you reach a city or inn." },
+    { key = "hunter", label = "Hunter Ammo", tip = "Only your equipped ammo, at or below its own amount." },
+    { key = "stocked", label = "All Stocked", tip = TEXT_STOCKED },
+}
+
+local function SampleReagent()
+    local own
+    for _, family in ipairs(FAMILIES) do
+        if family.class == PLAYER_CLASS then
+            own = true
+            local item = family[1][2]
+            if Target(item) > 0 then return item end
+        end
+    end
+    if not own then return SAMPLE_REAGENT end
+end
+
+local function AddShort(lines, item, target)
+    lines[#lines + 1] = TEXT_SHORT:format(ItemName(item), math.floor(target * SAMPLE_SHARE), target)
+end
+
+local function SampleCarried(lines)
+    local reagent = S.Get("restockReagents") and SampleReagent()
+    if reagent then AddShort(lines, reagent, Target(reagent)) end
+    if S.Get("restockAmmo") and not HunterAmmoOn() then
+        AddShort(lines, SAMPLE_AMMO, S.Get("restockAmmoTarget"))
+    end
+    table.sort(lines)
+end
+
+local function SampleBags(lines)
+    if S.Get("restockFood") then
+        local below = S.Get("restockFoodBelow")
+        lines[#lines + 1] = TEXT_FOOD:format(math.floor(below * SAMPLE_SHARE))
+        if not NO_DRINK[PLAYER_CLASS] then
+            lines[#lines + 1] = TEXT_DRINK:format(math.floor(below * SAMPLE_DRINK_SHARE))
+        end
+    end
+    if not S.Get("restockVendor") then return end
+    lines[#lines + 1] = TEXT_JUNK:format(SAMPLE_JUNK)
+    lines[#lines + 1] = TEXT_BAGS:format(S.Get("restockBagsBelow") - 1)
+end
+
+local function SampleLines(lines, state)
+    wipe(lines)
+    if state == "stocked" then return lines end
+    if state == "low" then SampleCarried(lines) end
+    if state == "hunter" or (state == "low" and HunterAmmoOn()) then
+        AddShort(lines, SAMPLE_AMMO, S.Get("restockHunterAmmoBelow"))
+    end
+    if state == "low" then SampleBags(lines) end
+    return lines
+end
+
+local function NewPreview(stage)
+    local preview = CreateFrame("Frame", nil, stage)
+    preview:SetAllPoints()
+    preview.view = NewView(CreateFrame("Frame", nil, preview))
+    preview.note = ns.Font(preview, NOTE_SIZE, nil, T.muted)
+    preview.note:SetPoint("BOTTOM", 0, NOTE_Y)
+    preview.lines = {}
+    C_Item.RequestLoadItemDataByID(SAMPLE_AMMO)
+    for itemID in pairs(TARGETS) do C_Item.RequestLoadItemDataByID(itemID) end
+    return preview
+end
+
+local function Fit(preview)
+    local view = preview.view
+    local w, h = view:GetWidth(), view:GetHeight()
+    local roomW = preview:GetWidth() - STAGE_MARGIN * 2
+    local roomH = preview:GetHeight() - STAGE_MARGIN * 2 - TEXT_ROOM
+    local scale = 1
+    if roomW > 0 and w > roomW then scale = roomW / w end
+    if roomH > 0 and h * scale > roomH then scale = roomH / h end
+    view:SetScale(scale)
+    view:ClearAllPoints()
+    view:SetPoint("CENTER", preview, "CENTER", 0, TEXT_ROOM / 2 / scale)
+end
+
+local function PaintPreview(preview, state)
+    local lines = SampleLines(preview.lines, state)
+    local shown = #lines > 0
+    preview.view:SetShown(shown)
+    local hunterOff = state == "hunter" and not S.Get("restockHunterAmmo")
+    preview.note:SetText(state == "stocked" and ns.L(TEXT_STOCKED) or hunterOff and ns.L(TEXT_HUNTER_OFF)
+        or not shown and TEXT_NOTHING or "")
+    if not shown then return end
+    Fill(preview.view, lines)
+    Fit(preview)
 end
 
 loot:Card({
@@ -519,5 +669,6 @@ loot:Card({
         .. "you are short on. It stays up until you have what you need or leave. Move it "
         .. "in the HUD Editor.",
     summary = RestockSummary,
+    studio = { height = STAGE_H, states = STATES, new = NewPreview, paint = PaintPreview },
     rows = RestockRows,
 })

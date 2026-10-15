@@ -44,9 +44,9 @@ local ALLOWED = {
       reason = "Go opens the Journal only for row.dungeon, set only when ns.OpenJournalWindow exists" },
     { addon = "NaowhForever_BiS", field = "OpenJournalWindow", file = "NaowhForever_BiS/BiS/Sources.lua",
       reason = "the dungeon and faction kinds come only from the Journal's drops and factions" },
-    { addon = "NaowhForever_AuraBuffs", field = "[BUILD[shown]]", file = "NaowhForever_AuraBuffs/UI/Window.lua",
+    { addon = "NaowhForever_Combat", field = "[BUILD[shown]]", file = "NaowhForever_Combat/AuraBuffs/UI/Window.lua",
       reason = "both page builders BUILD names are defined in UI/WindowPages.lua, the same addon" },
-    { addon = "NaowhForever_PvP", field = "OpenMacroWindow", file = "NaowhForever_PvP/UI/AurasPage.lua",
+    { addon = "NaowhForever_Combat", field = "OpenMacroWindow", file = "NaowhForever_Combat/PvP/UI/AurasPage.lua",
       reason = "the Open Forge button is disabled unless ForgeReady sees ns.OpenMacroWindow" },
 }
 
@@ -429,10 +429,6 @@ else
     local hard = table.concat(qol.hard, ",")
     if hard ~= CORE then
         failures[#failures + 1] = QOL .. " must depend on the core alone, not: " .. hard
-    end
-    local topBar = byName.NaowhForever_TopBar
-    if not (topBar and Closure(topBar)[QOL]) then
-        failures[#failures + 1] = "the Top Bar's card is on QoL > Interface, so NaowhForever_TopBar must depend on " .. QOL
     end
 end
 

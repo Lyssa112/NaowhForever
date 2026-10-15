@@ -3,12 +3,9 @@ local ns = _G.NaowhForever
 
 local Training = ns.Training
 local S = Training.Settings
-local Style = Training.Style
 local Settings = ns.Shared.Settings
 
-local PERCENT, ROUND = Training.C.PERCENT, Training.C.ROUND
-local OPACITY_RANGE, PERCENT_SCALE = Style.OPACITY_RANGE, Style.PERCENT_SCALE
-local ORDER_ON_THE_WAY, ORDER_WINDOW, ORDER_BUILDS = 10, 20, 30
+local ORDER_ON_THE_WAY, ORDER_KEYS, ORDER_WINDOW, ORDER_BUILDS = 10, 15, 20, 30
 local BUILDS_TAB = "builds"
 local TEXT_OFF = ns.L("Turn on the Training Planner")
 local TEXT_BUILDS_SEARCH = ns.L("talents talent points follow import export share auto spend")
@@ -21,8 +18,6 @@ local TEXT_DETAIL = ns.L("%s left to pay on the road to 60. %d talent %s for you
 local TEXT_BUILD, TEXT_BUILDS = ns.L("build"), ns.L("builds")
 local TEXT_BOTH, TEXT_TOAST, TEXT_PANEL, TEXT_NOTHING =
     ns.L("Level-up toast and trainer panel"), ns.L("Level-up toast"), ns.L("Trainer panel"), ns.L("Nothing on the way")
-local TEXT_WINDOW = ns.L("%d%% opacity%s")
-local TEXT_MINI_SHOWN = ns.L(", mini bar shown")
 local TEXT_FOLLOWING = ns.L("Following: %s")
 local TEXT_NOT_FOLLOWING = ns.L("Not following a build")
 
@@ -88,11 +83,6 @@ local function OnTheWaySummary(store)
     return TEXT_NOTHING
 end
 
-local function WindowSummary(store)
-    return TEXT_WINDOW:format(math.floor((store.Get("windowAlpha") or 1) * PERCENT + ROUND),
-        store.Get("miniShown") and TEXT_MINI_SHOWN or "")
-end
-
 local page = Settings.Page("Training Planner/Settings", S)
 
 page:Window({
@@ -117,8 +107,17 @@ page:Card({
         { key = "trainerPanel", label = "Panel at the Trainer", toggle = true,
           needs = Training.On, why = TEXT_OFF,
           help = "Beside your class trainer, the spells you can learn now, ticked, with their total and Learn "
-              .. "All I Can Afford. Untick one to leave it.",
+              .. "Selected. Untick one to leave it.",
           search = "put the new ranks on my bars swap ranks /nf ranks nf ranks" },
+    },
+})
+
+page:Card({
+    id = "keys", name = "Key Binding", order = ORDER_KEYS,
+    help = "The key that opens the Training Planner.",
+    rows = {
+        { label = TEXT_OPEN, binding = "NAOWHFOREVER_TRAINING",
+          help = "Press this key to open the Training Planner, and again to close it." },
     },
 })
 
@@ -126,14 +125,11 @@ page:Card({
     id = "window", name = "Window", order = ORDER_WINDOW,
     help = "The planner's own window, and a mini bar to leave up while you level.",
     search = "right-click right click skip spell",
-    summary = WindowSummary,
     rows = {
         { key = "miniShown", label = "Mini Bar", toggle = true, needs = Training.On,
           why = TEXT_OFF,
           help = "A small bar with your next trainer visit and your gold, to leave up while you level. Move it "
               .. "by dragging." },
-        { key = "windowAlpha", label = "Window Opacity", slider = OPACITY_RANGE,
-          unit = "%", scale = PERCENT_SCALE, help = "How solid the planner's window is, in percent. Also on its title bar." },
     },
 })
 

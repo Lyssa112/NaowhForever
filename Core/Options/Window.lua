@@ -25,7 +25,6 @@ local SCROLL_BAR_GAP = 12
 local NAV_STEP = 30
 local NAV_DOT, NAV_OPEN, NAV_OPEN_ICON = 6, 22, 14
 local NAV_COUNT_SIZE = 12
--- 28 keeps every module inside the default 852-high window (test-navigation.lua).
 local NAV_ROW, NAV_OFF_ALPHA = 28, 0.45
 local MISS_ALPHA = 0.3
 local NAV_BUTTON_EXTRA, NAV_FILL_ALPHA, NAV_MARKER_W = 6, 0.16, 3
@@ -88,19 +87,22 @@ local navButtons, tabStrips, navBlocks = {}, {}, {}
 local wrappers = {}
 local currentPage = FIRST_PAGE
 local pendingRefresh
-local onShowCallbacks, onHideCallbacks = {}, {}
+local onHideCallbacks = {}
 local moduleWindows = {}
 local refreshQueued
 local lastFilter, searchJump
 local NO_TABS = {}
+local Off = { group = ns.L("TURNED OFF"), page = ns.L("%s is turned off. Turn it on to change these settings."),
+    row = "%s / %s" }
+local Forever = { insetLeft = 3, insetRight = 4, insetBottom = 6, tabTop = 8, titleY = 8, crumbGap = 4,
+    subGap = 12, headRoom = 560, edge = 16, buttonGap = 10, switchGap = 18, labelGap = 8, buttonH = 26, navText = 15,
+    itemX = 24, groupGap = 6, groupBelow = 2, railOut = 6 }
 
 function ns.VersionText()
     return TEXT_VERSION .. (ns.CODE_BUILD or C_AddOns.GetAddOnMetadata(ns.MODULE_KEY, "Version") or TEXT_UNKNOWN)
 end
 
-function UI:RegisterOnShow(fn) onShowCallbacks[#onShowCallbacks + 1] = fn end
 function UI:RegisterOnHide(fn) onHideCallbacks[#onHideCallbacks + 1] = fn end
-function UI:ClearContentHeader() end
 
 local function SoonPage(parent, text)
     local head, body = parent.soonHead, parent.soonBody
@@ -120,8 +122,26 @@ local function SoonPage(parent, text)
     return -SOON.height
 end
 
+function Off.Page(page, parent, filter)
+    local W, Search = UI.Widgets, UI.Search
+    local _, h = W:Note(parent, Off.page:format(DisplayName(page.module)), -PAGE_TOP)
+    local y = -PAGE_TOP - h
+    local rows = Search.OffRows(filter, page.key)
+    if not rows[1] then
+        _, h = W:Note(parent, TEXT_NO_MATCH, y)
+        return y - h
+    end
+    for _, t in ipairs(rows) do
+        local label = Search.Mark(filter, ns.L(t.label))
+        _, h = W:Note(parent, t.isCard and label or Off.row:format(Search.Mark(filter, t.trail), label), y)
+        y = y - h
+    end
+    return y
+end
+
 local function BuildPageInto(page, parent, filter)
     if page.soon then return SoonPage(parent, page.soon) end
+    if page.module and not Loaded(page.module) then return Off.Page(page, parent, filter) end
     local Settings = ns.Shared and ns.Shared.Settings
     if Settings and Settings.pages[page.key] then
         return -Settings.Render(parent, page.key, function(height)
@@ -177,20 +197,33 @@ local function LayoutNav()
     for _, block in ipairs(navBlocks) do LayoutBlock(block) end
 end
 
+function Off.Layout()
+    local y, shown = Off.top - Off.headH, false
+    for _, mod in ipairs(Off.mods) do
+        local btn = navButtons[mod.name]
+        local found = (btn.found or 0) > 0
+        btn:SetShown(found)
+        if found then
+            btn:SetPoint("TOPLEFT", NAV_INSET, y)
+            btn:SetPoint("TOPRIGHT", -NAV_INSET, y)
+            y, shown = y - NAV_ROW, true
+        end
+    end
+    Off.label:SetShown(shown)
+    Off.nav:SetHeight(-(shown and y or Off.top))
+end
+
 local function PaintNavButton(btn, hover)
     local active = btn.fill:IsShown()
     local found = UI.filter and btn.found
     local off = btn.mod ~= nil and not ModuleOn(btn.mod)
-    local c = (active or hover) and T.fg or (ns.classicSkin and T.accent or T.muted)
+    local c = (active or hover) and T.fg or (ns.foreverSkin and T.accent or T.muted)
     local a = (off and not active and not hover) and NAV_OFF_ALPHA or 1
     if found == false and not active and not hover then a = MISS_ALPHA end
     btn.label:SetTextColor(c.r, c.g, c.b, a)
-    if btn.fullColor then
-        btn.icon:SetAlpha(a)
-    elseif btn.icon then
-        btn.icon:SetVertexColor(c.r, c.g, c.b, a)
-    end
+    if btn.icon then btn.icon:SetVertexColor(c.r, c.g, c.b, a) end
     if btn.open then btn.open:SetAlpha((active or hover) and 1 or NAV_OPEN_DIM) end
+    if btn.forever then ns.Shared.Parts.PaintForeverNav(btn, active, hover) end
     if btn.dot then btn.dot:SetShown(off and not UI.filter) end
     btn.count:SetText(found and found > 0 and found or "")
 end
@@ -216,6 +249,7 @@ local function PaintNav()
         if filter then btn.found = Found(filter, name, btn) end
         PaintNavButton(btn, btn:IsMouseOver())
     end
+    Off.Layout()
     for _, bar in pairs(tabStrips) do PaintTabs(bar, currentPage, filter) end
 end
 
@@ -224,10 +258,12 @@ local function LayoutHeader(page, mod, headerH)
     breadcrumb:SetText(mod and (DisplayName(mod) .. " / " .. ns.L(page.name)) or TEXT_BRAND)
     headerSub:SetText(mod and (mod.command and TEXT_SUB_COMMAND:format(ns.L(mod.subtitle), mod.command)
         or ns.L(mod.subtitle)) or ns.L(page.subtitle))
-    contentHeader:ClearAllPoints()
-    contentHeader:SetPoint("TOPLEFT", window, "TOPLEFT", SIDEBAR_W, -TOP_H)
-    contentHeader:SetPoint("TOPRIGHT", window, "TOPRIGHT", 0, -TOP_H)
-    contentHeader:SetHeight(headerH)
+    if headerH then
+        contentHeader:ClearAllPoints()
+        contentHeader:SetPoint("TOPLEFT", window, "TOPLEFT", SIDEBAR_W, -TOP_H)
+        contentHeader:SetPoint("TOPRIGHT", window, "TOPRIGHT", 0, -TOP_H)
+        contentHeader:SetHeight(headerH)
+    end
     moduleSwitch:SetShown(mod ~= nil and not page.soon)
     moduleLabel:SetShown(mod ~= nil and not page.soon)
     if mod and not page.soon then
@@ -240,6 +276,7 @@ local function LayoutContent()
     local page = PAGES[currentPage]
     local mod = page.module
     local nested = mod and #mod.tabs > 1
+    if window.forever then return Forever.Layout(page, mod, nested) end
     local left, top = SIDEBAR_W, TOP_H
     local headerH = PAGE_HEADER_H + (nested and TAB_H - TAB_TUCK or 0)
     LayoutHeader(page, mod, headerH)
@@ -265,8 +302,7 @@ end
 local function BuildWrapper(wrapper, child, key, filter)
     wrapper._builtWidth = child:GetWidth()
     wrapper._dirty = nil
-    wrapper._pageKey, wrapper._collapsible, wrapper._nsuiCollapsed = key, PAGES[key].collapse, nil
-    wrapper._nsuiFeatureId = nil
+    wrapper._nsuiCollapsed = nil
     if PAGES[key].reuse then UI.BeginReusableRows(wrapper) end
     local usedY = BuildPageInto(PAGES[key], wrapper, filter)
     wrapper:SetHeight(math.abs(usedY) + PAGE_ROOM)
@@ -284,7 +320,7 @@ local function ShowWrapper(pageWrappers, child, key, filter)
 end
 
 local function ShowPage(key)
-    if PAGES[key].module and not Loaded(PAGES[key].module) then key = SETTINGS_PAGE end
+    if PAGES[key].module and not Loaded(PAGES[key].module) and not UI.filter then key = SETTINGS_PAGE end
     currentPage = key
     if PAGES[key].module then lastPages[PAGES[key].module.name] = key end
     LayoutContent()
@@ -299,6 +335,16 @@ function UI.SearchPages()
     for _, mod in ipairs(MODULES) do
         for _, tab in ipairs(mod.tabs) do
             if not tab.soon and Loaded(mod) then pages[#pages + 1] = tab end
+        end
+    end
+    return pages
+end
+
+function UI.SearchOffPages()
+    local pages = {}
+    for _, mod in ipairs(MODULES) do
+        for _, tab in ipairs(mod.tabs) do
+            if not tab.soon and not Loaded(mod) then pages[#pages + 1] = tab end
         end
     end
     return pages
@@ -502,7 +548,7 @@ local function TabStrip(parent, mod, onPick, maxW)
     local items = {}
     for i, tab in ipairs(mod.tabs) do items[i] = { key = tab.key, label = ns.L(tab.name) } end
     local Parts = ns.Shared.Parts
-    local bar = Parts.Tabs(parent, 1, items, onPick)
+    local bar = Parts.Tabs(parent, 1, items, onPick, true)
     Parts.FitTabs(bar, items, TAB_MARGIN, maxW)
     return bar
 end
@@ -549,14 +595,13 @@ local function NavIcon(btn, icon)
     btn.icon = btn:CreateTexture(nil, "ARTWORK")
     btn.icon:SetSize(NAV_ICON_SIZE, NAV_ICON_SIZE)
     btn.icon:SetPoint("LEFT", NAV_ICON_X, 0)
-    btn.fullColor = ns.Shared.Parts.ClassicIcon(btn.icon, icon)
-    if not btn.fullColor then
-        btn.icon:SetTexture(NAV_ICONS .. icon .. ".tga")
-        btn.icon:SetVertexColor(T.muted.r, T.muted.g, T.muted.b, 1)
-    end
+    btn.icon:SetTexture(NAV_ICONS .. icon .. ".tga")
+    btn.icon:SetVertexColor(T.muted.r, T.muted.g, T.muted.b, 1)
 end
 
-local function NavigationButton(parent, label, y, onClick, icon)
+local function NavigationButton(parent, label, y, onClick, icon, listed)
+    if ns.foreverSkin then icon = nil end
+    local lined = ns.foreverSkin and listed
     local btn = CreateFrame("Button", nil, parent)
     btn:SetPoint("TOPLEFT", NAV_INSET, y)
     btn:SetPoint("TOPRIGHT", -NAV_INSET, y)
@@ -567,20 +612,13 @@ local function NavigationButton(parent, label, y, onClick, icon)
     btn.marker = ns.Solid(btn, "ARTWORK", T.accent, 1)
     btn.marker:SetPoint("TOPLEFT"); btn.marker:SetPoint("BOTTOMLEFT"); btn.marker:SetWidth(NAV_MARKER_W)
     btn.marker:Hide()
-    if ns.classicSkin then
-        local St = ns.Shared.Style
-        local c = St.CLASSIC_PICK_RGB
-        btn.fill:SetColorTexture(1, 1, 1, 1)
-        btn.fill:SetGradient("HORIZONTAL", CreateColor(c.r, c.g, c.b, St.CLASSIC_PICK_ALPHA),
-            CreateColor(c.r, c.g, c.b, St.CLASSIC_PICK_FADE))
-        local line = St.CLASSIC_PICK_LINE_RGB
-        btn.marker:SetColorTexture(line.r, line.g, line.b, St.CLASSIC_PICK_LINE_ALPHA)
-        btn.marker:ClearAllPoints()
-        btn.marker:SetPoint("TOPLEFT"); btn.marker:SetPoint("TOPRIGHT")
-        ns.Hairline(btn.marker, "h")
+    if lined then
+        ns.Shared.Parts.ForeverNavLine(btn)
+    elseif ns.foreverSkin then
+        ns.Shared.Parts.ForeverNavButton(btn)
     end
-    btn.label = ns.Font(btn, NAV_TEXT_SIZE, nil, T.muted, true)
-    btn.label:SetPoint("LEFT", icon and NAV_LABEL_X or NAV_TEXT_X, 0)
+    btn.label = ns.Font(btn, ns.foreverSkin and Forever.navText or NAV_TEXT_SIZE, nil, T.muted, true)
+    btn.label:SetPoint("LEFT", lined and Forever.itemX or icon and NAV_LABEL_X or NAV_TEXT_X, 0)
     btn.label:SetPoint("RIGHT", -NAV_TEXT_RIGHT, 0)
     btn.label:SetJustifyH("LEFT")
     btn.label:SetWordWrap(false)
@@ -669,10 +707,7 @@ local function WindowFrame()
     ns.Shared.Parts.Backdrop(window):Paint(1)
     ns.Shared.Parts.Shadow(window)
     local border = ns.Border(window, ns.Shared.Style.BORDER_RGB)
-    if ns.classicSkin then
-        ns.Shared.Parts.ClassicTrim(window)
-        ns.Shared.Parts.TitlePlate(window, TEXT_BRAND)
-    end
+    if ns.foreverSkin then ns.Shared.Parts.ForeverFrame(window) end
     window:SetScript("OnKeyDown", OnWindowKeyDown)
     return border
 end
@@ -734,11 +769,56 @@ local function NavGroups()
     return groups, grouped
 end
 
+function Off.First(mod)
+    for _, tab in ipairs(mod.tabs) do
+        if UI.filter and UI.filter.count[tab.key] then return tab.key end
+    end
+    return mod.tabs[1].key
+end
+
+function Off.Build(nav, top)
+    local label, headH
+    if ns.foreverSkin then
+        label = CreateFrame("Frame", nil, nav)
+        label:SetPoint("TOPLEFT", NAV_INSET, top - Forever.groupGap)
+        label:SetPoint("TOPRIGHT", -NAV_INSET, top - Forever.groupGap)
+        label:SetHeight(NAV_ROW)
+        ns.Shared.Parts.ForeverGroupBar(label, Off.group)
+        headH = Forever.groupGap + NAV_ROW + Forever.groupBelow
+    else
+        label = ns.Font(nav, SIDE.groupSize, nil, T.muted, true)
+        label:SetPoint("TOPLEFT", SIDE.groupX, top - SIDE.groupY)
+        label:SetText(Off.group)
+        headH = SIDE.groupStep
+    end
+    label:Hide()
+    local mods = {}
+    for _, mod in ipairs(MODULES) do
+        if Ready(mod) and not Loaded(mod) then
+            local btn = NavigationButton(nav, DisplayName(mod), top, function() ShowPage(Off.First(mod)) end,
+                mod.navIcon, true)
+            btn:SetHeight(NAV_ROW)
+            btn.mod = mod
+            btn:Hide()
+            navButtons[mod.name] = btn
+            mods[#mods + 1] = mod
+        end
+    end
+    Off.nav, Off.top, Off.label, Off.headH, Off.mods = nav, top, label, headH, mods
+end
+
 local function ModuleNav(nav)
     local groups, grouped = NavGroups()
     local ny = 0
     for _, group in ipairs(groups) do
-        if group ~= "" then
+        if group ~= "" and ns.foreverSkin then
+            local bar = CreateFrame("Frame", nil, nav)
+            bar:SetPoint("TOPLEFT", NAV_INSET, ny - Forever.groupGap)
+            bar:SetPoint("TOPRIGHT", -NAV_INSET, ny - Forever.groupGap)
+            bar:SetHeight(NAV_ROW)
+            ns.Shared.Parts.ForeverGroupBar(bar, ns.L(group))
+            ny = ny - Forever.groupGap - NAV_ROW - Forever.groupBelow
+        elseif group ~= "" then
             local label = ns.Font(nav, SIDE.groupSize, nil, T.muted, true)
             label:SetPoint("TOPLEFT", SIDE.groupX, ny - SIDE.groupY); label:SetText(ns.L(group))
             ny = ny - SIDE.groupStep
@@ -746,13 +826,14 @@ local function ModuleNav(nav)
         navBlocks[#navBlocks + 1] = { top = ny, mods = grouped[group] }
         for _, mod in ipairs(grouped[group]) do
             local btn = NavigationButton(nav, DisplayName(mod), ny,
-                function() ShowPage(lastPages[mod.name] or mod.tabs[1].key) end, mod.navIcon)
+                function() ShowPage(lastPages[mod.name] or mod.tabs[1].key) end, mod.navIcon, true)
             btn:SetHeight(NAV_ROW)
             NavExtras(btn, mod)
             navButtons[mod.name] = btn
             ny = ny - NAV_ROW
         end
     end
+    Off.Build(nav, ny)
     nav:SetHeight(-ny)
 end
 
@@ -788,17 +869,29 @@ local function SidebarFooter(sidebar)
     end
 end
 
+function Forever.Top()
+    local St = ns.Shared.Style
+    return St.FOREVER_BAND_H + St.FOREVER_RAIL
+end
+
+function Forever.Frame()
+    ns.Shared.Parts.ForeverPanes(window, ns.Shared.Style.FOREVER_BAND_H, SIDEBAR_W)
+end
+
 local function Sidebar()
     local sidebar = CreateFrame("Frame", nil, window)
-    sidebar:SetPoint("TOPLEFT", 0, -TOP_H); sidebar:SetPoint("BOTTOMLEFT"); sidebar:SetWidth(SIDEBAR_W)
+    sidebar:SetPoint("TOPLEFT", 0, -(window.forever and Forever.Top() or TOP_H)); sidebar:SetPoint("BOTTOMLEFT")
+    sidebar:SetWidth(SIDEBAR_W)
     local edge = ns.Solid(sidebar, "ARTWORK", T.line, 1)
     edge:SetPoint("TOPRIGHT"); edge:SetPoint("BOTTOMRIGHT"); ns.Hairline(edge, "v")
+    if window.forever then edge:Hide() end
     searchBox = UI.AttachSearchBox(sidebar, OnSearch, SEARCH.columns)
     searchBox:SetPoint("TOPLEFT", SEARCH.left, -SEARCH.top)
     searchBox:SetPoint("TOPRIGHT", -SEARCH.right, -SEARCH.top)
     searchBox:SetHeight(SEARCH.h)
-    local nav = NavigationScroll(sidebar, SEARCH.top + SEARCH.h + SEARCH.gap,
-        FOOTER_H_SIDEBAR + SIDE.utilityRoom + NAV_STEP * #SYSTEM_NAV, SIDEBAR_W)
+    local top = SEARCH.top + SEARCH.h + SEARCH.gap
+    local bottom = FOOTER_H_SIDEBAR + SIDE.utilityRoom + NAV_STEP * #SYSTEM_NAV
+    local nav = NavigationScroll(sidebar, top, bottom, SIDEBAR_W)
     ModuleNav(nav)
     SystemNav(sidebar)
     SidebarFooter(sidebar)
@@ -819,7 +912,7 @@ local function ContentHeader()
     contentHeader:SetHeight(PAGE_HEADER_H)
     breadcrumb = ns.Font(contentHeader, HEAD.crumbSize, nil, T.muted)
     breadcrumb:SetPoint("TOPLEFT", CONTENT_X, -HEAD.crumbY)
-    headerTitle = ns.Font(contentHeader, HEAD.titleSize, nil, ns.classicSkin and T.accent or nil, true)
+    headerTitle = ns.Font(contentHeader, HEAD.titleSize, nil, ns.foreverSkin and T.accent or nil, true)
     headerTitle:SetPoint("TOPLEFT", CONTENT_X, -HEAD.titleY)
     headerTitle:SetPoint("TOPRIGHT", contentHeader, "TOPRIGHT", -HEAD.titleRoom, -HEAD.titleY)
     headerTitle:SetJustifyH("LEFT"); headerTitle:SetWordWrap(false)
@@ -831,15 +924,71 @@ local function ContentHeader()
     moduleLabel = ns.Font(contentHeader, HEAD.labelSize, nil, nil, true)
     moduleLabel:SetPoint("RIGHT", moduleSwitch, "LEFT", -HEAD.labelGap, 0)
     ns.Tooltip(moduleSwitch, TEXT_MODULE, TEXT_MODULE_HELP)
+    local tabsW = WINDOW_W - SIDEBAR_W - CONTENT_X - CONTENT_RIGHT
+    if window.forever then tabsW = tabsW - ns.Shared.Style.FOREVER_RAIL end
     for _, mod in ipairs(MODULES) do
         if #mod.tabs > 1 then
-            local bar = TabStrip(contentHeader, mod, ShowPage, WINDOW_W - SIDEBAR_W - CONTENT_X - CONTENT_RIGHT)
+            local bar = TabStrip(contentHeader, mod, ShowPage, tabsW)
             bar:SetPoint("TOPLEFT", contentHeader, "TOPLEFT", CONTENT_X, -(PAGE_HEADER_H - HEAD.tabDrop))
             bar:Hide()
             tabStrips[mod.name] = bar
         end
     end
     tabLine = ns.Solid(window, "ARTWORK", T.line, 1); ns.Hairline(tabLine, "h")
+    if window.forever then Forever.Header() end
+end
+
+function Forever.Buttons()
+    local unlock = ns.Button(contentHeader, TEXT_HUD_EDITOR, TOP.hudW, Forever.buttonH, EnterUnlockMode)
+    ns.Tooltip(unlock, TEXT_HUD_EDITOR, TEXT_HUD_HELP)
+    local reload = ns.AccentBorder(ns.ReloadButton(contentHeader, TEXT_RELOAD, TOP.reloadW, Forever.buttonH))
+    reload:SetPoint("RIGHT", contentHeader, "RIGHT", -Forever.edge, 0)
+    unlock:SetPoint("RIGHT", reload, "LEFT", -Forever.buttonGap, 0)
+    moduleLabel:ClearAllPoints()
+    moduleLabel:SetPoint("RIGHT", unlock, "LEFT", -Forever.switchGap, 0)
+    moduleSwitch:ClearAllPoints()
+    moduleSwitch:SetPoint("RIGHT", moduleLabel, "LEFT", -Forever.labelGap, 0)
+end
+
+function Forever.Header()
+    local St = ns.Shared.Style
+    contentHeader:ClearAllPoints()
+    contentHeader:SetPoint("TOPLEFT", window, "TOPLEFT")
+    contentHeader:SetPoint("TOPRIGHT", window, "TOPRIGHT")
+    contentHeader:SetHeight(St.FOREVER_BAND_H)
+    DragRegion(contentHeader, window)
+    headerTitle:ClearAllPoints()
+    headerTitle:SetPoint("TOPLEFT", St.FOREVER_PORTRAIT_ROOM, -Forever.titleY)
+    headerTitle:SetPoint("TOPRIGHT", contentHeader, "TOPRIGHT", -Forever.headRoom, -Forever.titleY)
+    breadcrumb:ClearAllPoints()
+    breadcrumb:SetPoint("TOPLEFT", headerTitle, "BOTTOMLEFT", 0, -Forever.crumbGap)
+    headerSub:ClearAllPoints()
+    headerSub:SetPoint("LEFT", breadcrumb, "RIGHT", Forever.subGap, 0)
+    headerSub:SetPoint("RIGHT", contentHeader, "RIGHT", -Forever.headRoom, 0)
+    Forever.Buttons()
+    local tabX = SIDEBAR_W + St.FOREVER_RAIL + CONTENT_X
+    local tabY = Forever.Top() + Forever.tabTop
+    for _, bar in pairs(tabStrips) do
+        bar:ClearAllPoints()
+        bar:SetPoint("TOPLEFT", window, "TOPLEFT", tabX, -tabY)
+    end
+    tabLine:Hide()
+    Forever.tabRail = ns.Shared.Parts.ForeverRail(window)
+    Forever.tabRail:SetPoint("TOPLEFT", window, "TOPLEFT", tabX - Forever.railOut, -(tabY + St.TAB_H))
+    Forever.tabRail:SetPoint("TOPRIGHT", window, "TOPRIGHT", -CONTENT_RIGHT, -(tabY + St.TAB_H))
+    Forever.tabRail:Hide()
+end
+
+function Forever.Layout(page, mod, nested)
+    LayoutHeader(page, mod)
+    for name, strip in pairs(tabStrips) do strip:SetShown(nested and name == mod.name or false) end
+    Forever.tabRail:SetShown(nested and true or false)
+    local top = Forever.Top() + (nested and Forever.tabTop + TAB_H or 0)
+    scrollFrame:ClearAllPoints()
+    scrollFrame:SetPoint("TOPLEFT", window, "TOPLEFT", SIDEBAR_W + ns.Shared.Style.FOREVER_RAIL + SCROLL_X,
+        -(top + SCROLL_Y))
+    scrollFrame:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -CONTENT_RIGHT, SCROLL_BOTTOM)
+    scrollChild:SetWidth(window:GetWidth() - SIDEBAR_W - CHILD_ROOM)
 end
 
 local function OnWindowShow(self)
@@ -853,7 +1002,6 @@ local function OnWindowShow(self)
         InvalidatePages(wrappers)
     end
     ShowPage(currentPage)
-    for i = 1, #onShowCallbacks do onShowCallbacks[i]() end
 end
 
 local function OnWindowHide()
@@ -864,7 +1012,7 @@ end
 
 local function CreateWindow()
     local border = WindowFrame()
-    TopBar(border)
+    if window.forever then Forever.Frame() else TopBar(border) end
     Sidebar()
     ContentHeader()
     scrollFrame = UI.SlimScroll(window, nil, SCROLL_BAR_GAP)
@@ -934,7 +1082,7 @@ local function ModuleWindowFrame()
     win:EnableMouse(true)
     ns.Shared.Parts.Backdrop(win):Paint(1)
     ns.Border(win, ns.Shared.Style.BORDER_RGB)
-    if ns.classicSkin then ns.Shared.Parts.ClassicTrim(win) end
+    if ns.foreverSkin then ns.Shared.Parts.ForeverFrame(win) end
     win:SetScript("OnKeyDown", CloseOnEscape)
     return win
 end
@@ -949,8 +1097,9 @@ local function ModuleHeader(win, mod)
     header:SetPoint("TOPRIGHT")
     header:SetHeight(HEADER_H)
     DragRegion(header, win)
-    local title = ns.Font(header, MW.titleSize, nil, ns.classicSkin and T.accent or nil, true)
-    title:SetPoint("TOPLEFT", header, "TOPLEFT", MW.titleX, -MW.titleY)
+    local title = ns.Font(header, MW.titleSize, nil, ns.foreverSkin and T.accent or nil, true)
+    title:SetPoint("TOPLEFT", header, "TOPLEFT", win.forever and ns.Shared.Style.FOREVER_PORTRAIT_ROOM or MW.titleX,
+        -MW.titleY)
     title:SetText(ns.L(mod.name))
     local sub = ns.Font(header, MW.subSize, nil, T.muted)
     sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", MW.subX, -MW.subGap)
@@ -963,6 +1112,10 @@ local function ModuleHeader(win, mod)
     switch:SetPoint("RIGHT", close, "LEFT", -MW.switchGap, 0)
     ns.Tooltip(switch, mod.name, ModuleSwitchTip(mod))
     win.switch = switch
+    if not win.forever then return end
+    close:Hide()
+    switch:ClearAllPoints()
+    switch:SetPoint("TOPRIGHT", header, "TOPRIGHT", -MW.closeInset, -MW.closeInset)
 end
 
 local function ModuleBody(win, mod)
@@ -973,6 +1126,11 @@ local function ModuleBody(win, mod)
     line:SetPoint("TOPLEFT", win, "TOPLEFT", 0, -offset)
     line:SetPoint("TOPRIGHT", win, "TOPRIGHT", 0, -offset)
     ns.Hairline(line, "h")
+    if win.forever then
+        local inset = ns.Shared.Parts.ForeverInset(win)
+        inset:SetPoint("TOPLEFT", win, "TOPLEFT", Forever.insetLeft, -offset)
+        inset:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -Forever.insetRight, Forever.insetBottom)
+    end
     win.scrollFrame = UI.SlimScroll(win, nil, SCROLL_BAR_GAP)
     win.scrollFrame:SetPoint("TOPLEFT", win, "TOPLEFT", MW.scrollX, -(offset + MW.scrollY))
     win.scrollFrame:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -MW.scrollRight, MW.scrollBottom)

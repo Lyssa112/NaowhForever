@@ -12,6 +12,9 @@ local FILL_SUBLEVEL = 1
 local SEARCH_ICON_SIZE, SEARCH_ICON_LEFT, SEARCH_ICON_GAP = 13, 7, 6
 local SEARCH_TEXT_LEFT = SEARCH_ICON_LEFT + SEARCH_ICON_SIZE + SEARCH_ICON_GAP
 local SEARCH_TEXT_RIGHT = 22
+local FOREVER_OVERHANG = math.max(St.FOREVER_TAB_RIGHT_X, St.FOREVER_ACTIVE_RIGHT_X)
+
+local fitOrder = {}
 
 local function TabClicked(button)
     local bar = button:GetParent()
@@ -20,7 +23,7 @@ end
 
 local function TabEnter(button)
     if button.key ~= button:GetParent().shown then button.text:SetTextColor(T.fg.r, T.fg.g, T.fg.b) end
-    if button.tip then TipLines(button, "ANCHOR_BOTTOM", button.label, button.tip) end
+    if button.tip or button.cut then TipLines(button, "ANCHOR_BOTTOM", button.label, button.tip) end
 end
 
 local function TabLeave(button)
@@ -40,15 +43,7 @@ local function NewTab(bar)
     button.line:SetPoint("BOTTOMLEFT")
     button.line:SetPoint("BOTTOMRIGHT")
     button.line:SetHeight(TAB_LINE)
-    if ns.classicSkin then
-        local top, bottom = St.CLASSIC_TAB_RGB[1], St.CLASSIC_TAB_RGB[2]
-        button.fill:SetColorTexture(1, 1, 1, 1)
-        button.fill:SetGradient("VERTICAL", CreateColor(bottom.r, bottom.g, bottom.b, 1), CreateColor(top.r, top.g, top.b, 1))
-        button.line:SetColorTexture(St.CLASSIC_GOLD_RGB.r, St.CLASSIC_GOLD_RGB.g, St.CLASSIC_GOLD_RGB.b, 1)
-        button.line:ClearAllPoints()
-        button.line:SetPoint("TOPLEFT")
-        button.line:SetPoint("TOPRIGHT")
-    end
+    if ns.foreverSkin then Parts.ForeverTab(button) end
     button:SetScript("OnClick", TabClicked)
     button:SetScript("OnEnter", TabEnter)
     button:SetScript("OnLeave", TabLeave)
@@ -62,7 +57,7 @@ local function FillTabs(bar, items)
         bar.buttons[i] = button
         button.key, button.label, button.tip = item.key, item.label, item.tip
         button.text:SetText(ns.L(item.label))
-        button.want = math.ceil(button.text:GetStringWidth())
+        button.want = math.ceil(button.text:GetStringWidth()) + (button.capRoom or 0)
         words = words + button.want
         button:Show()
     end
@@ -95,26 +90,83 @@ function Parts.PaintTabs(bar, shown)
     bar.shown = shown
     for _, button in ipairs(bar.buttons) do
         local on = button.key == shown
-        local color = on and T.fg or (ns.classicSkin and T.accent or T.muted)
+        local color = on and T.fg or T.muted
         button.text:SetTextColor(color.r, color.g, color.b)
         button.fill:SetShown(on)
         button.line:SetShown(on)
+        if ns.foreverSkin then Parts.PaintForeverTab(button, on) end
     end
+end
+
+local function Widest(a, b) return a.fit > b.fit end
+
+local function CutWidest(count, room, total)
+    for i = 1, count do
+        total = total - fitOrder[i].fit
+        local level = math.floor((room - total) / i)
+        if i == count or level >= fitOrder[i + 1].fit then
+            for j = 1, i do
+                local button = fitOrder[j]
+                button.fit = math.max(level, button.pad)
+                button.cut = true
+                button.text:SetWordWrap(false)
+                button.text:SetWidth(math.max(1, button.fit - button.pad))
+            end
+            return
+        end
+    end
+end
+
+local function FitForeverTabs(bar, count, width)
+    local room = width - St.FOREVER_TAB_GAP * (count - 1) - FOREVER_OVERHANG
+    local total = 0
+    for i = 1, count do
+        local button = bar.buttons[i]
+        button.fit, button.pad, button.cut = button.want, button.capRoom or 0, nil
+        button.text:SetWidth(0)
+        total = total + button.want
+    end
+    if total <= room then return end
+    local trim = math.ceil((total - room) / count)
+    total = 0
+    for i = 1, count do
+        local button = bar.buttons[i]
+        local cut = math.min(trim, math.max(0, button.pad - 2 * St.FOREVER_TAB_TIGHT))
+        button.fit, button.pad = button.fit - cut, button.pad - cut
+        total = total + button.fit
+        fitOrder[i] = button
+    end
+    for i = count + 1, #fitOrder do fitOrder[i] = nil end
+    if total <= room then return end
+    table.sort(fitOrder, Widest)
+    CutWidest(count, room, total)
+end
+
+local function PlaceRail(bar, rowW)
+    local rail = bar.rail
+    if not rail then return end
+    rail:SetShown(rowW > 0)
+    rail:ClearAllPoints()
+    rail:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", -St.FOREVER_TAB_RAIL_OUT, 0)
+    rail:SetWidth(rowW + 2 * St.FOREVER_TAB_RAIL_OUT)
 end
 
 function Parts.SetTabs(bar, items)
     local width = bar:GetWidth()
     local words = FillTabs(bar, items)
-    if #items == 0 then return end
+    if #items == 0 then return PlaceRail(bar, 0) end
+    if ns.foreverSkin then FitForeverTabs(bar, #items, width) end
     local spare, x = (width - words) / #items, 0
     for i = 1, #items do
         local button = bar.buttons[i]
         local w = i == #items and width - x or math.floor(button.want + spare + 0.5)
+        if ns.foreverSkin then w = button.fit end
         button:SetSize(w, TAB_H)
         button:SetPoint("LEFT", x, 0)
-        if i > 1 then Split(bar, i, x) end
-        x = x + w
+        if i > 1 and not ns.foreverSkin then Split(bar, i, x) end
+        x = x + w + (ns.foreverSkin and St.FOREVER_TAB_GAP or 0)
     end
+    PlaceRail(bar, x - St.FOREVER_TAB_GAP)
 end
 
 function Parts.FitTabs(bar, items, margin, maxW)
@@ -125,11 +177,15 @@ function Parts.FitTabs(bar, items, margin, maxW)
     Parts.SetTabs(bar, items)
 end
 
-function Parts.Tabs(parent, width, items, onPick)
+function Parts.Tabs(parent, width, items, onPick, noRail)
     local bar = CreateFrame("Frame", nil, parent)
     bar:SetSize(width, TAB_H)
-    ns.Solid(bar, "BACKGROUND", T.panel, 1):SetAllPoints()
-    ns.Border(bar, BORDER_RGB)
+    if not ns.foreverSkin then
+        ns.Solid(bar, "BACKGROUND", T.panel, 1):SetAllPoints()
+        ns.Border(bar, BORDER_RGB)
+    elseif not noRail then
+        bar.rail = Parts.ForeverRail(bar)
+    end
     bar.buttons, bar.splits, bar.onPick = {}, {}, onPick
     Parts.SetTabs(bar, items)
     return bar
@@ -151,7 +207,10 @@ function Parts.SearchBox(parent, hint, onSearch, columns)
     box.hint:ClearAllPoints()
     box.hint:SetPoint("LEFT", textLeft, 0)
     Edge(box, BORDER_RGB)
-    box:HookScript("OnEditFocusGained", SearchFocus)
-    box:HookScript("OnEditFocusLost", SearchBlur)
+    if not ns.foreverSkin then
+        box:HookScript("OnEditFocusGained", SearchFocus)
+        box:HookScript("OnEditFocusLost", SearchBlur)
+    end
+    if ns.foreverSkin then Parts.ForeverSearch(box, fill, icon) end
     return box
 end

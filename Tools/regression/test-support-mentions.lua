@@ -108,7 +108,7 @@ end
 
 local scanned, hitFiles = 0, {}
 for _, path in ipairs(TOC_LUA) do
-    local f = not path:find("^Libs/") and not path:find("^Core/Locales/") and not path:find("^NaowhForever_%a%a%a%a/") and io.open(path, "rb")
+    local f = not path:find("^Libs/") and not path:find("^Core/Locales/") and not path:find("^NaowhForever_Locales/") and io.open(path, "rb")
     if f then
         local src = f:read("*a")
         f:close()
@@ -244,11 +244,10 @@ local function Shown(flag)
     end
     local pages = #texts
 
-    for key, tier in pairs(ns.BADGE_TIERS) do
+    for _, tier in pairs(ns.BADGE_TIERS) do
         for _, field in ipairs({ "title", "about", "label", "tooltipLine" }) do
             if tier[field] then texts[#texts + 1] = tier[field] end
         end
-        ns.ShowBadgeCard(key, "Someone")
     end
     texts[#texts + 1] = ns.BadgeSince({ tier = "legendary", since = "2026-03" })
     for _, command in ipairs({ "", "preview", "toast", "preview none", "preview off", "id" }) do

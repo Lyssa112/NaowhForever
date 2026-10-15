@@ -4,10 +4,9 @@ local Setup = {}
 ns.Setup = Setup
 
 local KEEP = "keep"
-local RECOMMENDED = "recommended"
 local CUSTOM = "custom"
 local PRESET_KEY = "preset"
-local SKIN_NAOWH, SKIN_CLASSIC = "", "classic"
+local SKIN_NAOWH, SKIN_FOREVER = "", "forever"
 local BIS = "bis"
 local PANELS = { { key = "characterPanel", pick = "characterPanelPicked" },
     { key = "inspectPanel", pick = "inspectPanelPicked" } }
@@ -17,8 +16,8 @@ local COPY_NAME = "%s %d"
 local character
 
 Setup.KEEP = KEEP
-Setup.SKIN_NAOWH, Setup.SKIN_CLASSIC = SKIN_NAOWH, SKIN_CLASSIC
-Setup.SKINS = { SKIN_NAOWH, SKIN_CLASSIC }
+Setup.SKIN_NAOWH, Setup.SKIN_FOREVER = SKIN_NAOWH, SKIN_FOREVER
+Setup.SKINS = { SKIN_NAOWH, SKIN_FOREVER }
 
 Setup.ITEMS = {
     qol = { addon = "NaowhForever_QoL", db = "qol", key = "enabled",
@@ -51,14 +50,10 @@ Setup.ITEMS = {
         blurb = ns.L("Buff, food and campfire reminders.") },
     threatMeter = { addon = "NaowhForever_ThreatMeter", db = "threatMeter", key = "enabled",
         blurb = ns.L("Your group's threat on your target.") },
-    damageMeter = { addon = "NaowhForever_DamageMeter", db = "damageMeter", key = "enabled",
-        blurb = ns.L("Damage, healing and more for your group.") },
     groupInspect = { addon = "NaowhForever_GroupInspect", db = "qol", key = "groupInspect",
         blurb = ns.L("Your group's gear, talents and Naowh Score.") },
     pvp = { addon = "NaowhForever_PvP", db = "pvp", key = "enabled",
         blurb = ns.L("Your target's short buffs and crowd control.") },
-    topBar = { addon = "NaowhForever_TopBar", db = "topBar", key = "enabled",
-        blurb = ns.L("Your buttons and a clock along the top.") },
     swingTimer = { addon = "NaowhForever_SwingTimer", db = "swingTimer", key = "enabled",
         blurb = ns.L("Your swings, with marks to time around them.") },
 }
@@ -107,7 +102,7 @@ local function SwitchOn(m)
 end
 
 local function Enabled(m)
-    return EnableState(m.addon, character) > 0
+    return EnableState(m.host or m.addon, character) > 0
 end
 
 local function IsOn(m)
@@ -141,14 +136,16 @@ local function Settle(modules, list)
     return modules
 end
 
+Setup.Settle, Setup.SetSwitch, Setup.SwitchOn = Settle, SetSwitch, SwitchOn
+
 function Setup.Modules()
     local list = {}
     for _, mod in ipairs(ns.ModuleAddons(character)) do
         local id = byAddon[mod.addon]
         local item = id and Setup.ITEMS[id]
         if item then
-            list[#list + 1] = { id = id, name = mod.name, addon = mod.addon, navIcon = mod.navIcon, store = mod.store,
-                db = item.db, key = item.key, blurb = item.blurb }
+            list[#list + 1] = { id = id, name = mod.name, addon = mod.addon, host = ns.ModuleHost(mod.addon),
+                navIcon = mod.navIcon, store = mod.store, db = item.db, key = item.key, blurb = item.blurb }
         end
     end
     return list
@@ -175,12 +172,13 @@ end
 
 function Setup.DefaultProfile()
     local account = ns.AccountSettings()
-    if account.welcomeSeen or account.setupBefore or not Preset(RECOMMENDED) then return KEEP end
-    return RECOMMENDED
+    local start = ns.PRESETS.newInstall
+    if account.welcomeSeen or account.setupBefore or not Preset(start) then return KEEP end
+    return start
 end
 
 function Setup.CurrentSkin()
-    return ns.AccountSettings().skin == SKIN_CLASSIC and SKIN_CLASSIC or SKIN_NAOWH
+    return ns.AccountSettings().skin == SKIN_FOREVER and SKIN_FOREVER or SKIN_NAOWH
 end
 
 function Setup.Fresh()
@@ -204,7 +202,7 @@ function Setup.Toggle(picks, id, on)
 end
 
 local function Loaded(m)
-    return C_AddOns.IsAddOnLoaded(m.addon)
+    return C_AddOns.IsAddOnLoaded(m.host or m.addon)
 end
 
 function Setup.Plan(picks)
@@ -220,7 +218,7 @@ function Setup.Plan(picks)
             local names = want and plan.on or plan.off
             names[#names + 1] = m.name
         end
-        if (want and not Loaded(m)) or (not want and Loaded(m) and (preset and Enabled(m) or IsOn(m))) then
+        if (want and not Loaded(m)) or (not want and Loaded(m) and not m.host and (preset and Enabled(m) or IsOn(m))) then
             plan.reload = true
         end
     end
@@ -253,7 +251,8 @@ function Setup.Restore()
     for k in pairs(root) do root[k] = nil end
     for k, v in pairs(saved.root) do root[k] = type(v) == "table" and CopyTable(v) or v end
     for addon, on in pairs(saved.addons) do
-        if (EnableState(addon, saved.character) > 0) ~= on then SetAddOn(addon, on, saved.character) end
+        local real = ns.ModuleHost(addon) or addon
+        if (EnableState(real, saved.character) > 0) ~= on then SetAddOn(real, on, saved.character) end
     end
     if saved.skin ~= nil then account.skin = saved.skin ~= SKIN_NAOWH and saved.skin or nil end
     account.setupBefore = nil
@@ -262,13 +261,28 @@ end
 
 local function ApplyModule(m, want, preset)
     if want then
-        if not Enabled(m) then SetAddOn(m.addon, true, character) end
+        if not Enabled(m) then SetAddOn(m.host or m.addon, true, character) end
         if not SwitchOn(m) then SetSwitch(m, true) end
         return not Loaded(m)
     end
+    if m.host then
+        if SwitchOn(m) then SetSwitch(m, false) end
+        return false
+    end
     if not (preset and Enabled(m) or IsOn(m)) then return false end
     SetAddOn(m.addon, false, character)
+    SetSwitch(m, false)
     return Loaded(m)
+end
+
+local function SettleHosts(list, picks)
+    local wanted = {}
+    for _, m in ipairs(list) do
+        if m.host then wanted[m.host] = wanted[m.host] or picks.modules[m.id] == true end
+    end
+    for host, on in pairs(wanted) do
+        if not on and EnableState(host, character) > 0 then SetAddOn(host, false, character) end
+    end
 end
 
 local function PickPanels(picks)
@@ -296,6 +310,7 @@ function Setup.Apply(picks)
         if want ~= base[m.id] then custom = true end
         if ApplyModule(m, want, preset) then reload = true end
     end
+    SettleHosts(list, picks)
     if custom then ns.QoLSettings.Set(PRESET_KEY, CUSTOM) end
     PickPanels(picks)
     return reload

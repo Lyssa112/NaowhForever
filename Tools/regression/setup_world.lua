@@ -1,5 +1,5 @@
 -- A stub game for the onboarding tests: the real Features.lua, Options/Modules.lua, Presets.lua,
--- Setups.lua and Onboarding/Setup.lua, on stub settings stores, one profile, account settings and a
+-- Setups.lua, Onboarding/Setup.lua and Onboarding/ModuleState.lua, on stub settings stores, one profile, account settings and a
 -- C_AddOns that remembers every call. A module's settings store exists only while its addon is
 -- loaded, as in the game (the QoL store is the core's, so always). Not a test itself (run-all.sh
 -- runs only test*.lua). Run from the repo root:
@@ -47,9 +47,10 @@ end
 local MODULES = assert(loadstring(Read("Core/Options/Modules.lua"):match("\n(local MODULES = {.-\n}\n)")
     .. "\nreturn MODULES"))()
 for _, mod in ipairs(MODULES) do
-    for line in Read(mod.addon .. "/" .. mod.addon .. ".toc"):gmatch("[^\n]+") do
+    local addon = mod.host or mod.addon
+    for line in Read(addon .. "/" .. addon .. ".toc"):gmatch("[^\n]+") do
         local file = line:match("^%s*(.-)%s*$")
-        if not file:match("^#") and file:match("%.%a+$") then Own(mod.addon, mod.addon .. "/" .. file:gsub("\\", "/")) end
+        if not file:match("^#") and file:match("%.%a+$") then Own(addon, addon .. "/" .. file:gsub("\\", "/")) end
     end
 end
 
@@ -76,7 +77,7 @@ end
 return function(opts)
     opts = opts or {}
     local w = { root = opts.root or {}, account = opts.account or {}, enabled = {}, others = {}, loaded = {},
-        calls = {}, changed = {}, profile = "Default", character = opts.character == true, GUID = GUID,
+        calls = {}, changed = {}, reloads = {}, timers = {}, frames = {}, combat = false, profile = "Default", character = opts.character == true, GUID = GUID,
         MODULES = MODULES, OWNED = OWNED }
     for _, mod in ipairs(MODULES) do
         local addon = mod.addon
@@ -84,6 +85,16 @@ return function(opts)
         local other = (opts.others or opts.enabled or {})[addon]
         w.others[addon] = other == true
         w.loaded[addon] = (opts.loaded or {})[addon] == true
+        local host = mod.host
+        if host then
+            local function Host(given, members)
+                if given[host] ~= nil then return given[host] == true end
+                return members[host] or members[addon]
+            end
+            w.enabled[host] = Host(opts.enabled or {}, w.enabled)
+            w.others[host] = Host(opts.others or opts.enabled or {}, w.others)
+            w.loaded[host] = Host(opts.loaded or {}, w.loaded)
+        end
     end
     local ns = opts.ns or {}
     ns.UI = ns.UI or {}
@@ -118,9 +129,20 @@ return function(opts)
             return (w.enabled[addon] or w.others[addon]) and 1 or 0
         end,
         IsAddOnLoaded = function(addon) return w.loaded[addon] == true end,
+        DoesAddOnExist = function() return true end,
     }
     local env = setmetatable({ C_AddOns = C_AddOns, CopyTable = CopyTable, unpack = unpack,
-        UnitGUID = function(unit) return unit == "player" and GUID or nil end }, { __index = _G })
+        UnitGUID = function(unit) return unit == "player" and GUID or nil end,
+        InCombatLockdown = function() return w.combat end,
+        C_Timer = { After = function(_, fn) w.timers[#w.timers + 1] = fn end },
+        CreateFrame = function()
+            local frame = { events = {} }
+            function frame:RegisterEvent(event) self.events[event] = true end
+            function frame:UnregisterEvent(event) self.events[event] = nil end
+            function frame:SetScript(_, fn) self.onEvent = fn end
+            w.frames[#w.frames + 1] = frame
+            return frame
+        end }, { __index = _G })
     env._G = { NaowhForever = ns }
     w.env = env
     Load("Core/Features.lua", env)
@@ -129,6 +151,8 @@ return function(opts)
     Load("Core/Options/Modules.lua", env)
     Load("Core/Profiles/Setups.lua", env)
     Load("Core/Onboarding/Setup.lua", env)
+    ns.ConfirmReload = ns.ConfirmReload or function(text) w.reloads[#w.reloads + 1] = text end
+    Load("Core/Onboarding/ModuleState.lua", env)
     local dbOf = {}
     for _, item in pairs(ns.Setup.ITEMS) do
         for _, mod in ipairs(MODULES) do
@@ -155,13 +179,15 @@ return function(opts)
         return v == true
     end
     function w.On(id)
-        return w.enabled[ns.Setup.ITEMS[id].addon] and w.Switch(id)
+        local addon = ns.Setup.ITEMS[id].addon
+        return w.enabled[ns.ModuleHost(addon) or addon] and w.Switch(id)
     end
     function w.Reload()
         for _, mod in ipairs(MODULES) do
-            local ok = w.enabled[mod.addon]
+            local addon = mod.host or mod.addon
+            local ok = w.enabled[addon]
             for _, need in ipairs(mod.needs or {}) do ok = ok and w.enabled[need] end
-            w.loaded[mod.addon] = ok == true
+            w.loaded[addon] = ok == true
         end
         w.Session()
     end

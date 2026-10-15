@@ -13,7 +13,7 @@ local SCALE_VALUES = { [200] = "200%", [190] = "190%", [180] = "180%", [170] = "
     [80] = "80%", [70] = "70%", [60] = "60%", [50] = "50%" }
 local SCALE_ORDER = { 200, 190, 180, 170, 160, 150, 140, 130, 120, 110, 100, 90, 80, 70, 60, 50 }
 local CUSTOM = "custom"
-local SKIN_CLASSIC = "classic"
+local SKIN_FOREVER = "forever"
 local DEFAULT_START = "default"
 local AUTO = "auto"
 local MINIMAP_NAME = "NaowhForever"
@@ -30,14 +30,16 @@ local TEXT_REPLACE = ns.L("Replace your custom colors with %s?")
 local TEXT_COLORS_RELOAD = ns.L("Reload UI to apply your color changes.")
 local TEXT_RXP_RELOAD = ns.L("Reload UI to apply your RestedXP changes.")
 local TEXT_RXP_PICK_RELOAD = "Reload UI to pick a theme."
-local TEXT_SKIN_TIP = ns.L("Classic+ dresses the addon's windows like the game's own, in gold and bronze. "
-    .. "It has its own colors and uses the game's fonts unless you pick an Addon Font. Saved "
-    .. "for this computer.|n|nTakes effect after a /reload.")
-local TEXT_CLASSIC_PLUS = "Classic+"
-local SKINS = { [""] = TEXT_NAOWH_DEFAULT, [SKIN_CLASSIC] = TEXT_CLASSIC_PLUS }
-local SKIN_ORDER = { "", SKIN_CLASSIC }
+local TEXT_RXP_WINDOW_NEEDS = "Turn on RestedXP's Beta Features and V2 interface."
+local TEXT_WINDOW_THEME_SAME = "Same as the Addon"
+local TEXT_SKIN_RELOAD = ns.L("Reload UI to change the skin.")
+local TEXT_SKIN_TIP = ns.L("Dresses the addon's windows as Naowh's own or WoW Forever's, after a reload.")
+local TEXT_FOREVER = "Forever"
+local SKINS = { [""] = TEXT_NAOWH_DEFAULT, [SKIN_FOREVER] = TEXT_FOREVER }
+local SKIN_ORDER = { "", SKIN_FOREVER }
 local TEXT_MINIMAP_TIP = ns.L("A minimap button that opens %s. /nf%s does the same, "
     .. "and the Top Bar can carry it too. Saved for this computer.")
+local TEXT_FEATURE_TIP = ns.L("A minimap button that opens %s. Saved for this computer.")
 local TEXT_TURNED_OFF = ns.L("%s is turned off, so its settings are hidden. Turn it on under Modules below.")
 local NONE = {}
 local TEXT_ON_ITS_OWN, TEXT_ITS_SETTINGS = ns.L("%s on its own"), ns.L("%s's settings")
@@ -71,19 +73,38 @@ local function ModuleRow(mod)
     return { type = "toggle", text = O.DisplayName(mod), module = mod,
         tooltip = mod.needs and NeedsTip(mod) or mod.subtitle,
         getValue = function()
-            if not Loaded(mod) then return C_AddOns.GetAddOnEnableState(mod.addon) > 0 end
+            if not Loaded(mod) then return ns.ModuleListed(mod.addon) end
             return ModuleOn(mod)
         end,
         setValue = function(v) SetModuleOn(mod, v) end }
 end
 
+local function SearchHit(title, rows)
+    local filter = UI.filter
+    if not filter then return false end
+    local Mark = UI.Search.Mark
+    local shown = ns.L(title)
+    if Mark(filter, shown) ~= shown then return true end
+    for _, row in ipairs(rows) do
+        if Mark(filter, row.text) ~= row.text then return true end
+        for _, mod in ipairs(filter.off or NONE) do
+            if row.module == mod then return true end
+        end
+    end
+    return false
+end
+
+local function FoldedRows(W, parent, y, title, rows)
+    local _, h = W:FoldHeader(parent, title, y, SearchHit(title, rows)); y = y - h
+    return Rows(W, parent, y, rows)
+end
+
 local function ModulesSection(W, parent, y)
-    local _, h = W:SectionHeader(parent, "MODULES", y); y = y - h
     local rows = {}
     for _, mod in ipairs(MODULES) do
         if mod.addon then rows[#rows + 1] = ModuleRow(mod) end
     end
-    return Rows(W, parent, y, rows)
+    return FoldedRows(W, parent, y, "MODULES", rows)
 end
 
 local function ShowIcon(name, shown)
@@ -107,6 +128,13 @@ local function ModuleButtonRow(mod)
         setValue = function(v) SetModuleButton(mod, v) end }
 end
 
+local function FeatureButtonRow(feature)
+    return { type = "toggle", text = feature.name,
+        tooltip = TEXT_FEATURE_TIP:format(ns.L(feature.name)),
+        getValue = function() return ns.MinimapFeatureOn(feature) end,
+        setValue = function(v) ns.SetMinimapFeature(feature, v) end }
+end
+
 local function MinimapShown()
     local mm = ns.AccountSettings().minimap
     return not (type(mm) == "table" and mm.hide)
@@ -124,9 +152,7 @@ local function GameMenuButtonOn()
 end
 
 local function MinimapSection(W, parent, y)
-    local _, h
-    _, h = W:SectionHeader(parent, "MINIMAP ICONS", y); y = y - h
-    _, h = W:DualRow(parent, y,
+    local rows = {
         { type = "toggle", text = "Minimap Button",
           tooltip = "The Naowh Forever button on the minimap. The addon compartment entry "
           .. "and /naowh open this window either way.",
@@ -136,13 +162,13 @@ local function MinimapSection(W, parent, y)
           tooltip = "Naowh Forever in the game menu (Esc), by the other addons' buttons. "
           .. "Saved for this computer. Not shown with a gamepad; use /nf.",
           getValue = GameMenuButtonOn,
-          setValue = function(v) ns.AccountSettings().gameMenuButton = v and true or false end }
-    ); y = y - h
-    local rows = {}
+          setValue = function(v) ns.AccountSettings().gameMenuButton = v and true or false end },
+    }
     for _, mod in ipairs(MODULES) do
         if mod.command and Loaded(mod) then rows[#rows + 1] = ModuleButtonRow(mod) end
     end
-    return Rows(W, parent, y, rows)
+    for _, feature in ipairs(ns.MinimapFeatures) do rows[#rows + 1] = FeatureButtonRow(feature) end
+    return FoldedRows(W, parent, y, "MINIMAP ICONS", rows)
 end
 
 local LANGUAGE_VALUES, LANGUAGE_ORDER = (function()
@@ -151,8 +177,7 @@ local LANGUAGE_VALUES, LANGUAGE_ORDER = (function()
         values[code] = ns.L(ns.LANGUAGE_NAMES[code])
         order[#order + 1] = code
     end
-    local saved = _G.NaowhForeverLanguageDB and _G.NaowhForeverLanguageDB.locale
-    return UI.KeepMissing(values, order, saved)
+    return UI.KeepMissing(values, order, ns.LANGUAGE_PICK)
 end)()
 
 local function WindowSection(W, parent, y)
@@ -168,10 +193,9 @@ local function WindowSection(W, parent, y)
         { type = "dropdown", text = "Language", values = LANGUAGE_VALUES, order = LANGUAGE_ORDER,
           tooltip = "The language of this addon. Game Language follows your game client. Saved for this "
           .. "computer.|n|nTakes effect after a /reload.",
-          getValue = function() return NaowhForeverLanguageDB and NaowhForeverLanguageDB.locale or AUTO end,
+          getValue = function() return ns.AccountSettings().language or AUTO end,
           setValue = function(v)
-              NaowhForeverLanguageDB = NaowhForeverLanguageDB or {}
-              NaowhForeverLanguageDB.locale = v ~= AUTO and v or nil
+              ns.AccountSettings().language = v ~= AUTO and v or nil
               ns.ConfirmReload(TEXT_LANGUAGE_RELOAD)
           end }
     )
@@ -291,8 +315,8 @@ local function CustomRows(W, parent, y)
     return y
 end
 
-local function ClassicSkin()
-    return ns.AccountSettings().skin == SKIN_CLASSIC
+local function SkinColors()
+    return ns.AccountSettings().skin == SKIN_FOREVER
 end
 
 local function SkinRow()
@@ -301,27 +325,31 @@ local function SkinRow()
         setValue = function(v)
             ns.AccountSettings().skin = v ~= "" and v or nil
             ColorsChanged()
+            ns.ConfirmReload(TEXT_SKIN_RELOAD)
+        end }
+end
+
+local function ThemeRow(themes, themeOrder)
+    return { type = "dropdown", text = "Theme", values = themes, order = themeOrder,
+        tooltip = "Theme presets for the addon's windows and HUD frames, plus a Custom "
+        .. "option for your own colors. If text gets hard to read, pick Naowh (default). "
+        .. "Saved for this computer.|n|nTakes effect after a /reload.",
+        getValue = ns.ThemePresetKey,
+        disabled = SkinColors,
+        palette = function()
+            local colors = ns.ThemePalette(ns.ThemePresetKey())
+            return { colors[1], colors[math.floor(#colors / 2) + 1], colors[#colors] }
+        end,
+        setValue = function(v)
+            ns.SetThemePreset(v)
+            ColorsChanged()
         end }
 end
 
 local function ColorsSection(W, parent, y)
     local _, h = W:SectionHeader(parent, "COLORS", y); y = y - h
-    _, h = W:DualRow(parent, y, SkinRow(), Empty()); y = y - h
-    local themes, themeOrder = ThemeChoices()
-    _, h = W:DualRow(parent, y,
-        { type = "dropdown", text = "Theme", values = themes, order = themeOrder,
-          tooltip = "Theme presets for the addon's windows and HUD frames, plus a Custom "
-          .. "option for your own colors. If text gets hard to read, pick Naowh (default). "
-          .. "Saved for this computer.|n|nTakes effect after a /reload.",
-          getValue = ns.ThemePresetKey,
-          disabled = ClassicSkin,
-          setValue = function(v)
-              ns.SetThemePreset(v)
-              ColorsChanged()
-          end },
-        { type = "palette", text = "", colors = function() return ns.ThemePalette(ns.ThemePresetKey()) end }
-    ); y = y - h
-    if ns.ThemePresetKey() == CUSTOM and not ClassicSkin() then y = CustomRows(W, parent, y) end
+    _, h = W:DualRow(parent, y, SkinRow(), ThemeRow(ThemeChoices())); y = y - h
+    if ns.ThemePresetKey() == CUSTOM and not SkinColors() then y = CustomRows(W, parent, y) end
     if colorsPending then
         _, h = W:Note(parent, TEXT_COLORS_RELOAD, y); y = y - h
     end
@@ -396,14 +424,20 @@ local function ArrowTextRow(image)
           setValue = function(v) ns.SetRXPArrowGap(v) end } or Empty()
 end
 
+local function ArrowObjectiveRow()
+    local sizeMin, sizeMax, sizeStep = ns.RXPArrowTextSizeRange()
+    return { type = "toggle", text = "Arrow Shows Objective",
+          tooltip = "The objective under RestedXP's arrow, as in Talk to Duokna, in place of the step number.",
+          getValue = ns.RXPArrowObjective,
+          setValue = function(v) ns.SetRXPArrowObjective(v) end },
+        { type = "slider", text = "Arrow Text Size", min = sizeMin, max = sizeMax, step = sizeStep,
+          tooltip = "How big the text under RestedXP's arrow is.",
+          getValue = ns.RXPArrowTextSize,
+          setValue = function(v) ns.SetRXPArrowTextSize(v) end }
+end
+
 local function RxpThemeRows(W, parent, y)
-    local image = ns.RXPArrowStyle() == "image"
-    local _, h = W:DualRow(parent, y, ArrowStyleRow(image)); y = y - h
-    if image then
-        _, h = W:DualRow(parent, y, ArrowLookRow()); y = y - h
-    end
-    _, h = W:DualRow(parent, y, ArrowTextRow(image)); y = y - h
-    _, h = W:DualRow(parent, y,
+    local _, h = W:DualRow(parent, y,
         RxpSwitch("Use Addon Font", "RestedXP's text uses your Addon Font.", ns.RXPFontEnabled, ns.SetRXPFont),
         RxpSwitch("Use Theme Text Color", "RestedXP's text uses the theme's Text color.",
             ns.RXPTextColorEnabled, ns.SetRXPTextColor)
@@ -411,13 +445,191 @@ local function RxpThemeRows(W, parent, y)
     return y - h
 end
 
+local function RxpArrowRows(W, parent, y)
+    local on = ns.RXPArrowEnabled()
+    local _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Style RestedXP's Arrow",
+          tooltip = "The waypoint arrow in a look of its own, whatever theme or window is used.",
+          getValue = ns.RXPArrowEnabled,
+          setValue = function(v)
+              ns.SetRXPArrow(v)
+              UI:RefreshPage(true)
+          end },
+        Empty()
+    ); y = y - h
+    if not on then return y end
+    local image = ns.RXPArrowStyle() == "image"
+    _, h = W:DualRow(parent, y, ArrowStyleRow(image)); y = y - h
+    if image then
+        _, h = W:DualRow(parent, y, ArrowLookRow()); y = y - h
+    end
+    _, h = W:DualRow(parent, y, ArrowTextRow(image)); y = y - h
+    _, h = W:DualRow(parent, y, ArrowObjectiveRow()); y = y - h
+    _, h = W:DualRow(parent, y,
+        RxpSwitch("Arrow Addon Font", "The text under the arrow uses your Addon Font.", ns.RXPArrowFontEnabled,
+            ns.SetRXPArrowFont),
+        Empty()
+    )
+    return y - h
+end
+
+local function WindowOptionCell(option)
+    local key = option.key
+    local function Get() return ns.RXPWindowOption(key) end
+    local function Set(v) ns.SetRXPWindowOption(key, v) end
+    if option.kind == "toggle" then
+        return { type = "toggle", text = option.label, tooltip = option.tip, getValue = Get, setValue = Set }
+    elseif option.kind == "number" then
+        return { type = "slider", text = option.label, min = option.min, max = option.max, step = 1,
+          tooltip = option.tip, getValue = Get, setValue = Set }
+    elseif option.kind == "choice" then
+        return { type = "dropdown", text = option.label, values = option.values, order = option.order,
+          tooltip = option.tip, getValue = Get, setValue = Set }
+    elseif option.kind == "font" then
+        local values, order = UI.FontChoices(Get())
+        return { type = "dropdown", text = option.label, values = values, order = order, tooltip = option.tip,
+          getValue = Get, setValue = Set }
+    end
+    local values, order = UI.TextureChoices(Get(), option.defaultLabel)
+    return { type = "dropdown", text = option.label, values = values, order = order, tooltip = option.tip,
+      getValue = Get, setValue = Set }
+end
+
+local function WindowColorCell(color)
+    local name = color.name
+    return { type = "colorpicker", text = color.label, hasAlpha = not color.opaque, tooltip = color.tip,
+      getValue = function() return ns.RXPWindowColor(name) end,
+      setValue = function(r, g, b, a) ns.SetRXPWindowColor(name, r, g, b, a) end }
+end
+
+local function IconStyleRow()
+    return { type = "dropdown", text = "Step Icons",
+        values = { [""] = "RestedXP's own", line = "Line", filled = "Filled" },
+        order = { "", "line", "filled" },
+        tooltip = "Naowh's own step icons in the accent color in place of RestedXP's, after a /reload.",
+        getValue = ns.RXPIconStyle,
+        setValue = function(v)
+            ns.SetRXPIconStyle(v)
+            RxpChanged()
+        end }
+end
+
+local function WindowThemeRow()
+    local values, order = { [""] = TEXT_WINDOW_THEME_SAME }, { "" }
+    for _, key in ipairs(ns.THEME_PRESET_ORDER) do
+        values[key] = ns.THEME_PRESETS[key].name
+        order[#order + 1] = key
+    end
+    values.forever = TEXT_FOREVER
+    order[#order + 1] = "forever"
+    values[CUSTOM] = TEXT_CUSTOM
+    order[#order + 1] = CUSTOM
+    return { type = "dropdown", text = "Window Theme", values = values, order = order,
+        tooltip = "The window's colors alone, whatever the addon's theme is; Custom lets you pick them.",
+        getValue = ns.RXPWindowThemeKey,
+        setValue = function(v)
+            ns.SetRXPWindowTheme(v)
+            UI:RefreshPage(true)
+        end }
+end
+
+local function RxpWindowStyleRows(W, parent, y)
+    local _, h = W:GroupHeader(parent, "WINDOW LOOK", y); y = y - h
+    _, h = W:DualRow(parent, y, WindowThemeRow(), Empty()); y = y - h
+    local cells = {}
+    for _, group in ipairs({ "Text", "Look", "Progress" }) do
+        for _, option in ipairs(ns.RXPWindowOptions()) do
+            if option.group == group then cells[#cells + 1] = WindowOptionCell(option) end
+        end
+    end
+    if ns.RXPWindowOwnColors() then
+        for _, color in ipairs(ns.RXPWindowColors()) do cells[#cells + 1] = WindowColorCell(color) end
+    end
+    for i = 1, #cells, 2 do
+        _, h = W:DualRow(parent, y, cells[i], cells[i + 1] or Empty()); y = y - h
+    end
+    _, h = W:DualRow(parent, y,
+        { type = "button", text = "Window Look", buttonText = "Reset",
+          tooltip = "Puts the window's text, colors and bars back as they were.",
+          onClick = function()
+              ns.ResetRXPWindowStyle()
+              UI:RefreshPage(true)
+          end },
+        Empty()
+    )
+    return y - h
+end
+
+local function SetUpRows(W, parent, y)
+    local _, h = W:DualRow(parent, y,
+        { type = "toggle", text = "Set Up New Characters",
+          tooltip = "Turns on RestedXP's new interface and the Naowh theme for a character that has not been set up.",
+          getValue = ns.RXPSetUpEnabled,
+          setValue = function(v) ns.SetRXPSetUp(v) end },
+        { type = "button", text = "This Character", buttonText = "Set Up",
+          tooltip = "Turns them on for the character you are playing now.",
+          onClick = function()
+              if ns.RXPSetUpCharacter() == "reload" then RxpChanged() else UI:RefreshPage(true) end
+          end }
+    )
+    return y - h
+end
+
+local function RxpWindowRows(W, parent, y)
+    local on = ns.RXPWindowEnabled()
+    local _, h = W:SwitchFold(parent, "RestedXP Naowh Window (V2)", y, {
+        get = ns.RXPWindowEnabled,
+        set = function(v)
+            ns.SetRXPWindow(v)
+            UI:RefreshPage(true)
+        end,
+        tooltip = "RestedXP's guide and active steps in one Naowh window, in place of its own and of the theme.",
+        rows = on, open = UI.filter ~= nil }); y = y - h
+    if not on then return y end
+    y = SetUpRows(W, parent, y)
+    if not ns.RXPWindowReady() then
+        _, h = W:DualRow(parent, y, { type = "label", text = TEXT_RXP_WINDOW_NEEDS }, Empty()); y = y - h
+    end
+    local stepsMin, stepsMax, stepsStep = ns.RXPWindowStepsRange()
+    local scaleMin, scaleMax, scaleStep = ns.RXPWindowScaleRange()
+    _, h = W:DualRow(parent, y,
+        { type = "slider", text = "Upcoming Steps", min = stepsMin, max = stepsMax, step = stepsStep,
+          tooltip = "How many of the steps after the active one are listed.",
+          getValue = ns.RXPWindowSteps,
+          setValue = function(v) ns.SetRXPWindowSteps(v) end },
+        { type = "slider", text = "Naowh Window Scale", min = scaleMin, max = scaleMax, step = scaleStep,
+          tooltip = "How big the whole window is, its text with it.",
+          getValue = ns.RXPWindowScale,
+          setValue = function(v) ns.SetRXPWindowScale(v) end }
+    ); y = y - h
+    _, h = W:DualRow(parent, y, IconStyleRow(), Empty()); y = y - h
+    y = RxpArrowRows(W, parent, y)
+    y = RxpWindowStyleRows(W, parent, y)
+    W:EndFold(parent)
+    return y
+end
+
 local function RestedXPSection(W, parent, y)
     if not (ns.RXPThemesAvailable and ns.RXPThemesAvailable()) then return y end
-    local _, h = W:SectionHeader(parent, "RESTEDXP", y); y = y - h
-    local themesSwitch = RxpSwitch("Add Themes to RestedXP", "Adds the Naowh themes to RestedXP's theme list.",
+    local themesOn = ns.RXPThemesEnabled()
+    local themesSwitch = RxpSwitch("RestedXP Theme (V1)",
+        "Adds the Naowh themes to RestedXP's theme list, in place of the Naowh window.",
         ns.RXPThemesEnabled, ns.SetRXPThemes)
-    _, h = W:DualRow(parent, y, themesSwitch, RxpThemeChoice()); y = y - h
-    if ns.RXPThemesEnabled() then y = RxpThemeRows(W, parent, y) end
+    local _, h = W:SwitchFold(parent, "RestedXP Theme (V1)", y, {
+        get = themesSwitch.getValue, set = themesSwitch.setValue, tooltip = themesSwitch.tooltip, rows = themesOn,
+        open = UI.filter ~= nil })
+    y = y - h
+    if themesOn then
+        _, h = W:DualRow(parent, y, RxpThemeChoice(), Empty()); y = y - h
+        y = RxpThemeRows(W, parent, y)
+        y = RxpArrowRows(W, parent, y)
+    end
+    W:EndFold(parent)
+    y = RxpWindowRows(W, parent, y)
+    if not (ns.RXPThemesEnabled() or ns.RXPWindowEnabled()) then
+        _, h = W:SectionHeader(parent, "RESTEDXP ARROW", y); y = y - h
+        y = RxpArrowRows(W, parent, y)
+    end
     if rxpPending then
         _, h = W:Note(parent, TEXT_RXP_RELOAD, y); y = y - h
     end
@@ -455,6 +667,17 @@ function Terms:SectionHeader(_, text)
     self.section = text
     return nil, 0
 end
+
+Terms.FoldHeader = Terms.SectionHeader
+Terms.GroupHeader = Terms.SectionHeader
+
+function Terms:SwitchFold(_, text, _, cfg)
+    self.section = text
+    self:Take({ text = text, tooltip = cfg.tooltip })
+    return nil, 0
+end
+
+function Terms:EndFold() end
 
 function Terms:Take(row)
     if row.text == "" or row.type == "label" then return end

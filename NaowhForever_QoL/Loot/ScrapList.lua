@@ -34,7 +34,10 @@ local VIEW_SPARE = 8
 local SUMMARY_SIZE = 12
 local LAST_BAG = NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS
 local EVENTS = { "BAG_UPDATE_DELAYED", "PLAYER_LEVEL_UP", "EQUIPMENT_SETS_CHANGED" }
-local EMPTY_NOTE = ns.L("Nothing marked. Alt-click an item in your bags to mark it.")
+local EMPTY_NOTE = {
+    alt = ns.L("Nothing marked. Alt-click an item in your bags to mark it."),
+    ctrl = ns.L("Nothing marked. Ctrl-click an item in your bags to mark it."),
+}
 local NO_MATCH = ns.L("No scrap item matches your search.")
 local TAGS = { account = ns.L("Account"), char = ns.L("Character") }
 local TAG_TIPS = { account = ns.L("Marked on every character; click for this character only."),
@@ -184,7 +187,7 @@ function Draw:Redraw()
         end
     end
     if #ids == 0 then
-        self:Note(EMPTY_NOTE)
+        self:Note(EMPTY_NOTE[Scrap.Modifier()])
     elseif shown == 0 then
         self:Note(NO_MATCH)
     end
@@ -382,9 +385,14 @@ local function OpenFromCard()
 end
 
 Shared.Settings.Page(PAGE, ns.QoLSettings):Window({
-    order = 26,
+    order = 66,
     text = "Open Scrap List",
     open = OpenFromCard,
     headline = "Scrap List",
     detail = "Every item marked as scrap, to search, unmark, share or add to.",
+})
+
+ns.RegisterMinimapFeature({
+    id = "ScrapList", name = "Scrap List", icon = "Interface\\Icons\\INV_Misc_Bag_08",
+    open = ns.ToggleScrapList, tooltip = "Click to open or close the Scrap List.",
 })

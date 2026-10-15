@@ -2,6 +2,7 @@
 -- update and unit filter, the Buff Reminders aura burst and refresh, and the Blessings bar's
 -- aura reads. Run from the repo root. An optional first argument is a folder holding older
 -- copies of the modules (same layout), to print their numbers for comparison.
+rawset(_G, "C_AddOns", { DoesAddOnExist = function() return false end, GetAddOnEnableState = function() return 0 end })
 local ROOT = arg[1] or ""
 local RUNS = 1000
 local checks, failures = 0, 0
@@ -170,10 +171,10 @@ do
         UnitGroupRolesAssigned = function() return "DAMAGER" end, GetShapeshiftFormID = function() return nil end,
         C_Timer = { After = function() end, NewTicker = function() return { Cancel = function() end } end },
     })
-    for _, file in ipairs({ "Core/Features.lua", "NaowhForever_ThreatMeter/ThreatMeter.lua",
-        "NaowhForever_ThreatMeter/Constants.lua", "NaowhForever_ThreatMeter/Data/Samples.lua",
-        "NaowhForever_ThreatMeter/Threat.lua", "NaowhForever_ThreatMeter/View/Meter.lua",
-        "NaowhForever_ThreatMeter/UI/Meter.lua", "NaowhForever_ThreatMeter/UI/SettingsPage.lua" }) do
+    for _, file in ipairs({ "Core/Features.lua", "NaowhForever_Combat/ThreatMeter/ThreatMeter.lua",
+        "NaowhForever_Combat/ThreatMeter/Constants.lua", "NaowhForever_Combat/ThreatMeter/Data/Samples.lua",
+        "NaowhForever_Combat/ThreatMeter/Threat.lua", "NaowhForever_Combat/ThreatMeter/View/Meter.lua",
+        "NaowhForever_Combat/ThreatMeter/UI/Meter.lua", "NaowhForever_Combat/ThreatMeter/UI/SettingsPage.lua" }) do
         Run(Source(file), file, env)
     end
     Fire("PLAYER_LOGIN")
@@ -241,12 +242,15 @@ do
             { category = "flask", itemID = 13510, auras = { 17626 } },
         } }
     local bags = { [13931] = 2, [13510] = 1 }
-    local ns = { L = dofile("Tools/regression/locale_stub.lua").L, Upper = string.upper, Lower = string.lower, MEDIA = dofile("Tools/regression/core_media.lua"), AuraBuffSettings = Settings(values), THEME = THEME, Apply = function() end,
+    local ns = { AccountSettings = function() return {} end, L = dofile("Tools/regression/locale_stub.lua").L, Upper = string.upper, Lower = string.lower, MEDIA = dofile("Tools/regression/core_media.lua"), AuraBuffSettings = Settings(values), THEME = THEME, Apply = function() end,
+        OnePixel = function() return 1 end,
         ShowUnlockMode = function() end, HideUnlockMode = function() end,
         Border = function() end, Solid = function(parent) return New("Texture", nil, parent) end,
+        ThemeTint = function(_, literal) return literal end,
         Font = function(parent) return New("FontString", nil, parent) end,
         UI = { AttachMover = function() return New("Mover") end },
-        Shared = { Parts = { HudFont = function(fs, _, size, outline) fs:SetFont("font", size, outline) end } } }
+        Shared = { Parts = { HudFont = function(fs, _, size, outline) fs:SetFont("font", size, outline) end },
+            ItemBar = { SetItem = function(button, itemID) button.itemID = itemID end } } }
     local lastAfter
     local timer = { Cancel = function() end }
     local env = BaseEnv(ns, {
@@ -267,17 +271,23 @@ do
             local list = auras[unit]
             return list and list[i]
         end },
-        C_Item = { GetItemCount = function(id) return bags[id] or 0 end, GetItemIconByID = function(id) return id end },
+        C_Item = { GetItemCount = function(id) return bags[id] or 0 end, GetItemIconByID = function(id) return id end,
+            GetItemSpell = function() end, GetItemInfo = function() end, RequestLoadItemDataByID = function() end },
+        C_Container = { GetContainerNumSlots = function() return 2 end,
+            GetContainerItemID = function(_, slot) return slot == 1 and 13931 or 13510 end },
+        NUM_BAG_SLOTS = 0,
+        UnitLevel = function() return 60 end,
         C_Spell = { GetSpellTexture = function(id) return id end },
         C_SpellBook = { IsSpellKnown = function() return false end },
         C_Timer = { After = function(_, fn) lastAfter = fn end, NewTimer = function() return timer end },
     })
     ns.UI.ModuleSettings = function() return ns.AuraBuffSettings end
-    for _, file in ipairs({ "Core/Features.lua", "NaowhForever_AuraBuffs/AuraBuffs.lua",
-        "NaowhForever_AuraBuffs/Constants.lua", "Shared/Game/Consumables.lua",
-        "NaowhForever_AuraBuffs/Data/BuffReminders.lua", "NaowhForever_AuraBuffs/BuffReminders.lua",
-        "NaowhForever_AuraBuffs/View/Style.lua", "NaowhForever_AuraBuffs/View/BuffCell.lua",
-        "NaowhForever_AuraBuffs/UI/BuffMenu.lua", "NaowhForever_AuraBuffs/UI/BuffReminders.lua" }) do
+    for _, file in ipairs({ "Core/Features.lua", "NaowhForever_Combat/AuraBuffs/AuraBuffs.lua",
+        "NaowhForever_Combat/AuraBuffs/Constants.lua", "Shared/Game/Consumables.lua",
+        "NaowhForever_Combat/AuraBuffs/Data/BuffReminders.lua", "NaowhForever_Combat/AuraBuffs/BuffReminders.lua",
+        "NaowhForever_Combat/AuraBuffs/View/Style.lua", "NaowhForever_Combat/AuraBuffs/View/Glow.lua",
+        "NaowhForever_Combat/AuraBuffs/View/BuffCell.lua",
+        "NaowhForever_Combat/AuraBuffs/UI/BuffMenu.lua", "NaowhForever_Combat/AuraBuffs/UI/BuffReminders.lua" }) do
         Run(Source(file), file, env)
     end
     Fire("PLAYER_LOGIN")
@@ -312,7 +322,7 @@ end
 --  Blessings: every ask in one bar refresh reads a member's buffs once
 -------------------------------------------------------------------------------
 do
-    local source = Source("NaowhForever_Blessings/Buffs.lua")
+    local source = Source("NaowhForever_Combat/Blessings/Buffs.lua")
     local first = source:find("local memoAt", 1, true) or source:find("-- Present, with the time left", 1, true)
     local last = assert(source:find("local function InRange(member, spell)", first, true))
     local SECRET = {}

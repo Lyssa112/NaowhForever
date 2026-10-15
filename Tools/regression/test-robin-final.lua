@@ -1,4 +1,5 @@
 -- Run with Lua 5.1 from the repository root. Hardware actions are recorded, not executed.
+rawset(_G, "C_AddOns", { DoesAddOnExist = function() return false end, GetAddOnEnableState = function() return 0 end })
 local TocFiles = dofile('Tools/regression/toc_files.lua')
 local checks = 0
 local function check(label, value) assert(value, label); checks = checks + 1 end
@@ -11,7 +12,7 @@ local function fixture(kind)
         local f = { scripts = {}, events = {}, shown = true, parent = parent, attributes = {},
             secure = template == 'SecureActionButtonTemplate' or name == 'NaowhForeverTrinkets' }
         local noop = function() end
-        setmetatable(f, { __index = function(_, key) return noop end })
+        setmetatable(f, { __index = function(_, key) if key ~= 'sitSpot' and key ~= 'hot' then return noop end end })
         function f:SetScript(key, fn) self.scripts[key] = fn end
         function f:HookScript(key, fn)
             local old = self.scripts[key]
@@ -58,6 +59,8 @@ local function fixture(kind)
         ThemeTint = function(_, literal) return literal end,
         Shared = { Style = { TIME_OK_RGB = {}, TIME_LOW_RGB = {}, TIME_OUT_RGB = {} },
             Parts = { Smooth = function(t) return t end, HudText = function(t) return t end,
+                Pill = function() return frame() end, SetPill = function() return 0 end, ColorPill = function() end,
+                Press = function(button) button.pressed = true end,
                 HudFont = function(fs, font, size, outline) fs:SetFont(font, size, outline) end } },
         Font = function() return frame() end, Tooltip = function() end,
         Button = function(parent, text, w, h, callback)
@@ -81,6 +84,7 @@ local function fixture(kind)
         GetInventoryItemTexture = function(_, slot) return slot + 1000 end,
         GetInventoryItemID = function(_, slot) return slot + 2000 end,
         C_Secrets = { ShouldAurasBeSecret = function() return state.secret end },
+        LibStub = function() return { PixelGlow_Start = function() end, PixelGlow_Stop = function() end } end,
         C_UnitAuras = { GetPlayerAuraBySpellID = function(id)
             assert(not state.combat and not state.secret, 'restricted aura read')
             return state.auras and state.auras[id]
@@ -110,6 +114,7 @@ local function fixture(kind)
     function state.load(path)
         local chunk = assert(loadfile(path)); setfenv(chunk, env); chunk()
     end
+    state.load('Shared/UI/ItemBar.lua')
     function state.loadModule(dir)
         for _, path in ipairs(TocFiles("^" .. dir .. "/.*%.lua$")) do state.load(path) end
     end
@@ -123,7 +128,7 @@ end
 
 do
     local s = fixture('gear')
-    s.loadModule('NaowhForever_GearSets'); s.fire('PLAYER_LOGIN')
+    s.loadModule('NaowhForever_Combat/GearSets'); s.fire('PLAYER_LOGIN')
     check('hidden set bar stays hidden', not s.named.NaowhForeverGearBar.shown)
     local swaps = false
     for _, f in ipairs(s.frames) do if f.events.PLAYER_MOUNT_DISPLAY_CHANGED then swaps = true end end
@@ -155,7 +160,7 @@ end
 do
     local s = fixture('gear')
     s.settings.trinketBar = false
-    s.loadModule('NaowhForever_GearSets'); s.fire('PLAYER_LOGIN')
+    s.loadModule('NaowhForever_Combat/GearSets'); s.fire('PLAYER_LOGIN')
     local function Listening(e)
         for _, f in ipairs(s.frames) do if f.events[e] then return f end end
     end
@@ -177,7 +182,7 @@ end
 do
     local s = fixture('gear')
     s.settings.gearBarVisible, s.settings.gearBarShow, s.settings.trinketBar = true, 'nocombat', false
-    s.loadModule('NaowhForever_GearSets'); s.fire('PLAYER_LOGIN')
+    s.loadModule('NaowhForever_Combat/GearSets'); s.fire('PLAYER_LOGIN')
     local bar = s.named.NaowhForeverGearBar
     check('Show Out of Combat: shown out of combat', bar.shown)
     s.fire('PLAYER_REGEN_DISABLED'); s.combat = true
@@ -200,8 +205,8 @@ end
 
 do
     local s = fixture('camp')
-    s.load('Core/Features.lua'); s.load('NaowhForever_AuraBuffs/AuraBuffs.lua')
-    s.load('NaowhForever_AuraBuffs/Constants.lua')
+    s.load('Core/Features.lua'); s.load('NaowhForever_Combat/AuraBuffs/AuraBuffs.lua')
+    s.load('NaowhForever_Combat/AuraBuffs/Constants.lua')
     local parse = s.ns.ParseConsumableEntry
     check('explicit item and buff IDs parse', parse('food', '123, 456, 789').auras[2] == 789)
     local alone = parse('food', '123')
@@ -221,9 +226,9 @@ do
     check('anything else holds no list', not s.ns.ParseConsumableList('hello'))
     check('invalid IDs rejected', not parse('food', '123, x') and not parse('food', '0, 1'))
     s.S.Set('campShowUnder', false)
-    for _, file in ipairs({ 'Data/Campfire.lua', 'CampReader.lua', 'View/Style.lua', 'View/CampIcon.lua',
+    for _, file in ipairs({ 'Data/Campfire.lua', 'CampReader.lua', 'View/Style.lua', 'View/Glow.lua', 'View/CampIcon.lua',
         'View/CampBar.lua', 'View/CampAlert.lua', 'UI/Campfire.lua', 'UI/CampfireCards.lua' }) do
-        s.load('NaowhForever_AuraBuffs/' .. file)
+        s.load('NaowhForever_Combat/AuraBuffs/' .. file)
     end
     s.fire('PLAYER_LOGIN')
     local icon = s.named.NaowhForeverCampfire
@@ -249,8 +254,8 @@ do
     local s = fixture('profile')
     local active = {}
     s.ns.DB = function() return active end
-    s.load('Core/Features.lua'); s.load('NaowhForever_AuraBuffs/AuraBuffs.lua')
-    s.load('NaowhForever_AuraBuffs/Constants.lua')
+    s.load('Core/Features.lua'); s.load('NaowhForever_Combat/AuraBuffs/AuraBuffs.lua')
+    s.load('NaowhForever_Combat/AuraBuffs/Constants.lua')
     local entry = { category = "food", itemID = 123, auras = { 456 } }
     s.S.Set("consumableEntries", { entry })
     check('editor writes profile-backed definitions', active.utilityReminders.consumables[1] == entry)

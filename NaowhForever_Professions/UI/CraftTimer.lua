@@ -1,9 +1,10 @@
--- CraftTimer.lua: Total Craft Timer: one bar for a batch of crafts, on the Flight Timer's spot, in place of the cast bar.
+-- CraftTimer.lua: Total Craft Timer: one bar for a batch of crafts, on the Flight Timer's spot, optionally alongside the cast bar.
 local ns = _G.NaowhForever
 
 local T = ns.THEME
 
 local P = ns.Professions
+local R = P.Recipes
 local S = P.Settings
 local Style = P.Style
 local Widgets = P.Widgets
@@ -50,6 +51,7 @@ local function Clock(seconds)
 end
 
 local function HideCastBars()
+    if S.Get("craftTimerShowCastBar") then return end
     for _, name in ipairs(CAST_BARS) do
         local frame = _G[name]
         if frame and frame.SetAlpha then
@@ -209,11 +211,13 @@ local function Watch()
 end
 
 local function OnCraft(recipeID, count)
+    if not On() then return end
+    local recipe = C_TradeSkillUI.GetRecipeInfo(recipeID)
     count = tonumber(count) or 1
+    if recipe then count = math.min(count, R.Craftable(recipe)) end
+    if count < MIN_BATCH then return end
     local spell = C_Spell.GetSpellInfo(recipeID)
     local cast = spell and (spell.castTime or 0) / MS or 0
-    if not On() or count < MIN_BATCH then return end
-    local recipe = C_TradeSkillUI.GetRecipeInfo(recipeID)
     Stop()
     job = { recipeID = recipeID, name = recipe and recipe.name or (spell and spell.name),
         icon = recipe and recipe.icon or (spell and spell.iconID), count = count, done = 0,
@@ -236,6 +240,8 @@ end
 local function OnSettingChanged(key)
     if key == "enabled" or key == "craftTimer" then
         Apply()
+    elseif key == "craftTimerShowCastBar" then
+        if S.Get(key) then RestoreCastBars() elseif job then HideCastBars() end
     elseif bar and key:find("^craftTimer") then
         Look.Style(bar)
     end
