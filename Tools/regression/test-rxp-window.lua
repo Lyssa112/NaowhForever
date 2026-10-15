@@ -1062,7 +1062,7 @@ do
     w.talk.frame.text:SetText("Boar Meat: 3/8")
     Flush(w)
     Check(f.bar.barColor[1] == 1 and f.bar.barColor[2] == 0 and f.bar.barColor[3] == 1, "a bar color is the guide's bar's")
-    local meters = Meters()
+    meters = Meters()
     Check(#meters >= 1 and meters[1].barColor[1] == 1 and meters[1].barColor[2] == 0, "and a row's bar's, in any theme")
     Check(ns.RXPWindowColor("accent") == accent[1] and select(2, ns.RXPWindowColor("accent")) == accent[2],
         "while the accent is the accent's still, for the text and the icons")
