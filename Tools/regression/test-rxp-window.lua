@@ -71,6 +71,7 @@ local function Object(everything)
     function o:SetAlpha(a) self.alpha = a end
     function o:GetAlpha() return self.alpha or 1 end
     function o:EnableMouse(on) self.mouse = on end
+    function o:EnableMouseWheel(on) self.wheelOn = on end
     function o:IsMouseEnabled() return self.mouse ~= false end
     function o:IsForbidden() return false end
     function o:GetFrameLevel() return self.level or 1 end
@@ -822,7 +823,7 @@ do
         return line and line.text:match("^(%d+)")
     end
     local function Wheel(ticks)
-        for _ = 1, math.abs(ticks) do f.scripts.OnMouseWheel(f, ticks > 0 and 1 or -1) end
+        for _ = 1, math.abs(ticks) do f.wheel.scripts.OnMouseWheel(f.wheel, ticks > 0 and 1 or -1) end
         Flush(w)
     end
     local function Hit(index)
@@ -833,8 +834,10 @@ do
     local accent = ns.RXPWindowColor("accent")
 
     Check(#Lines() == 6 and First() == "37", "to start: the six steps after the active one, as before")
-    Check(f.scripts.OnMouseWheel ~= nil and f.track.shown == true and f.thumb.shown == true,
-        "and a bar says there are more of them")
+    Check(f.track.shown == true and f.thumb.shown == true, "and a bar says there are more of them")
+    Check(f.scripts.OnMouseWheel == nil and f.wheel.wheelOn == true and Seen(f.wheel)
+        and f.wheel.points[1][5] == f.track.points[1][5] and f.wheel.width == 380 - 20,
+        "the wheel is the list's alone, over its lines, not the whole window's: the camera still zooms elsewhere")
     Check(f.track.points[1][2] == f and f.track.points[1][3] == "TOPRIGHT" and f.track.points[1][4] == -10
         and f.thumb.points[1][4] == -10, "at the step box's right edge, not the window's: as wide as the step it follows")
     Check(Lines()[1].width == 380 - 20 - 2 - 4, "and the lines end before it, not under it")
@@ -893,10 +896,18 @@ do
     account.rxpWindowCollapsed = true
     ns.RXPWindowRefresh()
     Flush(w)
-    Check(f.track.shown == false and f.thumb.shown == false, "folded: no bar either")
+    Check(f.track.shown == false and f.thumb.shown == false and f.wheel.shown == false,
+        "folded: no bar either, and the wheel is free")
     account.rxpWindowCollapsed = nil
     ns.RXPWindowRefresh()
     Flush(w)
+
+    ns.SetRXPWindowSteps(0)
+    Flush(w)
+    Check(f.wheel.shown == false and f.wheel.wheelOn == false, "with no steps listed the wheel is free too")
+    ns.SetRXPWindowSteps(6)
+    Flush(w)
+    Check(f.wheel.shown == true and f.wheel.wheelOn == true, "and it scrolls again when they are back")
 
     rxp.GetGuideProgress = function() return 66, "id" end
     rxp.v2:UpdateGuideWindow()
@@ -916,7 +927,7 @@ do
     end
     Check(p.track.shown == false and p.thumb.shown == false, "the scroll bar is off to start: no bar")
     Check(#PlainLines() == 6 and PlainLines()[1].width == 380 - 20, "and the lines are as wide as the step box, with no room kept for it")
-    p.scripts.OnMouseWheel(p, 1)
+    p.wheel.scripts.OnMouseWheel(p.wheel, 1)
     Flush(plain)
     Check(PlainLines()[1].text:find("^35") ~= nil, "while the wheel scrolls the list as it does with it")
     for _, o in ipairs(plain.frames) do
