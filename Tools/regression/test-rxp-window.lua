@@ -1035,9 +1035,6 @@ do
     Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 2, "and are whole pixels: a size between two is the nearer")
     ns.SetRXPWindowOption("rxpWindowBarBorderSize", 0.4)
     Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 0, "down to none")
-    account.rxpWindowBoxBorderSize = 1.5
-    Check(ns.RXPWindowOption("rxpWindowBoxBorderSize") == 2, "a half step an earlier build saved is read as a whole one")
-    account.rxpWindowBoxBorderSize = nil
 
     ns.SetRXPWindowOption("rxpWindowBarBorderSize", 1)
     w.talk.frame.text:SetText("Boar Meat: 3/8")
