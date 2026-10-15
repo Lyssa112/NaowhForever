@@ -579,9 +579,8 @@ do
     w.shift = false
     hits[2].scripts.OnEnter(hits[2])
     Check(w.env.GameTooltip.text == "Go to step 39" and hits[2].shade.shown, "it says so, and is lit")
-    Check(#w.env.GameTooltip.lines == 2 and w.env.GameTooltip.lines[1] == "Shift-click"
-        and w.env.GameTooltip.lines[2] == "Scroll for more steps",
-        "and it does not say where the menu is, only that the list scrolls")
+    Check(#w.env.GameTooltip.lines == 1 and w.env.GameTooltip.lines[1] == "Shift-click",
+        "and it does not say where the menu is, nor that the list scrolls")
     hits[2].scripts.OnLeave(hits[2])
     Check(hits[2].shade.shown == false, "and not when the mouse leaves")
     Check(hits[1].scripts.OnDragStart ~= nil, "a line is still where the window is dragged from")
@@ -863,8 +862,8 @@ do
     Check(#went == 1 and went[1] == 35, "a step done is gone back to like any other: with shift, a click goes to it")
     w.shift = false
     Hit(35).scripts.OnEnter(Hit(35))
-    Check(w.env.GameTooltip.text == "Go to step 35" and w.env.GameTooltip.lines[2] == "Scroll for more steps",
-        "and its tooltip says so, and that the list scrolls")
+    Check(w.env.GameTooltip.text == "Go to step 35" and #w.env.GameTooltip.lines == 1,
+        "and its tooltip says so, and no more")
     ns.SetRXPWindowOption("rxpWindowSkip", "off")
     Flush(w)
     local before = #went
@@ -923,8 +922,8 @@ do
     for _, o in ipairs(plain.frames) do
         if o.index == 35 and o.shade and Seen(o) then
             o.scripts.OnEnter(o)
-            Check(plain.env.GameTooltip.lines[#plain.env.GameTooltip.lines] == "Scroll for more steps",
-                "and a line still says that the list scrolls")
+            Check(plain.env.GameTooltip.text == "Go to step 35" and #plain.env.GameTooltip.lines == 1,
+                "and a line's tooltip says nothing of the scroll")
         end
     end
     plain.ns.SetRXPWindowOption("rxpWindowScrollBar", true)

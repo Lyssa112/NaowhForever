@@ -91,7 +91,7 @@ Core/Integrations/RestedXP/
   little dimmer, so that a step can be gone back to. It starts at the first step after the active one
   and the mouse wheel moves it, two lines a tick, over the steps before (the one the guide is on in
   the accent color) and after. The wheel always scrolls it. A bar that shows where it is (Show Scroll
-  Bar, off to start: the list is as wide as the step box and a tooltip says it scrolls) is there only
+  Bar, off to start: the list is as wide as the step box, and no tooltip says it scrolls) is there only
   when there are more steps than lines: it is at the right edge of the step box, as wide as the steps
   are and not at the window's (where it looked like it belonged to nothing), and the lines end before
   it. It goes back to the steps after the active one when the guide moves on (a

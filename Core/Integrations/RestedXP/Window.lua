@@ -32,7 +32,6 @@ local TEXT_SHIFT = ns.L("Shift-click")
 local TEXT_MENU = ns.L("Right-click: menu")
 local TEXT_GO = ns.L("Go to step %d")
 local TEXT_PICK = ns.L("Pick a guide")
-local TEXT_SCROLL = ns.L("Scroll for more steps")
 local TIP_DIM = 0.7
 local WHEEL_LINES, DONE_ALPHA = 2, 0.5
 local SCROLL_W, SCROLL_GAP, SCROLL_MIN = 2, 4, 12
@@ -348,7 +347,7 @@ local function StepClick(self, button)
     if MaySkip() then SkipStep(self.step) end
 end
 
-local function Tip(owner, text, menu, plain, hint)
+local function Tip(owner, text, menu, plain)
     if not ns.RXPWindowOption("rxpWindowTips") or GameTooltip:IsForbidden() then return end
     local mode = ns.RXPWindowOption("rxpWindowSkip")
     GameTooltip:SetOwner(owner, TIP_ANCHOR)
@@ -361,7 +360,6 @@ local function Tip(owner, text, menu, plain, hint)
         GameTooltip:SetText(text, r, g, b)
         if mode == "shift" then GameTooltip:AddLine(TEXT_SHIFT, TIP_DIM, TIP_DIM, TIP_DIM) end
         if menu then GameTooltip:AddLine(TEXT_MENU, TIP_DIM, TIP_DIM, TIP_DIM) end
-        if hint then GameTooltip:AddLine(hint, TIP_DIM, TIP_DIM, TIP_DIM) end
     end
     GameTooltip:Show()
 end
@@ -588,7 +586,7 @@ local function MakeHit()
         if self.menu then
             Tip(self, TEXT_PICK, false, true)
         else
-            Tip(self, TEXT_GO:format(self.index or 0), false, false, self.scrollable and TEXT_SCROLL)
+            Tip(self, TEXT_GO:format(self.index or 0))
         end
     end)
     hit:SetScript("OnLeave", function(self)
@@ -819,7 +817,7 @@ local function DrawPanel()
     window.edge._frame:SetShown(borderOn and not inset)
 end
 
-local function ListLine(y, inner, listH, text, index, menu, look, scrollable, barred)
+local function ListLine(y, inner, listH, text, index, menu, look, barred)
     local item = Acquire("line")
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
@@ -831,7 +829,7 @@ local function ListLine(y, inner, listH, text, index, menu, look, scrollable, ba
     hit:ClearAllPoints()
     hit:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
     hit:SetSize(inner, listH)
-    hit.index, hit.menu, hit.scrollable = index, menu, scrollable
+    hit.index, hit.menu = index, menu
     hit.shade:Hide()
     return y - listH
 end
@@ -861,7 +859,7 @@ local function DrawSteps(model, y, inner, listH)
         local entry = list[i]
         local look = model.current[entry.index] and "current" or entry.done and "done" or nil
         y = ListLine(y, inner, listH, ("%d  %s"):format(entry.index, ns.RXPWindowLineText(entry)), entry.index, false,
-            look, scrollable, barred)
+            look, barred)
     end
     window.track:SetShown(barred)
     window.thumb:SetShown(barred)

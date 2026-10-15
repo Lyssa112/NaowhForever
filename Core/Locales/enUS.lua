@@ -4155,7 +4155,6 @@ L["Scrap Marker, which sells what it marks"] = true
 L["Scrap: offered at the next vendor"] = true
 L["Scrap: sold at the next vendor"] = true
 L["Scroll"] = true
-L["Scroll for more steps"] = true
 L["Scroll the mouse wheel to see the rest; right-click an icon for its settings."] = true
 L["Scroll to zoom"] = true
 L["Seal Colors"] = true
