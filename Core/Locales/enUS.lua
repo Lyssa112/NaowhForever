@@ -970,6 +970,7 @@ L["A reminder when a weapon has no sharpening stone, weightstone or oil on it."]
 L["A row of icons for missing food, flask, elixir and scroll buffs, your own class buff, and class buffs missing in your group. Out of combat only: the game keeps your buffs from addons in combat, so the icons keep what they showed. Hover one to pick a carried item to use. Move them in the HUD Editor."] = true
 L["A row that is done and the steps after the active one."] = true
 L["A running gold per hour beside the newest line, counting money and item value since your first loot this session."] = true
+L["A sample: the meter in the game shows your fights."] = true
 L["A Scan Prices button on the auction house. It reads every listing and keeps the lowest buyout for each item, for this realm and faction. Blizzard allows one full scan every 15 minutes."] = true
 L["A scrap icon on the bag slot of each item marked as scrap."] = true
 L["A second panel for your focus, to keep Sap or Polymorph's time on one enemy while you fight another."] = true
@@ -3604,6 +3605,7 @@ L["Pets use their owner's class icon, desaturated."] = true
 L["Physics Integration"] = true
 L["Pick a guide"] = true
 L["Pick a part to share."] = true
+L["Pick a Spell Panel Color or a Window Color"] = true
 L["Pick a window to open."] = true
 L["Pick All"] = true
 L["Pick an icon for "] = true

@@ -48,6 +48,7 @@ local S = UI.ModuleSettings("qol", {
     damageMeterTitleSize = 0, damageMeterButtons = "game", damageMeterButtonColor = false,
     damageMeterPanelColor = false, damageMeterPanelAlpha = 70, damageMeterTheme = "current",
     damageMeterGameBars = "class", damageMeterGameTexture = "", damageMeterGameIconEdge = false,
+    damageMeterGameFont = "",
     damageMeterShowTimer = true, damageMeterShowSession = true, damageMeterShowCog = true,
     damageMeterShowTitle = true, damageMeterShowDropdown = true, damageMeterShowMinimize = true,
     damageMeterMenu = false, damageMeterTitleX = 0, damageMeterTimerX = 0,

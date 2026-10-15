@@ -495,6 +495,12 @@ local own, ownList = UI.TextureChoices("NaowhGradient", "Naowh Gradient")
 check("also when it is the element's own under another spelling", own.NaowhGradient == "NaowhGradient"
     and own[""] == "Naowh Gradient" and #ownList == 4)
 check("a saved texture that has gone stays listed", textures.Gone == "Gone (unavailable)" and list[#list] == "Gone")
+local fonts, fontList = UI.FontChoices("")
+check("font choices: the Addon Font first, then every SharedMedia font", fontList[1] == "" and fonts[""] == "Addon Font"
+    and fonts.Naowh == "Naowh" and #fontList == 2)
+fonts, fontList = UI.FontChoices("", "Game Default")
+check("and a row can name its own first entry, as a texture row does", fonts[""] == "Game Default"
+    and fontList[1] == "" and fonts.Naowh == "Naowh" and #fontList == 2)
 check("texture path: a SharedMedia name", UI.TexturePath("Solid", "own") == "solid")
 check("texture path: the element's own for empty or missing", UI.TexturePath("", "own") == "own"
     and UI.TexturePath("Gone", "own") == "own" and UI.TexturePath(nil, "own") == "own")

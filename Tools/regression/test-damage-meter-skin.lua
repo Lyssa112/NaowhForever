@@ -228,7 +228,7 @@ local function Boot(settings, loaded, windows)
         damageMeterNameSize = 0, damageMeterValueSize = 0, damageMeterTitleSize = 0, damageMeterButtons = "game",
         damageMeterButtonColor = false, damageMeterPanelColor = false, damageMeterPanelAlpha = 70,
         damageMeterTheme = "current", damageMeterGameBars = "class", damageMeterGameTexture = "",
-        damageMeterGameIconEdge = false, damageMeterShowTimer = true, damageMeterShowSession = true,
+        damageMeterGameIconEdge = false, damageMeterGameFont = "", damageMeterShowTimer = true, damageMeterShowSession = true,
         damageMeterShowCog = true, damageMeterShowTitle = true, damageMeterShowDropdown = true,
         damageMeterShowMinimize = true, damageMeterMenu = false, damageMeterTitleX = 0,
         damageMeterTimerX = 0 }
@@ -239,6 +239,8 @@ local function Boot(settings, loaded, windows)
         return v
     end
     function store.Set(k, v) s.settings[k] = v end
+    function store.Raw(k) return s.settings[k] end
+    function store.Default(k) return defaults[k] end
     local meter = { windows = windows or { Window() } }
     function meter:GetPrimarySessionWindow() return self.windows[1] end
     function meter:ForEachSessionWindow(fn)
@@ -267,6 +269,8 @@ local function Boot(settings, loaded, windows)
                 get = function() return "0" end, set = function() end } },
             restore = { label = "Restore Game Settings", buttonText = "Restore", button = function() end } },
         Print = function(text) s.printed[#s.printed + 1] = text end,
+        DamageMeterPreview = { height = function() return 1 end, states = {}, new = function() end,
+            paint = function() end },
         MEDIA = "Media\\",
         UIFontPath = function() return FONT end,
         UI = { FontPath = function(name) return "Fonts\\" .. name .. ".ttf" end,
@@ -358,6 +362,19 @@ local function Login(frames)
 end
 
 local function SameRgb(c, t) return c and c[1] == t.r and c[2] == t.g and c[3] == t.b end
+local PICKED = { "damageMeterBarColor", "damageMeterBarAlpha", "damageMeterBarBgColor", "damageMeterBarBgAlpha",
+    "damageMeterScrollBar", "damageMeterFont", "damageMeterOutline", "damageMeterHeaderColor",
+    "damageMeterWindowColor", "damageMeterNameColor", "damageMeterNameSize", "damageMeterValueColor",
+    "damageMeterValueSize", "damageMeterTitleColor", "damageMeterTitleSize", "damageMeterPanelColor",
+    "damageMeterPanelAlpha", "damageMeterBorder", "damageMeterBorderColor", "damageMeterButtons",
+    "damageMeterButtonColor", "damageMeterTitleFade", "damageMeterTitleFadeAlpha", "damageMeterShowTitle",
+    "damageMeterShowDropdown", "damageMeterShowTimer", "damageMeterShowSession", "damageMeterShowCog",
+    "damageMeterShowMinimize", "damageMeterMenu", "damageMeterTitleX", "damageMeterTimerX", "damageMeterGameBars",
+    "damageMeterGameTexture", "damageMeterGameIconEdge", "damageMeterGameFont" }
+local GAP = 4
+local function Unpick(store)
+    for _, key in ipairs(PICKED) do store.Set(key, store.Default(key)) end
+end
 local function Entries(window)
     local c = window.MinimizeContainer
     return { c.LocalPlayerEntry, c.ScrollBox.frames[1], c.ScrollBox.frames[2], c.SourceWindow.ScrollBox.frames[1] }
@@ -368,9 +385,9 @@ do
     local s = Boot()
     check("one card, on the Damage Meter page", #s.cards == 1 and s.pageKey == "QoL/Damage Meter")
     local card = s.cards[1]
-    check("its id and name, a Reskin toggle first and no switch of its own", card.id == "damageMeterSkin"
-        and card.name == "Default Damage Meter" and card.switch == nil and card.rows[1].key == "damageMeterSkin"
-        and card.rows[1].toggle == true)
+    check("its id and name, the game's own settings first and no switch of its own", card.id == "damageMeterSkin"
+        and card.name == "Default Damage Meter" and card.switch == nil and card.rows[1].group == "Game Settings"
+        and card.rows[2].label == "Visibility")
     local row
     for _, item in ipairs(card.rows) do
         if item.key == "damageMeterBars" then row = item end
@@ -566,8 +583,15 @@ do
         name.flags == GAME_FLAGS and name.sx == 1 and name.sy == -1)
     store.Set("damageMeterOutline", "THICKOUTLINE")
     store.Set("damageMeterSkin", false)
-    check("off: the font, flags and shadow are the game's", name.path == GAME_FONT and name.size == GAME_SIZE
-        and name.flags == GAME_FLAGS and name.sx == 1 and name.sy == -1)
+    check("off: the outline picked stays, and no font was picked for the game's look: its own face",
+        name.path == GAME_FONT and name.size == GAME_SIZE and name.flags == "THICKOUTLINE" and name.sx == 0)
+    store.Set("damageMeterGameFont", "Why")
+    check("off: a font picked for the game's look", name.path == "Fonts\\Why.ttf" and name.flags == "THICKOUTLINE")
+    store.Set("damageMeterGameFont", "")
+    store.Set("damageMeterOutline", "game")
+    check("off, nothing picked: the font, flags and shadow are the game's", name.path == GAME_FONT
+        and name.size == GAME_SIZE and name.flags == GAME_FLAGS and name.sx == 1 and name.sy == -1)
+    store.Set("damageMeterOutline", "THICKOUTLINE")
     store.Set("damageMeterSkin", true)
     check("on again: the face is ours again", name.path == "Fonts\\Exo.ttf" and name.flags == "THICKOUTLINE")
 end
@@ -857,6 +881,7 @@ do
     check("bar background: the game's refresh does not undo it", bar.Background.alpha == 0.5)
     store.Set("damageMeterBarBgColor", false)
     check("bar background: not picked follows the Window Color", SameRgb(bar.Background.solid, THEME.bg))
+    Unpick(store)
     store.Set("damageMeterSkin", false)
     check("off: the game's own opacities are back", bar.Background.alpha == 1 and entry.barTexture.alpha == 1)
 end
@@ -889,6 +914,7 @@ do
     check("scroll bar: the game's colors back", SameRgb(scroll.thumb.vertex, { r = 1, g = 1, b = 1 })
         and SameRgb(scroll.track.vertex, { r = 1, g = 1, b = 1 }))
     store.Set("damageMeterScrollBar", "accent")
+    Unpick(store)
     store.Set("damageMeterSkin", false)
     check("scroll bar: skin off gives it back", SameRgb(scroll.thumb.vertex, { r = 1, g = 1, b = 1 })
         and scroll.alpha == 1)
@@ -908,6 +934,7 @@ do
     store.Set("damageMeterNameSize", 0)
     check("sizes: 0 is the game's own, for that one only", bar.Name.size == GAME_SIZE and bar.Value.size == 12
         and window.DamageMeterTypeDropdown.TypeName.size == 20)
+    Unpick(store)
     store.Set("damageMeterSkin", false)
     check("sizes: off gives the game's sizes back", bar.Value.size == GAME_SIZE and window.SessionTimer.size == GAME_SIZE
         and window.SessionDropdown.SessionName.size == GAME_SIZE)
@@ -957,12 +984,16 @@ do
     local gear, arrow = window.SettingsDropdown.glyph, window.DamageMeterTypeDropdown.glyph
     check("buttons: grey first, then tinted to the Accent", gear.desaturated == true and SameRgb(gear.vertex, THEME.accent)
         and SameRgb(arrow.vertex, THEME.accent) and window.MinimizeButton.glyph.desaturated == true)
+    check("buttons: the list's text is not tinted, the title has its own color",
+        window.DamageMeterTypeDropdown.label.vertex == nil and window.DamageMeterTypeDropdown.label.desaturated == nil)
     store.Set("damageMeterButtonColor", { r = 1, g = 0, b = 0 })
     check("buttons: a picked color", SameRgb(gear.vertex, { r = 1, g = 0, b = 0 }))
+    check("buttons: the text is still not", window.DamageMeterTypeDropdown.label.vertex == nil)
     store.Set("damageMeterButtons", "game")
     check("buttons: Game Default puts the art back", gear.desaturated == false
         and SameRgb(gear.vertex, { r = 1, g = 1, b = 1 }))
     store.Set("damageMeterButtons", "themed")
+    Unpick(store)
     store.Set("damageMeterSkin", false)
     check("buttons: skin off gives them back", gear.desaturated == false and arrow.desaturated == false
         and SameRgb(arrow.vertex, { r = 1, g = 1, b = 1 }))
@@ -1009,6 +1040,7 @@ do
         framed = framed or border.frame == meter.windows[1].MinimizeContainer.SourceWindow
     end
     check("spell panel: Window Border puts one round it too", framed)
+    Unpick(store)
     store.Set("damageMeterSkin", false)
     check("spell panel: off gives the game's own opacity back", panel.alpha == 0.9)
 end
@@ -1040,13 +1072,18 @@ do
             if item.label == "Window Width" then width = item end
         end
     end
-    check("sections, in order", table.concat(heads, "|") == "Window|Bars|Text|Title Bar|Spell Panel|Reset")
-    check("each row sits where it belongs", at["Reskin"] == "top" and at["Visibility"] == "Window"
-        and at["Window Width"] == "Window" and at["Move and Resize"] == "Window" and at["Window Color"] == "Window"
-        and at["Bar Height"] == "Bars" and at["Bar Texture"] == "Bars" and at["Font"] == "Text"
+    check("sections, in order: the game's own settings first", table.concat(heads, "|")
+        == "Game Settings|Look|Window|Bars|Text|Title Bar|Spell Panel|Reset")
+    check("each row sits where it belongs", at["Reskin"] == "Look" and at["Theme"] == "Look"
+        and at["Visibility"] == "Game Settings" and at["Window Width"] == "Game Settings"
+        and at["Window Height"] == "Game Settings" and at["Bar Height"] == "Game Settings"
+        and at["Restore Game Settings"] == "Game Settings" and at["Move and Resize"] == "Window"
+        and at["Window Color"] == "Window" and at["Bar Texture"] == "Bars" and at["Font"] == "Text"
         and at["Name Color"] == "Text" and at["Title Color"] == "Title Bar" and at["Buttons"] == "Title Bar"
-        and at["Window Position"] == "Reset" and at["Restore Game Settings"] == "Reset")
-    check("the reskin's rows wait for its switch, the game's own do not", byLabel["Bar Texture"].needs == "damageMeterSkin"
+        and at["Window Position"] == "Reset")
+    check("only the Theme row waits for the reskin: every other row works on the game's own look",
+        byLabel["Theme"].needs == "damageMeterSkin" and byLabel["Bar Texture"].needs == nil
+        and byLabel["Font"].needs == nil and byLabel["Name Color"].needs == nil and byLabel["Window Color"].needs == nil
         and byLabel["Bar Height"].needs == nil and byLabel["Visibility"].needs == nil
         and byLabel["Move and Resize"].needs == nil)
     check("the width waits for Move and Resize to be off", width.needs() == true)
@@ -1109,13 +1146,19 @@ do
         local bar = e.StatusBar
         check("entry " .. i .. ": the shadow is the game's, as solid as it was told", bar.Background.atlas
             == "ui-damagemeters-bar-shadowbg" and bar.Background.alpha == 0.5 and bar.BackgroundEdge.alpha == 1)
-        check("entry " .. i .. ": the font is the player's, the colors are the game's", bar.Name.path == FONT
-            and bar.Value.path == FONT and bar.Name.r == 1 and bar.Name.g == 0.82 and bar.Value.r == 1)
+        check("entry " .. i .. ": the font and the colors are the game's", bar.Name.path == GAME_FONT
+            and bar.Value.path == GAME_FONT and bar.Name.r == 1 and bar.Name.g == 0.82 and bar.Value.r == 1)
         check("entry " .. i .. ": the bar keeps the game's art and the class color, whatever the theme look says",
             e.StatusBar.file == nil and SameRgb(e.barTexture.vertex, CLASS))
     end
-    check("the title text: the font, and the color it had", window.SessionTimer.path == FONT
+    check("the title text: the font, and the color it had", window.SessionTimer.path == GAME_FONT
         and window.SessionTimer.r == 1 and window.SessionTimer.g == 0.82)
+    store.Set("damageMeterGameFont", "Exo")
+    check("a font picked for this look is on every text, and the theme look's is not read",
+        entry.StatusBar.Name.path == "Fonts\\Exo.ttf" and window.SessionTimer.path == "Fonts\\Exo.ttf")
+    store.Set("damageMeterFont", "Other")
+    check("and the theme look's own pick changes nothing here", entry.StatusBar.Name.path == "Fonts\\Exo.ttf")
+    store.Set("damageMeterFont", "")
 
     -- the look's own bar texture and bar color
     store.Set("damageMeterGameTexture", "Flat")
@@ -1163,11 +1206,11 @@ do
         and values.current == "Current Theme" and order[3] == "default" and values.default == "Naowh (default)"
         and order[4] == "midnight" and values.midnight == "Midnight" and order[5] == "classic"
         and order[6] == "custom" and values.custom == "Custom" and #order == 6)
-    check("the color, border, button and scroll bar rows wait for the reskin only",
-        rows.damageMeterWindowColor.needs == "damageMeterSkin" and rows.damageMeterHeaderColor.needs == "damageMeterSkin"
-        and rows.damageMeterNameColor.needs == "damageMeterSkin" and rows.damageMeterBorder.needs == "damageMeterSkin"
-        and rows.damageMeterButtons.needs == "damageMeterSkin" and rows.damageMeterScrollBar.needs == "damageMeterSkin"
-        and rows.damageMeterPanelColor.needs == "damageMeterSkin")
+    check("the color, border, button and scroll bar rows wait for nothing: the game's look has them",
+        rows.damageMeterWindowColor.needs == nil and rows.damageMeterHeaderColor.needs == nil
+        and rows.damageMeterNameColor.needs == nil and rows.damageMeterBorder.needs == nil
+        and rows.damageMeterButtons.needs == nil and rows.damageMeterScrollBar.needs == nil
+        and rows.damageMeterPanelColor.needs == nil)
     check("Border Color has its rule of its own", rows.damageMeterBorderColor.needs() == true)
     store.Set("damageMeterBorder", false)
     check("and waits for the border", rows.damageMeterBorderColor.needs() == false)
@@ -1175,13 +1218,16 @@ do
     check("each look shows its own Bar Texture row, named as the game's own or the Naowh Gradient",
         rows.damageMeterGameTexture.hidden() == false and rows.damageMeterTexture.hidden() == true
         and rows.damageMeterGameTexture.texture == "Game Default" and rows.damageMeterTexture.texture == "Naowh Reverse Gradient")
-    check("Bar Color and Icon Border read and write the look's own setting", rows.damageMeterBars.get() == "class"
-        and rows.damageMeterIconEdge.get() == true)
-    rows.damageMeterBars.set("custom")
-    rows.damageMeterIconEdge.set(false)
-    check("so the other look's are untouched", store.Get("damageMeterGameBars") == "custom"
-        and store.Get("damageMeterBars") == "accent" and store.Get("damageMeterIconEdge") == true
-        and store.Get("damageMeterGameIconEdge") == false)
+    check("and Bar Color and Icon Border: a row of each look, on its own setting, for Reset to see",
+        rows.damageMeterGameBars.hidden() == false and rows.damageMeterBars.hidden() == true
+        and rows.damageMeterGameIconEdge.hidden() == false and rows.damageMeterIconEdge.hidden() == true
+        and rows.damageMeterGameBars.choice == rows.damageMeterBars.choice
+        and rows.damageMeterGameBars.key == "damageMeterGameBars"
+        and rows.damageMeterGameIconEdge.key == "damageMeterGameIconEdge")
+    check("Custom Bar Color waits for the Bar Color of the look that is shown", rows.damageMeterBarColor.needs() == false)
+    store.Set("damageMeterGameBars", "custom")
+    check("which is the game look's own while it is the look", rows.damageMeterBarColor.needs() == true
+        and store.Get("damageMeterBars") == "accent")
     store.Set("damageMeterGameBars", "class")
     store.Set("damageMeterGameIconEdge", true)
 
@@ -1203,8 +1249,9 @@ do
     store.Set("damageMeterTheme", "game")
     check("off again: the window art is back, the picks stay", c.Background.atlas == windowArt
         and SameRgb(window.Header.solid, RED) and SameRgb(c.SourceWindow.Background.solid, RED))
-    check("off again: the names are the game's, in the player's font", entry.StatusBar.Name.r == 1
-        and entry.StatusBar.Name.g == 0.82 and entry.StatusBar.Name.path == FONT)
+    check("off again: the names are the game's, in the font picked for this look", entry.StatusBar.Name.r == 1
+        and entry.StatusBar.Name.g == 0.82 and entry.StatusBar.Name.path == "Fonts\\Exo.ttf")
+    store.Set("damageMeterGameFont", "")
     store.Set("damageMeterHeaderColor", false)
     store.Set("damageMeterBarBgColor", false)
     store.Set("damageMeterPanelColor", false)
@@ -1320,6 +1367,7 @@ do
     store.Set("damageMeterShowTimer", true)
     check("shown again: whole", window.SessionTimer.alpha == 1 and window.SessionDropdown.alpha == 0)
     store.Set("damageMeterShowTimer", false)
+    Unpick(store)
     store.Set("damageMeterSkin", false)
     check("the reskin off: every part is the game's and shown", window.SessionTimer.alpha == 1
         and window.SessionDropdown.alpha == 1 and window.SettingsDropdown.alpha == 1)
@@ -1329,9 +1377,9 @@ do
     for _, row in ipairs(s.cards[1].rows) do
         if row.key then rows[row.key] = row end
     end
-    check("rows: a toggle each, waiting for the reskin", rows.damageMeterShowTimer.toggle == true
+    check("rows: a toggle each, not waiting for the reskin", rows.damageMeterShowTimer.toggle == true
         and rows.damageMeterShowSession.toggle == true and rows.damageMeterShowCog.toggle == true
-        and rows.damageMeterShowTimer.needs == "damageMeterSkin"
+        and rows.damageMeterShowTimer.needs == nil
         and rows.damageMeterMenu.toggle == true and rows.damageMeterShowTitle.toggle == true
         and rows.damageMeterShowMinimize.toggle == true and rows.damageMeterShowDropdown.toggle == true)
 end
@@ -1376,6 +1424,7 @@ do
     store.Set("damageMeterShowCog", true)
     check("shown again: the width it had, and its opacity", window.SessionDropdown.width == 62
         and window.SettingsDropdown.width == 24 and window.SessionDropdown.alpha == 1)
+    Unpick(store)
     store.Set("damageMeterSkin", false)
     check("the reskin off: every part has the game's width again", window.SessionTimer.width == 0
         and window.MinimizeButton.width == 24 and window.DamageMeterTypeDropdown.width == 140)
@@ -1436,33 +1485,40 @@ do
     Login(frames)
     local window = meter.windows[1]
     local dropdown, text = window.DamageMeterTypeDropdown, window.DamageMeterTypeDropdown.TypeName
-    check("no offset: the text where the game put it", #text.points == 1 and text.points[1][4] == 28
+    check("no offset: the text where the game put it, a gap off the arrow", #text.points == 1
+        and text.points[1][4] == 28 + GAP
         and text.points[1][5] == 0 and text.points[1][2] == dropdown)
     check("and the dropdown button after the timer, as the game has it",
         #dropdown.points == 1 and dropdown.points[1][1] == "TOPLEFT" and dropdown.points[1][2] == window.SessionTimer
         and dropdown.points[1][3] == "TOPRIGHT" and dropdown.points[1][4] == 0 and dropdown.points[1][5] == 6)
     store.Set("damageMeterTitleX", 30)
-    check("to the right: the text, from where the game put it, the same place vertically", text.points[1][4] == 58
+    check("to the right: the text, from where the game put it, the same place vertically",
+        text.points[1][4] == 58 + GAP
         and text.points[1][5] == 0 and text.points[1][2] == dropdown)
     check("the dropdown button does not move with it", dropdown.points[1][4] == 0 and dropdown.points[1][5] == 6)
     store.Set("damageMeterTitleX", -10)
-    check("to the left, from where the game put it and not from the last place", text.points[1][4] == 18)
+    check("to the left, from where the game put it and not from the last place", text.points[1][4] == 18 + GAP)
     store.Set("damageMeterTitleX", 0)
-    check("0 puts it back", text.points[1][4] == 28)
+    check("0 puts it back", text.points[1][4] == 28 + GAP)
     store.Set("damageMeterTitleX", 20)
     store.Set("damageMeterSkin", false)
-    check("the reskin off puts both back as the game had them", text.points[1][4] == 28 and #text.points == 1
+    check("the reskin off keeps the offset: it is a pick, not the theme", text.points[1][4] == 48 + GAP
+        and #text.points == 1
+        and dropdown.points[1][2] == window.SessionTimer)
+    store.Set("damageMeterTitleX", 0)
+    check("and with 0 and the reskin off both are as the game had them", text.points[1][4] == 28 and #text.points == 1
         and dropdown.points[1][2] == window.SessionTimer and dropdown.points[1][1] == "TOPLEFT"
         and dropdown.points[1][3] == "TOPRIGHT" and dropdown.points[1][5] == 6)
+    store.Set("damageMeterTitleX", 20)
     store.Set("damageMeterSkin", true)
-    check("and on again the text is moved again", text.points[1][4] == 48
+    check("and on again the text is moved again", text.points[1][4] == 48 + GAP
         and dropdown.points[1][2] == window.SessionTimer)
     local row
     for _, item in ipairs(s.cards[1].rows) do
         if item.key == "damageMeterTitleX" then row = item end
     end
-    check("a Title X Offset row, from left to right, waiting for the reskin", row and row.slider[1] == -200
-        and row.slider[2] == 200 and row.unit == "px" and row.needs == "damageMeterSkin")
+    check("a Title X Offset row, from left to right, not waiting for the reskin", row and row.slider[1] == -200
+        and row.slider[2] == 200 and row.unit == "px" and row.needs == nil)
 end
 
 -- the timer stays in front of the title, as wide as its text, and has an X offset of its own
@@ -1481,16 +1537,17 @@ do
     store.Set("damageMeterTimerX", 30)
     check("the timer's offset moves the timer", timer.points[1][4] == 31 and timer.points[1][5] == -9)
     check("and nothing else: the button is given it back and the text is where it was",
-        dropdown.points[1][4] == -30 and dropdown.points[1][5] == 6 and text.points[1][4] == 28)
+        dropdown.points[1][4] == -30 and dropdown.points[1][5] == 6 and text.points[1][4] == 28 + GAP)
     store.Set("damageMeterTimerX", -20)
     check("to the left from where the game put it, not from the last place", timer.points[1][4] == -19
         and dropdown.points[1][4] == 20)
     store.Set("damageMeterTitleX", 40)
-    check("the title's offset is its own", text.points[1][4] == 68 and timer.points[1][4] == -19
+    check("the title's offset is its own", text.points[1][4] == 68 + GAP and timer.points[1][4] == -19
         and dropdown.points[1][4] == 20)
     store.Set("damageMeterTimerX", 0)
     store.Set("damageMeterTitleX", 0)
-    check("0 puts both back", timer.points[1][4] == 1 and dropdown.points[1][4] == 0 and text.points[1][4] == 28)
+    check("0 puts both back", timer.points[1][4] == 1 and dropdown.points[1][4] == 0
+        and text.points[1][4] == 28 + GAP)
     store.Set("damageMeterTimerX", 15)
     text:SetText("Healing Done")
     check("the title changing lays it out the same", timer.points[1][4] == 16 and dropdown.points[1][4] == -15)
@@ -1511,11 +1568,15 @@ do
     store.Set("damageMeterShowTimer", true)
     check("shown again: its text's width", timer.width == 0 and timer.alpha == 1)
     store.Set("damageMeterSkin", false)
-    check("the reskin off: both of the game's anchors and the button as it had it", #timer.points == 2
+    check("the reskin off keeps the offset: it is a pick, not the theme", timer.points[1][4] == 16
+        and #timer.points == 1 and dropdown.points[1][4] == -15)
+    store.Set("damageMeterTimerX", 0)
+    check("and with 0 and the reskin off: both of the game's anchors and the button as it had it", #timer.points == 2
         and timer.points[1][4] == 1 and timer.points[2][1] == "TOPRIGHT" and timer.width == 0
         and dropdown.points[1][2] == timer and dropdown.points[1][4] == 0)
     timer:SetWidth(300)
     check("and what the game does then is left alone", timer.width == 300 and #timer.points == 2)
+    store.Set("damageMeterTimerX", 15)
     store.Set("damageMeterSkin", true)
     check("on again: the offset is applied again", timer.points[1][4] == 16 and #timer.points == 1
         and dropdown.points[1][4] == -15)
@@ -1523,8 +1584,8 @@ do
     for _, item in ipairs(s.cards[1].rows) do
         if item.key == "damageMeterTimerX" then row = item end
     end
-    check("a Timer X Offset row, from left to right, waiting for the reskin", row and row.slider[1] == -200
-        and row.slider[2] == 200 and row.unit == "px" and row.needs == "damageMeterSkin")
+    check("a Timer X Offset row, from left to right, not waiting for the reskin", row and row.slider[1] == -200
+        and row.slider[2] == 200 and row.unit == "px" and row.needs == nil)
 end
 
 -- numbers the game keeps secret are never added, compared or measured
@@ -1543,11 +1604,12 @@ do
         and dropdown.points[1][5] == SECRET)
     check("the timer is laid out all the same: one anchor, moved by its offset", #timer.points == 1
         and timer.points[1][2] == window.Header and timer.points[1][4] == 11)
-    check("the rest of the title bar is laid out and the skin went on", text.points[1][4] == 28
+    check("the rest of the title bar is laid out and the skin went on", text.points[1][4] == 28 + GAP
         and window.MinimizeContainer.Background.solid ~= nil)
     check("a secret width is not collapsed on (it could not be given back)", window.SessionDropdown.width == SECRET)
     store.Set("damageMeterTitleX", 10)
-    check("and the next layout is as unharmed", text.points[1][4] == 38 and window.SessionDropdown.width == SECRET)
+    check("and the next layout is as unharmed", text.points[1][4] == 38 + GAP
+        and window.SessionDropdown.width == SECRET)
     dropdown.points[1][5] = 6
     env.issecretvalue = function() return false end
     store.Set("damageMeterTitleX", 0)
@@ -1588,7 +1650,8 @@ do
     Login(frames)
     local window = meter.windows[1]
     check("a value that is not a number moves nothing", window.SessionTimer.points[1][4] == 1
-        and window.DamageMeterTypeDropdown.points[1][4] == 0 and window.DamageMeterTypeDropdown.TypeName.points[1][4] == 28)
+        and window.DamageMeterTypeDropdown.points[1][4] == 0
+        and window.DamageMeterTypeDropdown.TypeName.points[1][4] == 28 + GAP)
 end
 
 -- a layout that fails is reported and the skin goes on
@@ -1622,6 +1685,7 @@ do
         store.Set("damageMeterTheme", round == 2 and "game" or "current")
     end
     check("on, off and on again, with every switch changed between, raises no error", true)
+    Unpick(store)
     store.Set("damageMeterSkin", false)
     check("the game's order is back: the dropdown after the timer, the timer on its own anchors",
         dropdown.points[1][2] == timer and #timer.points == 2 and timer.points[1][2] == window.Header)
@@ -1638,7 +1702,238 @@ do
     check("a failing layout raises its error", not pcall(store.Set, "damageMeterTitleX", 5))
     timer.SetWidth = setWidth
     store.Set("damageMeterTitleX", 6)
-    check("and the next one is not locked out", dropdown.TypeName.points[1][4] == 34)
+    check("and the next one is not locked out", dropdown.TypeName.points[1][4] == 34 + GAP)
+end
+
+-- the reskin off: what is picked still applies on the game's own look, and nothing else is touched
+do
+    local CLASS = { r = CLASS_RGB[1], g = CLASS_RGB[2], b = CLASS_RGB[3] }
+    local RED, GREY = { r = 0.9, g = 0.1, b = 0.1 }, { r = 0.4, g = 0.4, b = 0.4 }
+    local s, store, meter, ns, frames = Boot({ damageMeterBarAlpha = 60 }, true)
+    Login(frames)
+    local window = meter.windows[1]
+    local c = window.MinimizeContainer
+    local entry = c.ScrollBox.frames[1]
+    local bar = entry.StatusBar
+    local rows = {}
+    for _, row in ipairs(s.cards[1].rows) do
+        if row.key then rows[row.key] = row end
+    end
+    check("a pick with the reskin off is applied from login", s.hooks > s.base and entry.barTexture.alpha == 0.6)
+    check("and the game's look is kept: its art, colors, font and bar", window.Header.atlas == "ui-damagemeters-header-bar"
+        and window.Header.solid == nil and c.Background.atlas == "damagemeters-background"
+        and bar.Name.path == GAME_FONT and bar.Name.r == 1 and bar.Name.g == 0.82
+        and bar.Background.atlas == "ui-damagemeters-bar-shadowbg" and SameRgb(entry.barTexture.vertex, CLASS)
+        and #s.borders == 0)
+
+    -- the rows read the game's look, and every one is on
+    check("the rows are the game's look's own: its font, texture, bar color and icon border", rows.damageMeterFont.hidden()
+        and rows.damageMeterGameFont.hidden() == false and rows.damageMeterGameFont.font == "Game Default"
+        and rows.damageMeterGameTexture.hidden() == false
+        and rows.damageMeterTexture.hidden() == true and rows.damageMeterGameBars.hidden() == false
+        and rows.damageMeterBars.hidden() == true and rows.damageMeterGameIconEdge.hidden() == false
+        and rows.damageMeterIconEdge.hidden() == true)
+    check("only the Theme row waits for the reskin", rows.damageMeterTheme.needs == "damageMeterSkin"
+        and rows.damageMeterGameFont.needs == nil and rows.damageMeterNameColor.needs == nil
+        and rows.damageMeterScrollBar.needs == nil and rows.damageMeterTitleFade.needs == nil)
+    check("the spell panel's opacity waits for a color, which it says", rows.damageMeterPanelAlpha.needs() == false
+        and rows.damageMeterPanelAlpha.why == "Pick a Spell Panel Color or a Window Color")
+
+    -- font, outline, sizes and colors
+    store.Set("damageMeterGameFont", "Exo")
+    store.Set("damageMeterOutline", "THICKOUTLINE")
+    check("a font and an outline", bar.Name.path == "Fonts\\Exo.ttf" and bar.Name.flags == "THICKOUTLINE"
+        and bar.Value.path == "Fonts\\Exo.ttf" and window.SessionTimer.path == "Fonts\\Exo.ttf")
+    store.Set("damageMeterNameSize", 18)
+    store.Set("damageMeterNameColor", RED)
+    check("a size and a color for the names only", bar.Name.size == 18 and bar.Value.size == GAME_SIZE
+        and SameRgb({ bar.Name.r, bar.Name.g, bar.Name.b }, RED) and bar.Value.r == 1 and bar.Value.g == 0.82)
+    store.Set("damageMeterWindowColor", GREY)
+    check("a Window Color: the window, and the spell panel and the shadows that follow it", SameRgb(c.Background.solid, GREY)
+        and SameRgb(c.SourceWindow.Background.solid, GREY) and SameRgb(bar.Background.solid, GREY)
+        and window.Header.atlas == "ui-damagemeters-header-bar")
+    check("which the spell panel's opacity then waits for no longer", rows.damageMeterPanelAlpha.needs() == true)
+
+    -- bars, borders, buttons, scroll bar, title bar
+    store.Set("damageMeterGameBars", "accent")
+    store.Set("damageMeterGameTexture", "Flat")
+    store.Set("damageMeterGameIconEdge", true)
+    check("the game's look's own bar color, texture and icon border", SameRgb(entry.barTexture.vertex, THEME.accent)
+        and bar.file == "Textures\\Flat" and #s.borders == 4)
+    store.Set("damageMeterBorder", true)
+    store.Set("damageMeterButtons", "themed")
+    store.Set("damageMeterShowTimer", false)
+    check("a window border, themed buttons and a hidden timer", #s.borders == 6 and window.MinimizeButton.glyph.desaturated == true
+        and window.SessionTimer.alpha == 0)
+    store.Set("damageMeterScrollBar", "hidden")
+    store.Set("damageMeterTitleFade", "hover")
+    check("a hidden scroll bar and a faded title bar tick", c.ScrollBar.alpha == 0 and frames[#frames].shown == true)
+    store.Set("damageMeterTitleX", 12)
+    check("a title offset moves the title's text", window.DamageMeterTypeDropdown.TypeName.points[1][4] == 40 + GAP)
+
+    -- the reskin on paints the rest from the theme, the picks stay; off again gives that back
+    store.Set("damageMeterSkin", true)
+    check("on: the title bar is the theme's, the picks stay", SameRgb(window.Header.solid, THEME.panel)
+        and SameRgb(c.Background.solid, GREY) and SameRgb({ bar.Name.r, bar.Name.g, bar.Name.b }, RED)
+        and bar.Name.path == FONT)
+    store.Set("damageMeterSkin", false)
+    check("off again: the title bar is the game's, the picks stay", window.Header.atlas == "ui-damagemeters-header-bar"
+        and SameRgb(c.Background.solid, GREY) and SameRgb({ bar.Name.r, bar.Name.g, bar.Name.b }, RED)
+        and bar.Name.path == "Fonts\\Exo.ttf" and window.SessionTimer.alpha == 0 and entry.barTexture.alpha == 0.6)
+
+    -- read once: the game's refreshes do not read the store
+    local reads, raw = 0, store.Raw
+    store.Raw = function(key)
+        reads = reads + 1
+        return raw(key)
+    end
+    for _ = 1, 5 do
+        entry:UpdateStyle(); entry:UpdateBackground(); entry:UpdateStatusBarColor()
+    end
+    check("the card's picks are read when a setting changes, not at each refresh", reads == 0)
+    store.Set("damageMeterBarAlpha", 70)
+    check("and once for a change", reads > 0 and entry.barTexture.alpha == 0.7)
+    store.Raw = raw
+
+    -- a profile loaded: picks that were not Set are found at Apply
+    Unpick(store)
+    check("nothing picked and the reskin off: every one is the game's again", window.Header.atlas == "ui-damagemeters-header-bar"
+        and c.Background.atlas == "damagemeters-background" and bar.Name.path == GAME_FONT and bar.Name.size == GAME_SIZE
+        and bar.Name.flags == GAME_FLAGS and bar.Name.r == 1 and entry.barTexture.alpha == 1 and window.SessionTimer.alpha == 1
+        and bar.Background.atlas == "ui-damagemeters-bar-shadowbg"
+        and entry.barTexture.atlas == "UI-HUD-CoolDownManager-Bar"
+        and SameRgb(entry.barTexture.vertex, CLASS) and c.ScrollBar.alpha == 1
+        and window.DamageMeterTypeDropdown.TypeName.points[1][4] == 28)
+    check("and the borders are hidden", s.borders[1]._frame.shown == false and s.borders[#s.borders]._frame.shown == false)
+    entry:UpdateStyle()
+    check("a refresh by the game is left as it is", bar.Background.atlas == "ui-damagemeters-bar-shadowbg")
+    s.settings.damageMeterBarAlpha = 40
+    ns.Apply()
+    check("a profile with a pick is found when it is applied", entry.barTexture.alpha == 0.4)
+    store.Set("enabled", false)
+    check("QoL off gives it back, picks and all", entry.barTexture.alpha == 1)
+end
+
+-- every pick of the card starts it with the reskin off, and the theme's own do not
+do
+    for _, key in ipairs(PICKED) do
+        local s, store, _, _, frames = Boot({}, true)
+        Login(frames)
+        local default = store.Default(key)
+        local value
+        if default == true then
+            value = false
+        elseif default == false then
+            value = { r = 1, g = 0, b = 0 }
+        elseif type(default) == "number" then
+            value = default + 1
+        else
+            value = default .. "x"
+        end
+        check(key .. ": untouched until it is picked", s.hooks == s.base)
+        store.Set(key, value)
+        check(key .. ": picked, with the reskin off, it is applied", s.hooks > s.base)
+    end
+    local s = Boot()
+    local keyed = {}
+    for _, row in ipairs(s.cards[1].rows) do
+        if row.key then keyed[row.key] = true end
+    end
+    for _, key in ipairs(PICKED) do
+        check(key .. ": a row of the card has it as its setting, so Reset on the card gives it back", keyed[key] == true)
+    end
+    for _, pick in ipairs({ { "damageMeterBars", "custom" }, { "damageMeterTexture", "Flat" },
+            { "damageMeterIconEdge", false }, { "damageMeterTheme", "midnight" } }) do
+        local s, store, _, _, frames = Boot({}, true)
+        Login(frames)
+        store.Set(pick[1], pick[2])
+        check(pick[1] .. ": the theme look's own pick does nothing with the reskin off", s.hooks == s.base)
+    end
+end
+
+-- the title's text is kept a few pixels off the arrow while the arrow shows
+do
+    local _, store, meter, _, frames = Boot({ damageMeterSkin = true }, true)
+    local window = meter.windows[1]
+    local text = window.DamageMeterTypeDropdown.TypeName
+    text.points = { { "LEFT", window.DamageMeterTypeDropdown, "RIGHT", 0, 3 },
+        { "RIGHT", window.SessionDropdown, "LEFT", -5, 0 } }
+    Login(frames)
+    check("the arrow shows: the text's left edge is a gap off it, its right edge is the game's",
+        #text.points == 2 and text.points[1][4] == GAP and text.points[1][5] == 3 and text.points[2][4] == -5)
+    store.Set("damageMeterTitleX", 10)
+    check("and the title's offset moves both", text.points[1][4] == 10 + GAP and text.points[2][4] == 5)
+    store.Set("damageMeterShowDropdown", false)
+    check("the arrow hidden: no gap to keep", text.points[1][4] == 10 and text.points[2][4] == 5)
+    store.Set("damageMeterShowDropdown", true)
+    check("shown again: the gap again", text.points[1][4] == 10 + GAP)
+    store.Set("damageMeterTitleX", 0)
+    store.Set("damageMeterSkin", false)
+    check("nothing picked and the reskin off: the game's own anchors", #text.points == 2 and text.points[1][4] == 0
+        and text.points[2][4] == -5)
+end
+
+-- what the card's preview reads: what the picks make of each part
+do
+    local RED = { r = 0.9, g = 0.1, b = 0.1 }
+    local s, store, _, ns, frames = Boot({}, true)
+    Login(frames)
+    local Describe = ns.DamageMeterLook.Describe
+    check("the card has the preview", s.cards[1].studio == ns.DamageMeterPreview)
+    local look = Describe()
+    check("nothing picked, the reskin off: the game's own look, every part shown", look.on == false
+        and look.header == nil and look.barTexture == nil and look.font == nil and look.border == nil
+        and look.title and look.arrow and look.timer and look.session and look.cog and look.minimize
+        and look.barAlpha == 1 and look.gap == 0)
+    store.Set("damageMeterSkin", true)
+    store.Set("damageMeterBars", "accent")
+    look = Describe()
+    check("the reskin on, the current theme: its colors, the Naowh gradient, the addon's font", look.on == true
+        and look.header == THEME.panel and look.window == THEME.bg and look.barBackground == THEME.bg
+        and look.barTexture == "Media\\NaowhReverseGradient.tga" and look.barColor == THEME.accent
+        and look.font == FONT and look.nameColor == THEME.fg and look.valueColor == THEME.muted
+        and look.iconBorder == true and look.border == nil and look.buttons == nil)
+    store.Set("damageMeterTheme", "game")
+    look = Describe()
+    check("the game's own look: its art, its bar and its face, the icons not bordered", look.header == nil
+        and look.window == nil and look.barTexture == nil and look.barColor == nil and look.font == nil
+        and look.nameColor == nil and look.iconBorder == false)
+    store.Set("damageMeterGameFont", "Exo")
+    store.Set("damageMeterGameBars", "accent")
+    store.Set("damageMeterGameTexture", "Flat")
+    store.Set("damageMeterGameIconEdge", true)
+    store.Set("damageMeterHeaderColor", RED)
+    store.Set("damageMeterNameSize", 18)
+    store.Set("damageMeterOutline", "THICKOUTLINE")
+    store.Set("damageMeterBarAlpha", 40)
+    store.Set("damageMeterBarBgColor", RED)
+    store.Set("damageMeterBarBgAlpha", 50)
+    look = Describe()
+    check("what is picked for it", look.font == "Fonts\\Exo.ttf" and look.barColor == THEME.accent
+        and look.barTexture == "Textures\\Flat" and look.iconBorder == true and look.header == RED
+        and look.nameSize == 18 and look.valueSize == nil and look.outline == "THICKOUTLINE"
+        and look.barAlpha == 0.4 and look.barBackground == RED and look.barBackgroundAlpha == 0.5)
+    store.Set("damageMeterBorder", true)
+    store.Set("damageMeterButtons", "themed")
+    check("a border, in the line color, and themed buttons in the accent", Describe().border == THEME.line
+        and Describe().buttons == THEME.accent)
+    store.Set("damageMeterBorderColor", RED)
+    store.Set("damageMeterButtonColor", RED)
+    check("and in the colors picked", Describe().border == RED and Describe().buttons == RED)
+    store.Set("damageMeterShowTimer", false)
+    store.Set("damageMeterShowCog", false)
+    store.Set("damageMeterTitleX", 12)
+    store.Set("damageMeterTimerX", -5)
+    look = Describe()
+    check("the parts switched off and the offsets", look.timer == false and look.cog == false
+        and look.session == true and look.minimize == true and look.titleX == 12 and look.timerX == -5
+        and look.gap == 4)
+    store.Set("damageMeterShowDropdown", false)
+    check("no arrow, no gap off it", Describe().arrow == false and Describe().gap == 0)
+    store.Set("damageMeterTitleX", "far")
+    check("an offset that is not a number is none", Describe().titleX == 0)
+    store.Set("enabled", false)
+    check("QoL off: the game's own look again", Describe().on == false and Describe().header == nil)
 end
 
 print("PASS damage meter skin: " .. checks .. " checks")

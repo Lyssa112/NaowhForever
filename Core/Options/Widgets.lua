@@ -1327,8 +1327,8 @@ function UI.KeepMissing(values, order, selected)
     return values, order
 end
 
-function UI.FontChoices(selected)
-    local values, order = { [""] = TEXT_ADDON_FONT }, { "" }
+function UI.FontChoices(selected, label)
+    local values, order = { [""] = label or TEXT_ADDON_FONT }, { "" }
     local LSM = SharedMedia()
     if LSM then
         for _, name in ipairs(LSM:List("font")) do

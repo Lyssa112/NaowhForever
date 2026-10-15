@@ -35,10 +35,19 @@ local Title = { switches = { SessionTimer = "damageMeterShowTimer", SessionDropd
     SettingsDropdown = "damageMeterShowCog", MinimizeButton = "damageMeterShowMinimize" },
     titleKey = "damageMeterShowTitle", arrowKey = "damageMeterShowDropdown", menuKey = "damageMeterMenu",
     shiftKey = "damageMeterTitleX", timerKey = "damageMeterTimerX", shiftRange = { -200, 200, 1 },
-    menuTitle = "Damage Meter Title Bar", collapsed = 1 }
+    menuTitle = "Damage Meter Title Bar", collapsed = 1, gap = 4 }
 Title.items = { { "Title", Title.titleKey }, { "Dropdown Button", Title.arrowKey },
     { "Timer", Title.switches.SessionTimer }, { "Session Button", Title.switches.SessionDropdown },
     { "Settings Button", Title.switches.SettingsDropdown }, { "Minimize Button", Title.switches.MinimizeButton } }
+local PICKS = { "damageMeterBarColor", "damageMeterBarAlpha", "damageMeterBarBgColor", "damageMeterBarBgAlpha",
+    "damageMeterScrollBar", "damageMeterFont", "damageMeterOutline", "damageMeterHeaderColor",
+    "damageMeterWindowColor", "damageMeterNameColor", "damageMeterNameSize", "damageMeterValueColor",
+    "damageMeterValueSize", "damageMeterTitleColor", "damageMeterTitleSize", "damageMeterPanelColor",
+    "damageMeterPanelAlpha", "damageMeterBorder", "damageMeterBorderColor", "damageMeterButtons",
+    "damageMeterButtonColor", "damageMeterTitleFade", "damageMeterTitleFadeAlpha", Title.titleKey, Title.arrowKey,
+    Title.menuKey, Title.shiftKey, Title.timerKey, Title.switches.SessionTimer, Title.switches.SessionDropdown,
+    Title.switches.SettingsDropdown, Title.switches.MinimizeButton, "damageMeterGameBars", "damageMeterGameTexture",
+    "damageMeterGameIconEdge", "damageMeterGameFont" }
 local FADE_EVERY, FADE_STEP, SETTLE, WATCH_DEPTH, SCROLL_DEPTH, PERCENT = 0.1, 0.35, 1, 5, 3, 100
 local PERCENT_RANGE = { 0, PERCENT, 5 }
 local FONT_SIZE_RANGE, FONT_SIZE_DEFAULT = { 0, 24, 1 }, 12
@@ -48,6 +57,7 @@ local BUTTONS_GAME, BUTTONS_THEMED = "game", "themed"
 local BUTTONS = { { game = TEXT_GAME_DEFAULT, themed = "Themed" }, { BUTTONS_GAME, BUTTONS_THEMED } }
 local TEXT_NEEDS_THEMED = ns.L("Set Buttons to Themed")
 local TEXT_NEEDS_BORDER, TEXT_NEEDS_FADE = ns.L("Turn on Window Border"), ns.L("Set Title Bar to Shown on Hover")
+local TEXT_NEEDS_PANEL = ns.L("Pick a Spell Panel Color or a Window Color")
 local SETTING_PREFIX, POSITION_KEY = "^damageMeter", "damageMeterPos"
 local THEME_KEY = "damageMeterTheme"
 local LOOK_GAME, LOOK_CURRENT, LOOK_DEFAULT, LOOK_CUSTOM = "game", "current", "default", "custom"
@@ -65,6 +75,7 @@ local function Weak()
 end
 
 local meter
+local customized
 local generation = 0
 local looks, hooked, edges, entries = Weak(), Weak(), Weak(), Weak()
 local arts, swapped, faced, faded = Weak(), Weak(), Weak(), Weak()
@@ -77,8 +88,36 @@ local fader
 local sinceTick = 0
 local hovering, lowAlpha, scrollHidden, busy, awake = false, 0, false, false, 0
 
+local function SkinOn()
+    return S.Get("damageMeterSkin") == true
+end
+
+local function Picked(key)
+    local raw = S.Raw(key)
+    if raw == nil then return false end
+    local default = S.Default(key)
+    if type(raw) == "table" and type(default) == "table" then
+        return raw.r ~= default.r or raw.g ~= default.g or raw.b ~= default.b
+    end
+    return raw ~= default
+end
+
+-- Read once and kept until a setting changes: the hooks ask for it at every refresh of every bar.
+local function Customized()
+    if customized == nil then
+        customized = false
+        for _, key in ipairs(PICKS) do
+            if Picked(key) then
+                customized = true
+                break
+            end
+        end
+    end
+    return customized
+end
+
 local function On()
-    return S.Get("enabled") and S.Get("damageMeterSkin")
+    return S.Get("enabled") and (SkinOn() or Customized())
 end
 
 local function Free()
@@ -91,7 +130,7 @@ local function Watched(key)
 end
 
 local function Blizzard()
-    return S.Get(THEME_KEY) == LOOK_GAME
+    return not SkinOn() or S.Get(THEME_KEY) == LOOK_GAME
 end
 
 local function NotBlizzard()
@@ -157,7 +196,7 @@ end
 
 local function Token(token)
     local look = S.Get(THEME_KEY)
-    if look == LOOK_GAME then return nil end
+    if look == LOOK_GAME or not SkinOn() then return nil end
     if look == LOOK_CURRENT or type(look) ~= "string" then return T[token] end
     return Palette(look)[token]
 end
@@ -219,9 +258,17 @@ local function BarColor()
     if choice == BAR_CUSTOM then return Pick("damageMeterBarColor", "accent") end
 end
 
+local function FontKey()
+    return Blizzard() and "damageMeterGameFont" or "damageMeterFont"
+end
+
+-- nil is the game's own face, which only the game's look keeps when no font is picked
 local function FontPath()
-    local name = S.Get("damageMeterFont")
-    if name == "" then return ns.UIFontPath() end
+    local name = S.Get(FontKey())
+    if type(name) ~= "string" or name == "" then
+        if Blizzard() then return nil end
+        return ns.UIFontPath()
+    end
     return ns.UI.FontPath(name)
 end
 
@@ -268,12 +315,13 @@ end
 
 local function Face(fontString, was, key)
     local outline = S.Get("damageMeterOutline")
+    local path = FontPath() or was.path
     if outline == OUTLINE_GAME then
-        fontString:SetFont(FontPath(), Size(was.size, key), was.flags)
+        fontString:SetFont(path, Size(was.size, key), was.flags)
         Shadow(fontString, was)
         return
     end
-    fontString:SetFont(FontPath(), Size(was.size, key), Parts.HudFlags(outline))
+    fontString:SetFont(path, Size(was.size, key), Parts.HudFlags(outline))
     if outline == OUTLINE_SHADOW then Parts.HudText(fontString) else Parts.HudText(fontString, false) end
 end
 
@@ -437,7 +485,7 @@ local function Buttons(window, themed)
     buttoned[window] = true
     local c = Pick("damageMeterButtonColor", "accent")
     for _, key in ipairs(BUTTON_PARTS) do
-        for _, texture in ipairs(Textures(window[key], BUTTON_DEPTH, {})) do
+        for _, texture in ipairs(Title.Glyphs(window[key])) do
             if glyphs[texture] == nil and Has(texture, "GetVertexColor") then
                 local first = Vertex(texture)
                 first.desaturated = Has(texture, "IsDesaturated") and texture:IsDesaturated() or false
@@ -568,12 +616,19 @@ function Title.Arrange(window)
         return value
     end
     local pull = timerHome and Offset(Title.timerKey) or 0
+    -- the game hangs the title's text flush to the arrow (x of 0): a few pixels keep it off the arrow while it shows
+    local gap = (themed and S.Get(Title.arrowKey) ~= false) and Title.gap or 0
+    local shift = Offset(Title.shiftKey)
+    local function Along(anchor)
+        if type(anchor[1]) == "string" and anchor[1]:find("LEFT", 1, true) then return shift + gap end
+        return shift
+    end
     -- the part the others hang from goes first: no anchor ever depends on itself
     if timerHome then Title.Put(timer, timerHome, pull, themed) end
     if dropHome then
         Title.Put(dropdown, dropHome, function(anchor) return anchor[2] == timer and -pull or 0 end)
     end
-    if textHome then Title.Put(text, textHome, Offset(Title.shiftKey)) end
+    if textHome then Title.Put(text, textHome, Along) end
     if timerHome then timer:SetWidth((themed and not Title.Shown("SessionTimer")) and Title.collapsed or 0) end
 end
 
@@ -621,6 +676,15 @@ end
 
 function Title.IsText(region)
     return Has(region, "GetObjectType") and region:GetObjectType() == "FontString"
+end
+
+-- the pieces of a button that are art: its texts are the title and the session's letter, which have colors of their own
+function Title.Glyphs(part)
+    local out = {}
+    for _, region in ipairs(Textures(part, BUTTON_DEPTH, {})) do
+        if not Title.IsText(region) then out[#out + 1] = region end
+    end
+    return out
 end
 
 function Title.Inner(window)
@@ -943,11 +1007,13 @@ end
 
 hooksecurefunc(S, "Set", function(key)
     if not Watched(key) then return end
+    customized = nil
     Start()
     Apply()
     if key == THEME_KEY and ns.UI and ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
 end)
 hooksecurefunc(ns, "Apply", function()
+    customized = nil
     Start()
     Apply()
 end)
@@ -964,8 +1030,8 @@ local function Bordered()
     return S.Get("damageMeterBorder") == true
 end
 
-local function SkinOn()
-    return S.Get("damageMeterSkin") == true
+local function Paneled()
+    return PanelColor() ~= nil
 end
 
 local function NotFree()
@@ -992,13 +1058,6 @@ local function SizeRow(key, label, help)
         set = function(v) S.Set(key, v) end }
 end
 
-local function Own(keyOf)
-    return function() return S.Get(keyOf()) end, function(v) S.Set(keyOf(), v) end
-end
-
-local barsGet, barsSet = Own(BarsKey)
-local edgeGet, edgeSet = Own(EdgeKey)
-
 local function LookChoices()
     local values = { [LOOK_GAME] = TEXT_LOOK_GAME, [LOOK_CURRENT] = TEXT_LOOK_CURRENT,
         [LOOK_DEFAULT] = TEXT_LOOK_DEFAULT, [LOOK_CUSTOM] = TEXT_LOOK_CUSTOM }
@@ -1012,13 +1071,16 @@ local function LookChoices()
 end
 
 local skin = {
-    barColor = { key = "damageMeterBars", label = "Bar Color", choice = BARS, get = barsGet, set = barsSet },
+    barColor = { key = "damageMeterBars", label = "Bar Color", choice = BARS, hidden = Blizzard },
+    gameBarColor = { key = "damageMeterGameBars", label = "Bar Color", choice = BARS, hidden = NotBlizzard },
     customBarColor = ColorRow("damageMeterBarColor", "Custom Bar Color", "accent",
         "The bars' color when Bar Color is Custom Color.", CustomBars, TEXT_NEEDS_CUSTOM),
     texture = { key = "damageMeterTexture", label = "Bar Texture", texture = TEXT_GRADIENT, hidden = Blizzard },
     gameTexture = { key = "damageMeterGameTexture", label = "Bar Texture", texture = TEXT_GAME_DEFAULT,
       hidden = NotBlizzard },
-    iconEdge = { key = "damageMeterIconEdge", label = "Icon Border", toggle = true, get = edgeGet, set = edgeSet,
+    iconEdge = { key = "damageMeterIconEdge", label = "Icon Border", toggle = true, hidden = Blizzard,
+      help = "A thin border round each bar's icon." },
+    gameIconEdge = { key = "damageMeterGameIconEdge", label = "Icon Border", toggle = true, hidden = NotBlizzard,
       help = "A thin border round each bar's icon." },
     barAlpha = { key = "damageMeterBarAlpha", label = "Bar Opacity", slider = PERCENT_RANGE, unit = "%",
       help = "How solid the bars are." },
@@ -1028,7 +1090,8 @@ local skin = {
       help = "How solid the color behind each bar is." },
     scrollBar = { key = "damageMeterScrollBar", label = "Scroll Bar", choice = SCROLLS,
       help = "The game's own, in your Accent, or hidden; the mouse wheel still scrolls." },
-    font = { key = "damageMeterFont", label = "Font", font = true },
+    font = { key = "damageMeterFont", label = "Font", font = true, hidden = Blizzard },
+    gameFont = { key = "damageMeterGameFont", label = "Font", font = TEXT_GAME_DEFAULT, hidden = NotBlizzard },
     outline = { key = "damageMeterOutline", label = "Outline", choice = OUTLINES,
       help = "The game's own, none, the soft shadow, a thin outline or a thick one." },
     nameColor = ColorRow("damageMeterNameColor", "Name Color", "fg", "The names on the bars."),
@@ -1042,7 +1105,7 @@ local skin = {
     panelColor = ColorRow("damageMeterPanelColor", "Spell Panel Color", "bg",
         "The panel a left click opens, the Window Color until you pick one.", nil, nil, PanelColor),
     panelAlpha = { key = "damageMeterPanelAlpha", label = "Spell Panel Opacity", slider = PERCENT_RANGE, unit = "%",
-      help = "How solid the panel a left click opens is." },
+      needs = Paneled, why = TEXT_NEEDS_PANEL, help = "How solid the panel a left click opens is." },
     windowColor = ColorRow("damageMeterWindowColor", "Window Color", "bg", "The window and the shadow behind each bar."),
     border = { key = "damageMeterBorder", label = "Window Border", toggle = true,
       help = "A thin border round the window and the spell panel." },
@@ -1077,13 +1140,30 @@ local skin = {
       help = "How much of the title bar stays while the mouse is away." },
 }
 
-for _, row in pairs(skin) do
-    local own = row.needs
-    if type(own) == "function" then
-        row.needs = function() return SkinOn() and own() end
-    elseif own == nil then
-        row.needs = "damageMeterSkin"
-    end
+-- What the picks make of each part, for the card's preview: nil is the game's own look of it.
+ns.DamageMeterLook = {}
+
+function ns.DamageMeterLook.Describe()
+    local look = { on = On() == true, title = true, arrow = true, timer = true, session = true, cog = true,
+        minimize = true, barAlpha = 1, barBackgroundAlpha = 1, titleX = 0, timerX = 0, gap = 0 }
+    if not look.on then return look end
+    look.header, look.window = Resolve("damageMeterHeaderColor", "panel"), WindowColor()
+    look.barBackground, look.barBackgroundAlpha = BarBackground(), Fraction("damageMeterBarBgAlpha")
+    look.barTexture, look.barColor, look.barAlpha = TextureFile(), BarColor(), Fraction("damageMeterBarAlpha")
+    look.font, look.outline = FontPath(), S.Get("damageMeterOutline")
+    look.nameColor, look.nameSize = Resolve("damageMeterNameColor", "fg"), Size(nil, "damageMeterNameSize")
+    look.valueColor, look.valueSize = Resolve("damageMeterValueColor", "muted"), Size(nil, "damageMeterValueSize")
+    look.titleColor, look.titleSize = Resolve("damageMeterTitleColor", "fg"), Size(nil, "damageMeterTitleSize")
+    look.iconBorder = S.Get(EdgeKey()) ~= false
+    if S.Get("damageMeterBorder") == true then look.border = Pick("damageMeterBorderColor", "line") end
+    if ThemedButtons() then look.buttons = Pick("damageMeterButtonColor", "accent") end
+    look.title, look.arrow = S.Get(Title.titleKey) ~= false, S.Get(Title.arrowKey) ~= false
+    look.timer, look.session = Title.Shown("SessionTimer"), Title.Shown("SessionDropdown")
+    look.cog, look.minimize = Title.Shown("SettingsDropdown"), Title.Shown("MinimizeButton")
+    look.titleX = type(S.Get(Title.shiftKey)) == "number" and S.Get(Title.shiftKey) or 0
+    look.timerX = type(S.Get(Title.timerKey)) == "number" and S.Get(Title.timerKey) or 0
+    look.gap = look.arrow and Title.gap or 0
+    return look
 end
 
 local layout = ns.DamageMeterLayout
@@ -1100,23 +1180,26 @@ local function Add(...)
     end
 end
 
+-- The game's own settings come first: they are saved through Edit Mode, and the game may only take them at a reload.
+Add(Settings.Group("Game Settings"))
+Add(game.Visibility, game.FrameWidth, game.FrameHeight, game.Transparency, game.BackgroundTransparency, game.Style,
+    game.BarHeight, game.Padding, game.ShowSpecIcon, game.ShowClassColor, game.TextSize, game.Numbers,
+    layout and layout.restore)
+Add(Settings.Group("Look"))
 Add({ key = "damageMeterSkin", label = "Reskin", toggle = true,
-    help = "Draws the game's damage meter in your theme; the rows that need it wait for this." })
+    help = "Draws the game's meter in your theme; off keeps its colors, and the rows below still apply." })
 Add({ key = THEME_KEY, label = "Theme", choice = LookChoices, needs = "damageMeterSkin",
     help = "The colors you have not picked: the game's own, your current theme, or a theme." })
 Add(Settings.Group("Window"))
-Add(game.Visibility, game.FrameWidth, game.FrameHeight)
 Add({ key = "damageMeterFree", label = "Move and Resize", toggle = true,
     note = function() return placementNote end,
     help = "Drag the window and its corner here, without Edit Mode." })
-Add(game.Transparency, game.BackgroundTransparency, skin.windowColor, skin.border, skin.borderColor)
+Add(skin.windowColor, skin.border, skin.borderColor)
 Add(Settings.Group("Bars"))
-Add(game.Style, game.BarHeight, game.Padding, skin.texture, skin.gameTexture, skin.barColor, skin.customBarColor,
-    skin.barAlpha, skin.barBgColor, skin.barBgAlpha, game.ShowSpecIcon, game.ShowClassColor, skin.iconEdge,
-    skin.scrollBar)
+Add(skin.texture, skin.gameTexture, skin.barColor, skin.gameBarColor, skin.customBarColor, skin.barAlpha,
+    skin.barBgColor, skin.barBgAlpha, skin.iconEdge, skin.gameIconEdge, skin.scrollBar)
 Add(Settings.Group("Text"))
-Add(skin.font, skin.outline, game.TextSize, game.Numbers, skin.nameColor, skin.nameSize, skin.valueColor,
-    skin.valueSize)
+Add(skin.font, skin.gameFont, skin.outline, skin.nameColor, skin.nameSize, skin.valueColor, skin.valueSize)
 Add(Settings.Group("Title Bar"))
 Add(skin.titleColor, skin.titleSize, skin.titleX, skin.timerX, skin.headerColor, skin.buttons, skin.buttonColor,
     skin.showTitle, skin.showArrow, skin.showTimer, skin.showSession, skin.showCog, skin.showMinimize, skin.menu,
@@ -1126,7 +1209,6 @@ Add(skin.panelColor, skin.panelAlpha)
 Add(Settings.Group("Reset"))
 Add({ label = "Window Position", buttonText = "Reset", button = ResetPosition,
     needs = "damageMeterFree", help = "Puts the window back where Edit Mode has it." })
-Add(layout and layout.restore)
 
 local function OtherMeters()
     local names
@@ -1139,6 +1221,7 @@ end
 
 Settings.Page("QoL/Damage Meter", S):Card({
     id = "damageMeterSkin", name = "Default Damage Meter", order = CARD_ORDER, open = true, note = OtherMeters,
+    studio = ns.DamageMeterPreview,
     help = "The game's own damage meter: in your theme, sized and set here instead of in Edit Mode.",
     search = "damage meter skin reskin blizzard default look theme colors bar height move resize edit mode style "
         .. "numbers padding",
