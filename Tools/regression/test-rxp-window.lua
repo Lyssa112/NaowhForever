@@ -946,10 +946,26 @@ do
     Check(select(4, ns.RXPWindowColor("barBack")) == 0.5 and select(1, ns.RXPWindowColor("barBack"))
         == select(1, ns.RXPWindowColor("line")), "the bar's background is the line's color to start")
 
-    ns.SetRXPWindowTheme(ns.THEME_PRESET_ORDER[1])
-    Check(Black(ns.RXPWindowColor("boxBorder")) and Black(ns.RXPWindowColor("barBorder")),
-        "in a preset theme too, and in the Forever skin's")
+    local function Is(line, ...)
+        local r, g, b, a = ...
+        return r == line.r and g == line.g and b == line.b and a == 1
+    end
+    local preset = ns.THEME_PRESET_ORDER[1]
+    ns.SetRXPWindowTheme(preset)
+    Check(Is(ns.THEME_PRESETS[preset].line, ns.RXPWindowColor("boxBorder"))
+        and Is(ns.THEME_PRESETS[preset].line, ns.RXPWindowColor("barBorder")),
+        "a preset's is its own line color: themed, and black only in the Naowh theme")
+    ns.SetRXPWindowTheme("forever")
+    Check(Is(ns.FOREVER_SKIN.line, ns.RXPWindowColor("boxBorder")) and Is(ns.FOREVER_SKIN.line, ns.RXPWindowColor("barBorder")),
+        "and the Forever skin's its bronze")
     ns.SetRXPWindowTheme("")
+    Check(Black(ns.RXPWindowColor("boxBorder")), "the addon's own theme is black again")
+    account.themePreset = preset
+    ns.ApplyThemeColors()
+    local painted = ns.THEME.line
+    Check(Is(painted, ns.RXPWindowColor("boxBorder")) and not Black(ns.RXPWindowColor("boxBorder")),
+        "and a theme picked for the whole addon is the window's, as its line color")
+    account.themePreset = nil
 
     local tall = f.height
     ns.SetRXPWindowOption("rxpWindowBoxBorderSize", 3)
@@ -974,8 +990,18 @@ do
         "none: no border and no room for it")
     ns.SetRXPWindowOption("rxpWindowBarBorderSize", 9)
     ns.SetRXPWindowOption("rxpWindowBoxBorderSize", 0)
-    Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 4 and ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1,
-        "the sizes are held to 4 at most, and the box's to 1 at least")
+    Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 4 and ns.RXPWindowOption("rxpWindowBoxBorderSize") == 0.5,
+        "the sizes are held to 4 at most, and the box's to half a pixel at least")
+    ns.SetRXPWindowOption("rxpWindowBoxBorderSize", 1.5)
+    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 0.7)
+    Check(ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1.5 and ns.RXPWindowOption("rxpWindowBarBorderSize") == 0.5,
+        "and in half steps: a size between two is the nearer")
+    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 0.2)
+    Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 0, "down to none")
+    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 1.5)
+    Flush(w)
+    Check(Box().borderObject.pixels == 1.5 and f.bar.edge.pixels == 1.5 and f.bar.height == 5 + 2 * 1.5
+        and account.rxpWindowBoxBorderSize == 1.5, "a half step is drawn and given room, and kept")
 
     ns.SetRXPWindowOption("rxpWindowBarBorderSize", 1)
     w.talk.frame.text:SetText("Boar Meat: 3/8")

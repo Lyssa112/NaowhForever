@@ -480,7 +480,7 @@ local function WindowOptionCell(option)
     if option.kind == "toggle" then
         return { type = "toggle", text = option.label, tooltip = option.tip, getValue = Get, setValue = Set }
     elseif option.kind == "number" then
-        return { type = "slider", text = option.label, min = option.min, max = option.max, step = 1,
+        return { type = "slider", text = option.label, min = option.min, max = option.max, step = option.step or 1,
           tooltip = option.tip, getValue = Get, setValue = Set }
     elseif option.kind == "choice" then
         return { type = "dropdown", text = option.label, values = option.values, order = option.order,

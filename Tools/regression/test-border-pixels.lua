@@ -27,6 +27,8 @@ local function Object(kind, parent)
     function o:SetScript(name, fn) self.scripts[name] = fn end
     function o:IsVisible() return true end
     function o:SetColorTexture(r, g, b, a) self.color = { r, g, b, a } end
+    function o:SetSnapToPixelGrid(on) self.snap = on end
+    function o:SetTexelSnappingBias(bias) self.bias = bias end
     function o:CreateTexture()
         local t = Object("Texture", self)
         self.textures[#self.textures + 1] = t
@@ -81,6 +83,16 @@ Check(edges[1].height == 3 * pixel and edges[2].height == 3 * pixel and edges[3]
     and edges[4].width == 3 * pixel, "three pixels when asked")
 border:SetColor(1, 0, 0, 0.5)
 Check(edges[1].color[1] == 1 and edges[4].color[4] == 0.5, "and the color is every edge's")
+
+border:SetPixels(1.5)
+Check(edges[1].height == 1.5 * pixel and edges[3].width == 1.5 * pixel, "a half step is as many pixels")
+Check(edges[1].snap == false and edges[3].snap == false and edges[1].bias == 0,
+    "and is not snapped to the pixel grid, or it would be drawn as a whole one")
+border:SetPixels(2)
+Check(edges[1].snap == true and edges[1].height == 2 * pixel, "a whole size is snapped again")
+border:SetPixels(1)
+Check(side.snap == nil and top.snap == nil, "and an edge never given a half step was never told")
+border:SetPixels(3)
 
 pixel = 1
 ns.RefitPixels()

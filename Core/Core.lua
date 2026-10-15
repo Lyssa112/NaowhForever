@@ -600,6 +600,7 @@ function ns.Font(parent, size, flags, color, heading)
 end
 
 local fitters = setmetatable({}, { __mode = "k" })
+local unsnapped = setmetatable({}, { __mode = "k" })
 local EDGE_PIXELS = 1
 
 local function OnePixel(region)
@@ -627,6 +628,16 @@ function ns.Hairline(tex, axis, pixels)
     Register(tex, function(px)
         if axis == "h" then tex:SetHeight(count * px) else tex:SetWidth(count * px) end
     end)
+    if tex.SetSnapToPixelGrid then
+        if count ~= math.floor(count) then
+            tex:SetSnapToPixelGrid(false)
+            tex:SetTexelSnappingBias(0)
+            unsnapped[tex] = true
+        elseif unsnapped[tex] then
+            tex:SetSnapToPixelGrid(true)
+            unsnapped[tex] = nil
+        end
+    end
     return tex
 end
 

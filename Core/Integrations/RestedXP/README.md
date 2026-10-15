@@ -163,16 +163,20 @@ Core/Integrations/RestedXP/
   36 of 66) and one in the active step (the rows done over its rows). Its texture is a SharedMedia
   statusbar picked in the page and flat to start, its track is the Bar Background Color (the Line color
   to start) and its fill the Accent color. The fill's height is fixed (`BAR_HEIGHT`).
-- The step box and the bars have a border of their own, black and one pixel to start, as Naowh's house style
-  has it and as Naowh asked for them: Step Box Border Size and Color, Bar Border Size and Color, and the bar's
-  background. The size is in screen pixels (`ns.Border:SetPixels`, a count of `ns.Hairline`'s pixel) and
-  the bar is that much taller, `EDGE_SIDES` times the size, so its fill is as thick as it was: the border is
-  inside the bar's frame and over it. The three colors are the player's in every theme (`always` is
-  set on them, and they are black and not a theme's to start): a black edge is not part of a theme's
-  look, so Custom is not needed to change it. The window's own border
-  keeps the Border Color, and the two windows of RestedXP that take the step's look (Active Targets and
-  Items) take the step box's, as they are drawn as the step box is. The Forever skin draws its own rim
-  and inset, so its look has neither the border nor its size.
+- The step box and the bars have a border of their own, one pixel to start and black in the Naowh theme,
+  as Naowh's house style has it and as Naowh asked for them: Step Box Border Size and Color, Bar Border
+  Size and Color, and the bar's background. The color is themed (`edge` in `COLORS`, `ThemedEdge`): black
+  for the addon's own theme, the preset's line color for a preset (the window's or the addon's), and the
+  Forever skin's bronze for the skin, so a theme keeps its look and only the Naowh theme is black. The
+  size is in screen pixels (`ns.Border:SetPixels`, a count of `ns.Hairline`'s pixel) in steps of a half
+  (`step` of the option): a size that is not whole is not snapped to the pixel grid, or the engine would
+  draw it as the whole one next to it, and it is snapped again when it is whole. The bar is that much
+  taller, `EDGE_SIDES` times the size, so its fill is as thick as it was: the border is inside the bar's
+  frame and over it. The three colors are the player's in every theme (`always` is set on them): a
+  theme's edge is not what a player has to take, so Custom is not needed to change it. The window's own
+  border keeps the Border Color, and the two windows of RestedXP that take the step's look (Active
+  Targets and Items) take the step box's, as they are drawn as the step box is. The Forever skin draws
+  its own rim and inset, so its look has neither the border nor its size.
 - The window is resized from its corner (`StartSizing`). Its height is what it draws, so the height does
   not set a height: it sets how many steps are listed. Draw keeps the height the window has without the
   list (`chrome`) and the height of a line, and letting go of the grip turns the width and
