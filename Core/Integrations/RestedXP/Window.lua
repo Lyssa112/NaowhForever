@@ -442,7 +442,7 @@ local function Edge(frame)
     local holder = CreateFrame("Frame", nil, frame)
     holder:SetAllPoints()
     holder:SetFrameLevel(frame:GetFrameLevel() + EDGE_RAISE)
-    local edge = { _frame = holder, pixels = 0, color = { 0, 0, 0, 1 }, textures = {}, whole = true }
+    local edge = { _frame = holder, pixels = 0, color = { 0, 0, 0, 1 }, textures = {} }
     for i = 1, EDGE_COUNT do edge.textures[i] = holder:CreateTexture(nil, "OVERLAY") end
     local top, bottom, left, right = unpack(edge.textures)
     top:SetPoint("TOPLEFT")
@@ -465,16 +465,6 @@ local function Edge(frame)
         bottom:SetHeight(size)
         left:SetWidth(size)
         right:SetWidth(size)
-        local whole = pixels == math.floor(pixels)
-        if whole ~= self.whole then
-            self.whole = whole
-            for _, texture in ipairs(self.textures) do
-                if texture.SetSnapToPixelGrid then
-                    texture:SetSnapToPixelGrid(whole)
-                    if not whole then texture:SetTexelSnappingBias(0) end
-                end
-            end
-        end
     end
     return edge
 end

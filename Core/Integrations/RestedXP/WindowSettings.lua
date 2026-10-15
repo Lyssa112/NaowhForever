@@ -47,7 +47,7 @@ local OPTIONS = {
     { key = "rxpWindowBoxBorder", group = "Look", kind = "toggle", label = "Step Box Border", default = true,
       tip = "A border round the active step." },
     { key = "rxpWindowBoxBorderSize", group = "Look", kind = "number", label = "Step Box Border Size", default = 1,
-      min = 0.5, max = 4, step = 0.5, tip = "How thick the border round the active step is." },
+      min = 1, max = 4, tip = "How thick the border round the active step is." },
     { key = "rxpWindowBoxOpacity", group = "Look", kind = "number", label = "Step Box Opacity",
       default = BOX_OPACITY, min = 0, max = PERCENT, tip = "How solid the background of the active step is." },
     { key = "rxpWindowSpacing", group = "Look", kind = "number", label = "Spacing", default = 5, min = 0, max = 12,
@@ -55,7 +55,7 @@ local OPTIONS = {
     { key = "rxpWindowBarTexture", group = "Progress", kind = "texture", label = "Bar Texture",
       defaultLabel = TEXT_GRADIENT, tip = "The texture of the progress bars, the Naowh Gradient to start." },
     { key = "rxpWindowBarBorderSize", group = "Progress", kind = "number", label = "Bar Border Size", default = 1,
-      min = 0, max = 4, step = 0.5, tip = "How thick the border round the progress bars is, or none." },
+      min = 0, max = 4, tip = "How thick the border round the progress bars is, or none." },
 }
 
 local COLORS = {
@@ -147,7 +147,7 @@ function ns.RXPWindowOption(key)
     local value = Settings()[key]
     if option.kind == "number" then
         local number = tonumber(value)
-        return number and Snap(number, option.min, option.max, option.step or 1) or option.default
+        return number and Snap(number, option.min, option.max, 1) or option.default
     elseif option.kind == "toggle" then
         if value == nil then return option.default end
         return value == true
@@ -163,7 +163,7 @@ function ns.SetRXPWindowOption(key, value)
     local store
     if option.kind == "number" then
         local number = tonumber(value)
-        number = number and Snap(number, option.min, option.max, option.step or 1)
+        number = number and Snap(number, option.min, option.max, 1)
         store = number ~= option.default and number or nil
     elseif option.kind == "toggle" then
         local on = value and true or false

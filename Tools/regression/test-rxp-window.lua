@@ -75,8 +75,6 @@ local function Object(everything)
     function o:IsForbidden() return false end
     function o:GetFrameLevel() return self.level or 1 end
     function o:SetFrameLevel(level) self.level = level end
-    function o:SetSnapToPixelGrid(on) self.snap = on end
-    function o:SetTexelSnappingBias(bias) self.bias = bias end
     function o:GetChildren() return unpack(self.kids) end
     function o:CreateFontString()
         local fs = Object(everything)
@@ -1031,21 +1029,15 @@ do
         "none: no border and no room for it")
     ns.SetRXPWindowOption("rxpWindowBarBorderSize", 9)
     ns.SetRXPWindowOption("rxpWindowBoxBorderSize", 0)
-    Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 4 and ns.RXPWindowOption("rxpWindowBoxBorderSize") == 0.5,
-        "the sizes are held to 4 at most, and the box's to half a pixel at least")
-    ns.SetRXPWindowOption("rxpWindowBoxBorderSize", 1.5)
-    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 0.7)
-    Check(ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1.5 and ns.RXPWindowOption("rxpWindowBarBorderSize") == 0.5,
-        "and in half steps: a size between two is the nearer")
-    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 0.2)
+    Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 4 and ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1,
+        "the sizes are held to 4 at most, and the box's to 1 at least")
+    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 2.4)
+    Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 2, "and are whole pixels: a size between two is the nearer")
+    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 0.4)
     Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 0, "down to none")
-    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 1.5)
-    Flush(w)
-    local halves = Box().edge.textures
-    Check(halves[1].snap == false and halves[4].snap == false and halves[1].bias == 0 and halves[1].height == 1.5
-        and halves[3].width == 1.5, "a half step is as many pixels, and is not snapped to the pixel grid")
-    Check(Box().edge.pixels == 1.5 and f.bar.edge.pixels == 1.5 and f.bar.height == 5 + 2 * 1.5
-        and account.rxpWindowBoxBorderSize == 1.5, "a half step is drawn and given room, and kept")
+    account.rxpWindowBoxBorderSize = 1.5
+    Check(ns.RXPWindowOption("rxpWindowBoxBorderSize") == 2, "a half step an earlier build saved is read as a whole one")
+    account.rxpWindowBoxBorderSize = nil
 
     ns.SetRXPWindowOption("rxpWindowBarBorderSize", 1)
     w.talk.frame.text:SetText("Boar Meat: 3/8")
@@ -1064,8 +1056,6 @@ do
     Flush(w)
     Check(ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1 and Black(ns.RXPWindowColor("boxBorder"))
         and f.bar.edge.pixels == 1, "Reset puts the sizes and colors back")
-    Check(Box().edge.textures[1].snap == true and f.bar.edge.textures[1].snap == true and Box().edge.pixels == 1,
-        "and a whole size is on the pixel grid again")
 
     local accent = { ns.RXPWindowColor("accent") }
     local fill = { ns.RXPWindowColor("barFill") }

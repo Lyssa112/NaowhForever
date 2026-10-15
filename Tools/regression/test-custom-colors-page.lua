@@ -696,9 +696,9 @@ do
     Check(swatches and #All(plain, "Title Color") == 0,
         "the step box's and the bars' colors are swatches in any theme, each once, and the others are not")
     local boxSize, barSize = All(plain, "Step Box Border Size")[1], All(plain, "Bar Border Size")[1]
-    Check(boxSize and boxSize.type == "slider" and boxSize.min == 0.5 and boxSize.max == 4 and boxSize.step == 0.5
-        and barSize and barSize.type == "slider" and barSize.min == 0 and barSize.max == 4 and barSize.step == 0.5,
-        "and a size for the step box's border and for the bars', in half steps")
+    Check(boxSize and boxSize.type == "slider" and boxSize.min == 1 and boxSize.max == 4 and boxSize.step == 1
+        and barSize and barSize.type == "slider" and barSize.min == 0 and barSize.max == 4 and barSize.step == 1,
+        "and a size for the step box's border and for the bars', in whole pixels")
     Check(boxSize.getValue() == 1 and barSize.getValue() == 1 and All(plain, "Bar Border Color")[1].getValue() == 0,
         "one pixel and black to start")
     All(plain, "Bar Border Color")[1].setValue(1, 0, 0, 1)
