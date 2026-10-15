@@ -1493,6 +1493,36 @@ do
     Look(target, "targets")
     Look(items, "items")
 
+    local unset = Begin({ rxpWindow = true }, function(world, rxp)
+        Both(world, rxp)
+        for _, frame in ipairs({ rxp.targeting.activeTargetFrame, rxp.activeItemFrame }) do
+            local text = frame.title.text
+            text.bad = 0
+            function text:SetFont(path, size, flags)
+                if type(size) ~= "number" or size <= 0 then self.bad = self.bad + 1 end
+                self.font, self.fontSize, self.fontFlags = path, size, flags
+            end
+            function text:GetFont() return nil, -1566.511841, nil end
+        end
+    end)
+    local broken = unset.rxp.targeting.activeTargetFrame.title.text
+    local huge = unset.rxp.activeItemFrame.title.text
+    Check(broken.bad == 0 and huge.bad == 0, "a title with no font to read, and a size that is no size, is never given one")
+    Check(broken.font == "Fonts\\Naowh.ttf" and broken.fontSize == 9 and huge.fontSize == 9,
+        "it is set in the window's face at RestedXP's size, 9")
+    huge.GetFont = function() return "Fonts\\RXP.ttf", 5e30, "" end
+    unset.rxp.activeItemFrame:UpdateVisuals()
+    Flush(unset)
+    Check(huge.bad == 0 and huge.fontSize == 9, "and so is one that answers a size out of any range")
+    huge.GetFont = function() return nil, 14, nil end
+    unset.rxp.activeItemFrame:UpdateVisuals()
+    Flush(unset)
+    Check(huge.bad == 0 and huge.fontSize == 9, "and one with no face, whatever size it answers")
+    huge.GetFont = function() return "Fonts\\RXP.ttf", 12, "" end
+    unset.rxp.activeItemFrame:UpdateVisuals()
+    Flush(unset)
+    Check(huge.bad == 0 and huge.fontSize == 12, "while a size RestedXP gave it is kept")
+
     target:UpdateVisuals()
     Look(target, "targets painted again")
     w.rxp.targeting:RenderTargetFrameBackground()

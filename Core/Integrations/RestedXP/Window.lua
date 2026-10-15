@@ -12,6 +12,7 @@ local PERCENT = 100
 local PAD, BOX_PAD, FOLD_W, PROGRESS_W = 10, 7, 16, 120
 local HEAD_PAD, LIST_PAD = 10, 6
 local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
+local BOX_TITLE_TEXT_MIN, BOX_TITLE_TEXT_MAX = 6, 32
 local BAR_W, ICON_GAP, GRIP_SIZE = 2, 5, 16
 local FIRST_GROW, FIRST_ICON_GROW, LOGO_SIZE, BAR_HEIGHT, INDENT, ICON_SIZE = 2, 2, 24, 5, 12, 18
 local HOVER_ALPHA, ICON_DONE_ALPHA = 0.25, 0.5
@@ -204,8 +205,9 @@ end
 local function SkinTitle(title)
     SkinBox(title)
     local text = title.text
-    local _, size = text:GetFont()
-    Faced(text, size or BOX_TITLE_TEXT)
+    local path, size = text:GetFont()
+    local given = path and size >= BOX_TITLE_TEXT_MIN and size <= BOX_TITLE_TEXT_MAX
+    Faced(text, given and size or BOX_TITLE_TEXT)
     Coloured(text, "title")
     title:SetSize(text:GetStringWidth() + BOX_TITLE_ROOM, BOX_TITLE_HEIGHT)
 end
