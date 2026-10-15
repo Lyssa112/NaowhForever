@@ -14,7 +14,7 @@ local HEAD_PAD, LIST_PAD = 10, 6
 local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
 local BAR_W, ICON_GAP, GRIP_SIZE = 2, 5, 16
 local FIRST_GROW, FIRST_ICON_GROW, LOGO_SIZE, BAR_HEIGHT, INDENT, ICON_SIZE = 2, 2, 24, 5, 12, 18
-local EDGE_SIDES, EDGE_COUNT, EDGE_RAISE = 2, 4, 1
+local EDGE_SIDES = 2
 local HOVER_ALPHA, ICON_DONE_ALPHA = 0.25, 0.5
 local COUNT_MIN, COUNT_GAP = 2, 2
 local BAG_EVENT = "BAG_UPDATE_DELAYED"
@@ -435,37 +435,6 @@ local function PaintInset(frame, on)
     end
 end
 
-local function Edge(frame)
-    local holder = CreateFrame("Frame", nil, frame)
-    holder:SetAllPoints()
-    holder:SetFrameLevel(frame:GetFrameLevel() + EDGE_RAISE)
-    local edge = { _frame = holder, pixels = 0, color = { 0, 0, 0, 1 }, textures = {} }
-    for i = 1, EDGE_COUNT do edge.textures[i] = holder:CreateTexture(nil, "OVERLAY") end
-    local top, bottom, left, right = unpack(edge.textures)
-    top:SetPoint("TOPLEFT")
-    top:SetPoint("TOPRIGHT")
-    bottom:SetPoint("BOTTOMLEFT")
-    bottom:SetPoint("BOTTOMRIGHT")
-    left:SetPoint("TOPLEFT")
-    left:SetPoint("BOTTOMLEFT")
-    right:SetPoint("TOPRIGHT")
-    right:SetPoint("BOTTOMRIGHT")
-    function edge:SetColor(r, g, b, a)
-        local c = self.color
-        c[1], c[2], c[3], c[4] = r, g, b, a
-        for _, texture in ipairs(self.textures) do texture:SetColorTexture(r, g, b, a) end
-    end
-    function edge:SetPixels(pixels)
-        self.pixels = pixels
-        local size = pixels * ns.OnePixel(holder)
-        top:SetHeight(size)
-        bottom:SetHeight(size)
-        left:SetWidth(size)
-        right:SetWidth(size)
-    end
-    return edge
-end
-
 local function PaintBar(bar, fraction)
     bar:SetStatusBarTexture(TexturePath())
     local r, g, b, a = ns.RXPWindowColor("barFill")
@@ -483,7 +452,7 @@ local function PaintBar(bar, fraction)
     end
     local size = ns.RXPWindowOption("rxpWindowBarBorderSize")
     local edged = size > 0 and not forever
-    if edged and not bar.edge then bar.edge = Edge(bar) end
+    if edged and not bar.edge then bar.edge = ns.Border(bar) end
     if bar.edge then bar.edge._frame:SetShown(edged) end
     local height = BAR_HEIGHT
     if edged then
@@ -549,7 +518,7 @@ local function MakeBox()
     Draggable(box)
     box.back = ns.Solid(box, "BACKGROUND", T.bg, 1)
     box.back:SetAllPoints()
-    box.edge = Edge(box)
+    box.edge = ns.Border(box)
     box.label = Text(box, "rxpWindowTextSize")
     box.logo = box:CreateTexture(nil, "OVERLAY")
     box.logo:SetTexture(LOGO)

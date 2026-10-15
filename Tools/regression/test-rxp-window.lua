@@ -1026,8 +1026,8 @@ do
     local box = Box()
     Check(box.edge.pixels == 3 and box.edge.color[1] == 1 and box.edge._frame.shown == true,
         "a size and a color for the step's box, in the addon's own theme")
-    Check(box.edge.textures[1].solid[1] == 1 and box.edge.textures[4].solid[1] == 1 and box.edge.textures[2].solid[2] == 0,
-        "drawn on all four of its edges")
+    Check(box.edge.parent == box and f.bar.edge.parent == f.bar,
+        "drawn by the shared border (ns.Border), sized in whole pixels")
     Check(f.bar.edge.pixels == 2 and f.bar.edge.color[2] == 1 and f.bar.edge.color[4] == 0.5 and f.bar.height == 5 + 2 * 2,
         "and for the bar: the size, the color, and room for it, so the fill is as thick as it was")
     Check(f.bar.track.solid[3] == 1 and f.bar.track.solid[4] == 0.25, "and the bar's background its own")
