@@ -12,6 +12,7 @@ local BOX_OPACITY = 55
 local TEXT_GRADIENT = "Naowh Gradient"
 local COLORS_KEY, THEME_KEY = "rxpWindowColors", "rxpWindowTheme"
 local CUSTOM, FOLLOW, FOREVER = "custom", "", "forever"
+local BLACK = { r = 0, g = 0, b = 0 }
 
 local OUTLINES = { shadow = "Shadow", outline = "Outline", thick = "Thick Outline", none = "None" }
 local SKIPS = { shift = "Shift-click", click = "Click", off = "Off" }
@@ -43,12 +44,16 @@ local OPTIONS = {
       tip = "A border round the whole window." },
     { key = "rxpWindowBoxBorder", group = "Look", kind = "toggle", label = "Step Box Border", default = true,
       tip = "A border round the active step." },
+    { key = "rxpWindowBoxBorderSize", group = "Look", kind = "number", label = "Step Box Border Size", default = 1,
+      min = 1, max = 4, tip = "How thick the border round the active step is." },
     { key = "rxpWindowBoxOpacity", group = "Look", kind = "number", label = "Step Box Opacity",
       default = BOX_OPACITY, min = 0, max = PERCENT, tip = "How solid the background of the active step is." },
     { key = "rxpWindowSpacing", group = "Look", kind = "number", label = "Spacing", default = 5, min = 0, max = 12,
       tip = "The room between the rows." },
     { key = "rxpWindowBarTexture", group = "Progress", kind = "texture", label = "Bar Texture",
       defaultLabel = TEXT_GRADIENT, tip = "The texture of the progress bars, the Naowh Gradient to start." },
+    { key = "rxpWindowBarBorderSize", group = "Progress", kind = "number", label = "Bar Border Size", default = 1,
+      min = 0, max = 4, tip = "How thick the border round the progress bars is, or none." },
 }
 
 local COLORS = {
@@ -61,8 +66,13 @@ local COLORS = {
     { name = "line", label = "Line Color", token = "fg", alpha = RULE_ALPHA, tip = "The line and the bars' track." },
     { name = "box", label = "Step Box Color", token = "bg", opaque = true,
       tip = "Behind the active step; its opacity is its own setting." },
-    { name = "border", label = "Border Color", token = "line", alpha = EDGE_ALPHA,
-      tip = "Round the active step and round the whole window." },
+    { name = "border", label = "Border Color", token = "line", alpha = EDGE_ALPHA, tip = "Round the whole window." },
+    { name = "boxBorder", label = "Step Box Border Color", fixed = BLACK, always = true,
+      tip = "Round the active step and the two windows that follow its look, black to start." },
+    { name = "barBack", label = "Bar Background Color", follows = "line", always = true,
+      tip = "Behind the filled part of the progress bars, the Line Color to start." },
+    { name = "barBorder", label = "Bar Border Color", fixed = BLACK, always = true,
+      tip = "Round the progress bars, black to start." },
     { name = "panel", label = "Window Color", token = "panel", alpha = PANEL_ALPHA, tip = "Behind the whole window." },
     { name = "arrow", label = "Arrow Color", token = "accent", tip = "RestedXP's waypoint arrow." },
 }
@@ -211,8 +221,10 @@ end
 function ns.RXPWindowColor(name)
     local color = COLOR_BY_NAME[name]
     if not color then return 1, 1, 1, 1 end
-    local saved = ns.RXPWindowOwnColors() and Dig(Settings(), COLORS_KEY, name)
+    local saved = (color.always or ns.RXPWindowOwnColors()) and Dig(Settings(), COLORS_KEY, name)
     if saved then return saved.r, saved.g, saved.b, saved.a end
+    if color.follows then return ns.RXPWindowColor(color.follows) end
+    if color.fixed then return color.fixed.r, color.fixed.g, color.fixed.b, color.alpha or 1 end
     local key = ns.RXPWindowThemeKey()
     local source = (key == FOREVER and ns.FOREVER_SKIN) or (IsPreset(key) and ns.THEME_PRESETS[key]) or nil
     local base = source and source[color.token] or ns.THEME[color.token]

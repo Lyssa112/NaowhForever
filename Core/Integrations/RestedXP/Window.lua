@@ -15,6 +15,7 @@ local BOX_TITLE_TEXT, BOX_TITLE_HEIGHT, BOX_TITLE_ROOM = 9, 19, 10
 local BOX_TITLE_TEXT_MIN, BOX_TITLE_TEXT_MAX = 6, 32
 local BAR_W, ICON_GAP, GRIP_SIZE = 2, 5, 16
 local FIRST_GROW, FIRST_ICON_GROW, LOGO_SIZE, BAR_HEIGHT, INDENT, ICON_SIZE = 2, 2, 24, 5, 12, 18
+local EDGE_SIDES = 2
 local HOVER_ALPHA, ICON_DONE_ALPHA = 0.25, 0.5
 local COUNT_MIN, COUNT_GAP = 2, 2
 local BAG_EVENT = "BAG_UPDATE_DELAYED"
@@ -206,7 +207,7 @@ local function SkinBox(part)
         back.textures[1]:SetVertexColor(r, g, b, ns.RXPWindowOption("rxpWindowBoxOpacity") / PERCENT)
     end
     if not border then return end
-    local r, g, b, a = ns.RXPWindowColor("border")
+    local r, g, b, a = ns.RXPWindowColor("boxBorder")
     for _, texture in ipairs(border.textures) do texture:SetColorTexture(r, g, b, a) end
     border:SetShown(ns.RXPWindowOption("rxpWindowBoxBorder") and (not back or back:IsShown()))
 end
@@ -450,12 +451,23 @@ local function PaintBar(bar, fraction)
         local field = style.FOREVER_FIELD_RGB
         bar.track:SetColorTexture(field.r, field.g, field.b, 1)
     else
-        r, g, b, a = ns.RXPWindowColor("line")
+        r, g, b, a = ns.RXPWindowColor("barBack")
         bar.track:SetColorTexture(r, g, b, a)
+    end
+    local size = ns.RXPWindowOption("rxpWindowBarBorderSize")
+    local edged = size > 0 and not forever
+    if edged and not bar.edge then bar.edge = ns.Border(bar, ns.THEME.line) end
+    if bar.edge then bar.edge._frame:SetShown(edged) end
+    local height = BAR_HEIGHT
+    if edged then
+        bar.edge:SetColor(ns.RXPWindowColor("barBorder"))
+        bar.edge:SetPixels(size)
+        height = height + EDGE_SIDES * size * ns.OnePixel(bar)
     end
     bar:SetMinMaxValues(0, 1)
     bar:SetValue(fraction)
-    bar:SetHeight(BAR_HEIGHT)
+    bar:SetHeight(height)
+    return height
 end
 
 local function Build()
@@ -641,9 +653,10 @@ local function DrawMeter(item, row, x, y, width)
     item.meter:ClearAllPoints()
     item.meter:SetPoint("TOPLEFT", item, "TOPLEFT", x, -y)
     item.meter:SetWidth(width)
-    PaintBar(item.meter, fraction)
+    local barHeight = PaintBar(item.meter, fraction)
     item.meter:Show()
     if row.bags then wantsBags = true end
+    return barHeight
 end
 
 local function DrawRow(box, row, x, y, width, first)
@@ -682,8 +695,7 @@ local function DrawRow(box, row, x, y, width, first)
     item.text:SetText(row.text)
     local height = math.max(drop + math.max(item.text:GetStringHeight(), textSize), iconSize)
     if row.need and row.need >= COUNT_MIN then
-        DrawMeter(item, row, BAR_W + gap + iconW, height + COUNT_GAP, textWidth)
-        height = height + COUNT_GAP + BAR_HEIGHT
+        height = height + COUNT_GAP + DrawMeter(item, row, BAR_W + gap + iconW, height + COUNT_GAP, textWidth)
     else
         item.meter:Hide()
     end
@@ -708,8 +720,9 @@ local function DrawBox(step, y, inner, current)
     if inset then box.inset.fill:SetColorTexture(boxR, boxG, boxB, opacity) end
     box.back:SetColorTexture(boxR, boxG, boxB, opacity)
     box.back:SetShown(not inset)
-    local r, g, b, a = ns.RXPWindowColor("border")
+    local r, g, b, a = ns.RXPWindowColor("boxBorder")
     box.edge:SetColor(r, g, b, a)
+    box.edge:SetPixels(ns.RXPWindowOption("rxpWindowBoxBorderSize"))
     box.edge._frame:SetShown(bordered and not inset)
     box.label:ClearAllPoints()
     box.label:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, -BOX_PAD)
@@ -777,9 +790,9 @@ local function DrawLine(model, y)
         window.bar:ClearAllPoints()
         window.bar:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
         window.bar:SetPoint("TOPRIGHT", window, "TOPRIGHT", -PAD, y)
-        PaintBar(window.bar, model.fraction or 0)
+        local barHeight = PaintBar(window.bar, model.fraction or 0)
         window.bar:Show()
-        return y - BAR_HEIGHT - gap
+        return y - barHeight - gap
     elseif line == "rule" then
         window.rule:ClearAllPoints()
         window.rule:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)

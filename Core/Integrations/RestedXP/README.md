@@ -161,7 +161,18 @@ Core/Integrations/RestedXP/
   the outline and the three sizes change at once.
 - The progress bar is a `StatusBar`: the guide's under the title (the step over the number of steps, so
   36 of 66) and one in the active step (the rows done over its rows). Its texture is a SharedMedia
-  statusbar picked in the page and flat to start, its track is the Line color and its fill the Accent color. Its height is fixed (`BAR_HEIGHT`).
+  statusbar picked in the page and flat to start, its track is the Bar Background Color (the Line color
+  to start) and its fill the Accent color. The fill's height is fixed (`BAR_HEIGHT`).
+- The step box and the bars have a border of their own, black and one pixel to start, as Naowh's house style
+  has it and as Naowh asked for them: Step Box Border Size and Color, Bar Border Size and Color, and the bar's
+  background. The size is in screen pixels (`ns.Border:SetPixels`, a count of `ns.Hairline`'s pixel) and
+  the bar is that much taller, `EDGE_SIDES` times the size, so its fill is as thick as it was: the border is
+  inside the bar's frame and over it. The three colors are the player's in every theme (`always` is
+  set on them, and they are black and not a theme's to start): a black edge is not part of a theme's
+  look, so Custom is not needed to change it. The window's own border
+  keeps the Border Color, and the two windows of RestedXP that take the step's look (Active Targets and
+  Items) take the step box's, as they are drawn as the step box is. The Forever skin draws its own rim
+  and inset, so its look has neither the border nor its size.
 - The window is resized from its corner (`StartSizing`). Its height is what it draws, so the height does
   not set a height: it sets how many steps are listed. Draw keeps the height the window has without the
   list (`chrome`) and the height of a line, and letting go of the grip turns the width and
@@ -255,7 +266,8 @@ Core/Integrations/RestedXP/
   its fold and shown at once. It is the window's colors alone: the addon's theme (COLORS) is not read for
   a preset and not set by it, and the icons and the arrow follow the window's. The colors are the preset's
   and the player's own only while it is Custom (`RXPWindowOwnColors`): a theme is a look as a whole, so the
-  nine colors are shown only for Custom, and what was picked is kept for when it is Custom again. Forever is
+  nine colors are shown only for Custom, and what was picked is kept for when it is Custom again (the three of
+  the step box's border and the bars, `always`, are shown and kept in any theme). Forever is
   the addon's Forever skin for the window alone: its gold and bronze (`ns.FOREVER_SKIN`) and its face, with the
   addon left as it is (the skin itself, under COLORS, is read at load and takes the window with it when the
   window's theme is the addon's). The

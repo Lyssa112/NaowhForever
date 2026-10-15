@@ -687,6 +687,24 @@ do
     local arrow = All(custom, "Arrow Color")[1]
     Check(arrow.type == "colorpicker" and arrow.tooltip == "RestedXP's waypoint arrow.", "the arrow's is a swatch")
     Check(#All(Page({ rxpWindow = true }, true), "Listed Steps") == 1, "the sliders are there either way")
+    local plain = Page({ rxpWindow = true }, true)
+    local swatches = true
+    for _, name in ipairs({ "Step Box Border Color", "Bar Background Color", "Bar Border Color" }) do
+        local found = All(plain, name)
+        if #found ~= 1 or found[1].type ~= "colorpicker" then swatches = false end
+    end
+    Check(swatches and #All(plain, "Title Color") == 0,
+        "the step box's and the bars' colors are swatches in any theme, each once, and the others are not")
+    local boxSize, barSize = All(plain, "Step Box Border Size")[1], All(plain, "Bar Border Size")[1]
+    Check(boxSize and boxSize.type == "slider" and boxSize.min == 1 and boxSize.max == 4 and barSize
+        and barSize.type == "slider" and barSize.min == 0 and barSize.max == 4,
+        "and a size for the step box's border and for the bars'")
+    Check(boxSize.getValue() == 1 and barSize.getValue() == 1 and All(plain, "Bar Border Color")[1].getValue() == 0,
+        "one pixel and black to start")
+    All(plain, "Bar Border Color")[1].setValue(1, 0, 0, 1)
+    barSize.setValue(3)
+    Check(plain.account.rxpWindowColors and plain.account.rxpWindowColors.barBorder.r == 1
+        and plain.account.rxpWindowBarBorderSize == 3, "and a pick and a size are kept")
     local pick = Page({ rxpWindow = true }, true)
     local picker = All(pick, "Window Theme")[1]
     local refreshed = pick.refreshes

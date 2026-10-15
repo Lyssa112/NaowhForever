@@ -542,8 +542,9 @@ local function RxpWindowStyleRows(W, parent, y)
             if option.group == group then cells[#cells + 1] = WindowOptionCell(option) end
         end
     end
-    if ns.RXPWindowOwnColors() then
-        for _, color in ipairs(ns.RXPWindowColors()) do cells[#cells + 1] = WindowColorCell(color) end
+    local own = ns.RXPWindowOwnColors()
+    for _, color in ipairs(ns.RXPWindowColors()) do
+        if own or color.always then cells[#cells + 1] = WindowColorCell(color) end
     end
     for i = 1, #cells, 2 do
         _, h = W:DualRow(parent, y, cells[i], cells[i + 1] or Empty()); y = y - h

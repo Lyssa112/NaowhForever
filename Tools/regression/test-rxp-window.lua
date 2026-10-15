@@ -170,12 +170,14 @@ local function World(account, opts)
         w.borders[#w.borders + 1] = parent
         local border = { _frame = Object(w.everything), parent = parent }
         function border:SetColor(r, g, b, a) self.color = { r, g, b, a } end
+        function border:SetPixels(pixels) self.pixels = pixels end
         parent.borderObject = border
         return border
     end
     ns.UI = { FontPath = function(name) return "Fonts\\" .. name .. ".ttf" end,
         TexturePath = function(name) return "Textures\\" .. name end }
     ns.Hairline = function() end
+    ns.OnePixel = function() return 1 end
     ns.Shared = { Style = { FOREVER_FIELD_RGB = { r = 0, g = 0, b = 0 } }, Parts = {
         ForeverInset = function(parent)
             local inset = Object(w.everything)
@@ -369,7 +371,7 @@ do
         "the window has a panel and a border to turn on, and both are off to start")
     local boxed = 0
     for _, parent in ipairs(w.borders) do
-        if parent ~= f then boxed = boxed + 1 end
+        if parent ~= f and not parent.track then boxed = boxed + 1 end
     end
     Check(boxed == 1, "only the active step is in a box")
     Check(not seenTip, "a step that is a tip only, or not active, is not a box")
@@ -915,6 +917,85 @@ do
     Check(shown == 3 and g.track.shown == false, "a guide with no more steps than lines has no bar to show")
 end
 
+-- the step box and the bars have a border, black to start, and its size and color are the player's in any theme
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns = w.ns
+    local f = Window(w)
+    local function Box()
+        for _, o in ipairs(w.frames) do
+            if o.label and o.logo then return o end
+        end
+    end
+    local function Meters()
+        local out = {}
+        for _, o in ipairs(w.frames) do
+            if o.track and o ~= f and o ~= f.bar and o.parent ~= f and Seen(o) then out[#out + 1] = o end
+        end
+        return out
+    end
+    local function Black(r, g, b, a) return r == 0 and g == 0 and b == 0 and a == 1 end
+
+    Check(Black(ns.RXPWindowColor("boxBorder")) and Black(ns.RXPWindowColor("barBorder")),
+        "both borders are black to start")
+    Check(ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1 and ns.RXPWindowOption("rxpWindowBarBorderSize") == 1,
+        "and one pixel")
+    Check(Box().borderObject.pixels == 1 and f.bar.edge and f.bar.edge.pixels == 1 and Black(unpack(f.bar.edge.color)),
+        "as drawn: the step's box and the guide's bar")
+    Check(select(4, ns.RXPWindowColor("barBack")) == 0.5 and select(1, ns.RXPWindowColor("barBack"))
+        == select(1, ns.RXPWindowColor("line")), "the bar's background is the line's color to start")
+
+    ns.SetRXPWindowTheme(ns.THEME_PRESET_ORDER[1])
+    Check(Black(ns.RXPWindowColor("boxBorder")) and Black(ns.RXPWindowColor("barBorder")),
+        "in a preset theme too, and in the Forever skin's")
+    ns.SetRXPWindowTheme("")
+
+    local tall = f.height
+    ns.SetRXPWindowOption("rxpWindowBoxBorderSize", 3)
+    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 2)
+    ns.SetRXPWindowColor("boxBorder", 1, 0, 0, 1)
+    ns.SetRXPWindowColor("barBorder", 0, 1, 0, 0.5)
+    ns.SetRXPWindowColor("barBack", 0, 0, 1, 0.25)
+    Flush(w)
+    Check(f.height == tall + 2, "the window is as tall as the bar's border makes it, the step box's being inside its own")
+    local box = Box()
+    Check(box.borderObject.pixels == 3 and box.borderObject.color[1] == 1 and box.borderObject._frame.shown == true,
+        "a size and a color for the step's box, in the addon's own theme")
+    Check(f.bar.edge.pixels == 2 and f.bar.edge.color[2] == 1 and f.bar.edge.color[4] == 0.5 and f.bar.height == 5 + 2 * 2,
+        "and for the bar: the size, the color, and room for it, so the fill is as thick as it was")
+    Check(f.bar.track.solid[3] == 1 and f.bar.track.solid[4] == 0.25, "and the bar's background its own")
+    Check(account.rxpWindowBoxBorderSize == 3 and account.rxpWindowBarBorderSize == 2
+        and account.rxpWindowColors.boxBorder ~= nil, "kept")
+
+    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 0)
+    Flush(w)
+    Check(f.bar.edge._frame.shown == false and f.bar.height == 5 and account.rxpWindowBarBorderSize == 0,
+        "none: no border and no room for it")
+    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 9)
+    ns.SetRXPWindowOption("rxpWindowBoxBorderSize", 0)
+    Check(ns.RXPWindowOption("rxpWindowBarBorderSize") == 4 and ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1,
+        "the sizes are held to 4 at most, and the box's to 1 at least")
+
+    ns.SetRXPWindowOption("rxpWindowBarBorderSize", 1)
+    w.talk.frame.text:SetText("Boar Meat: 3/8")
+    Flush(w)
+    local meters = Meters()
+    Check(#meters >= 1 and meters[1].edge and meters[1].edge.pixels == 1 and meters[1].edge.color[2] == 1,
+        "a row that counts has the bar's border too, in the same color")
+
+    ns.SetRXPWindowTheme("forever")
+    Flush(w)
+    Check(f.bar.edge._frame.shown == false and f.bar.rim._frame.shown == true,
+        "the Forever skin has its own rim, not this border")
+    ns.SetRXPWindowTheme("")
+
+    ns.ResetRXPWindowStyle()
+    Flush(w)
+    Check(ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1 and Black(ns.RXPWindowColor("boxBorder"))
+        and f.bar.edge.pixels == 1, "Reset puts the sizes and colors back")
+end
+
 -- RestedXP's windows that are not there yet are taken when they are, at whatever redraw is first
 do
     local w = Start({ rxpWindow = true }, { later = true })
@@ -1019,7 +1100,7 @@ do
     r, g, b, a = ns.RXPWindowColor("panel")
     Check(r == T.panel.r and g == T.panel.g and b == T.panel.b and a == 0.92,
         "the panel is the theme's panel color")
-    Check(#ns.RXPWindowColors() == 9, "the nine colors it lists, each for several things")
+    Check(#ns.RXPWindowColors() == 12, "the twelve colors it lists, each for several things")
     ns.SetRXPWindowColor("title", 0.1, 0.2, 0.3, 0.4)
     r, g, b, a = ns.RXPWindowColor("title")
     Check(r == 0.1 and g == 0.2 and b == 0.3 and a == 0.4 and account.rxpWindowColors.title.a == 0.4,
@@ -1095,7 +1176,8 @@ do
     Check(f.bar.shown == true and f.rule.shown == false, "under the title: the guide's progress bar to start")
     Check(math.abs(f.bar.value - 36 / 66) < 1e-9 and f.bar.range[1] == 0 and f.bar.range[2] == 1,
         "full as far as the guide is, steps 36 of 66")
-    Check(f.bar.height == 5 and f.bar.barTexture == w.ns.MEDIA .. "NaowhGradient.tga", "5 thick, in the Naowh Gradient")
+    Check(f.bar.height == 5 + 2 and f.bar.barTexture == w.ns.MEDIA .. "NaowhGradient.tga",
+        "5 thick inside its border, in the Naowh Gradient")
     Check(f.bar.barColor[1] == T.accent.r and f.bar.barColor[4] == 1, "in the accent")
     Check(f.bar.track.solid[1] == T.fg.r and f.bar.track.solid[4] == 0.5, "over a track of the line's color")
     local box
@@ -1134,8 +1216,9 @@ do
     w.ns.SetRXPWindowColor("accent", 1, 0, 0, 0.5)
     w.ns.SetRXPWindowColor("line", 0, 0, 1, 1)
     Flush(w)
-    Check(f.bar.height == 5 and f.bar.barTexture == "Textures\\Flat Name" and f.bar.barColor[1] == 1
-        and f.bar.barColor[4] == 0.5 and f.bar.track.solid[3] == 1, "the height is fixed, the texture and the colors are its own")
+    Check(f.bar.height == 5 + 2 and f.bar.barTexture == "Textures\\Flat Name" and f.bar.barColor[1] == 1
+        and f.bar.barColor[4] == 0.5 and f.bar.track.solid[3] == 1,
+        "the height is fixed, the texture and the colors are its own, and the track follows the line's")
     w.rows[1].complete = true
     w.rxp.GetGuideProgress = function() return 66, "id" end
     w.rxp.v2:UpdateGuideWindow()
@@ -1277,15 +1360,16 @@ do
     for _, o in ipairs(w.frames) do
         if o.label and o.logo then box = o end
     end
-    Check(box.borderObject._frame.shown == true and box.borderObject.color[1] == 0.9 and box.borderObject.color[4] == 0.6,
-        "the step's box has its border, in the same color")
+    Check(box.borderObject._frame.shown == true and box.borderObject.color[1] == 0 and box.borderObject.color[2] == 0
+        and box.borderObject.color[3] == 0 and box.borderObject.color[4] == 1 and box.borderObject.pixels == 1,
+        "the step's box has its border, black and one pixel: it is not the window's")
     Check(math.abs(box.back.solid[4] - 0.55) < 1e-9, "the box is a little see-through to start")
     ns.SetRXPWindowOption("rxpWindowBoxBorder", false)
     ns.SetRXPWindowColor("box", 0.3, 0.3, 0.3, 0.3)
     ns.SetRXPWindowColor("border", 1, 1, 0, 1)
     Flush(w)
-    Check(box.borderObject._frame.shown == false and box.back.solid[1] == 0.3 and box.borderObject.color[1] == 1
-        and f.borderObject.color[1] == 1, "which can be turned off, and has its colors, the window's border the same")
+    Check(box.borderObject._frame.shown == false and box.back.solid[1] == 0.3 and f.borderObject.color[1] == 1,
+        "which can be turned off, and has its color, the window's border its own")
     Check(math.abs(box.back.solid[4] - 0.55) < 1e-9 and select(4, ns.RXPWindowColor("box")) == 1,
         "the opacity of the box is not part of its color")
     ns.SetRXPWindowOption("rxpWindowBoxOpacity", 100)
@@ -1590,7 +1674,7 @@ do
     local function Look(frame, name)
         local r, g, b = ns.RXPWindowColor("box")
         local opacity = ns.RXPWindowOption("rxpWindowBoxOpacity") / 100
-        local er, eg, eb, ea = ns.RXPWindowColor("border")
+        local er, eg, eb, ea = ns.RXPWindowColor("boxBorder")
         local label = { ns.RXPWindowColor("title") }
         Check(Is(Fill(frame), r, g, b, opacity), name .. ": the background is the active step's color and opacity")
         Check(Fill(frame.title) and Is(Fill(frame.title), r, g, b, opacity), name .. ": and so is its title's")
@@ -1649,7 +1733,7 @@ do
     -- what is set for the window is what they follow
     ns.SetRXPWindowOption("rxpWindowBoxOpacity", 80)
     ns.SetRXPWindowColor("box", 1, 0, 0)
-    ns.SetRXPWindowColor("border", 0, 1, 0, 0.5)
+    ns.SetRXPWindowColor("boxBorder", 0, 1, 0, 0.5)
     ns.SetRXPWindowOption("rxpWindowOutline", "outline")
     ns.SetRXPWindowOption("rxpWindowFont", "Fancy")
     Flush(w)
@@ -1868,7 +1952,7 @@ do
     Flush(w)
     local buy = Row(BUY)
     Check(buy.meter.shown and math.abs(buy.meter.value - 0.4) < 1e-9, "buy five with two in the bags: two fifths")
-    Check(buy.meter.points[1][4] == 2 + 5 + 23 and buy.meter.width == buy.width - 2 - 5 - 23 and buy.height == 18 + 2 + 5,
+    Check(buy.meter.points[1][4] == 2 + 5 + 23 and buy.meter.width == buy.width - 2 - 5 - 23 and buy.height == 18 + 2 + 5 + 2,
         "under the text as wide as it, and the row is as tall as both")
     Check(f.events and f.events[BAGS] == true, "and the bags are listened to")
 

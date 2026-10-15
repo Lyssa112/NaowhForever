@@ -600,6 +600,7 @@ function ns.Font(parent, size, flags, color, heading)
 end
 
 local fitters = setmetatable({}, { __mode = "k" })
+local EDGE_PIXELS = 1
 
 local function OnePixel(region)
     return PixelUtil.GetPixelToUIUnitFactor() / region:GetEffectiveScale()
@@ -621,9 +622,10 @@ local function Register(region, fit)
     fit(OnePixel(region))
 end
 
-function ns.Hairline(tex, axis)
+function ns.Hairline(tex, axis, pixels)
+    local count = pixels or EDGE_PIXELS
     Register(tex, function(px)
-        if axis == "h" then tex:SetHeight(px) else tex:SetWidth(px) end
+        if axis == "h" then tex:SetHeight(count * px) else tex:SetWidth(count * px) end
     end)
     return tex
 end
@@ -669,6 +671,10 @@ function ns.Border(frame, color, alpha)
         _frame = bf,
         SetColor = function(_, r, g, b, a2)
             for i = 1, BORDER_EDGES do edges[i]:SetColorTexture(r, g, b, a2 or 1) end
+        end,
+        SetPixels = function(_, pixels)
+            for i = 1, 2 do ns.Hairline(edges[i], "h", pixels) end
+            for i = 3, BORDER_EDGES do ns.Hairline(edges[i], "v", pixels) end
         end,
     }
 end
