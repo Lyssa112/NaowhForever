@@ -805,7 +805,7 @@ end
 
 -- the list is the guide's steps, scrolled with the wheel: the ones done above, the ones to come below
 do
-    local account = { rxpWindow = true }
+    local account = { rxpWindow = true, rxpWindowScrollBar = true }
     local w = Start(account)
     local ns, rxp = w.ns, w.rxp
     local f = Window(w)
@@ -906,7 +906,37 @@ do
     Wheel(1)
     Check(#Lines() == 2 and First() == "49", "and a tick up shows the last steps")
 
-    local small = Start({ rxpWindow = true })
+    local plain = Start({ rxpWindow = true })
+    local p = Window(plain)
+    local function PlainLines()
+        local out = {}
+        for _, o in ipairs(plain.everything) do
+            if o.text and Seen(o) and o.text:find("^%d+  ") then out[#out + 1] = o end
+        end
+        return out
+    end
+    Check(p.track.shown == false and p.thumb.shown == false, "the scroll bar is off to start: no bar")
+    Check(#PlainLines() == 6 and PlainLines()[1].width == 380 - 20, "and the lines are as wide as the step box, with no room kept for it")
+    p.scripts.OnMouseWheel(p, 1)
+    Flush(plain)
+    Check(PlainLines()[1].text:find("^35") ~= nil, "while the wheel scrolls the list as it does with it")
+    for _, o in ipairs(plain.frames) do
+        if o.index == 35 and o.shade and Seen(o) then
+            o.scripts.OnEnter(o)
+            Check(plain.env.GameTooltip.lines[#plain.env.GameTooltip.lines] == "Scroll for more steps",
+                "and a line still says that the list scrolls")
+        end
+    end
+    plain.ns.SetRXPWindowOption("rxpWindowScrollBar", true)
+    Flush(plain)
+    Check(p.track.shown == true and p.thumb.shown == true and PlainLines()[1].width == 380 - 20 - 2 - 4,
+        "Show Scroll Bar shows it, and the lines end before it")
+    plain.ns.SetRXPWindowOption("rxpWindowScrollBar", false)
+    Flush(plain)
+    Check(p.track.shown == false and p.thumb.shown == false and PlainLines()[1].width == 380 - 20,
+        "and off again hides it")
+
+    local small = Start({ rxpWindow = true, rxpWindowScrollBar = true })
     local g = Window(small)
     for _, row in ipairs(small.rows) do
         if row.index > 40 then row.hidden = true end

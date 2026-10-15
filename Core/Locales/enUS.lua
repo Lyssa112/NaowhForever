@@ -2,6 +2,7 @@
 local L = _G.NaowhForeverLocale or {}
 _G.NaowhForeverLocale = L
 
+L["A thin bar at the edge of the list that shows how far it is scrolled."] = true
 L["Bar Border Color"] = true
 L["Bar Border Size"] = true
 L["Behind the filled part of the progress bars, the Line Color to start."] = true
@@ -14,6 +15,7 @@ L["Recipe Availability Marks"] = true
 L["Round the active step and the two windows that follow its look, black in the Naowh theme."] = true
 L["Round the progress bars, black in the Naowh theme."] = true
 L["Round the whole window."] = true
+L["Show Scroll Bar"] = true
 L["Shows small markers on recipe rows when the result is in your bags or bank, or the recipe is already on the Shopping List. Hover a marker for its exact count. Equipped items do not count as bag contents."] = true
 L["Return on Investment"] = true
 L["Shows the selected recipe's profit as a percentage of the materials' cost, under its profit."] = true

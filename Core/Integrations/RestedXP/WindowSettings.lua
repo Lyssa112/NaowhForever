@@ -36,6 +36,8 @@ local OPTIONS = {
       tip = "What it takes to click the active step to skip it, or a step of the list to go to it." },
     { key = "rxpWindowTips", group = "Look", kind = "toggle", label = "Show Tooltips", default = true,
       tip = "What a click on a step does, said when the mouse is over it." },
+    { key = "rxpWindowScrollBar", group = "Look", kind = "toggle", label = "Show Scroll Bar", default = false,
+      tip = "A thin bar at the edge of the list that shows how far it is scrolled." },
     { key = "rxpWindowLock", group = "Look", kind = "toggle", label = "Lock Window", default = false,
       tip = "The window cannot be moved or resized." },
     { key = "rxpWindowPanel", group = "Look", kind = "toggle", label = "Window Background", default = false,

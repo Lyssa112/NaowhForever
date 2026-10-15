@@ -819,11 +819,11 @@ local function DrawPanel()
     window.edge._frame:SetShown(borderOn and not inset)
 end
 
-local function ListLine(y, inner, listH, text, index, menu, look, scrollable)
+local function ListLine(y, inner, listH, text, index, menu, look, scrollable, barred)
     local item = Acquire("line")
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
-    item:SetWidth(scrollable and inner - SCROLL_ROOM or inner)
+    item:SetWidth(barred and inner - SCROLL_ROOM or inner)
     Coloured(item, look == "current" and ACCENT or "muted")
     item:SetAlpha(look == "done" and DONE_ALPHA or 1)
     item:SetText(text)
@@ -855,16 +855,17 @@ local function DrawSteps(model, y, inner, listH)
     local top = math.max(1, math.min(model.first + scroll, math.max(model.first, #list - count + 1)))
     scroll = top - model.first
     local scrollable = count > 0 and #list > count
+    local barred = scrollable and ns.RXPWindowOption("rxpWindowScrollBar")
     local from = y
     for i = top, math.min(#list, top + count - 1) do
         local entry = list[i]
         local look = model.current[entry.index] and "current" or entry.done and "done" or nil
         y = ListLine(y, inner, listH, ("%d  %s"):format(entry.index, ns.RXPWindowLineText(entry)), entry.index, false,
-            look, scrollable)
+            look, scrollable, barred)
     end
-    window.track:SetShown(scrollable)
-    window.thumb:SetShown(scrollable)
-    if scrollable then DrawScrollBar(from, from - y, top, count, #list) end
+    window.track:SetShown(barred)
+    window.thumb:SetShown(barred)
+    if barred then DrawScrollBar(from, from - y, top, count, #list) end
     return y
 end
 
