@@ -35,7 +35,8 @@ local TEXT_PICK = ns.L("Pick a guide")
 local TEXT_SCROLL = ns.L("Scroll for more steps")
 local TIP_DIM = 0.7
 local WHEEL_LINES, DONE_ALPHA = 2, 0.5
-local SCROLL_W, SCROLL_INSET, SCROLL_MIN = 2, 3, 12
+local SCROLL_W, SCROLL_GAP, SCROLL_MIN = 2, 4, 12
+local SCROLL_ROOM = SCROLL_W + SCROLL_GAP
 local HOME = { "LEFT", "LEFT", 0, 35 }
 local DRAG_BUTTON, TIP_ANCHOR = "LeftButton", "ANCHOR_TOP"
 local ACCENT = "accent"
@@ -822,7 +823,7 @@ local function ListLine(y, inner, listH, text, index, menu, look, scrollable)
     local item = Acquire("line")
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
-    item:SetWidth(inner)
+    item:SetWidth(scrollable and inner - SCROLL_ROOM or inner)
     Coloured(item, look == "current" and ACCENT or "muted")
     item:SetAlpha(look == "done" and DONE_ALPHA or 1)
     item:SetText(text)
@@ -839,11 +840,11 @@ local function DrawScrollBar(from, height, top, count, total)
     local grip = math.max(SCROLL_MIN, height * count / total)
     local share = math.min(1, (top - 1) / (total - count))
     window.track:ClearAllPoints()
-    window.track:SetPoint("TOPRIGHT", window, "TOPRIGHT", -SCROLL_INSET, from)
+    window.track:SetPoint("TOPRIGHT", window, "TOPRIGHT", -PAD, from)
     window.track:SetSize(SCROLL_W, height)
     window.track:SetColorTexture(ns.RXPWindowColor("line"))
     window.thumb:ClearAllPoints()
-    window.thumb:SetPoint("TOPRIGHT", window, "TOPRIGHT", -SCROLL_INSET, from - share * (height - grip))
+    window.thumb:SetPoint("TOPRIGHT", window, "TOPRIGHT", -PAD, from - share * (height - grip))
     window.thumb:SetSize(SCROLL_W, grip)
     window.thumb:SetColorTexture(ns.RXPWindowColor(ACCENT))
 end

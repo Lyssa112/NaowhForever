@@ -836,6 +836,9 @@ do
     Check(#Lines() == 6 and First() == "37", "to start: the six steps after the active one, as before")
     Check(f.scripts.OnMouseWheel ~= nil and f.track.shown == true and f.thumb.shown == true,
         "and a bar says there are more of them")
+    Check(f.track.points[1][2] == f and f.track.points[1][3] == "TOPRIGHT" and f.track.points[1][4] == -10
+        and f.thumb.points[1][4] == -10, "at the step box's right edge, not the window's: as wide as the step it follows")
+    Check(Lines()[1].width == 380 - 20 - 2 - 4, "and the lines end before it, not under it")
 
     Wheel(1)
     Check(First() == "35" and First(2) == "36" and First(3) == "37" and #Lines() == 6,
@@ -915,6 +918,11 @@ do
         if o.text and Seen(o) and o.text:find("^%d+  ") then shown = shown + 1 end
     end
     Check(shown == 3 and g.track.shown == false, "a guide with no more steps than lines has no bar to show")
+    local full = true
+    for _, o in ipairs(small.everything) do
+        if o.text and Seen(o) and o.text:find("^%d+  ") and o.width ~= 380 - 20 then full = false end
+    end
+    Check(full, "and its lines are as wide as the step box")
 end
 
 -- the step box and the bars have a border, black to start, and its size and color are the player's in any theme
