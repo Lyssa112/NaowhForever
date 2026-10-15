@@ -356,8 +356,9 @@ do
     Check(#labels == 1, "the active step is labelled in capitals, as RestedXP titles it")
     Check(#rowTexts == 3 and rowTexts[1] == "Talk to |cff00ff00Duokna|r", "its rows are RestedXP's own, as they read now")
     Check(#lines == 6 and lines[1] == "37  Step 37 line one" and lines[2] == "39  Talk to Gornek"
-        and lines[3] == "40  Step 40 line one" and lines[4] == "42  Step 42 line one",
-        "six steps after it, one line each, without the one RestedXP hides and the one that is done")
+        and lines[3] == "40  Step 40 line one" and lines[4] == "41  Step 41 line one"
+        and lines[5] == "42  Step 42 line one" and lines[6] == "43  Step 43 line one",
+        "six steps after it, one line each, without the one RestedXP hides")
     Check(progress.text:find(string.char(194, 183), 1, true), "the step and the percent are joined by a dot")
     Check(f.menu == nil, "there is no menu button: the right click is the menu")
     local panel
@@ -565,7 +566,7 @@ do
     for _, o in ipairs(w.frames) do
         if o.index and o.shade and Seen(o) then hits[#hits + 1] = o end
     end
-    Check(#hits == 6 and hits[1].index == 37 and hits[2].index == 39 and hits[6].index == 44,
+    Check(#hits == 6 and hits[1].index == 37 and hits[2].index == 39 and hits[6].index == 43,
         "each line of the list has a button for its step")
     Check(hits[2].width == 380 - 20 and hits[2].height == 12 + 6, "as big as the line")
     hits[2].scripts.OnClick(hits[2])
@@ -576,8 +577,9 @@ do
     w.shift = false
     hits[2].scripts.OnEnter(hits[2])
     Check(w.env.GameTooltip.text == "Go to step 39" and hits[2].shade.shown, "it says so, and is lit")
-    Check(#w.env.GameTooltip.lines == 1 and w.env.GameTooltip.lines[1] == "Shift-click",
-        "and it does not say where the menu is")
+    Check(#w.env.GameTooltip.lines == 2 and w.env.GameTooltip.lines[1] == "Shift-click"
+        and w.env.GameTooltip.lines[2] == "Scroll for more steps",
+        "and it does not say where the menu is, only that the list scrolls")
     hits[2].scripts.OnLeave(hits[2])
     Check(hits[2].shade.shown == false, "and not when the mouse leaves")
     Check(hits[1].scripts.OnDragStart ~= nil, "a line is still where the window is dragged from")
@@ -789,14 +791,128 @@ do
     rxp.GetGuideProgress = function() return 40, "id" end
     w.talk.frame.text:SetText("Talk to Duokna 0/2")
     Flush(w)
-    Check(rxp.v2.snapshots == snapshots + 1 and Lines()[1].text == "42  Step 42 line one",
-        "nor are the steps after another step")
+    Check(rxp.v2.snapshots == snapshots and Lines()[1].text == "41  Step 41 line one",
+        "the guide on another step is the same list, from the step after it, and is not read again")
 
     walks = 0
     ns.SetRXPWindow(false)
     ns.SetRXPWindow(true)
     Check(walks > 0 and w.guide.frame.alpha == 0 and w.button.mouse == false,
         "off and on: its windows are taken again, whatever RestedXP did meanwhile")
+end
+
+-- the list is the guide's steps, scrolled with the wheel: the ones done above, the ones to come below
+do
+    local account = { rxpWindow = true }
+    local w = Start(account)
+    local ns, rxp = w.ns, w.rxp
+    local f = Window(w)
+    local went = {}
+    rxp.SetStep = function(n) went[#went + 1] = n end
+    local function Lines()
+        local out = {}
+        for _, o in ipairs(w.everything) do
+            if o.text and Seen(o) and o.text:find("^%d+  ") then out[#out + 1] = o end
+        end
+        return out
+    end
+    local function First(of)
+        local line = Lines()[of or 1]
+        return line and line.text:match("^(%d+)")
+    end
+    local function Wheel(ticks)
+        for _ = 1, math.abs(ticks) do f.scripts.OnMouseWheel(f, ticks > 0 and 1 or -1) end
+        Flush(w)
+    end
+    local function Hit(index)
+        for _, o in ipairs(w.frames) do
+            if o.index == index and o.shade and Seen(o) then return o end
+        end
+    end
+    local accent = ns.RXPWindowColor("accent")
+
+    Check(#Lines() == 6 and First() == "37", "to start: the six steps after the active one, as before")
+    Check(f.scripts.OnMouseWheel ~= nil and f.track.shown == true and f.thumb.shown == true,
+        "and a bar says there are more of them")
+
+    Wheel(1)
+    Check(First() == "35" and First(2) == "36" and First(3) == "37" and #Lines() == 6,
+        "a tick up: the steps behind it, from the first of the guide RestedXP lists")
+    Check(Lines()[1].alpha == 0.5 and Lines()[3].alpha == 1, "a step that is done is dimmer")
+    Check(Lines()[2].color and math.abs(Lines()[2].color[1] - accent) < 1e-6 and Lines()[3].color[1] ~= accent,
+        "and the one the guide is on has the accent")
+    local thumb = f.thumb.points[1][5]
+    Check(f.track.points[1][5] == f.thumb.points[1][5], "the bar's thumb is at the top of its track")
+    Wheel(3)
+    Check(First() == "35", "no further up than the first step")
+
+    Wheel(-3)
+    Check(First() == "42" and #Lines() == 6, "three ticks down: further in the guide")
+    Check(f.thumb.points[1][5] < thumb, "and the bar's thumb has moved down")
+    Wheel(-30)
+    Check(First() == "45" and #Lines() == 6 and First(6) == "50", "no further down than the last step, at the bottom of the list")
+
+    w.shift = true
+    Wheel(30)
+    Hit(35).scripts.OnClick(Hit(35))
+    Check(#went == 1 and went[1] == 35, "a step done is gone back to like any other: with shift, a click goes to it")
+    w.shift = false
+    Hit(35).scripts.OnEnter(Hit(35))
+    Check(w.env.GameTooltip.text == "Go to step 35" and w.env.GameTooltip.lines[2] == "Scroll for more steps",
+        "and its tooltip says so, and that the list scrolls")
+    ns.SetRXPWindowOption("rxpWindowSkip", "off")
+    Flush(w)
+    local before = #went
+    Hit(35).scripts.OnClick(Hit(35))
+    Check(#went == before, "with Skipping Steps off it goes nowhere")
+    ns.SetRXPWindowOption("rxpWindowSkip", "shift")
+
+    rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(First() == "35", "RestedXP laying its window out again does not take the list from where it is scrolled")
+    rxp.GetGuideProgress = function() return 40, "id" end
+    rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(First() == "41", "the guide moving on takes it back to the steps after it")
+
+    ns.SetRXPWindowSteps(12)
+    Flush(w)
+    Check(#Lines() == 10 and f.track.shown == true, "twelve lines of the ten steps after it, and the rest above them")
+    Wheel(5)
+    Check(First() == "35" and #Lines() == 12, "all twelve lines are the guide's now")
+    ns.SetRXPWindowSteps(0)
+    Wheel(1)
+    Check(#Lines() == 0 and f.track.shown == false and f.thumb.shown == false, "none listed: nothing to scroll and no bar")
+    ns.SetRXPWindowSteps(6)
+    Flush(w)
+
+    account.rxpWindowCollapsed = true
+    ns.RXPWindowRefresh()
+    Flush(w)
+    Check(f.track.shown == false and f.thumb.shown == false, "folded: no bar either")
+    account.rxpWindowCollapsed = nil
+    ns.RXPWindowRefresh()
+    Flush(w)
+
+    rxp.GetGuideProgress = function() return 66, "id" end
+    rxp.v2:UpdateGuideWindow()
+    Flush(w)
+    Check(#Lines() == 0, "at the end of the guide there is nothing after it")
+    Wheel(1)
+    Check(#Lines() == 2 and First() == "49", "and a tick up shows the last steps")
+
+    local small = Start({ rxpWindow = true })
+    local g = Window(small)
+    for _, row in ipairs(small.rows) do
+        if row.index > 40 then row.hidden = true end
+    end
+    small.rxp.v2:UpdateGuideWindow()
+    Flush(small)
+    local shown = 0
+    for _, o in ipairs(small.everything) do
+        if o.text and Seen(o) and o.text:find("^%d+  ") then shown = shown + 1 end
+    end
+    Check(shown == 3 and g.track.shown == false, "a guide with no more steps than lines has no bar to show")
 end
 
 -- RestedXP's windows that are not there yet are taken when they are, at whatever redraw is first

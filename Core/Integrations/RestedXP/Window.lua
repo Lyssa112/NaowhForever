@@ -31,7 +31,10 @@ local TEXT_SHIFT = ns.L("Shift-click")
 local TEXT_MENU = ns.L("Right-click: menu")
 local TEXT_GO = ns.L("Go to step %d")
 local TEXT_PICK = ns.L("Pick a guide")
+local TEXT_SCROLL = ns.L("Scroll for more steps")
 local TIP_DIM = 0.7
+local WHEEL_LINES, DONE_ALPHA = 2, 0.5
+local SCROLL_W, SCROLL_INSET, SCROLL_MIN = 2, 3, 12
 local HOME = { "LEFT", "LEFT", 0, 35 }
 local DRAG_BUTTON, TIP_ANCHOR = "LeftButton", "ANCHOR_TOP"
 local ACCENT = "accent"
@@ -42,6 +45,7 @@ local OUTLINE_FLAGS = { outline = "OUTLINE", thick = "THICKOUTLINE" }
 local window, active, started, pending, styled, wantsBags
 local retake = true
 local sizing, sizingModel
+local scroll, anchorGuide, anchorAfter = 0
 local pool, used = { box = {}, row = {}, line = {}, hit = {} }, { box = 0, row = 0, line = 0, hit = 0 }
 local silenced = setmetatable({}, { __mode = "k" })
 local dressed = setmetatable({}, { __mode = "k" })
@@ -65,6 +69,11 @@ local function Refresh()
 end
 
 ns.RXPWindowRefresh = Refresh
+
+local function Wheel(_, delta)
+    scroll = scroll - delta * WHEEL_LINES
+    Refresh()
+end
 
 local function Rebuilt()
     retake = true
@@ -337,7 +346,7 @@ local function StepClick(self, button)
     if MaySkip() then SkipStep(self.step) end
 end
 
-local function Tip(owner, text, menu, plain)
+local function Tip(owner, text, menu, plain, hint)
     if not ns.RXPWindowOption("rxpWindowTips") or GameTooltip:IsForbidden() then return end
     local mode = ns.RXPWindowOption("rxpWindowSkip")
     GameTooltip:SetOwner(owner, TIP_ANCHOR)
@@ -350,6 +359,7 @@ local function Tip(owner, text, menu, plain)
         GameTooltip:SetText(text, r, g, b)
         if mode == "shift" then GameTooltip:AddLine(TEXT_SHIFT, TIP_DIM, TIP_DIM, TIP_DIM) end
         if menu then GameTooltip:AddLine(TEXT_MENU, TIP_DIM, TIP_DIM, TIP_DIM) end
+        if hint then GameTooltip:AddLine(hint, TIP_DIM, TIP_DIM, TIP_DIM) end
     end
     GameTooltip:Show()
 end
@@ -361,7 +371,7 @@ end
 local function LiveSize(width, height)
     if not (sizing and sizingModel and window) then return end
     sizing.width = math.min(WIDTH_MAX, math.max(WIDTH_MIN, width))
-    sizing.steps = StepsFor(height)
+    sizing.steps = math.max(0, math.min(STEPS_MAX, StepsFor(height)))
     Draw()
 end
 
@@ -382,7 +392,7 @@ local function MakeGrip(parent)
     grip:SetHighlightTexture(GRIP_HIGHLIGHT)
     grip:SetScript("OnMouseDown", function()
         if ns.RXPWindowOption("rxpWindowLock") then return end
-        sizingModel = ns.RXPWindowRead(STEPS_MAX)
+        sizingModel = ns.RXPWindowRead()
         sizing = { width = window:GetWidth(), steps = ns.RXPWindowSteps() }
         window:StartSizing(GRIP_CORNER)
     end)
@@ -480,6 +490,10 @@ local function Build()
     f.rule = ns.Solid(f, "ARTWORK", T.fg, 1)
     ns.Hairline(f.rule, "h")
     f.bar = MakeBar(f)
+    f.track = ns.Solid(f, "ARTWORK", T.line, 1)
+    f.thumb = ns.Solid(f, "OVERLAY", T.accent, 1)
+    f:EnableMouseWheel(true)
+    f:SetScript("OnMouseWheel", Wheel)
     f:SetScript("OnSizeChanged", function(_, width, height) LiveSize(width, height) end)
     f.grip = MakeGrip(f)
     Place(f)
@@ -545,6 +559,8 @@ end
 local function MakeHit()
     local hit = CreateFrame("Button", nil, window)
     hit:RegisterForClicks("LeftButtonUp")
+    hit:EnableMouseWheel(true)
+    hit:SetScript("OnMouseWheel", Wheel)
     hit.shade = hit:CreateTexture(nil, "BACKGROUND")
     hit.shade:SetAllPoints()
     hit:SetScript("OnClick", function(self)
@@ -559,7 +575,7 @@ local function MakeHit()
         if self.menu then
             Tip(self, TEXT_PICK, false, true)
         else
-            Tip(self, TEXT_GO:format(self.index or 0))
+            Tip(self, TEXT_GO:format(self.index or 0), false, false, self.scrollable and TEXT_SCROLL)
         end
     end)
     hit:SetScript("OnLeave", function(self)
@@ -789,31 +805,59 @@ local function DrawPanel()
     window.edge._frame:SetShown(borderOn and not inset)
 end
 
-local function ListLine(y, inner, listH, text, index, menu)
+local function ListLine(y, inner, listH, text, index, menu, look, scrollable)
     local item = Acquire("line")
     item:ClearAllPoints()
     item:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
     item:SetWidth(inner)
-    Coloured(item, "muted")
+    Coloured(item, look == "current" and ACCENT or "muted")
+    item:SetAlpha(look == "done" and DONE_ALPHA or 1)
     item:SetText(text)
     local hit = Acquire("hit")
     hit:ClearAllPoints()
     hit:SetPoint("TOPLEFT", window, "TOPLEFT", PAD, y)
     hit:SetSize(inner, listH)
-    hit.index, hit.menu = index, menu
+    hit.index, hit.menu, hit.scrollable = index, menu, scrollable
     hit.shade:Hide()
     return y - listH
+end
+
+local function DrawScrollBar(from, height, top, count, total)
+    local grip = math.max(SCROLL_MIN, height * count / total)
+    local share = math.min(1, (top - 1) / (total - count))
+    window.track:ClearAllPoints()
+    window.track:SetPoint("TOPRIGHT", window, "TOPRIGHT", -SCROLL_INSET, from)
+    window.track:SetSize(SCROLL_W, height)
+    window.track:SetColorTexture(ns.RXPWindowColor("line"))
+    window.thumb:ClearAllPoints()
+    window.thumb:SetPoint("TOPRIGHT", window, "TOPRIGHT", -SCROLL_INSET, from - share * (height - grip))
+    window.thumb:SetSize(SCROLL_W, grip)
+    window.thumb:SetColorTexture(ns.RXPWindowColor(ACCENT))
+end
+
+local function DrawSteps(model, y, inner, listH)
+    local list = model.list
+    local count = sizing and sizing.steps or ns.RXPWindowSteps()
+    local top = math.max(1, math.min(model.first + scroll, math.max(model.first, #list - count + 1)))
+    scroll = top - model.first
+    local scrollable = count > 0 and #list > count
+    local from = y
+    for i = top, math.min(#list, top + count - 1) do
+        local entry = list[i]
+        local look = model.current[entry.index] and "current" or entry.done and "done" or nil
+        y = ListLine(y, inner, listH, ("%d  %s"):format(entry.index, ns.RXPWindowLineText(entry)), entry.index, false,
+            look, scrollable)
+    end
+    window.track:SetShown(scrollable)
+    window.thumb:SetShown(scrollable)
+    if scrollable then DrawScrollBar(from, from - y, top, count, #list) end
+    return y
 end
 
 local function DrawList(model, y, inner, listH)
     if model.empty then y = ListLine(y, inner, listH, TEXT_PICK, nil, true) end
     for i, step in ipairs(model.steps) do y = DrawBox(step, y, inner, i == 1) end
-    for i = 1, sizing and sizing.steps or #model.upcoming do
-        local entry = model.upcoming[i]
-        if not entry then break end
-        y = ListLine(y, inner, listH, ("%d  %s"):format(entry.index, entry.text), entry.index, false)
-    end
-    return y
+    return DrawSteps(model, y, inner, listH)
 end
 
 local function DrawChrome(y, listH, folded)
@@ -834,6 +878,9 @@ function Draw()
     window = window or Build()
     local model = sizing and sizingModel or ns.RXPWindowRead() or ns.RXPWindowNoGuide()
     if not sizing and retake then retake = not Take() end
+    if not sizing and (model.guide ~= anchorGuide or model.after ~= anchorAfter) then
+        anchorGuide, anchorAfter, scroll = model.guide, model.after, 0
+    end
     Reset()
     Refaced()
     local width = sizing and sizing.width or ns.RXPWindowWidth()
@@ -844,6 +891,8 @@ function Draw()
     DrawPanel()
     DrawHeader(model, folded, width, headH)
     local y = DrawLine(model, -PAD - headH)
+    window.track:Hide()
+    window.thumb:Hide()
     if not folded then y = DrawList(model, y, width - PAD * 2, listH) end
     DrawChrome(y, listH, folded)
     window:Show()

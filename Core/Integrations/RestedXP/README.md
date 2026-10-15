@@ -86,13 +86,21 @@ Core/Integrations/RestedXP/
   only the first four make the redraw read RestedXP's steps and walk its windows again (`Rebuilt`).
   The window needs RestedXP's V2 interface (`v2:IsGuideWindowEnabled()`): the active step rows and
   the guide's rows are built for it.
-- Steps after the active one come from `v2:BuildGuideStepsSnapshot`, which is what RestedXP's own
-  v2 guide window lists, so a step it hides or has done is not listed here either. It walks the
-  whole guide and joins every step's text, so it is read once and kept, for the most steps that can
-  be listed, by guide and by the step it follows, until RestedXP builds again. A counter ticking
-  redraws from what was kept, as RestedXP's own window is only rebuilt then too: with a guide of 700
-  steps a redraw went from reading it (2.6 ms of Lua, plus the same in RestedXP's own window at its
-  layout) to none.
+- The list under the active step is the guide's steps as `v2:BuildGuideStepsSnapshot` has them, which
+  is what RestedXP's own v2 guide window lists: a step it hides is not listed, and a step done is, a
+  little dimmer, so that a step can be gone back to. It starts at the first step after the active one
+  and the mouse wheel moves it, two lines a tick, over the steps before (the one the guide is on in
+  the accent color) and after. A bar at its edge shows where it is and is there only when there are
+  more steps than lines. It goes back to the steps after the active one when the guide moves on (a
+  new progress or guide), and not when RestedXP builds again, so a list being read is not taken from
+  the reader. Listed Steps is how many lines it has, and a click on one goes to that step as it did
+  (shift-click to start): `SetStep` is what RestedXP's own "Go to step" calls, back or forward. With
+  RestedXP's Hide Completed Steps on, the snapshot has no done steps and so neither has the list.
+  The snapshot walks the whole guide and joins every step's text, so it is read once and kept, by
+  guide, until RestedXP builds again, and the text of a line is made when the line is drawn. A counter
+  ticking redraws from what was kept, as RestedXP's own window is only rebuilt then too: with a guide
+  of 700 steps a redraw went from reading it (2.6 ms of Lua, plus the same in RestedXP's own window at
+  its layout) to none.
 - RestedXP's two windows are walked (`Silence`) for frames made since the last time only when it built
   something, and when they are given back and taken again. A window that is not there yet is asked
   for at every redraw until both are.
@@ -161,7 +169,7 @@ Core/Integrations/RestedXP/
   Its bounds are the smallest (no steps) and the tallest (all of them). Lock Window stops moving and
   sizing, and a folded window has nothing to size. The width has no slider and the grip no switch:
   the corner is the way to size the window, so a setting for either was one more row to say the same
-  (only the steps keep one, Upcoming Steps, as a number is exact where a drag is not). A grip that an
+  (only the lines keep one, Listed Steps, as a number is exact where a drag is not). A grip that an
   older version had switched off is shown.
 - The window follows the drag as it happens (`OnSizeChanged` while the grip is held): what the list can
   show is read once when the grip is pressed, with every step it could list, and each size drawn from

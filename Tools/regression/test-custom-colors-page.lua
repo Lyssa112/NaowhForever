@@ -392,13 +392,13 @@ do
     local window = Pair(e, "RestedXP Naowh Window (V2)")
     Check(window and window.type == "toggle" and window.getValue() == false and a.rxpWindow == nil and window.folds == false,
         "a RestedXP Naowh Window (V2) switch, off by default")
-    Check(Pair(e, "Upcoming Steps") == nil and Pair(e, NEEDS) == nil, "and no steps or note while it is off")
+    Check(Pair(e, "Listed Steps") == nil and Pair(e, NEEDS) == nil, "and no steps or note while it is off")
     window.setValue(true)
     Check(a.rxpWindow == true, "on is stored")
     e.build()
     Check(Pair(e, "RestedXP Naowh Window (V2)").folds == true and Pair(e, NEEDS) ~= nil,
         "on: it folds what follows, and says what it needs while RestedXP's V2 interface is off")
-    local steps, scale = Pair(e, "Upcoming Steps")
+    local steps, scale = Pair(e, "Listed Steps")
     Check(steps and steps.type == "slider" and steps.min == 0 and steps.max == 12 and steps.step == 1,
         "on: the steps listed after the active one")
     Check(Pair(e, "Naowh Window Width") == nil and Pair(e, "Show Resize Grip") == nil,
@@ -686,7 +686,7 @@ do
         and #All(custom, "Arrow Color") == 1, "Custom: the colors, each once, the arrow's with them")
     local arrow = All(custom, "Arrow Color")[1]
     Check(arrow.type == "colorpicker" and arrow.tooltip == "RestedXP's waypoint arrow.", "the arrow's is a swatch")
-    Check(#All(Page({ rxpWindow = true }, true), "Upcoming Steps") == 1, "the sliders are there either way")
+    Check(#All(Page({ rxpWindow = true }, true), "Listed Steps") == 1, "the sliders are there either way")
     local pick = Page({ rxpWindow = true }, true)
     local picker = All(pick, "Window Theme")[1]
     local refreshed = pick.refreshes
@@ -732,7 +732,7 @@ do
     end
     local switch, set, note = Position(s, "RestedXP Naowh Window (V2)"), Position(s, "Set Up New Characters"),
         Position(s, "Turn on RestedXP's Beta Features and V2 interface.")
-    local steps, scale = Position(s, "Upcoming Steps"), Position(s, "Naowh Window Scale")
+    local steps, scale = Position(s, "Listed Steps"), Position(s, "Naowh Window Scale")
     Check(switch and set and note and steps and scale and switch < set and set < note and note < steps
         and steps < scale, "in the window's section it is the first thing: before what it needs and its sliders")
     Check(Position(s, "This Character") == set + 1, "and the button for the character played is beside it")
@@ -817,7 +817,7 @@ do
     Check(Count(v2, "Style RestedXP's Arrow") == 1 and Count(v2, "RestedXP Arrow") == 1 and not Has(v2, "RESTEDXP ARROW")
         and Has(v2, "RestedXP Naowh Window (V2)") and Has(v2, "WINDOW LOOK"),
         "V2 on: the arrow's options are in V2's section, once, before the window's look")
-    Check(Count(v2, "Use Addon Font") == 0 and Count(v1, "Upcoming Steps") == 0,
+    Check(Count(v2, "Use Addon Font") == 0 and Count(v1, "Listed Steps") == 0,
         "and what is of the one is not in the other")
     local function Position(page, name)
         local at = 0
@@ -860,13 +860,13 @@ do
         and theme["Style RestedXP's Arrow"] == "RestedXP Theme (V1)", "V1's switch and rows, under its title")
     Check(theme["RestedXP Naowh Window (V2)"] == "RestedXP Naowh Window (V2)", "and V2's switch, under its own")
     local window = Terms({ rxpWindow = true })
-    Check(window["Upcoming Steps"] == "RestedXP Naowh Window (V2)" and window["Set Up New Characters"]
+    Check(window["Listed Steps"] == "RestedXP Naowh Window (V2)" and window["Set Up New Characters"]
         == "RestedXP Naowh Window (V2)" and window["Title Color"] == nil and window["Window Look"] ~= nil,
         "V2's rows, the set up and the look, under its title, and no colors with a theme")
     Check(Terms({ rxpWindow = true, rxpWindowTheme = "custom" })["Title Color"] == "WINDOW LOOK",
         "and the colors with Custom, in the look's group")
     local none = Terms({})
-    Check(none["RestedXP Theme (V1)"] ~= nil and none["Upcoming Steps"] == nil and none["Style RestedXP's Arrow"] ~= nil,
+    Check(none["RestedXP Theme (V1)"] ~= nil and none["Listed Steps"] == nil and none["Style RestedXP's Arrow"] ~= nil,
         "nothing wished for: the two switches and the arrow's own")
 end
 

@@ -593,8 +593,8 @@ local function RxpWindowRows(W, parent, y)
     local stepsMin, stepsMax, stepsStep = ns.RXPWindowStepsRange()
     local scaleMin, scaleMax, scaleStep = ns.RXPWindowScaleRange()
     _, h = W:DualRow(parent, y,
-        { type = "slider", text = "Upcoming Steps", min = stepsMin, max = stepsMax, step = stepsStep,
-          tooltip = "How many of the steps after the active one are listed.",
+        { type = "slider", text = "Listed Steps", min = stepsMin, max = stepsMax, step = stepsStep,
+          tooltip = "How many steps the list shows at once, the rest by scrolling it.",
           getValue = ns.RXPWindowSteps,
           setValue = function(v) ns.SetRXPWindowSteps(v) end },
         { type = "slider", text = "Naowh Window Scale", min = scaleMin, max = scaleMax, step = scaleStep,
