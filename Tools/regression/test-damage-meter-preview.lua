@@ -253,6 +253,9 @@ do
     preview:Hide()
     timers[1]()
     check("a preview that is not shown is left as it is", w.entries[1].height == 30)
+    timers = {}
+    studio.Refresh()
+    check("and is not asked to repaint: no timer for a setting changed anywhere else", #timers == 0)
     preview:Show()
     timers = {}
     layout.BarHeight, layout.Padding = 40, 10

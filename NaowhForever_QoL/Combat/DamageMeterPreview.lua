@@ -331,7 +331,7 @@ end
 -- The page is drawn again for the card's own settings, but not for the game's (saved through Edit Mode) and not
 -- while a slider is held, so the preview paints itself, once a frame at most and after the skin has taken a change.
 local function Refresh()
-    if queued then return end
+    if queued or not (live and live:IsVisible()) then return end
     queued = true
     C_Timer.After(0, function()
         queued = false
