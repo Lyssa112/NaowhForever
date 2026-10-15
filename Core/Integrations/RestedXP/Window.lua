@@ -442,7 +442,7 @@ end
 
 local function PaintBar(bar, fraction)
     bar:SetStatusBarTexture(TexturePath())
-    local r, g, b, a = ns.RXPWindowColor(ACCENT)
+    local r, g, b, a = ns.RXPWindowColor("barFill")
     bar:SetStatusBarColor(r, g, b, a)
     local parts, style = ForeverParts()
     local forever = ForeverLook()

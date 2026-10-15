@@ -59,7 +59,7 @@ local OPTIONS = {
 local COLORS = {
     { name = "title", label = "Title Color", token = "fg", tip = "The guide's name and its percent." },
     { name = "accent", label = "Accent Color", token = "accent",
-      tip = "The level range, the step count, STEP and its number, and the filled part of the bars." },
+      tip = "The level range, the step count, STEP and its number, and the icons." },
     { name = "text", label = "Step Text Color", token = "fg", tip = "The rows of the active step." },
     { name = "muted", label = "Muted Text Color", token = "muted", alpha = MUTED_ALPHA,
       tip = "A row that is done and the steps after the active one." },
@@ -69,6 +69,8 @@ local COLORS = {
     { name = "border", label = "Border Color", token = "line", alpha = EDGE_ALPHA, tip = "Round the whole window." },
     { name = "boxBorder", label = "Step Box Border Color", edge = true, always = true,
       tip = "Round the active step and the two windows that follow its look, black in the Naowh theme." },
+    { name = "barFill", label = "Bar Color", follows = "accent", always = true,
+      tip = "The filled part of the progress bars, the Accent Color to start." },
     { name = "barBack", label = "Bar Background Color", follows = "line", always = true,
       tip = "Behind the filled part of the progress bars, the Line Color to start." },
     { name = "barBorder", label = "Bar Border Color", edge = true, always = true,

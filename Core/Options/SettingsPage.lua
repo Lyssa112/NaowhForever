@@ -31,7 +31,7 @@ local TEXT_COLORS_RELOAD = ns.L("Reload UI to apply your color changes.")
 local TEXT_RXP_RELOAD = ns.L("Reload UI to apply your RestedXP changes.")
 local TEXT_RXP_PICK_RELOAD = "Reload UI to pick a theme."
 local TEXT_RXP_WINDOW_NEEDS = "Turn on RestedXP's Beta Features and V2 interface."
-local TEXT_WINDOW_THEME_SAME = "Same as the Addon"
+local TEXT_WINDOW_THEME_CURRENT = "Current Theme"
 local TEXT_SKIN_RELOAD = ns.L("Reload UI to change the skin.")
 local TEXT_SKIN_TIP = ns.L("Dresses the addon's windows as Naowh's own or WoW Forever's, after a reload.")
 local TEXT_FOREVER = "Forever"
@@ -515,7 +515,7 @@ local function IconStyleRow()
 end
 
 local function WindowThemeRow()
-    local values, order = { [""] = TEXT_WINDOW_THEME_SAME }, { "" }
+    local values, order = { [""] = TEXT_WINDOW_THEME_CURRENT }, { "" }
     for _, key in ipairs(ns.THEME_PRESET_ORDER) do
         values[key] = ns.THEME_PRESETS[key].name
         order[#order + 1] = key
@@ -525,7 +525,7 @@ local function WindowThemeRow()
     values[CUSTOM] = TEXT_CUSTOM
     order[#order + 1] = CUSTOM
     return { type = "dropdown", text = "Window Theme", values = values, order = order,
-        tooltip = "The window's colors alone, whatever the addon's theme is; Custom lets you pick them.",
+        tooltip = "The window's own theme, or the addon's current one; Custom lets you pick the colors.",
         getValue = ns.RXPWindowThemeKey,
         setValue = function(v)
             ns.SetRXPWindowTheme(v)

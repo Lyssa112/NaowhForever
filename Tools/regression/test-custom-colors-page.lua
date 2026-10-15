@@ -667,11 +667,11 @@ do
         "a picker of its own, and the addon's is the one beside the Skin")
     Check(pickers[1].getValue ~= s.theme.getValue and pickers[1].getValue() == "",
         "it is not the addon's setting, and is the addon's theme to start")
-    Check(pickers[1].values[""] == "Same as the Addon" and pickers[1].values.midnight == "Midnight"
+    Check(pickers[1].values[""] == "Current Theme" and pickers[1].values.midnight == "Midnight"
         and pickers[1].values.forever == "Forever" and pickers[1].values.custom == "Custom" and pickers[1].order[1] == ""
         and pickers[1].order[#pickers[1].order] == "custom" and pickers[1].order[#pickers[1].order - 1] == "forever",
         "the addon's, every preset, the Forever skin and Custom last")
-    Check(pickers[1].tooltip == "The window's colors alone, whatever the addon's theme is; Custom lets you pick them.",
+    Check(pickers[1].tooltip == "The window's own theme, or the addon's current one; Custom lets you pick the colors.",
         "with a short tooltip")
     Check(#All(s, "Title Color") == 0 and #All(s, "Accent Color") == 0 and #All(s, "Arrow Color") == 0,
         "a theme picked: no colors to pick")
@@ -689,7 +689,7 @@ do
     Check(#All(Page({ rxpWindow = true }, true), "Listed Steps") == 1, "the sliders are there either way")
     local plain = Page({ rxpWindow = true }, true)
     local swatches = true
-    for _, name in ipairs({ "Step Box Border Color", "Bar Background Color", "Bar Border Color" }) do
+    for _, name in ipairs({ "Step Box Border Color", "Bar Color", "Bar Background Color", "Bar Border Color" }) do
         local found = All(plain, name)
         if #found ~= 1 or found[1].type ~= "colorpicker" then swatches = false end
     end

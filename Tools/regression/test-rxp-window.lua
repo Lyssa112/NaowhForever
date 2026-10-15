@@ -1028,6 +1028,26 @@ do
     Flush(w)
     Check(ns.RXPWindowOption("rxpWindowBoxBorderSize") == 1 and Black(ns.RXPWindowColor("boxBorder"))
         and f.bar.edge.pixels == 1, "Reset puts the sizes and colors back")
+
+    local accent = { ns.RXPWindowColor("accent") }
+    local fill = { ns.RXPWindowColor("barFill") }
+    Check(fill[1] == accent[1] and fill[2] == accent[2] and fill[3] == accent[3] and f.bar.barColor[1] == accent[1],
+        "the bar's color is the accent's to start: it follows the theme")
+    ns.SetRXPWindowColor("barFill", 1, 0, 1, 1)
+    w.talk.frame.text:SetText("Boar Meat: 3/8")
+    Flush(w)
+    Check(f.bar.barColor[1] == 1 and f.bar.barColor[2] == 0 and f.bar.barColor[3] == 1, "a bar color is the guide's bar's")
+    local meters = Meters()
+    Check(#meters >= 1 and meters[1].barColor[1] == 1 and meters[1].barColor[2] == 0, "and a row's bar's, in any theme")
+    Check(ns.RXPWindowColor("accent") == accent[1] and select(2, ns.RXPWindowColor("accent")) == accent[2],
+        "while the accent is the accent's still, for the text and the icons")
+    ns.SetRXPWindowColor("barFill")
+    ns.SetRXPWindowTheme("custom")
+    ns.SetRXPWindowColor("accent", 0, 1, 0, 1)
+    Flush(w)
+    Check(f.bar.barColor[1] == 0 and f.bar.barColor[2] == 1,
+        "no bar color of its own: the accent's, as the Custom theme has it")
+    ns.SetRXPWindowTheme("")
 end
 
 -- RestedXP's windows that are not there yet are taken when they are, at whatever redraw is first
@@ -1134,7 +1154,7 @@ do
     r, g, b, a = ns.RXPWindowColor("panel")
     Check(r == T.panel.r and g == T.panel.g and b == T.panel.b and a == 0.92,
         "the panel is the theme's panel color")
-    Check(#ns.RXPWindowColors() == 12, "the twelve colors it lists, each for several things")
+    Check(#ns.RXPWindowColors() == 13, "the thirteen colors it lists, each for several things")
     ns.SetRXPWindowColor("title", 0.1, 0.2, 0.3, 0.4)
     r, g, b, a = ns.RXPWindowColor("title")
     Check(r == 0.1 and g == 0.2 and b == 0.3 and a == 0.4 and account.rxpWindowColors.title.a == 0.4,

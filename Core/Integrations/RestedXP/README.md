@@ -163,7 +163,8 @@ Core/Integrations/RestedXP/
 - The progress bar is a `StatusBar`: the guide's under the title (the step over the number of steps, so
   36 of 66) and one in the active step (the rows done over its rows). Its texture is a SharedMedia
   statusbar picked in the page and flat to start, its track is the Bar Background Color (the Line color
-  to start) and its fill the Accent color. The fill's height is fixed (`BAR_HEIGHT`).
+  to start) and its fill the Bar Color (the Accent color to start, `barFill` follows `accent`, so it is
+  the theme's). The fill's height is fixed (`BAR_HEIGHT`).
 - The step box and the bars have a border of their own, one pixel to start and black in the Naowh theme,
   as Naowh's house style has it and as Naowh asked for them: Step Box Border Size and Color, Bar Border
   Size and Color, and the bar's background. The color is themed (`edge` in `COLORS`, `ThemedEdge`): black
@@ -267,11 +268,12 @@ Core/Integrations/RestedXP/
   (`ForeverInset`) behind the step box with its border on and behind the window with its border on, in place
   of the flat back and line, the skin's rim and field on the bars, and its plus and minus for the fold. The
   box's opacity and the window's panel are the fill of the inset; with no border the flat back is what is drawn.
-- The window has a theme of its own (`rxpWindowTheme`: the addon's to start, a preset, or Custom), picked in
-  its fold and shown at once. It is the window's colors alone: the addon's theme (COLORS) is not read for
+- The window has a theme of its own (`rxpWindowTheme`: the addon's current one to start, a preset, or Custom),
+  picked in its fold, where the addon's own is called Current Theme, as RestedXP's theme list does, and
+  shown at once. It is the window's colors alone: the addon's theme (COLORS) is not read for
   a preset and not set by it, and the icons and the arrow follow the window's. The colors are the preset's
   and the player's own only while it is Custom (`RXPWindowOwnColors`): a theme is a look as a whole, so the
-  nine colors are shown only for Custom, and what was picked is kept for when it is Custom again (the three of
+  nine colors are shown only for Custom, and what was picked is kept for when it is Custom again (the four of
   the step box's border and the bars, `always`, are shown and kept in any theme). Forever is
   the addon's Forever skin for the window alone: its gold and bronze (`ns.FOREVER_SKIN`) and its face, with the
   addon left as it is (the skin itself, under COLORS, is read at load and takes the window with it when the
