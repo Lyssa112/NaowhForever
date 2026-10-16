@@ -32,6 +32,7 @@ NaowhForever_Professions/
   Favorites.lua        favourite recipes (P.Favorites, ns.ProfFavorites)
   RecipeFinder.lua     the unlearned recipes, what they need and where they come from (ns.RecipeFinder)
   RankAlert.lua        a profession ready for its next rank, in the window and once in chat (ns.ProfessionRank)
+  Auctions.lua         your active auction quantities, kept per character (P.Auctions)
   Filters.lua          the Filter menu's rules (P.Filters)
   Entries.lua          what the recipe list holds, by category and group (P.Entries)
   Orders.lua           craft orders: value, tip, messages, sending (P.Orders)
@@ -143,6 +144,12 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   switch is on; bag totals are read from bag slots so equipped gear is never counted as bag stock.
   The list redraws on a Shopping List change only while the window is open: `/nf shopping` can
   change the list before the recipe window was ever built.
+- Your Auctions is opt-in. It reads the owner list only while the auction house is open, keeps the
+  latest active item quantities under the character's name and realm, as the Shopping List does, and
+  builds row markers only when needed. It asks for the owner list on opening the auction house and
+  after a post, but not after a cancel: the Auctions tab already asks again then, with the player's
+  sort, and its OWNED_AUCTIONS_UPDATED is read like any other.
+  Not Selling stays unavailable until the auction house has supplied the first complete owner list.
 - The rank banner pushes both columns down 46 while it shows. Filter is 76 wide for "Filter (3)".
   The Buy, Add to List and Create rows share one width, so they line up; the reagent rows end 4
   short of Create, hence the Buy row's 4 overhang.
@@ -232,6 +239,11 @@ Each layer uses only the ones above it, or reads a later one's table at call tim
   offered again.
 - The search box above the list keeps the rows whose name holds what is typed, any case. Typing and a star
   only lay out the rows already picked again, with no new pick; reopening the picker clears the search.
+- The Shopping List's Consumables button keeps its label only while the title, the subtitle and the whole
+  button fit side by side, measured when the window shows and as it is resized, so a longer translation
+  drops the label at a width where English keeps it. Without it the button is the square `Parts.BarIcon`
+  makes, as wide as it is tall. The empty-list message spans the list's current width, not the window's
+  starting one.
 - The shopping list makes a material from its parts, up to 4 levels down, only when whole crafts cost
   less than buying what is needed, and never from a recipe with a cooldown (it makes a few a day; a
   shared cooldown can read 0 on the spell). What was bought counts at every level, and a craft taken
