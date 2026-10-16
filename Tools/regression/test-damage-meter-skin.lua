@@ -1479,9 +1479,17 @@ do
     check("and not once it is off again", s.menu == nil)
 end
 
+-- a title bar option saved in a profile gives the gap without a new pick
+do
+    local _, _, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterShowCog = false }, true)
+    Login(frames)
+    check("a title switch off: the gap off the arrow", meter.windows[1].DamageMeterTypeDropdown.TypeName.points[1][4]
+        == 28 + GAP)
+end
+
 -- the title's text moves left and right, and the dropdown button stays
 do
-    local s, store, meter, _, frames = Boot({ damageMeterSkin = true }, true)
+    local s, store, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterPicksLive = true }, true)
     Login(frames)
     local window = meter.windows[1]
     local dropdown, text = window.DamageMeterTypeDropdown, window.DamageMeterTypeDropdown.TypeName
@@ -1523,7 +1531,7 @@ end
 
 -- the timer stays in front of the title, as wide as its text, and has an X offset of its own
 do
-    local s, store, meter, _, frames = Boot({ damageMeterSkin = true }, true)
+    local s, store, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterPicksLive = true }, true)
     Login(frames)
     local window = meter.windows[1]
     local timer, dropdown = window.SessionTimer, window.DamageMeterTypeDropdown
@@ -1656,7 +1664,7 @@ end
 
 -- the title and the timer are anchored in an order the game accepts, whichever way the settings are changed
 do
-    local _, store, meter, _, frames = Boot({ damageMeterSkin = true }, true)
+    local _, store, meter, _, frames = Boot({ damageMeterSkin = true, damageMeterPicksLive = true }, true)
     Login(frames)
     local window = meter.windows[1]
     local timer, dropdown = window.SessionTimer, window.DamageMeterTypeDropdown
@@ -1882,18 +1890,20 @@ do
     end
 end
 
--- the title's text is kept a few pixels off the arrow while the arrow shows
+-- the title's text is kept a few pixels off the arrow while the arrow shows, once something is picked
 do
-    local _, store, meter, _, frames = Boot({ damageMeterSkin = true }, true)
+    local _, store, meter, ns, frames = Boot({ damageMeterSkin = true }, true)
     local window = meter.windows[1]
     local text = window.DamageMeterTypeDropdown.TypeName
     text.points = { { "LEFT", window.DamageMeterTypeDropdown, "RIGHT", 0, 3 },
         { "RIGHT", window.SessionDropdown, "LEFT", -5, 0 } }
     Login(frames)
-    check("the arrow shows: the text's left edge is a gap off it, its right edge is the game's",
-        #text.points == 2 and text.points[1][4] == GAP and text.points[1][5] == 3 and text.points[2][4] == -5)
+    check("the reskin on and nothing picked: the title where the game puts it, no gap",
+        #text.points == 2 and text.points[1][4] == 0 and text.points[1][5] == 3 and text.points[2][4] == -5
+        and ns.DamageMeterLook.Describe().gap == 0)
     store.Set("damageMeterTitleX", 10)
-    check("and the title's offset moves both", text.points[1][4] == 10 + GAP and text.points[2][4] == 5)
+    check("a title bar pick: the text's left edge is a gap off the arrow, and the offset moves both",
+        text.points[1][4] == 10 + GAP and text.points[2][4] == 5 and ns.DamageMeterLook.Describe().gap == GAP)
     store.Set("damageMeterShowDropdown", false)
     check("the arrow hidden: no gap to keep", text.points[1][4] == 10 and text.points[2][4] == 5)
     store.Set("damageMeterShowDropdown", true)

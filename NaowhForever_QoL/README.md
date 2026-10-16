@@ -208,7 +208,9 @@ NaowhForever_QoL/
   tried and dropped: the title's frame can be as wide as the window, so the end of it is not the end of the text,
   which could not be measured. The timer's offset puts it there when it is wanted.
   The game anchors the title's text flush to the arrow (an x of 0), so while the arrow shows the text's left
-  anchor, and only that one, is given `TITLE_GAP` (4) pixels more, and a hidden arrow has no gap. Themed buttons
+  anchor, and only that one, is given `TITLE_GAP` (4) pixels more, and a hidden arrow has no gap. The gap waits
+  for a pick (`Title.Spaced`: `damageMeterPicksLive`, or a title bar option that is not its default), so a
+  player with Reskin on who picks nothing keeps the title where it was before. Themed buttons
   tint the art of the buttons only (`Title.Glyphs`): the list's text and the session's letter are texts with colors
   of their own, and tinting them changed the title. The parts are anchored in an
   order where no anchor depends on what depends on it (the game raises "Cannot anchor to a region dependent on

@@ -530,6 +530,16 @@ local function TitleAlpha(window, alpha, whole)
     end
 end
 
+function Title.Spaced()
+    if S.Get(LIVE_KEY) == true or Picked(Title.shiftKey) or Picked(Title.timerKey) or Picked(Title.menuKey) then
+        return true
+    end
+    for _, item in ipairs(Title.items) do
+        if Picked(item[2]) then return true end
+    end
+    return false
+end
+
 function Title.DropdownGone()
     return On() and S.Get(Title.titleKey) == false and S.Get(Title.arrowKey) == false
 end
@@ -623,7 +633,7 @@ function Title.Arrange(window)
         return value
     end
     local pull = timerHome and Offset(Title.timerKey) or 0
-    local gap = (themed and S.Get(Title.arrowKey) ~= false) and TITLE_GAP or 0
+    local gap = (themed and S.Get(Title.arrowKey) ~= false and Title.Spaced()) and TITLE_GAP or 0
     local shift = Offset(Title.shiftKey)
     local function Along(anchor)
         if type(anchor[1]) == "string" and anchor[1]:find("LEFT", 1, true) then return shift + gap end
@@ -1166,7 +1176,7 @@ function ns.DamageMeterLook.Describe()
     look.cog, look.minimize = Title.Shown("SettingsDropdown"), Title.Shown("MinimizeButton")
     look.titleX = type(S.Get(Title.shiftKey)) == "number" and S.Get(Title.shiftKey) or 0
     look.timerX = type(S.Get(Title.timerKey)) == "number" and S.Get(Title.timerKey) or 0
-    look.gap = look.arrow and TITLE_GAP or 0
+    look.gap = (look.arrow and Title.Spaced()) and TITLE_GAP or 0
     return look
 end
 
