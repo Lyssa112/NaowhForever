@@ -157,7 +157,9 @@ NaowhForever_QoL/
   (Blizzard), the addon's current theme (`ns.THEME`, the default), or the palette of one of the themes, read
   from `ns.ThemePalette` and kept until the next apply (`Token`, `palettes`). A color that is picked applies
   whichever it is, so every row works in all of them, and choosing a theme repaints at once with no reload,
-  since the meter reads the palette as it paints. With Blizzard a flat texture that has no color goes back to
+  since the meter reads the palette as it paints. Everything that follows the theme reads it the same way
+  (`Color`): Accent bars, the Accent scroll bar and the icon borders are the chosen theme's, not the current
+  one's. With Blizzard a flat texture that has no color goes back to
   its atlas (`Unflat`), a text keeps the color it had, the bar's shadow and edge stay, and the spell panel's
   opacity waits for a color of its own or the Window Color (the row says so). That look has its own Font, Bar
   Color, Bar Texture and Icon Border (`damageMeterGameFont`, `damageMeterGameBars`, `damageMeterGameTexture`,
@@ -174,6 +176,11 @@ NaowhForever_QoL/
   switch off runs nothing, as before: no hook, no tick, and the first pick starts it. Theme is the only row that
   waits for the switch. The picks of the theme look's own (`damageMeterBars`, `damageMeterTexture`,
   `damageMeterIconEdge`, `damageMeterFont`) are not in `PICKS` for that reason: they do nothing with it off.
+- Picks only apply with the Reskin switch off once `damageMeterPicksLive` is true, which the first change of a
+  row in `PICKS` sets. Before that release the picks only applied with the switch on, so a player who picked
+  colors, turned Reskin off and kept the game's look would otherwise have them painted on it after updating.
+  Their saved picks are not touched: they apply with Reskin on, as before, and with it off from the first pick
+  the player makes, all together.
 - The title bar's timer, session button, settings button and minimize button are each switched off with
   `SetAlpha(0)`, never a Hide, and a post-hook on each one's `SetAlpha` puts a part the game raises back to 0
   (`Title.KeepAlpha`); the title fade keeps them at 0 (`TitleAlpha`) and nothing picked, with the reskin off, gives
@@ -198,12 +205,14 @@ NaowhForever_QoL/
   tried and dropped: the title's frame can be as wide as the window, so the end of it is not the end of the text,
   which could not be measured. The timer's offset puts it there when it is wanted.
   The game anchors the title's text flush to the arrow (an x of 0), so while the arrow shows the text's left
-  anchor, and only that one, is given `Title.gap` (4) pixels more, and a hidden arrow has no gap. Themed buttons
+  anchor, and only that one, is given `TITLE_GAP` (4) pixels more, and a hidden arrow has no gap. Themed buttons
   tint the art of the buttons only (`Title.Glyphs`): the list's text and the session's letter are texts with colors
   of their own, and tinting them changed the title. The parts are anchored in an
   order where no anchor depends on what depends on it (the game raises "Cannot anchor to a region dependent on
-  it" otherwise). A layout that fails is reported through the error handler and does not stop the rest of the
-  skin.
+  it" otherwise). `Title.placing` keeps the layout's own `SetPoint` and `SetWidth` from laying it out again
+  through the hooks; `Apply` clears it, so a layout that raised an error does not stop the next one.
+- The skin's title bar parts are fields of one `Title` table, not locals: the file is close to the 200 locals
+  a Lua 5.1 chunk can have.
   The right-click menu is a hook on the window's
   `OnMouseUp`, made only when Right-Click Menu is on, that opens `MenuUtil.CreateContextMenu` with a checkbox for
   each switch, so a part that was switched off can be switched on from the window.

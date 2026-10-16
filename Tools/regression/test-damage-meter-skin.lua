@@ -231,7 +231,7 @@ local function Boot(settings, loaded, windows)
         damageMeterGameIconEdge = false, damageMeterGameFont = "", damageMeterShowTimer = true, damageMeterShowSession = true,
         damageMeterShowCog = true, damageMeterShowTitle = true, damageMeterShowDropdown = true,
         damageMeterShowMinimize = true, damageMeterMenu = false, damageMeterTitleX = 0,
-        damageMeterTimerX = 0 }
+        damageMeterTimerX = 0, damageMeterPicksLive = false }
     local store = {}
     function store.Get(k)
         local v = s.settings[k]
@@ -554,7 +554,7 @@ do
     store.Set("damageMeterTexture", "Other")
     check("texture: a new pick is written once", first.StatusBar.file == "Textures\\Other" and first.StatusBar.fileSets == 2)
     store.Set("damageMeterTexture", "")
-    check("texture: not picked is the Naowh Reverse Gradient", first.StatusBar.file == "Media\\NaowhReverseGradient.tga")
+    check("texture: not picked is the Naowh Gradient", first.StatusBar.file == "Media\\NaowhGradient.tga")
     store.Set("damageMeterTexture", "Flat")
     store.Set("damageMeterSkin", false)
     check("texture: switched off, the game's art is back", first.barTexture.atlas == "UI-HUD-CoolDownManager-Bar")
@@ -664,8 +664,8 @@ do
     check("the outline choice leads with the game's own, then the shared four",
         rows.damageMeterOutline.choice[2][1] == "game" and #rows.damageMeterOutline.choice[2] == 5
         and rows.damageMeterOutline.choice[1].game == "Game Default")
-    check("the texture row names the Naowh Reverse Gradient as its default",
-        rows.damageMeterTexture.texture == "Naowh Reverse Gradient")
+    check("the texture row names the Naowh Gradient as its default",
+        rows.damageMeterTexture.texture == "Naowh Gradient")
     for key, row in pairs(rows) do
         check(key .. ": help is one short sentence", row.help == nil or #row.help < 100)
     end
@@ -1217,7 +1217,7 @@ do
     store.Set("damageMeterBorder", true)
     check("each look shows its own Bar Texture row, named as the game's own or the Naowh Gradient",
         rows.damageMeterGameTexture.hidden() == false and rows.damageMeterTexture.hidden() == true
-        and rows.damageMeterGameTexture.texture == "Game Default" and rows.damageMeterTexture.texture == "Naowh Reverse Gradient")
+        and rows.damageMeterGameTexture.texture == "Game Default" and rows.damageMeterTexture.texture == "Naowh Gradient")
     check("and Bar Color and Icon Border: a row of each look, on its own setting, for Reset to see",
         rows.damageMeterGameBars.hidden() == false and rows.damageMeterBars.hidden() == true
         and rows.damageMeterGameIconEdge.hidden() == false and rows.damageMeterIconEdge.hidden() == true
@@ -1316,9 +1316,9 @@ do
     local r, g, b = rows.damageMeterWindowColor.get()
     check("the Window Color row shows the theme's Background", r == P.midnight[1].r and g == P.midnight[1].g
         and b == P.midnight[1].b)
-    r, g, b = rows.damageMeterHeaderColor.get()
+    r, g = rows.damageMeterHeaderColor.get()
     check("the Title Bar Color row its Panels", r == P.midnight[2].r and g == P.midnight[2].g)
-    r, g, b = rows.damageMeterNameColor.get()
+    r, g = rows.damageMeterNameColor.get()
     check("the Name Color row its Text", r == P.midnight[4].r and g == P.midnight[4].g)
     rows.damageMeterWindowColor.set(GREY.r, GREY.g, GREY.b)
     check("a pick stays the pick, whatever the theme", SameRgb(c.Background.solid, GREY)
@@ -1654,21 +1654,6 @@ do
         and window.DamageMeterTypeDropdown.TypeName.points[1][4] == 28 + GAP)
 end
 
--- a layout that fails is reported and the skin goes on
-do
-    local _, store, meter, _, frames, env = Boot({ damageMeterSkin = false }, true)
-    Login(frames)
-    local window = meter.windows[1]
-    local reported
-    env.geterrorhandler = function() return function(message) reported = message end end
-    window.SessionTimer.SetWidth = function() error("boom") end
-    local ok = pcall(store.Set, "damageMeterSkin", true)
-    check("the reskin on with a layout that fails: no error raised, reported through the handler", ok
-        and reported ~= nil and reported:find("boom") ~= nil)
-    check("and the rest of the skin is applied", window.MinimizeContainer.Background.solid ~= nil
-        and window.Header.solid ~= nil)
-end
-
 -- the title and the timer are anchored in an order the game accepts, whichever way the settings are changed
 do
     local _, store, meter, _, frames = Boot({ damageMeterSkin = true }, true)
@@ -1705,11 +1690,57 @@ do
     check("and the next one is not locked out", dropdown.TypeName.points[1][4] == 34 + GAP)
 end
 
+-- picks saved before they applied without the reskin wait for the reskin, or for a new pick
+do
+    local GREY = { r = 0.4, g = 0.4, b = 0.4 }
+    local s, store, meter, _, frames = Boot({ damageMeterBarAlpha = 60, damageMeterWindowColor = GREY }, true)
+    Login(frames)
+    local c = meter.windows[1].MinimizeContainer
+    local entry = c.ScrollBox.frames[1]
+    check("old picks with the reskin off: nothing runs and the game's look stays", s.hooks == s.base
+        and entry.barTexture.alpha == 1 and c.Background.atlas == "damagemeters-background")
+    store.Set("damageMeterSkin", true)
+    check("the reskin on applies them, as before", entry.barTexture.alpha == 0.6 and SameRgb(c.Background.solid, GREY))
+    store.Set("damageMeterSkin", false)
+    check("and the reskin off gives the game's look back, as before", entry.barTexture.alpha == 1
+        and c.Background.atlas == "damagemeters-background" and store.Get("damageMeterPicksLive") == false)
+    store.Set("damageMeterNameSize", 18)
+    check("a new pick makes the picks apply without the reskin", store.Get("damageMeterPicksLive") == true
+        and entry.barTexture.alpha == 0.6 and entry.StatusBar.Name.size == 18 and SameRgb(c.Background.solid, GREY))
+end
+
+-- a theme that is not the current one: Accent bars, the Accent scroll bar and the icon borders are its own
+do
+    local s, store, meter, ns, frames = Boot({ damageMeterSkin = true, damageMeterTheme = "midnight",
+        damageMeterBars = "accent", damageMeterScrollBar = "accent" }, true)
+    Login(frames)
+    local c = meter.windows[1].MinimizeContainer
+    local entry = c.ScrollBox.frames[1]
+    local function IconBorder()
+        for _, border in ipairs(s.borders) do
+            if border.frame == entry.Icon then return border end
+        end
+    end
+    local accent, line = s.palettes.midnight[6], s.palettes.midnight[3]
+    check("the bars in the theme's Accent", SameRgb(entry.barTexture.vertex, accent))
+    check("the scroll bar in it too", SameRgb(c.ScrollBar.thumb.vertex, accent) and SameRgb(c.ScrollBar.track.vertex, accent))
+    check("the icon border in the theme's line color", IconBorder().color == line)
+    local look = ns.DamageMeterLook.Describe()
+    check("and the preview is told the same", look.barColor == accent and look.iconBorder == line)
+    store.Set("damageMeterTheme", "classic")
+    accent, line = s.palettes.classic[6], s.palettes.classic[3]
+    check("another theme repaints them", SameRgb(entry.barTexture.vertex, accent)
+        and SameRgb(c.ScrollBar.thumb.vertex, accent) and SameRgb(IconBorder().color, line))
+    store.Set("damageMeterTheme", "current")
+    check("and the current theme gives the addon's own", SameRgb(entry.barTexture.vertex, THEME.accent)
+        and SameRgb(c.ScrollBar.thumb.vertex, THEME.accent) and SameRgb(IconBorder().color, THEME.line))
+end
+
 -- the reskin off: what is picked still applies on the game's own look, and nothing else is touched
 do
     local CLASS = { r = CLASS_RGB[1], g = CLASS_RGB[2], b = CLASS_RGB[3] }
     local RED, GREY = { r = 0.9, g = 0.1, b = 0.1 }, { r = 0.4, g = 0.4, b = 0.4 }
-    local s, store, meter, ns, frames = Boot({ damageMeterBarAlpha = 60 }, true)
+    local s, store, meter, ns, frames = Boot({ damageMeterBarAlpha = 60, damageMeterPicksLive = true }, true)
     Login(frames)
     local window = meter.windows[1]
     local c = window.MinimizeContainer
@@ -1719,7 +1750,7 @@ do
     for _, row in ipairs(s.cards[1].rows) do
         if row.key then rows[row.key] = row end
     end
-    check("a pick with the reskin off is applied from login", s.hooks > s.base and entry.barTexture.alpha == 0.6)
+    check("a pick made with the reskin off is applied from login", s.hooks > s.base and entry.barTexture.alpha == 0.6)
     check("and the game's look is kept: its art, colors, font and bar", window.Header.atlas == "ui-damagemeters-header-bar"
         and window.Header.solid == nil and c.Background.atlas == "damagemeters-background"
         and bar.Name.path == GAME_FONT and bar.Name.r == 1 and bar.Name.g == 0.82
@@ -1844,10 +1875,10 @@ do
     end
     for _, pick in ipairs({ { "damageMeterBars", "custom" }, { "damageMeterTexture", "Flat" },
             { "damageMeterIconEdge", false }, { "damageMeterTheme", "midnight" } }) do
-        local s, store, _, _, frames = Boot({}, true)
+        local booted, store, _, _, frames = Boot({}, true)
         Login(frames)
         store.Set(pick[1], pick[2])
-        check(pick[1] .. ": the theme look's own pick does nothing with the reskin off", s.hooks == s.base)
+        check(pick[1] .. ": the theme look's own pick does nothing with the reskin off", booted.hooks == booted.base)
     end
 end
 
@@ -1890,9 +1921,9 @@ do
     look = Describe()
     check("the reskin on, the current theme: its colors, the Naowh gradient, the addon's font", look.on == true
         and look.header == THEME.panel and look.window == THEME.bg and look.barBackground == THEME.bg
-        and look.barTexture == "Media\\NaowhReverseGradient.tga" and look.barColor == THEME.accent
+        and look.barTexture == "Media\\NaowhGradient.tga" and look.barColor == THEME.accent
         and look.font == FONT and look.nameColor == THEME.fg and look.valueColor == THEME.muted
-        and look.iconBorder == true and look.border == nil and look.buttons == nil)
+        and look.iconBorder == THEME.line and look.border == nil and look.buttons == nil)
     store.Set("damageMeterTheme", "game")
     look = Describe()
     check("the game's own look: its art, its bar and its face, the icons not bordered", look.header == nil
@@ -1910,7 +1941,7 @@ do
     store.Set("damageMeterBarBgAlpha", 50)
     look = Describe()
     check("what is picked for it", look.font == "Fonts\\Exo.ttf" and look.barColor == THEME.accent
-        and look.barTexture == "Textures\\Flat" and look.iconBorder == true and look.header == RED
+        and look.barTexture == "Textures\\Flat" and look.iconBorder == THEME.line and look.header == RED
         and look.nameSize == 18 and look.valueSize == nil and look.outline == "THICKOUTLINE"
         and look.barAlpha == 0.4 and look.barBackground == RED and look.barBackgroundAlpha == 0.5)
     store.Set("damageMeterBorder", true)

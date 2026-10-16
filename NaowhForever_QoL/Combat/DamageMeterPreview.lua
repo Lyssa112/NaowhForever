@@ -56,7 +56,6 @@ local function Geometry()
     return g
 end
 
--- A text's game face, kept to give back when nothing is picked for it.
 local function Remember(fs)
     local path, size, flags = fs:GetFont()
     local r, g, b = fs:GetTextColor()
@@ -170,7 +169,12 @@ local function PaintEntry(e, sample, index, look, g)
     e.iconFrame:SetSize(h, h)
     e.icon:SetTexture(ICON_PATH .. sample.icon)
     e.icon:SetTexCoord(CROP_LOW, CROP_HIGH, CROP_LOW, CROP_HIGH)
-    if look.iconBorder and g.icons then e.iconEdge._frame:Show() else e.iconEdge._frame:Hide() end
+    if look.iconBorder and g.icons then
+        e.iconEdge:SetColor(look.iconBorder.r, look.iconBorder.g, look.iconBorder.b, 1)
+        e.iconEdge._frame:Show()
+    else
+        e.iconEdge._frame:Hide()
+    end
     local framed = g.icons and (g.bordered or g.thin) and ICON_GAP_FRAMED or 0
     local iconW = g.icons and h or 0
     e.bar:ClearAllPoints()
@@ -204,7 +208,6 @@ local function PaintEntry(e, sample, index, look, g)
     PaintBar(e, sample, look, g, g.width - iconW - framed + BAR_RIGHT)
 end
 
--- A button of the game's: its frame, and its art at the size the atlas has, centered the way the game centers it.
 local function NewButton(window, width, height, atlas, y)
     local b = CreateFrame("Frame", nil, window)
     b:SetSize(width, height)
@@ -328,8 +331,6 @@ local function Paint(preview)
     preview.note:SetText(TEXT_NOTE)
 end
 
--- The page is drawn again for the card's own settings, but not for the game's (saved through Edit Mode) and not
--- while a slider is held, so the preview paints itself, once a frame at most and after the skin has taken a change.
 local function Refresh()
     if queued or not (live and live:IsVisible()) then return end
     queued = true

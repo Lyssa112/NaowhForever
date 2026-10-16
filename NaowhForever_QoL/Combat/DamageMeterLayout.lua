@@ -56,7 +56,6 @@ local function Refresh()
     if ns.UI and ns.UI.RefreshPage then ns.UI:RefreshPage(true) end
 end
 
--- The card's preview shows these values, so it is told when they change.
 local function Changed()
     local preview = ns.DamageMeterPreview
     if preview and preview.Refresh then preview.Refresh() end

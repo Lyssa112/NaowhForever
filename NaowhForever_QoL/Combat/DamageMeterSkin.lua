@@ -14,8 +14,8 @@ local OTHER_METERS = { { addon = "Details", name = "Details" },
 local TEXT_OTHERS = ns.L("Turn off every other damage meter first.")
 local TEXT_OTHERS_NAMED = ns.L("Turn off %s first.")
 local CARD_ORDER = 110
-local GRADIENT_TEX = ns.MEDIA .. "NaowhReverseGradient.tga"
-local TEXT_GRADIENT, TEXT_NEEDS_NOT_FREE = "Naowh Reverse Gradient", ns.L("Turn off Move and Resize")
+local GRADIENT_TEX = ns.MEDIA .. "NaowhGradient.tga"
+local TEXT_GRADIENT, TEXT_NEEDS_NOT_FREE = "Naowh Gradient", ns.L("Turn off Move and Resize")
 local TEXT_NO_WINDOW = ns.L("The game's meter has no window to place.")
 local TEXT_NO_PLACE = ns.L("Show the game's meter first, then switch this off and on.")
 local BAR_CLASS, BAR_ACCENT, BAR_CUSTOM = "class", "accent", "custom"
@@ -34,11 +34,13 @@ local TITLE_PARTS = { "Header", "MinimizeButton", "SettingsDropdown", "SessionDr
 local Title = { switches = { SessionTimer = "damageMeterShowTimer", SessionDropdown = "damageMeterShowSession",
     SettingsDropdown = "damageMeterShowCog", MinimizeButton = "damageMeterShowMinimize" },
     titleKey = "damageMeterShowTitle", arrowKey = "damageMeterShowDropdown", menuKey = "damageMeterMenu",
-    shiftKey = "damageMeterTitleX", timerKey = "damageMeterTimerX", shiftRange = { -200, 200, 1 },
-    menuTitle = "Damage Meter Title Bar", collapsed = 1, gap = 4 }
-Title.items = { { "Title", Title.titleKey }, { "Dropdown Button", Title.arrowKey },
-    { "Timer", Title.switches.SessionTimer }, { "Session Button", Title.switches.SessionDropdown },
-    { "Settings Button", Title.switches.SettingsDropdown }, { "Minimize Button", Title.switches.MinimizeButton } }
+    shiftKey = "damageMeterTitleX", timerKey = "damageMeterTimerX" }
+Title.items = { { ns.L("Title"), Title.titleKey }, { ns.L("Dropdown Button"), Title.arrowKey },
+    { ns.L("Timer"), Title.switches.SessionTimer }, { ns.L("Session Button"), Title.switches.SessionDropdown },
+    { ns.L("Settings Button"), Title.switches.SettingsDropdown },
+    { ns.L("Minimize Button"), Title.switches.MinimizeButton } }
+local TITLE_COLLAPSED, TITLE_GAP, OFFSET_RANGE = 1, 4, { -200, 200, 1 }
+local TEXT_MENU_TITLE = ns.L("Damage Meter Title Bar")
 local PICKS = { "damageMeterBarColor", "damageMeterBarAlpha", "damageMeterBarBgColor", "damageMeterBarBgAlpha",
     "damageMeterScrollBar", "damageMeterFont", "damageMeterOutline", "damageMeterHeaderColor",
     "damageMeterWindowColor", "damageMeterNameColor", "damageMeterNameSize", "damageMeterValueColor",
@@ -48,6 +50,8 @@ local PICKS = { "damageMeterBarColor", "damageMeterBarAlpha", "damageMeterBarBgC
     Title.menuKey, Title.shiftKey, Title.timerKey, Title.switches.SessionTimer, Title.switches.SessionDropdown,
     Title.switches.SettingsDropdown, Title.switches.MinimizeButton, "damageMeterGameBars", "damageMeterGameTexture",
     "damageMeterGameIconEdge", "damageMeterGameFont" }
+local PICKED = {}
+for _, key in ipairs(PICKS) do PICKED[key] = true end
 local FADE_EVERY, FADE_STEP, SETTLE, WATCH_DEPTH, SCROLL_DEPTH, PERCENT = 0.1, 0.35, 1, 5, 3, 100
 local PERCENT_RANGE = { 0, PERCENT, 5 }
 local FONT_SIZE_RANGE, FONT_SIZE_DEFAULT = { 0, 24, 1 }, 12
@@ -58,7 +62,7 @@ local BUTTONS = { { game = TEXT_GAME_DEFAULT, themed = "Themed" }, { BUTTONS_GAM
 local TEXT_NEEDS_THEMED = ns.L("Set Buttons to Themed")
 local TEXT_NEEDS_BORDER, TEXT_NEEDS_FADE = ns.L("Turn on Window Border"), ns.L("Set Title Bar to Shown on Hover")
 local TEXT_NEEDS_PANEL = ns.L("Pick a Spell Panel Color or a Window Color")
-local SETTING_PREFIX, POSITION_KEY = "^damageMeter", "damageMeterPos"
+local SETTING_PREFIX, POSITION_KEY, LIVE_KEY = "^damageMeter", "damageMeterPos", "damageMeterPicksLive"
 local THEME_KEY = "damageMeterTheme"
 local LOOK_GAME, LOOK_CURRENT, LOOK_DEFAULT, LOOK_CUSTOM = "game", "current", "default", "custom"
 local TEXT_LOOK_GAME, TEXT_LOOK_CURRENT = "Blizzard (Default)", "Current Theme"
@@ -102,13 +106,12 @@ local function Picked(key)
     return raw ~= default
 end
 
--- Read once and kept until a setting changes: the hooks ask for it at every refresh of every bar.
 local function Customized()
     if customized == nil then
         customized = false
         for _, key in ipairs(PICKS) do
             if Picked(key) then
-                customized = true
+                customized = S.Get(LIVE_KEY) == true
                 break
             end
         end
@@ -201,10 +204,14 @@ local function Token(token)
     return Palette(look)[token]
 end
 
+local function Color(token)
+    return Token(token) or T[token]
+end
+
 local function Pick(key, token)
     local c = S.Get(key)
     if type(c) == "table" then return c end
-    return Token(token) or T[token]
+    return Color(token)
 end
 
 local function Resolve(key, token)
@@ -254,7 +261,7 @@ end
 
 local function BarColor()
     local choice = S.Get(BarsKey())
-    if choice == BAR_ACCENT then return T.accent end
+    if choice == BAR_ACCENT then return Color("accent") end
     if choice == BAR_CUSTOM then return Pick("damageMeterBarColor", "accent") end
 end
 
@@ -262,7 +269,6 @@ local function FontKey()
     return Blizzard() and "damageMeterGameFont" or "damageMeterFont"
 end
 
--- nil is the game's own face, which only the game's look keeps when no font is picked
 local function FontPath()
     local name = S.Get(FontKey())
     if type(name) ~= "string" or name == "" then
@@ -343,8 +349,16 @@ local function Edge(frame)
         if edges[frame] then edges[frame]._frame:Hide() end
         return
     end
-    edges[frame] = edges[frame] or ns.Border(frame, T.line)
-    edges[frame]._frame:Show()
+    local c = Color("line")
+    local border = edges[frame]
+    if not border then
+        border = ns.Border(frame, c)
+        edges[frame] = border
+    elseif border.line ~= c then
+        border:SetColor(c.r, c.g, c.b, 1)
+    end
+    border.line = c
+    border._frame:Show()
 end
 
 local function Tint(entry)
@@ -469,11 +483,12 @@ local function ScrollBar(window, mode)
     if mode == SCROLL_GAME and not scrolled[window] then return end
     scrolled[window] = true
     if Has(bar, "SetAlpha") then bar:SetAlpha(mode == SCROLL_HIDDEN and 0 or 1) end
+    local accent = Color("accent")
     for _, texture in ipairs(Textures(bar, SCROLL_DEPTH, {})) do
         if tints[texture] == nil and Has(texture, "GetVertexColor") then tints[texture] = Vertex(texture) end
         local was = tints[texture]
         if mode == SCROLL_ACCENT then
-            texture:SetVertexColor(T.accent.r, T.accent.g, T.accent.b)
+            texture:SetVertexColor(accent.r, accent.g, accent.b)
         elseif was then
             texture:SetVertexColor(was.r, was.g, was.b, was.a)
         end
@@ -519,7 +534,6 @@ function Title.DropdownGone()
     return On() and S.Get(Title.titleKey) == false and S.Get(Title.arrowKey) == false
 end
 
--- Some of the window's numbers are secret in a restricted state of the game: they can only be handed back.
 function Title.Secret(value)
     return issecretvalue ~= nil and issecretvalue(value) == true
 end
@@ -541,8 +555,8 @@ function Title.KeepSize(part, hiddenNow)
     if Title.sized[part] or not Has(part, "SetWidth") then return end
     Title.sized[part] = true
     hooksecurefunc(part, "SetWidth", function(self, width)
-        if Title.Plain(width) ~= nil and width ~= Title.collapsed and On() and hiddenNow() then
-            self:SetWidth(Title.collapsed)
+        if Title.Plain(width) ~= nil and width ~= TITLE_COLLAPSED and On() and hiddenNow() then
+            self:SetWidth(TITLE_COLLAPSED)
         end
     end)
 end
@@ -555,7 +569,7 @@ function Title.Collapse(part, hide)
             if width == nil then return end
             Title.widths[part] = width
         end
-        part:SetWidth(Title.collapsed)
+        part:SetWidth(TITLE_COLLAPSED)
     elseif Title.widths[part] ~= nil then
         local width = Title.widths[part]
         Title.widths[part] = nil
@@ -580,7 +594,6 @@ function Title.Remember(part)
     home = {}
     for i = 1, part:GetNumPoints() do
         local point, relativeTo, relativePoint, x, y = part:GetPoint(i)
-        -- offsets the game keeps secret cannot be added to: the part stays where the game has it
         if Title.Secret(x) or Title.Secret(y) then return nil end
         home[i] = { point, relativeTo, relativePoint, x or 0, y or 0 }
     end
@@ -589,7 +602,6 @@ function Title.Remember(part)
     return home
 end
 
--- dx is a number, or a function of the anchor that gives the number for each one
 function Title.Put(part, home, dx, firstOnly)
     part:ClearAllPoints()
     for i, anchor in ipairs(home) do
@@ -600,11 +612,6 @@ function Title.Put(part, home, dx, firstOnly)
     end
 end
 
--- The game hangs the list's button from the timer's right edge, so the timer is in front and the title after it.
--- The timer is one anchor and a width of 0, so it is as wide as its text and the title is at the far left when
--- there is no time. Its X offset moves it alone: the button, which hangs from it, is given the same back, and the
--- title's offset moves the text only. Nothing here reads a position, the game's own anchors are all that is
--- added to: the positions are secret in some states of the game.
 function Title.Arrange(window)
     local dropdown, timer = window.DamageMeterTypeDropdown, window.SessionTimer
     local text = Dig(dropdown, "TypeName")
@@ -616,31 +623,25 @@ function Title.Arrange(window)
         return value
     end
     local pull = timerHome and Offset(Title.timerKey) or 0
-    -- the game hangs the title's text flush to the arrow (x of 0): a few pixels keep it off the arrow while it shows
-    local gap = (themed and S.Get(Title.arrowKey) ~= false) and Title.gap or 0
+    local gap = (themed and S.Get(Title.arrowKey) ~= false) and TITLE_GAP or 0
     local shift = Offset(Title.shiftKey)
     local function Along(anchor)
         if type(anchor[1]) == "string" and anchor[1]:find("LEFT", 1, true) then return shift + gap end
         return shift
     end
-    -- the part the others hang from goes first: no anchor ever depends on itself
     if timerHome then Title.Put(timer, timerHome, pull, themed) end
     if dropHome then
         Title.Put(dropdown, dropHome, function(anchor) return anchor[2] == timer and -pull or 0 end)
     end
     if textHome then Title.Put(text, textHome, Along) end
-    if timerHome then timer:SetWidth((themed and not Title.Shown("SessionTimer")) and Title.collapsed or 0) end
+    if timerHome then timer:SetWidth((themed and not Title.Shown("SessionTimer")) and TITLE_COLLAPSED or 0) end
 end
 
--- A layout that fails is reported, not raised: the rest of the skin goes on whatever the title bar did.
 function Title.Layout(window)
     if Title.placing then return end
     Title.placing = true
-    local ok, problem = pcall(Title.Arrange, window)
+    Title.Arrange(window)
     Title.placing = false
-    if ok then return end
-    local report = geterrorhandler and geterrorhandler()
-    if report then report(problem) else error(problem, 0) end
 end
 
 function Title.KeepTimer(window)
@@ -649,7 +650,7 @@ function Title.KeepTimer(window)
     if Has(timer, "SetWidth") then
         hooksecurefunc(timer, "SetWidth", function(_, width)
             if Title.placing or not On() then return end
-            if Title.Plain(width) == nil or width ~= (Title.Shown("SessionTimer") and 0 or Title.collapsed) then
+            if Title.Plain(width) == nil or width ~= (Title.Shown("SessionTimer") and 0 or TITLE_COLLAPSED) then
                 Title.Layout(window)
             end
         end)
@@ -678,7 +679,6 @@ function Title.IsText(region)
     return Has(region, "GetObjectType") and region:GetObjectType() == "FontString"
 end
 
--- the pieces of a button that are art: its texts are the title and the session's letter, which have colors of their own
 function Title.Glyphs(part)
     local out = {}
     for _, region in ipairs(Textures(part, BUTTON_DEPTH, {})) do
@@ -700,7 +700,7 @@ end
 
 function Title.Menu(owner)
     MenuUtil.CreateContextMenu(owner, function(_, root)
-        root:CreateTitle(Title.menuTitle)
+        root:CreateTitle(TEXT_MENU_TITLE)
         for _, item in ipairs(Title.items) do
             local key = item[2]
             root:CreateCheckbox(item[1], function() return S.Get(key) == true end,
@@ -975,6 +975,7 @@ local function Apply()
     for look in pairs(palettes) do palettes[look] = nil end
     if not meter then return end
     generation = generation + 1
+    Title.placing = false
     if not On() then
         GiveBack()
     elseif Has(meter, "ForEachSessionWindow") then
@@ -1007,6 +1008,10 @@ end
 
 hooksecurefunc(S, "Set", function(key)
     if not Watched(key) then return end
+    if PICKED[key] and S.Get(LIVE_KEY) ~= true then
+        S.Set(LIVE_KEY, true)
+        return
+    end
     customized = nil
     Start()
     Apply()
@@ -1127,9 +1132,9 @@ local skin = {
       help = "The game's own settings button in the title bar." },
     showMinimize = { key = Title.switches.MinimizeButton, label = "Show Minimize Button", toggle = true,
       help = "The button that folds the window away." },
-    titleX = { key = Title.shiftKey, label = "Title X Offset", slider = Title.shiftRange, unit = "px",
+    titleX = { key = Title.shiftKey, label = "Title X Offset", slider = OFFSET_RANGE, unit = "px",
       help = "Moves the title left (below 0) or right." },
-    timerX = { key = Title.timerKey, label = "Timer X Offset", slider = Title.shiftRange, unit = "px",
+    timerX = { key = Title.timerKey, label = "Timer X Offset", slider = OFFSET_RANGE, unit = "px",
       help = "Moves the fight time left (below 0) or right; the title stays." },
     menu = { key = Title.menuKey, label = "Right-Click Menu", toggle = true,
       help = "A right click on the title bar opens a menu to switch these." },
@@ -1140,7 +1145,6 @@ local skin = {
       help = "How much of the title bar stays while the mouse is away." },
 }
 
--- What the picks make of each part, for the card's preview: nil is the game's own look of it.
 ns.DamageMeterLook = {}
 
 function ns.DamageMeterLook.Describe()
@@ -1154,7 +1158,7 @@ function ns.DamageMeterLook.Describe()
     look.nameColor, look.nameSize = Resolve("damageMeterNameColor", "fg"), Size(nil, "damageMeterNameSize")
     look.valueColor, look.valueSize = Resolve("damageMeterValueColor", "muted"), Size(nil, "damageMeterValueSize")
     look.titleColor, look.titleSize = Resolve("damageMeterTitleColor", "fg"), Size(nil, "damageMeterTitleSize")
-    look.iconBorder = S.Get(EdgeKey()) ~= false
+    look.iconBorder = S.Get(EdgeKey()) ~= false and Color("line")
     if S.Get("damageMeterBorder") == true then look.border = Pick("damageMeterBorderColor", "line") end
     if ThemedButtons() then look.buttons = Pick("damageMeterButtonColor", "accent") end
     look.title, look.arrow = S.Get(Title.titleKey) ~= false, S.Get(Title.arrowKey) ~= false
@@ -1162,7 +1166,7 @@ function ns.DamageMeterLook.Describe()
     look.cog, look.minimize = Title.Shown("SettingsDropdown"), Title.Shown("MinimizeButton")
     look.titleX = type(S.Get(Title.shiftKey)) == "number" and S.Get(Title.shiftKey) or 0
     look.timerX = type(S.Get(Title.timerKey)) == "number" and S.Get(Title.timerKey) or 0
-    look.gap = look.arrow and Title.gap or 0
+    look.gap = look.arrow and TITLE_GAP or 0
     return look
 end
 
@@ -1180,7 +1184,6 @@ local function Add(...)
     end
 end
 
--- The game's own settings come first: they are saved through Edit Mode, and the game may only take them at a reload.
 Add(Settings.Group("Game Settings"))
 Add(game.Visibility, game.FrameWidth, game.FrameHeight, game.Transparency, game.BackgroundTransparency, game.Style,
     game.BarHeight, game.Padding, game.ShowSpecIcon, game.ShowClassColor, game.TextSize, game.Numbers,

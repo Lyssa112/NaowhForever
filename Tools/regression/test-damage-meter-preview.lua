@@ -172,7 +172,7 @@ do
         header = red, window = grey, barBackground = green, barBackgroundAlpha = 0.5,
         barTexture = "Media\\Gradient.tga", barColor = THEME.accent, barAlpha = 0.6, font = "Fonts\\Exo.ttf",
         outline = "THICKOUTLINE", nameColor = red, nameSize = 18, valueColor = green, valueSize = 10, titleColor = grey,
-        titleSize = 20, iconBorder = true, border = red, buttons = green })
+        titleSize = 20, iconBorder = grey, border = red, buttons = green })
     local first = w.entries[1]
     check("a title bar color and a window color, as solid as the background setting", Same(w.header.solid, red)
         and Same(w.back.solid, grey) and w.back.alpha == 0.6 and w.alpha == 0.8)
@@ -186,7 +186,8 @@ do
         and first.value.font[2] == 10 and Same(first.value.color, green) and w.title.font[2] == 20
         and Same(w.title.color, grey))
     check("the borders: the window's and each icon's", w.border._frame.shown == true and Same({ w.border.color.r,
-        w.border.color.g, w.border.color.b }, red) and first.iconEdge._frame.shown == true)
+        w.border.color.g, w.border.color.b }, red) and first.iconEdge._frame.shown == true
+        and Same({ first.iconEdge.color.r, first.iconEdge.color.g, first.iconEdge.color.b }, grey))
     check("themed buttons: grey, in the button color, and the session's letter", w.cog.texture.desaturated == true
         and Same(w.cog.texture.vertex, green) and Same(w.minimize.texture.vertex, green)
         and Same(w.arrow.texture.vertex, green) and Same(w.session.letter.color, green))

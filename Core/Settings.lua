@@ -51,7 +51,7 @@ local S = UI.ModuleSettings("qol", {
     damageMeterGameFont = "",
     damageMeterShowTimer = true, damageMeterShowSession = true, damageMeterShowCog = true,
     damageMeterShowTitle = true, damageMeterShowDropdown = true, damageMeterShowMinimize = true,
-    damageMeterMenu = false, damageMeterTitleX = 0, damageMeterTimerX = 0,
+    damageMeterMenu = false, damageMeterTitleX = 0, damageMeterTimerX = 0, damageMeterPicksLive = false,
     cursorCooldown = F.cursorCooldown, cursorCooldownSize = 29, cursorCooldownTime = 0.75,
     hdr = F.hdr,
     globalCopy = F.globalCopy, copyTooltipIds = true, copyModifier = "CTRL-SHIFT", copyKey = "C", copyShortcutSynced = false,

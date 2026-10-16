@@ -488,9 +488,9 @@ check("nor one that only differs in its spacing or case", spaced["Naowh Gradient
 local twice, twiceList = UI.TextureChoices("", "Flat")
 check("two of the list that only differ in spacing are listed once", twice["Naowh Gradient"] == "Naowh Gradient"
     and twice.NaowhGradient == nil and #twiceList == 4)
-local picked, pickedList = UI.TextureChoices("NaowhGradient", "Flat")
-check("but the one that is picked is always listed, and is not unavailable", picked.NaowhGradient == "NaowhGradient"
-    and #pickedList == 5)
+local chosen, chosenList = UI.TextureChoices("NaowhGradient", "Flat")
+check("but the one that is picked is always listed, and is not unavailable", chosen.NaowhGradient == "NaowhGradient"
+    and #chosenList == 5)
 local own, ownList = UI.TextureChoices("NaowhGradient", "Naowh Gradient")
 check("also when it is the element's own under another spelling", own.NaowhGradient == "NaowhGradient"
     and own[""] == "Naowh Gradient" and #ownList == 4)
